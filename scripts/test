@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+cd $(dirname $0)/..
+
+source scripts/lib/find_functions
+
+echo Looking for packages to test
+
+PACKAGES=$(find_go_pkg_dirs)
+
+echo Running tests in ${PACKAGES}
+[ "${ARCH}" == "amd64" ] && RACE=-race
+ginkgo ${RACE} -cover ${PACKAGES}

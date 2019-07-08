@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/version
+
+ARCH=${ARCH:-"amd64"}
+SUFFIX=""
+[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
+
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-submariner-io}
+
+cd $(dirname $0)/../package
+
+cp ../bin/coastguard-controller coastguard-controller
+
+IMAGE=${REPO}/coastguard:${TAG}
+ROUTEAGENT_IMAGE=${REPO}/coastguard-controller:${TAG}
+
+docker build -t ${IMAGE} .
+
+echo "Built coastguard to image: ${IMAGE}"
