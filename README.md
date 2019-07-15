@@ -1,5 +1,5 @@
-# coastguard
-Controller to facilitate network policing on a multi-cluster connected environments (proof-of-concept state)
+# lighthouse 
+Controller to facilitate multi-cluster connected environments (proof-of-concept state)
 
 
 # setup development environment
