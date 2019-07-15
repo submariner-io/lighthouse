@@ -1,5 +1,5 @@
 # lighthouse 
-Controller to facilitate multi-cluster connected environments (proof-of-concept state)
+Controller to facilitate DNS discovery in multi-cluster connected environments (proof-of-concept state)
 
 
 # setup development environment
