@@ -13,7 +13,7 @@ $(TARGETS): .dapper
 e2e: .dapper ./hacking/e2e_subm.sh
 ifneq ($(status),clean)
 	./hacking/e2e_subm.sh
-	./.dapper -m bind e2e
+	./.dapper -m bind e2e $(status)
 endif
 
 ifneq ($(status),keep)

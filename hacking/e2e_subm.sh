@@ -23,13 +23,3 @@ cd $SUBMARINER_DIR
 # we also deploy federation
 make e2e status=${1:-keep} version=1.14.1 kubefed=true
 
-if [[ "{$1:-keep}" == "keep" ]]; then
-    echo "your 3 virtual clusters are deployed and working properly with your local"
-    echo "submariner source code, and can be accessed with:"
-    echo ""
-    echo "export KUBECONFIG=\$(echo $(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')"
-    echo ""
-    echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
-    echo ""
-    echo "to cleanup, just run: make e2e status=clean"
-fi
