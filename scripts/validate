@@ -5,11 +5,12 @@ cd $(dirname $0)/..
 
 source scripts/lib/find_functions
 
-EXCLUDE_PKG_DIRS=".git .trash-cache vendor bin"
+EXCLUDE_PKG_DIRS=".git .tmp .trash-cache vendor bin"
 
 PACKAGES=$(find_go_pkg_dirs --no-trailing-dots "*.go")
 
 if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
+    goimports -l ${PACKAGES}
     echo Incorrect formatting, please run goimports
     exit 1
 fi
