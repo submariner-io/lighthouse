@@ -1,4 +1,4 @@
-TARGETS := $(shell ls scripts)
+TARGETS := $(shell ls scripts | grep -v e2e)
 
 .dapper:
 	@echo Downloading dapper

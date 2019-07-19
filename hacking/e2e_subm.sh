@@ -6,14 +6,14 @@ TOPDIR=$(git rev-parse --show-toplevel)
 SUBMARINER_GIT=${SUBMARINER_GIT:-https://github.com/submariner-io/submariner}
 SUBMARINER_BRANCH=${SUBMARINER_BRANCH:-master}
 
-SUBMARINER_DIR=submariner
+SUBMARINER_DIR=.tmp/submariner
 
 cd $TOPDIR
 if [[ ! -d $SUBMARINER_DIR ]]; then
     git clone $SUBMARINER_GIT $SUBMARINER_DIR
     cd $SUBMARINER_DIR
     git checkout origin/$SUBMARINER_BRANCH -B $SUBMARINER_BRANCH
-    cd ..
+    cd ../..
 fi
 
 cd $SUBMARINER_DIR
