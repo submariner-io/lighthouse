@@ -44,3 +44,5 @@ require (
 	google.golang.org/grpc v1.22.0 // indirect
 	gopkg.in/jcmturner/goidentity.v3 v3.0.0 // indirect
 )
+
+replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd
