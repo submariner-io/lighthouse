@@ -3,7 +3,7 @@ function find_go_pkg_dirs() {
     local BASE _EXCLUDED_PKG_DIRS FIND_EXCLUDE PACKAGE_DIRS
 
     BASE=${2:-.}
-    _EXCLUDED_PKG_DIRS=${EXCLUDE_PKG_DIRS:-vendor submariner test .git .trash-cache bin}
+    _EXCLUDED_PKG_DIRS=${EXCLUDE_PKG_DIRS:-vendor .tmp test .git .trash-cache bin}
 
     for excldir in $_EXCLUDED_PKG_DIRS; do
         FIND_EXCLUDE="-path ./$excldir -prune -o $FIND_EXCLUDE"
