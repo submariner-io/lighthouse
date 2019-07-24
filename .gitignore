@@ -1,5 +1,6 @@
 .idea
 .dapper
+.tmp
 bin
 dist
 output
