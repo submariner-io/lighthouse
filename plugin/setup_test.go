@@ -1,21 +1,24 @@
 package lighthouse
 
 import (
-	"testing"
-
 	"github.com/mholt/caddy"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-// TestSetup tests the various things that should be parsed by setup.
-// Make sure you also test for parse errors.
-func TestSetup(t *testing.T) {
-	c := caddy.NewTestController("dns", `lighthouse`)
-	if err := setupLighthouse(c); err != nil {
-		t.Fatalf("Expected no errors, but got: %v", err)
-	}
+var _ = Describe("[setup] Test basic bring up", func() {
 
-	c = caddy.NewTestController("dns", `lighthouse more`)
-	if err := setupLighthouse(c); err == nil {
-		t.Fatalf("Expected errors, but got: %v", err)
-	}
-}
+	It("Should come up without errors", func() {
+		c := caddy.NewTestController("dns", `lighthouse`)
+		err := setupLighthouse(c)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should give error on setup", func() {
+		c := caddy.NewTestController("dns", `lighthouse more`)
+		err := setupLighthouse(c)
+		Expect(err).To(HaveOccurred())
+	})
+
+})
