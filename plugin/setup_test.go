@@ -1,7 +1,7 @@
 package lighthouse
 
 import (
-	"github.com/mholt/caddy"
+	"github.com/caddyserver/caddy"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
