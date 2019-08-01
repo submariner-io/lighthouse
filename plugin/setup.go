@@ -1,10 +1,9 @@
 package lighthouse
 
 import (
+	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-
-	"github.com/mholt/caddy"
 )
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
