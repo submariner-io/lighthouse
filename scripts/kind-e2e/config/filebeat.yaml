@@ -156,3 +156,4 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: filebeat
+---
