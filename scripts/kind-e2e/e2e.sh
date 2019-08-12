@@ -219,6 +219,24 @@ function test_connection() {
     echo "Connection test was successful!"
 }
 
+function test_e2e_service_discovery() {
+    trap_commands
+    echo "Updating coredns deployment on cluster2 with cluster3 service nginx service ip"
+    kubectl --context=cluster2 -n kube-system set env deployment/coredns LIGHTHOUSE_SVCS="nginx-demo=${nginx_svc_ip_cluster3}"
+    kubectl --context=cluster2 rollout status -n kube-system deploy/coredns --timeout=60s
+    echo "Testing service discovery between clusters - $netshoot_pod cluster2 --> nginx service cluster3"
+    attempt_counter=0
+    max_attempts=5
+    until $(kubectl --context=cluster2 exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail nginx-demo); do
+        if [[ ${attempt_counter} -eq ${max_attempts} ]];then
+          echo "Max attempts reached, connection test failed!"
+          exit 1
+        fi
+        attempt_counter=$(($attempt_counter+1))
+    done
+    echo "Service Discovery test was successful!"
+}
+
 function enable_logging() {
     trap_commands
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
@@ -321,6 +339,7 @@ setup_cluster3_gateway
 test_connection
 update_coredns_configmap
 update_coredns_deployment
+test_e2e_service_discovery
 test_with_e2e_tests
 
 if [[ $1 = keep ]]; then
