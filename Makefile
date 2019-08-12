@@ -1,4 +1,10 @@
-TARGETS := $(shell ls scripts | grep -v e2e)
+status ?= onetime
+version ?= 1.14.3
+logging ?= false
+kubefed ?= true
+coredns ?= 1.5.2
+
+TARGETS := $(shell ls scripts)
 
 .dapper:
 	@echo Downloading dapper
@@ -8,19 +14,8 @@ TARGETS := $(shell ls scripts | grep -v e2e)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	./.dapper -m bind $@
-
-e2e: .dapper ./hacking/e2e_subm.sh
-ifneq ($(status),clean)
-	./hacking/e2e_subm.sh
-	./.dapper -m bind e2e $(status)
-endif
-
-ifneq ($(status),keep)
-	./hacking/e2e_subm.sh clean
-endif
+	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(coredns)
 
 .DEFAULT_GOAL := ci
 
 .PHONY: $(TARGETS)
-
