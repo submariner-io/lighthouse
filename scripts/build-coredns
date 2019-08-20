@@ -19,7 +19,7 @@ BUILD_DIR="build/linux/amd64"
 cd ${TOPDIR}
 git clone -b v${COREDNS_VERSION} ${COREDNS_GIT}
 cd ${TOPDIR}/coredns
-sed -i "\$alighthouse:github.com/submariner-io/lighthouse/plugin/lighthouse" plugin.cfg
+sed -i '/^kubernetes:kubernetes/a lighthouse:github.com/submariner-io/lighthouse/plugin/lighthouse' plugin.cfg
 go mod vendor
 mkdir -p ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/plugin/ ${BUILD_DIR}
 cp -R ${TOPDIR}/plugin ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/
