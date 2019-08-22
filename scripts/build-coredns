@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/../scripts/lib/debug_functions
+
+function cleanup {
+    trap_commands
+    rm -rf ${TOPDIR}/coredns
+}
+
+trap cleanup EXIT
+
+COREDNS_VERSION=$5
+TOPDIR=$(git rev-parse --show-toplevel)
+COREDNS_GIT="https://github.com/coredns/coredns.git"
+DOCKER_TAG="lighthouse-coredns:dev"
+BUILD_DIR="build/linux/amd64"
+
+cd ${TOPDIR}
+git clone -b v${COREDNS_VERSION} ${COREDNS_GIT}
+cd ${TOPDIR}/coredns
+sed -i '/^kubernetes:kubernetes/a lighthouse:github.com/submariner-io/lighthouse/plugin/lighthouse' plugin.cfg
+go mod vendor
+mkdir -p ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/plugin/ ${BUILD_DIR}
+cp -R ${TOPDIR}/plugin ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/
+cp Dockerfile ${BUILD_DIR}
+make BINARY=${BUILD_DIR}/coredns SYSTEM=GOOS=linux GOARCH=amd64
+docker build -t ${DOCKER_TAG} ${BUILD_DIR}

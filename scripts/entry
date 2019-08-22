@@ -3,7 +3,7 @@ set -e
 
 trap "chown -R $DAPPER_UID:$DAPPER_GID ." exit
 
-mkdir -p bin dist output
+mkdir -p bin output
 
 # download all go mod modules to the vendor directory 
 if [[ ! -d vendor ]]; then
@@ -17,5 +17,3 @@ if [ -e ./scripts/$1 ]; then
 else
     "$@"
 fi
-
-
