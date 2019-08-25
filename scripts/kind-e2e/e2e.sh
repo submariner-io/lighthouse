@@ -185,6 +185,21 @@ function update_coredns_deployment() {
     docker rmi lighthouse-coredns:dev_${uuid}
 }
 
+function update_coredns_configmap() {
+    trap_commands
+    for i in 2 3; do
+        echo "Updating coredns configMap in cluster${i}..."
+        kubectl --context=cluster${i} -n kube-system get cm coredns -o yaml > /tmp/coredns-cm-${i}.yaml
+        sed -i '/health/a\        log' /tmp/coredns-cm-${i}.yaml
+        sed -i 's/upstream/#upstream/g' /tmp/coredns-cm-${i}.yaml
+        sed -i 's/fallthrough in-addr/#fallthrough in-addr/g' /tmp/coredns-cm-${i}.yaml
+        sed -i '/#fallthrough/a\           fallthrough' /tmp/coredns-cm-${i}.yaml
+        sed -i '/prometheus :9153/i\        \lighthouse' /tmp/coredns-cm-${i}.yaml
+        kubectl --context=cluster${i} -n kube-system replace -f /tmp/coredns-cm-${i}.yaml
+        kubectl --context=cluster${i} -n kube-system describe cm coredns
+    done
+
+}
 function test_connection() {
     trap_commands
     nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
@@ -304,6 +319,7 @@ setup_broker
 setup_cluster2_gateway
 setup_cluster3_gateway
 test_connection
+update_coredns_configmap
 update_coredns_deployment
 test_with_e2e_tests
 
