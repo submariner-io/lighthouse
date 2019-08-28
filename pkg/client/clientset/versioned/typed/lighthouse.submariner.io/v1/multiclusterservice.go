@@ -21,7 +21,7 @@ package v1
 import (
 	"time"
 
-	v1 "github.com/submariner-io/lighthouse/pkg/apis/multiclusterservice/v1"
+	v1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	scheme "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

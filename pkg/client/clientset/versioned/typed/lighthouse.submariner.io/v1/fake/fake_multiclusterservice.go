@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	multiclusterservicev1 "github.com/submariner-io/lighthouse/pkg/apis/multiclusterservice/v1"
+	lighthousesubmarineriov1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var multiclusterservicesResource = schema.GroupVersionResource{Group: "lighthous
 var multiclusterservicesKind = schema.GroupVersionKind{Group: "lighthouse.submariner.io", Version: "v1", Kind: "MultiClusterService"}
 
 // Get takes name of the multiClusterService, and returns the corresponding multiClusterService object, and an error if there is any.
-func (c *FakeMultiClusterServices) Get(name string, options v1.GetOptions) (result *multiclusterservicev1.MultiClusterService, err error) {
+func (c *FakeMultiClusterServices) Get(name string, options v1.GetOptions) (result *lighthousesubmarineriov1.MultiClusterService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(multiclusterservicesResource, c.ns, name), &multiclusterservicev1.MultiClusterService{})
+		Invokes(testing.NewGetAction(multiclusterservicesResource, c.ns, name), &lighthousesubmarineriov1.MultiClusterService{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*multiclusterservicev1.MultiClusterService), err
+	return obj.(*lighthousesubmarineriov1.MultiClusterService), err
 }
 
 // List takes label and field selectors, and returns the list of MultiClusterServices that match those selectors.
-func (c *FakeMultiClusterServices) List(opts v1.ListOptions) (result *multiclusterservicev1.MultiClusterServiceList, err error) {
+func (c *FakeMultiClusterServices) List(opts v1.ListOptions) (result *lighthousesubmarineriov1.MultiClusterServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(multiclusterservicesResource, multiclusterservicesKind, c.ns, opts), &multiclusterservicev1.MultiClusterServiceList{})
+		Invokes(testing.NewListAction(multiclusterservicesResource, multiclusterservicesKind, c.ns, opts), &lighthousesubmarineriov1.MultiClusterServiceList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeMultiClusterServices) List(opts v1.ListOptions) (result *multiclust
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &multiclusterservicev1.MultiClusterServiceList{ListMeta: obj.(*multiclusterservicev1.MultiClusterServiceList).ListMeta}
-	for _, item := range obj.(*multiclusterservicev1.MultiClusterServiceList).Items {
+	list := &lighthousesubmarineriov1.MultiClusterServiceList{ListMeta: obj.(*lighthousesubmarineriov1.MultiClusterServiceList).ListMeta}
+	for _, item := range obj.(*lighthousesubmarineriov1.MultiClusterServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,31 +79,31 @@ func (c *FakeMultiClusterServices) Watch(opts v1.ListOptions) (watch.Interface, 
 }
 
 // Create takes the representation of a multiClusterService and creates it.  Returns the server's representation of the multiClusterService, and an error, if there is any.
-func (c *FakeMultiClusterServices) Create(multiClusterService *multiclusterservicev1.MultiClusterService) (result *multiclusterservicev1.MultiClusterService, err error) {
+func (c *FakeMultiClusterServices) Create(multiClusterService *lighthousesubmarineriov1.MultiClusterService) (result *lighthousesubmarineriov1.MultiClusterService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(multiclusterservicesResource, c.ns, multiClusterService), &multiclusterservicev1.MultiClusterService{})
+		Invokes(testing.NewCreateAction(multiclusterservicesResource, c.ns, multiClusterService), &lighthousesubmarineriov1.MultiClusterService{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*multiclusterservicev1.MultiClusterService), err
+	return obj.(*lighthousesubmarineriov1.MultiClusterService), err
 }
 
 // Update takes the representation of a multiClusterService and updates it. Returns the server's representation of the multiClusterService, and an error, if there is any.
-func (c *FakeMultiClusterServices) Update(multiClusterService *multiclusterservicev1.MultiClusterService) (result *multiclusterservicev1.MultiClusterService, err error) {
+func (c *FakeMultiClusterServices) Update(multiClusterService *lighthousesubmarineriov1.MultiClusterService) (result *lighthousesubmarineriov1.MultiClusterService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(multiclusterservicesResource, c.ns, multiClusterService), &multiclusterservicev1.MultiClusterService{})
+		Invokes(testing.NewUpdateAction(multiclusterservicesResource, c.ns, multiClusterService), &lighthousesubmarineriov1.MultiClusterService{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*multiclusterservicev1.MultiClusterService), err
+	return obj.(*lighthousesubmarineriov1.MultiClusterService), err
 }
 
 // Delete takes name of the multiClusterService and deletes it. Returns an error if one occurs.
 func (c *FakeMultiClusterServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(multiclusterservicesResource, c.ns, name), &multiclusterservicev1.MultiClusterService{})
+		Invokes(testing.NewDeleteAction(multiclusterservicesResource, c.ns, name), &lighthousesubmarineriov1.MultiClusterService{})
 
 	return err
 }
@@ -112,17 +112,17 @@ func (c *FakeMultiClusterServices) Delete(name string, options *v1.DeleteOptions
 func (c *FakeMultiClusterServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(multiclusterservicesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &multiclusterservicev1.MultiClusterServiceList{})
+	_, err := c.Fake.Invokes(action, &lighthousesubmarineriov1.MultiClusterServiceList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched multiClusterService.
-func (c *FakeMultiClusterServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *multiclusterservicev1.MultiClusterService, err error) {
+func (c *FakeMultiClusterServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *lighthousesubmarineriov1.MultiClusterService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(multiclusterservicesResource, c.ns, name, pt, data, subresources...), &multiclusterservicev1.MultiClusterService{})
+		Invokes(testing.NewPatchSubresourceAction(multiclusterservicesResource, c.ns, name, pt, data, subresources...), &lighthousesubmarineriov1.MultiClusterService{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*multiclusterservicev1.MultiClusterService), err
+	return obj.(*lighthousesubmarineriov1.MultiClusterService), err
 }

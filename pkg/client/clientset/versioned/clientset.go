@@ -19,7 +19,7 @@ limitations under the License.
 package versioned
 
 import (
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/multiclusterservice/v1"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

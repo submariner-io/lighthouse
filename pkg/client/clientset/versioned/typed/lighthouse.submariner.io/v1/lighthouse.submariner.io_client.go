@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/lighthouse/pkg/apis/multiclusterservice/v1"
+	v1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	"github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/scheme"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
