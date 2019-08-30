@@ -1,9 +1,13 @@
 package lighthouse
 
 import (
-	"github.com/caddyserver/caddy"
+	"os"
+	"strings"
+
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+
+	"github.com/caddyserver/caddy"
 )
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
@@ -26,11 +30,29 @@ func setupLighthouse(c *caddy.Controller) error {
 		return plugin.Error("lighthouse", c.ArgErr())
 	}
 
+	svcsMap := setupServicesMap()
+	log.Debugf("Services Map for lighthouse is %s", svcsMap)
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		return Lighthouse{Next: next}
+		return &Lighthouse{Next: next, SvcsMap: svcsMap}
 	})
 
 	// All OK, return a nil error.
 	return nil
+}
+
+func setupServicesMap() ServicesMap {
+	svcs := make(ServicesMap)
+	svcArray := os.Getenv("LIGHTHOUSE_SVCS")
+	if svcArray == "" {
+		return svcs
+	}
+	strArray := strings.Split(svcArray, ",")
+	for _, str := range strArray {
+		svc := strings.Split(str, "=")
+		if len(svc) == 2 {
+			svcs[svc[0]] = svc[1]
+		}
+	}
+	return svcs
 }
