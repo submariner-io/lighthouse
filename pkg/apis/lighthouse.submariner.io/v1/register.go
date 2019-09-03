@@ -9,7 +9,7 @@ import (
 // SchemeGroupVersion identifieds the group name and the group version.
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{
-	Group:   "multiclusterservice.lighthouse.submariner.io",
+	Group:   "lighthouse.submariner.io",
 	Version: "v1",
 }
 
