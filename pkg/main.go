@@ -6,8 +6,10 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/federate/kubefed"
+	multiclusterservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	"github.com/submariner-io/lighthouse/pkg/controller"
 	"github.com/submariner-io/submariner/pkg/signals"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 )
@@ -28,12 +30,20 @@ func main() {
 
 	klog.V(2).Info("Starting lighthouse")
 
+	err := multiclusterservice.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Exitf("Error adding submariner V1 to the scheme: %v", err)
+	}
+
 	stopCh := signals.SetupSignalHandler()
 
 	federator := buildKubeFedFederator(stopCh)
 	lightHouseController := controller.New(federator)
 
-	lightHouseController.Start()
+	err = lightHouseController.Start()
+	if err != nil {
+		klog.Exitf("Starting lighthouse controller failed: %v", err)
+	}
 
 	<-stopCh
 
