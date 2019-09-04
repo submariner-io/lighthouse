@@ -4,10 +4,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-
-	"github.com/caddyserver/caddy"
 )
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
@@ -22,23 +21,47 @@ func init() {
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
 // for parsing any extra options the this plugin may have. The first token this function sees is "lighthouse".
 func setupLighthouse(c *caddy.Controller) error {
-	c.Next() // Ignore "lighthouse" and give us the next token.
-	if c.NextArg() {
-		// If there was another token, return an error, because we currently don't have any configuration.
-		// Any errors returned from this setup function should be wrapped with plugin.Error, so we
-		// can present a slightly nicer error message to the user.
-		return plugin.Error("lighthouse", c.ArgErr())
+	l, err := lighthouseParse(c)
+	if err != nil {
+		return plugin.Error("lighthouse", err)
 	}
 
-	svcsMap := setupServicesMap()
-	log.Debugf("Services Map for lighthouse is %s", svcsMap)
-	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		return &Lighthouse{Next: next, SvcsMap: svcsMap}
+		l.Next = next
+		return l
 	})
 
-	// All OK, return a nil error.
 	return nil
+}
+
+func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
+	lh := Lighthouse{}
+	// Changed `for` to `if` to satisfy golint:
+	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
+	if c.Next() {
+		lh.Zones = c.RemainingArgs()
+		if len(lh.Zones) == 0 {
+			lh.Zones = make([]string, len(c.ServerBlockKeys))
+			copy(lh.Zones, c.ServerBlockKeys)
+		}
+		for i, str := range lh.Zones {
+			lh.Zones[i] = plugin.Host(str).Normalize()
+		}
+
+		for c.NextBlock() {
+			switch c.Val() {
+			case "fallthrough":
+				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
+			default:
+				if c.Val() != "}" {
+					return nil, c.Errf("unknown property '%s'", c.Val())
+				}
+			}
+		}
+		lh.SvcsMap = setupServicesMap()
+		return &lh, nil
+	}
+	return &lh, nil
 }
 
 func setupServicesMap() ServicesMap {

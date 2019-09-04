@@ -187,7 +187,7 @@ function update_coredns_deployment() {
         kind --name cluster${i} load docker-image lighthouse-coredns:dev_${uuid} --loglevel=debug
         kubectl --context=cluster${i} set image -n kube-system deploy/coredns coredns=lighthouse-coredns:dev_${uuid}
         echo "Waiting for coredns deployment to be Ready on cluster${i}."
-        kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=60s
+        kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=120s
     done
     docker rmi lighthouse-coredns:dev_${uuid}
 }
@@ -196,13 +196,7 @@ function update_coredns_configmap() {
     trap_commands
     for i in 2 3; do
         echo "Updating coredns configMap in cluster${i}..."
-        kubectl --context=cluster${i} -n kube-system get cm coredns -o yaml > /tmp/coredns-cm-${i}.yaml
-        sed -i '/health/a\        log' /tmp/coredns-cm-${i}.yaml
-        sed -i 's/upstream/#upstream/g' /tmp/coredns-cm-${i}.yaml
-        sed -i 's/fallthrough in-addr/#fallthrough in-addr/g' /tmp/coredns-cm-${i}.yaml
-        sed -i '/#fallthrough/a\           fallthrough' /tmp/coredns-cm-${i}.yaml
-        sed -i '/prometheus :9153/i\        \lighthouse' /tmp/coredns-cm-${i}.yaml
-        kubectl --context=cluster${i} -n kube-system replace -f /tmp/coredns-cm-${i}.yaml
+        kubectl --context=cluster${i} -n kube-system replace -f ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-cm.yaml
         kubectl --context=cluster${i} -n kube-system describe cm coredns
     done
 
