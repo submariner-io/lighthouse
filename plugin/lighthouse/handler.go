@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"strings"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
@@ -15,48 +14,71 @@ import (
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
+	qname := state.QName()
+	// qname: mysvc.default.svc.example.org.
+	// zone:  example.org.
+	// Matches will return zone in all lower cases
+	zone := plugin.Zones(lh.Zones).Matches(qname)
+	if zone == "" {
+		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
+	}
+	if state.QType() != dns.TypeA {
+		// We only support TypeA
+		log.Debugf("Only TypeA queries are supported yet")
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, "Only TypeA supported")
+	}
+	zone = qname[len(qname)-len(zone):] // maintain case of original query
+	state.Zone = zone
+
+	pReq, pErr := parseRequest(state)
+	if pErr != nil || pReq.podOrSvc != Svc {
+		// We only support svc type queries i.e. *.svc.*
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
+	}
+
+	ip := lh.lookup(pReq.service)
+	if ip == "" {
+		// We couldn't find record for this service name
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
+	}
+
+	rr := new(dns.A)
+	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
+	rr.A = net.ParseIP(ip).To4()
+
 	a := new(dns.Msg)
 	a.SetReply(r)
 	a.Authoritative = true
-
-	services := lh.SvcsMap
-	svcName := strings.Split(state.QName(), ".")[0]
-	ip := services[svcName]
-	if ip == "" {
-		// We can't handle this,let another plugin take an attempt
-		// NOTE: Once we have options enabled, this will only be done if
-		//       fallthrough is enabled.
-		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
-	}
-	rr := new(dns.A)
-
-	if state.Family() == 1 {
-		// IPv4 query
-		rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
-		rr.A = net.ParseIP(ip).To4()
-	} else {
-		// We don't support IPv6, let another plugin take an attempt
-		log.Debugf("IPv6 queries not supported yet")
-		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
-	}
-
 	a.Answer = []dns.RR{rr}
 
 	log.Debugf("Responding to query with '%s'", a.Answer)
 	wErr := w.WriteMsg(a)
 	if wErr != nil {
+		// Error writing reply msg
 		log.Errorf("Failed to write message %#v: %v", a, wErr)
-		return dns.RcodeServerFailure, lh.Error("failed to write response")
+		return dns.RcodeServerFailure, lh.error("failed to write response")
 	}
 
 	return dns.RcodeSuccess, nil
 }
 
-func (lh *Lighthouse) Error(str string) error {
-	return plugin.Error(lh.Name(), errors.New(str))
-}
-
 // Name implements the Handler interface.
 func (lh *Lighthouse) Name() string {
 	return "lighthouse"
+}
+
+func (lh *Lighthouse) error(str string) error {
+	return plugin.Error(lh.Name(), errors.New(str))
+}
+
+func (lh *Lighthouse) lookup(service string) string {
+	return lh.SvcsMap[service]
+}
+
+func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.ResponseWriter, r *dns.Msg, code int, error string) (int, error) {
+	if lh.Fall.Through(name) {
+		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
+	} else {
+		return code, lh.error(error)
+	}
 }
