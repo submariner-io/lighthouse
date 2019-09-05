@@ -86,6 +86,8 @@ func testClusterLifecycleNotifications() {
 	AfterEach(func() {
 		watchReactor.close()
 		controller.Stop()
+		watchReactor = nil
+		controller = nil
 	})
 
 	testOnAdd := func(clusterID string) {
@@ -181,6 +183,7 @@ func testResourceDistribution() {
 
 	AfterEach(func() {
 		mockCtrl.Finish()
+		mockCtrl = nil
 	})
 
 	createService := func() error {
@@ -188,21 +191,7 @@ func testResourceDistribution() {
 		return err
 	}
 
-	When("a Cluster resource is added", func() {
-		It("should distribute the resource", func() {
-			var captured **lighthousev1.MultiClusterService = new(*lighthousev1.MultiClusterService)
-			mockFederator.EXPECT().Distribute(EqMultiClusterService(multiClusterService)).Return(nil).Do(func(c *lighthousev1.MultiClusterService) {
-				*captured = c
-				distributeCalled <- true
-			})
-
-			Expect(createService()).To(Succeed())
-
-			Eventually(distributeCalled, 5).Should(Receive(), "Distribute was not called")
-		})
-	})
-
-	When("a Cluster resource is added with a matching clusterID label", func() {
+	When("a Service is added", func() {
 		It("should distribute the resource", func() {
 			mockFederator.EXPECT().Distribute(EqMultiClusterService(multiClusterService)).Return(nil).Do(func(c *lighthousev1.MultiClusterService) {
 				distributeCalled <- true
@@ -251,7 +240,7 @@ func (m *eqMultiClusterService) Matches(x interface{}) bool {
 	if !ok {
 		return false
 	}
-	return m.expected.Name == actual.Name && reflect.DeepEqual(m.expected.Spec, actual.Spec)
+	return m.expected.Name == actual.Name && m.expected.Namespace == actual.Namespace && reflect.DeepEqual(m.expected.Spec, actual.Spec)
 }
 
 func (m *eqMultiClusterService) String() string {

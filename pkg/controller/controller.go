@@ -14,21 +14,24 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/submariner-io/admiral/pkg/federate"
-	multiclusterservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
+type remoteServiceMap map[string]*mcservice.MultiClusterService
+type remoteClustersMap map[string]*remoteCluster
+
 type LightHouseController struct {
-	//remoteServices is a map that holds the remote services that are discovered.
-	remoteServices map[string]*multiclusterservice.MultiClusterService
+	// remoteServices is a map that holds the remote services that are discovered.
+	remoteServices remoteServiceMap
 
 	// remoteClusters is a map of remote clusters, which have been discovered
-	remoteClusters map[string]*RemoteCluster
+	remoteClusters remoteClustersMap
 
-	processingMutex *sync.Mutex
+	remoteClustersMutex *sync.Mutex
 
 	federator federate.Federator
 
@@ -36,21 +39,22 @@ type LightHouseController struct {
 	newClientset func(kubeConfig *rest.Config) (kubernetes.Interface, error)
 }
 
-type RemoteCluster struct {
-	stopCh chan struct{}
-
-	ClusterID       string
-	serviceInformer cache.SharedIndexInformer
-	queue           workqueue.RateLimitingInterface
+type remoteCluster struct {
+	stopCh              chan struct{}
+	clusterID           string
+	serviceInformer     cache.SharedIndexInformer
+	queue               workqueue.RateLimitingInterface
+	remoteServices      remoteServiceMap
+	federator           federate.Federator
+	remoteServicesMutex *sync.Mutex
 }
 
 func New(federator federate.Federator) *LightHouseController {
-
 	return &LightHouseController{
-		federator:       federator,
-		remoteServices:  make(map[string]*multiclusterservice.MultiClusterService),
-		remoteClusters:  make(map[string]*RemoteCluster),
-		processingMutex: &sync.Mutex{},
+		federator:           federator,
+		remoteServices:      make(remoteServiceMap),
+		remoteClusters:      make(remoteClustersMap),
+		remoteClustersMutex: &sync.Mutex{},
 
 		newClientset: func(c *rest.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(c)
@@ -58,48 +62,50 @@ func New(federator federate.Federator) *LightHouseController {
 	}
 }
 
-func (c *LightHouseController) Start() error {
-	err := c.federator.WatchClusters(c)
+func (r *LightHouseController) Start() error {
+	err := r.federator.WatchClusters(r)
 	if err != nil {
-		return fmt.Errorf("Could not register cluster watch: %v", err)
+		return fmt.Errorf("could not register cluster watch: %v", err)
 	}
 
 	return nil
 }
 
-func (c *LightHouseController) Stop() {
-	c.processingMutex.Lock()
-	defer c.processingMutex.Unlock()
+func (r *LightHouseController) Stop() {
+	r.remoteClustersMutex.Lock()
+	defer r.remoteClustersMutex.Unlock()
 
-	for _, remoteClusters := range c.remoteClusters {
+	for _, remoteClusters := range r.remoteClusters {
 		remoteClusters.close()
 	}
 }
 
-func (c *LightHouseController) OnAdd(clusterID string, kubeConfig *rest.Config) {
-	klog.Infof("adding cluster: %s", clusterID)
+func (r *LightHouseController) OnAdd(clusterID string, kubeConfig *rest.Config) {
+	klog.Infof("Adding cluster: %s", clusterID)
+	// startNewServiceWatcher acquires the lock before accessing the map.
+	r.startNewServiceWatcher(clusterID, kubeConfig)
+}
 
-	clientSet, err := c.newClientset(kubeConfig)
+func (r *LightHouseController) OnUpdate(clusterID string, kubeConfig *rest.Config) {
+	klog.Infof("Updating cluster: %s", clusterID)
+	r.remoteClustersMutex.Lock()
+	defer r.remoteClustersMutex.Unlock()
+	r.removeServiceWatcher(clusterID)
+	r.startNewServiceWatcher(clusterID, kubeConfig)
+}
+
+func (r *LightHouseController) OnRemove(clusterID string) {
+	r.remoteClustersMutex.Lock()
+	defer r.remoteClustersMutex.Unlock()
+	r.removeServiceWatcher(clusterID)
+}
+
+func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConfig *rest.Config) {
+	clientSet, err := r.newClientset(kubeConfig)
 	if err != nil {
-		klog.Errorf("error creating clientset for cluster %s: %s", clusterID, err.Error())
+		klog.Errorf("error creating client set for cluster %s: %s", clusterID, err.Error())
 		return
 	}
-	c.startNewServiceWatcher(clusterID, clientSet)
-}
-
-func (c *LightHouseController) OnUpdate(clusterID string, kubeConfig *rest.Config) {
-	//TODO asuryana need to implement
-	klog.Infof("updating cluster: %s", clusterID)
-	klog.Fatalf("Not implemented yet")
-}
-
-func (c *LightHouseController) OnRemove(clusterID string) {
-	c.processingMutex.Lock()
-	defer c.processingMutex.Unlock()
-	c.removeServiceWatcher(clusterID)
-}
-
-func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSet kubernetes.Interface) {
 	serviceInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -113,15 +119,19 @@ func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSe
 		0,
 		cache.Indexers{},
 	)
-	remoteCluster := &RemoteCluster{
-		stopCh:          make(chan struct{}),
-		ClusterID:       clusterID,
-		serviceInformer: serviceInformer,
-		queue:           workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+	remoteCluster := &remoteCluster{
+		stopCh:              make(chan struct{}),
+		clusterID:           clusterID,
+		serviceInformer:     serviceInformer,
+		queue:               workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		remoteServices:      r.remoteServices,
+		federator:           r.federator,
+		remoteServicesMutex: &sync.Mutex{},
 	}
-	c.processingMutex.Lock()
-	c.remoteClusters[clusterID] = remoteCluster
-	c.processingMutex.Unlock()
+	r.remoteClustersMutex.Lock()
+	defer r.remoteClustersMutex.Unlock()
+	r.remoteClusters[clusterID] = remoteCluster
+
 	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -137,127 +147,139 @@ func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSe
 		},
 	})
 
-	go c.Run(remoteCluster)
+	go remoteCluster.run()
 }
 
-func (c *LightHouseController) removeServiceWatcher(clusterID string) {
-	remoteCluster := c.remoteClusters[clusterID]
-	if remoteCluster != nil {
-		klog.V(2).Infof("stopping watcher for %s", clusterID)
+func (r *LightHouseController) removeServiceWatcher(clusterID string) {
+	remoteCluster, ok := r.remoteClusters[clusterID]
+	if ok {
+		klog.V(2).Infof("Stopping watcher for %s", clusterID)
 		remoteCluster.close()
-		delete(c.remoteClusters, clusterID)
+		delete(r.remoteClusters, clusterID)
 	}
 }
 
-func (rc *RemoteCluster) close() {
-	close(rc.stopCh)
-	rc.queue.ShutDown()
-	klog.Infof(" watcher queue shutdown for cluster: %s", rc.ClusterID)
+func (r *remoteCluster) close() {
+	close(r.stopCh)
+	r.queue.ShutDown()
+	klog.Infof("Watcher queue shutdown for cluster: %s", r.clusterID)
 }
 
-func (c *LightHouseController) Run(remoteCluster *RemoteCluster) {
+func (r *remoteCluster) run() {
 	defer utilruntime.HandleCrash()
-
-	go remoteCluster.serviceInformer.Run(remoteCluster.stopCh)
-
-	if !cache.WaitForCacheSync(remoteCluster.stopCh, remoteCluster.HasSynced) {
-		utilruntime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
-		return
-	}
-
-	go c.runWorker(remoteCluster)
+	go r.serviceInformer.Run(r.stopCh)
+	go r.runWorker()
 }
 
-// HasSynced is required for the cache.Controller interface.
-func (c *RemoteCluster) HasSynced() bool {
-	return c.serviceInformer.HasSynced()
-}
-
-func (c *LightHouseController) runWorker(remoteCluster *RemoteCluster) {
+func (r *remoteCluster) runWorker() {
 	for {
-		key, shutdown := remoteCluster.queue.Get()
+		keyObj, shutdown := r.queue.Get()
 		if shutdown {
-			klog.Infof("Lighthouse watcher for cluster \"%s\" stopped", remoteCluster.ClusterID)
+			klog.Infof("Lighthouse watcher for cluster \"%q\" stopped", r.clusterID)
 			return
 		}
-		defer remoteCluster.queue.Done(key)
+		key := keyObj.(string)
+		func() {
+			defer r.queue.Done(key)
+			obj, exists, err := r.serviceInformer.GetIndexer().GetByKey(key)
 
-		obj, exists, err := remoteCluster.serviceInformer.GetIndexer().GetByKey(key.(string))
-
-		if err != nil {
-			klog.Errorf("Error processing %s (will retry): %v", key, err)
-			// requeue the item to work on later
-			remoteCluster.queue.AddRateLimited(key)
-		}
-		if !exists {
-			//TODO Handle delete
-			remoteCluster.queue.Forget(key)
-		} else {
-
-			c.ObjectCreated(obj, remoteCluster.ClusterID)
-			remoteCluster.queue.Forget(key)
-		}
+			if err != nil {
+				klog.Errorf("error retrieving service with key %q from the cache: %v", key, err)
+				// requeue the item to work on later
+				r.queue.AddRateLimited(key)
+				return
+			}
+			if !exists {
+				err := r.serviceDeleted(key)
+				if err != nil {
+					klog.Errorf("error deleting service %q in cluster %q: %v", key, r.clusterID, err)
+					r.queue.AddRateLimited(key)
+					return
+				}
+			} else {
+				err := r.serviceCreated(obj, key)
+				if err != nil {
+					klog.Errorf("error creating service %q in cluster %q: %v", key, r.clusterID, err)
+					r.queue.AddRateLimited(key)
+					return
+				}
+			}
+			r.queue.Forget(key)
+		}()
 	}
 }
 
-func (c *LightHouseController) ObjectCreated(obj interface{}, clusterID string) {
-	klog.Info("ServiceHandler.ObjectCreated")
+func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
+	klog.V(2).Infof("In remoteCluster serviceCreated for cluster %q, service %#v", r.clusterID, obj)
 	service := obj.(*core_v1.Service)
-	serviceName := service.ObjectMeta.Name
-	if rs, exists := c.remoteServices[serviceName]; !exists {
-		c.remoteServices[serviceName] = c.createLightHouseCRD(service, clusterID)
-		klog.Infof("A new service is created and it is added to the map: %s", serviceName)
+	r.remoteServicesMutex.Lock()
+	defer r.remoteServicesMutex.Unlock()
+	if rs, exists := r.remoteServices[key]; !exists {
+		r.remoteServices[key] = r.createLightHouseCRD(service, r.clusterID)
+		klog.Infof("Creating a new MultiClusterService with service %q from cluster %q", key, r.clusterID)
 	} else {
-		klog.Infof("An addService event was received for a Service already in our cache: %s, updating instead", serviceName)
-		rs.Spec.Items = append(rs.Spec.Items, c.createClusterServiceInfo(service, clusterID))
+		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
+		for _, info := range rs.Spec.Items {
+			if info.ClusterID == r.clusterID {
+				return nil
+			}
+		}
+		rs.Spec.Items = append(rs.Spec.Items, r.createClusterServiceInfo(service, r.clusterID))
 	}
-	err := c.federator.Distribute(c.remoteServices[serviceName])
+	err := r.federator.Distribute(r.remoteServices[key])
 	if err != nil {
-		fmt.Println("  Distribute failed", err)
+		return err
 	}
+	return nil
 }
 
-func (c *LightHouseController) createLightHouseCRD(service *v1.Service, clusterID string) *multiclusterservice.MultiClusterService {
-	multiClusterServiceInfo :=
-		&[]multiclusterservice.ClusterServiceInfo{
-			c.createClusterServiceInfo(service, clusterID),
-		}
-	clusterInfo := &multiclusterservice.MultiClusterService{
+func (r *remoteCluster) createLightHouseCRD(service *v1.Service, clusterID string) *mcservice.MultiClusterService {
+	return &mcservice.MultiClusterService{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      service.ObjectMeta.Name,
 			Namespace: service.ObjectMeta.Namespace,
 		},
-		Spec: multiclusterservice.MultiClusterServiceSpec{
-			Items: *multiClusterServiceInfo,
+		Spec: mcservice.MultiClusterServiceSpec{
+			Items: []mcservice.ClusterServiceInfo{
+				r.createClusterServiceInfo(service, clusterID),
+			},
 		},
 	}
-	return clusterInfo
 }
 
-func (c *LightHouseController) createClusterServiceInfo(service *v1.Service, clusterID string) multiclusterservice.ClusterServiceInfo {
-	return multiclusterservice.ClusterServiceInfo{
+func (r *remoteCluster) createClusterServiceInfo(service *v1.Service, clusterID string) mcservice.ClusterServiceInfo {
+	return mcservice.ClusterServiceInfo{
 		ClusterID: clusterID,
 		ServiceIP: service.Spec.ClusterIP,
 	}
 }
 
-// ObjectDeleted is called when an object is deleted
-func (c *LightHouseController) ObjectDeleted(obj interface{}) {
-	service := obj.(*core_v1.Service)
-	serviceName := service.ObjectMeta.Name
-	if _, exists := c.remoteServices[serviceName]; exists {
-		err := c.federator.Delete(c.remoteServices[serviceName])
-		if err != nil {
-			fmt.Println("  Delete failed for service.", err)
+// serviceDeleted is called when an object is deleted
+func (r *remoteCluster) serviceDeleted(key string) error {
+	r.remoteServicesMutex.Lock()
+	defer r.remoteServicesMutex.Unlock()
+	if rs, exists := r.remoteServices[key]; exists {
+		if len(rs.Spec.Items) == 1 {
+			err := r.federator.Delete(r.remoteServices[key])
+			if err != nil {
+				return err
+			}
+			delete(r.remoteServices, key)
+			klog.Infof("Service %q has been deleted from cluster %q - deleted MultiClusterService", key, r.clusterID)
+		} else {
+			for i, service := range rs.Spec.Items {
+				if service.ClusterID == r.clusterID {
+					rs.Spec.Items[i] = rs.Spec.Items[len(rs.Spec.Items)-1]
+					rs.Spec.Items = rs.Spec.Items[:len(rs.Spec.Items)-1]
+					break
+				}
+			}
+			err := r.federator.Distribute(r.remoteServices[key])
+			if err != nil {
+				return err
+			}
+			klog.Infof("Service %q has been deleted from cluster %q - removed from MultiClusterService", key, r.clusterID)
 		}
-		delete(c.remoteServices, serviceName)
-		klog.Infof("Service is deleted from the map: %s", serviceName)
 	}
-	fmt.Println("ServiceHandler.ObjectDeleted")
-}
-
-// ObjectUpdated is called when an object is updated
-func (c *LightHouseController) ObjectUpdated(objOld, objNew interface{}) {
-	//TODO asuryana
-	fmt.Println("ServiceHandler.ObjectUpdated")
+	return nil
 }
