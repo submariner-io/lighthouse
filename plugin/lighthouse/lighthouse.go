@@ -9,8 +9,7 @@ import (
 // friends to log.
 var log = clog.NewWithPlugin("lighthouse")
 
-type ServicesMap map[string]string
 type Lighthouse struct {
-	Next    plugin.Handler
-	SvcsMap ServicesMap
+	Next             plugin.Handler
+	RemoteServiceMap remoteServiceMap
 }
