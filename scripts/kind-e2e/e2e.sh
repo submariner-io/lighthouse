@@ -171,6 +171,13 @@ function setup_cluster3_gateway() {
     fi
 }
 
+function setup_lighthouse_controller () {
+    trap_commands
+    docker tag submariner-io/lighthouse-controller:dev lighthouse-controller:local
+    kind --name cluster1 load docker-image lighthouse-controller:local
+    kubectl --context=cluster1 apply -f ${PRJ_ROOT}/package/lighthouse-controller-deployment.yaml
+}
+
 function update_coredns_deployment() {
     trap_commands
     uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
@@ -337,6 +344,9 @@ setup_broker
 setup_cluster2_gateway
 setup_cluster3_gateway
 test_connection
+if [[ $4 = true ]]; then
+    setup_lighthouse_controller
+fi
 update_coredns_configmap
 update_coredns_deployment
 test_e2e_service_discovery
