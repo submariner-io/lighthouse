@@ -81,31 +81,40 @@ func (r *LightHouseController) Stop() {
 }
 
 func (r *LightHouseController) OnAdd(clusterID string, kubeConfig *rest.Config) {
-	klog.Infof("Adding cluster: %s", clusterID)
-	// startNewServiceWatcher acquires the lock before accessing the map.
+	klog.Infof("Cluster %q added", clusterID)
+
+	r.remoteClustersMutex.Lock()
+	defer r.remoteClustersMutex.Unlock()
+
 	r.startNewServiceWatcher(clusterID, kubeConfig)
 }
 
 func (r *LightHouseController) OnUpdate(clusterID string, kubeConfig *rest.Config) {
-	klog.Infof("Updating cluster: %s", clusterID)
+	klog.Infof("Cluster %q updated", clusterID)
+
 	r.remoteClustersMutex.Lock()
 	defer r.remoteClustersMutex.Unlock()
+
 	r.removeServiceWatcher(clusterID)
 	r.startNewServiceWatcher(clusterID, kubeConfig)
 }
 
 func (r *LightHouseController) OnRemove(clusterID string) {
+	klog.Infof("Cluster %q removed", clusterID)
+
 	r.remoteClustersMutex.Lock()
 	defer r.remoteClustersMutex.Unlock()
+
 	r.removeServiceWatcher(clusterID)
 }
 
 func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConfig *rest.Config) {
 	clientSet, err := r.newClientset(kubeConfig)
 	if err != nil {
-		klog.Errorf("error creating client set for cluster %s: %s", clusterID, err.Error())
+		klog.Errorf("Error creating client set for cluster %q: %v", clusterID, err)
 		return
 	}
+
 	serviceInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -119,6 +128,7 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 		0,
 		cache.Indexers{},
 	)
+
 	remoteCluster := &remoteCluster{
 		stopCh:              make(chan struct{}),
 		clusterID:           clusterID,
@@ -128,8 +138,7 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 		federator:           r.federator,
 		remoteServicesMutex: &sync.Mutex{},
 	}
-	r.remoteClustersMutex.Lock()
-	defer r.remoteClustersMutex.Unlock()
+
 	r.remoteClusters[clusterID] = remoteCluster
 
 	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -153,7 +162,7 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 func (r *LightHouseController) removeServiceWatcher(clusterID string) {
 	remoteCluster, ok := r.remoteClusters[clusterID]
 	if ok {
-		klog.V(2).Infof("Stopping watcher for %s", clusterID)
+		klog.V(2).Infof("Stopping watcher for cluster %q", clusterID)
 		remoteCluster.close()
 		delete(r.remoteClusters, clusterID)
 	}
@@ -162,7 +171,7 @@ func (r *LightHouseController) removeServiceWatcher(clusterID string) {
 func (r *remoteCluster) close() {
 	close(r.stopCh)
 	r.queue.ShutDown()
-	klog.Infof("Watcher queue shutdown for cluster: %s", r.clusterID)
+	klog.Infof("Watcher queue shutdown for cluster %q", r.clusterID)
 }
 
 func (r *remoteCluster) run() {
@@ -175,35 +184,38 @@ func (r *remoteCluster) runWorker() {
 	for {
 		keyObj, shutdown := r.queue.Get()
 		if shutdown {
-			klog.Infof("Lighthouse watcher for cluster \"%q\" stopped", r.clusterID)
+			klog.Infof("Lighthouse watcher for cluster %q stopped", r.clusterID)
 			return
 		}
+
 		key := keyObj.(string)
 		func() {
 			defer r.queue.Done(key)
 			obj, exists, err := r.serviceInformer.GetIndexer().GetByKey(key)
 
 			if err != nil {
-				klog.Errorf("error retrieving service with key %q from the cache: %v", key, err)
+				klog.Errorf("Error retrieving service with key %q from the cache: %v", key, err)
 				// requeue the item to work on later
 				r.queue.AddRateLimited(key)
 				return
 			}
+
 			if !exists {
 				err := r.serviceDeleted(key)
 				if err != nil {
-					klog.Errorf("error deleting service %q in cluster %q: %v", key, r.clusterID, err)
+					klog.Errorf("Error deleting service %q in cluster %q: %v", key, r.clusterID, err)
 					r.queue.AddRateLimited(key)
 					return
 				}
 			} else {
 				err := r.serviceCreated(obj, key)
 				if err != nil {
-					klog.Errorf("error creating service %q in cluster %q: %v", key, r.clusterID, err)
+					klog.Errorf("Error creating service %q in cluster %q: %v", key, r.clusterID, err)
 					r.queue.AddRateLimited(key)
 					return
 				}
 			}
+
 			r.queue.Forget(key)
 		}()
 	}
@@ -211,21 +223,29 @@ func (r *remoteCluster) runWorker() {
 
 func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 	klog.V(2).Infof("In remoteCluster serviceCreated for cluster %q, service %#v", r.clusterID, obj)
+
 	service := obj.(*core_v1.Service)
+
 	r.remoteServicesMutex.Lock()
 	defer r.remoteServicesMutex.Unlock()
+
 	if rs, exists := r.remoteServices[key]; !exists {
 		r.remoteServices[key] = r.createLightHouseCRD(service, r.clusterID)
+
 		klog.Infof("Creating a new MultiClusterService with service %q from cluster %q", key, r.clusterID)
 	} else {
-		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
 		for _, info := range rs.Spec.Items {
 			if info.ClusterID == r.clusterID {
+				klog.V(2).Infof("Cluster %q already exists for MultiClusterService %q", r.clusterID, key)
 				return nil
 			}
 		}
+
 		rs.Spec.Items = append(rs.Spec.Items, r.createClusterServiceInfo(service, r.clusterID))
+
+		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
 	}
+
 	err := r.federator.Distribute(r.remoteServices[key])
 	if err != nil {
 		return err
@@ -258,13 +278,16 @@ func (r *remoteCluster) createClusterServiceInfo(service *v1.Service, clusterID 
 func (r *remoteCluster) serviceDeleted(key string) error {
 	r.remoteServicesMutex.Lock()
 	defer r.remoteServicesMutex.Unlock()
+
 	if rs, exists := r.remoteServices[key]; exists {
 		if len(rs.Spec.Items) == 1 {
 			err := r.federator.Delete(r.remoteServices[key])
 			if err != nil {
 				return err
 			}
+
 			delete(r.remoteServices, key)
+
 			klog.Infof("Service %q has been deleted from cluster %q - deleted MultiClusterService", key, r.clusterID)
 		} else {
 			for i, service := range rs.Spec.Items {
@@ -274,10 +297,12 @@ func (r *remoteCluster) serviceDeleted(key string) error {
 					break
 				}
 			}
+
 			err := r.federator.Distribute(r.remoteServices[key])
 			if err != nil {
 				return err
 			}
+
 			klog.Infof("Service %q has been deleted from cluster %q - removed from MultiClusterService", key, r.clusterID)
 		}
 	}
