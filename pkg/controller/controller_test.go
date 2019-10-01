@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/client-go/tools/cache"
+
 	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -139,35 +141,56 @@ func newMultiClusterService() *lighthousev1.MultiClusterService {
 	}
 }
 
-func newService() *core_v1.Service {
+func verifyMultiClusterService(mcs *lighthousev1.MultiClusterService, name, namespace string, serviceInfo ...*lighthousev1.ClusterServiceInfo) {
+	Expect(mcs.Name).To(Equal(name))
+	Expect(mcs.Namespace).To(Equal(namespace))
+
+	infoMap := make(map[string]string)
+	for _, info := range mcs.Spec.Items {
+		infoMap[info.ClusterID] = info.ServiceIP
+	}
+
+	for _, info := range serviceInfo {
+		ip, exists := infoMap[info.ClusterID]
+		Expect(exists).To(BeTrue(), "MultiClusterService %#v missing ClusterServiceInfo for %q", mcs, info.ClusterID)
+		Expect(ip).To(Equal(info.ServiceIP), "Unexpected ClusterServiceInfo ServiceIP")
+		delete(infoMap, info.ClusterID)
+	}
+
+	Expect(infoMap).To(BeEmpty(), "Unexpected ClusterServiceInfo items %s in MultiClusterService %#v", infoMap, mcs)
+}
+
+func newService(name, namespace, clusterIP string) *core_v1.Service {
 	return &core_v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testservice1",
-			Namespace: "testNS",
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: core_v1.ServiceSpec{
-			ClusterIP: "192.168.56.20",
+			ClusterIP: clusterIP,
 		},
 	}
 }
 
 func testResourceDistribution() {
-	const clusterID = "east"
-	const nameSpace = "testNS"
+	const serviceName1 = "serviceName1"
+	const serviceNS1 = "serviceNS1"
+	const serviceNS2 = "serviceNS2"
+	const serviceIP1 = "192.168.56.1"
+	const serviceIP2 = "192.168.56.2"
+	const eastCluster = "east"
+	const westCluster = "west"
 
 	var (
-		service             *core_v1.Service
-		multiClusterService *lighthousev1.MultiClusterService
-		distributeCalled    chan bool
-		mockCtrl            *gomock.Controller
-		mockFederator       *mocks.MockFederator
-		controller          *LightHouseController
-		fakeClientset       *fakeCoreClientSet.Clientset
+		distributeCalled chan bool
+		mockCtrl         *gomock.Controller
+		mockFederator    *mocks.MockFederator
+		controller       *LightHouseController
+		fakeClientset    *fakeCoreClientSet.Clientset
+		capturedMCS      **lighthousev1.MultiClusterService = new(*lighthousev1.MultiClusterService)
 	)
 
 	BeforeEach(func() {
-		service = newService()
-		multiClusterService = newMultiClusterService()
 		distributeCalled = make(chan bool, 1)
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockFederator = mocks.NewMockFederator(mockCtrl)
@@ -178,7 +201,7 @@ func testResourceDistribution() {
 			return fakeClientset, nil
 		}
 
-		controller.OnAdd(clusterID, &rest.Config{})
+		controller.OnAdd(eastCluster, &rest.Config{})
 	})
 
 	AfterEach(func() {
@@ -186,20 +209,123 @@ func testResourceDistribution() {
 		mockCtrl = nil
 	})
 
-	createService := func() error {
-		_, err := fakeClientset.CoreV1().Services(nameSpace).Create(service)
-		return err
+	createService1 := func() {
+		_, err := fakeClientset.CoreV1().Services(serviceNS1).Create(newService(serviceName1, serviceNS1, serviceIP1))
+		Expect(err).To(Succeed())
 	}
 
-	When("a Service is added", func() {
-		It("should distribute the resource", func() {
-			mockFederator.EXPECT().Distribute(EqMultiClusterService(multiClusterService)).Return(nil).Do(func(c *lighthousev1.MultiClusterService) {
+	setupExpectDistribute := func() {
+		mockFederator.EXPECT().Distribute(gomock.Any()).Return(nil).Do(func(m *lighthousev1.MultiClusterService) {
+			*capturedMCS = m
+			distributeCalled <- true
+		})
+	}
+
+	getCachedMCService := func(name, namespace string) *lighthousev1.MultiClusterService {
+		controller.remoteServicesMutex.Lock()
+		defer controller.remoteServicesMutex.Unlock()
+
+		key, _ := cache.MetaNamespaceKeyFunc(newService(name, namespace, ""))
+		mcs, exists := controller.remoteServices[key]
+		Expect(exists).To(BeTrue())
+		return mcs
+	}
+
+	verifyCapturedMCService := func(name, namespace string, serviceInfo ...*lighthousev1.ClusterServiceInfo) {
+		verifyMultiClusterService(*capturedMCS, name, namespace, serviceInfo...)
+		verifyMultiClusterService(getCachedMCService(name, namespace), name, namespace, serviceInfo...)
+	}
+
+	initMultiClusterService := func(name, namespace, clusterIP, clusterID string) {
+		service := newService(name, namespace, clusterIP)
+		key, err := cache.MetaNamespaceKeyFunc(service)
+		Expect(err).To(Succeed())
+
+		controller.remoteServicesMutex.Lock()
+		defer controller.remoteServicesMutex.Unlock()
+		controller.remoteServices[key] = &lighthousev1.MultiClusterService{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      service.ObjectMeta.Name,
+				Namespace: service.ObjectMeta.Namespace,
+			},
+			Spec: lighthousev1.MultiClusterServiceSpec{
+				Items: []lighthousev1.ClusterServiceInfo{
+					lighthousev1.ClusterServiceInfo{
+						ClusterID: clusterID,
+						ServiceIP: service.Spec.ClusterIP,
+					},
+				},
+			},
+		}
+	}
+
+	When("a Service is added with no existing MultiClusterService", func() {
+		It("should create a new MultiClusterService and distribute it", func() {
+			setupExpectDistribute()
+
+			createService1()
+
+			Eventually(distributeCalled, 5).Should(Receive(), "Distribute was not called")
+			verifyCapturedMCService(serviceName1, serviceNS1, &lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
+		})
+	})
+
+	When("a Service with the same name and namespace as an existing MultiClusterService is added", func() {
+		It("should append its ClusterServiceInfo to the existing MultiClusterService and distribute it", func() {
+			initMultiClusterService(serviceName1, serviceNS1, serviceIP2, westCluster)
+			setupExpectDistribute()
+
+			createService1()
+
+			Eventually(distributeCalled, 5).Should(Receive(), "Distribute was not called")
+			verifyCapturedMCService(serviceName1, serviceNS1, &lighthousev1.ClusterServiceInfo{ClusterID: westCluster, ServiceIP: serviceIP2},
+				&lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
+		})
+	})
+
+	When("a Service with an existing ClusterServiceInfo is re-added", func() {
+		It("should not append its ClusterServiceInfo again and the MultiClusterService should not be distributed", func() {
+			initMultiClusterService(serviceName1, serviceNS1, serviceIP1, eastCluster)
+			mockFederator.EXPECT().Distribute(gomock.Any()).Return(nil).MaxTimes(0).Do(func(m *lighthousev1.MultiClusterService) {
 				distributeCalled <- true
 			})
 
-			Expect(createService()).To(Succeed())
+			createService1()
+
+			Consistently(distributeCalled).ShouldNot(Receive(), "Distribute was unexpectedly called")
+			verifyMultiClusterService(getCachedMCService(serviceName1, serviceNS1), serviceName1, serviceNS1,
+				&lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
+		})
+	})
+
+	When("a Service is added with the same name but different namespace as an existing MultiClusterService", func() {
+		It("should create a new MultiClusterService and distribute it", func() {
+			initMultiClusterService(serviceName1, serviceNS2, serviceIP2, eastCluster)
+			setupExpectDistribute()
+
+			createService1()
 
 			Eventually(distributeCalled, 5).Should(Receive(), "Distribute was not called")
+			verifyCapturedMCService(serviceName1, serviceNS1, &lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
+			verifyMultiClusterService(getCachedMCService(serviceName1, serviceNS2), serviceName1, serviceNS2,
+				&lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP2})
+		})
+	})
+
+	When("a Service is added and Distribute initially fails", func() {
+		It("should retry until it succeeds", func() {
+			// Simulate the first call to Distribute fails and the second succeeds.
+			gomock.InOrder(
+				mockFederator.EXPECT().Distribute(gomock.Any()).Return(errors.New("mock")),
+				mockFederator.EXPECT().Distribute(gomock.Any()).Return(nil).Do(func(m *lighthousev1.MultiClusterService) {
+					*capturedMCS = m
+					distributeCalled <- true
+				}))
+
+			createService1()
+
+			Eventually(distributeCalled, 5).Should(Receive(), "Distribute was not retried")
+			verifyCapturedMCService(serviceName1, serviceNS1, &lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
 		})
 	})
 }
