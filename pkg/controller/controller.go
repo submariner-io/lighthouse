@@ -26,11 +26,11 @@ type remoteClustersMap map[string]*remoteCluster
 
 type LightHouseController struct {
 	// remoteServices is a map that holds the remote services that are discovered.
-	remoteServices remoteServiceMap
+	remoteServices      remoteServiceMap
+	remoteServicesMutex *sync.Mutex
 
 	// remoteClusters is a map of remote clusters, which have been discovered
-	remoteClusters remoteClustersMap
-
+	remoteClusters      remoteClustersMap
 	remoteClustersMutex *sync.Mutex
 
 	federator federate.Federator
@@ -40,19 +40,18 @@ type LightHouseController struct {
 }
 
 type remoteCluster struct {
-	stopCh              chan struct{}
-	clusterID           string
-	serviceInformer     cache.SharedIndexInformer
-	queue               workqueue.RateLimitingInterface
-	remoteServices      remoteServiceMap
-	federator           federate.Federator
-	remoteServicesMutex *sync.Mutex
+	stopCh          chan struct{}
+	clusterID       string
+	serviceInformer cache.SharedIndexInformer
+	queue           workqueue.RateLimitingInterface
+	controller      *LightHouseController
 }
 
 func New(federator federate.Federator) *LightHouseController {
 	return &LightHouseController{
 		federator:           federator,
 		remoteServices:      make(remoteServiceMap),
+		remoteServicesMutex: &sync.Mutex{},
 		remoteClusters:      make(remoteClustersMap),
 		remoteClustersMutex: &sync.Mutex{},
 
@@ -130,13 +129,11 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 	)
 
 	remoteCluster := &remoteCluster{
-		stopCh:              make(chan struct{}),
-		clusterID:           clusterID,
-		serviceInformer:     serviceInformer,
-		queue:               workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		remoteServices:      r.remoteServices,
-		federator:           r.federator,
-		remoteServicesMutex: &sync.Mutex{},
+		stopCh:          make(chan struct{}),
+		clusterID:       clusterID,
+		serviceInformer: serviceInformer,
+		queue:           workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		controller:      r,
 	}
 
 	r.remoteClusters[clusterID] = remoteCluster
@@ -226,30 +223,34 @@ func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 
 	service := obj.(*core_v1.Service)
 
-	r.remoteServicesMutex.Lock()
-	defer r.remoteServicesMutex.Unlock()
+	r.controller.remoteServicesMutex.Lock()
+	defer r.controller.remoteServicesMutex.Unlock()
 
-	if rs, exists := r.remoteServices[key]; !exists {
-		r.remoteServices[key] = r.createLightHouseCRD(service, r.clusterID)
+	mcs, exists := r.controller.remoteServices[key]
+	if !exists {
+		mcs = r.createLightHouseCRD(service, r.clusterID)
+		r.controller.remoteServices[key] = mcs
 
 		klog.Infof("Creating a new MultiClusterService with service %q from cluster %q", key, r.clusterID)
 	} else {
-		for _, info := range rs.Spec.Items {
+		for _, info := range mcs.Spec.Items {
 			if info.ClusterID == r.clusterID {
 				klog.V(2).Infof("Cluster %q already exists for MultiClusterService %q", r.clusterID, key)
 				return nil
 			}
 		}
 
-		rs.Spec.Items = append(rs.Spec.Items, r.createClusterServiceInfo(service, r.clusterID))
+		mcs.Spec.Items = append(mcs.Spec.Items, r.createClusterServiceInfo(service, r.clusterID))
 
 		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
 	}
 
-	err := r.federator.Distribute(r.remoteServices[key])
+	err := r.controller.federator.Distribute(mcs)
 	if err != nil {
+		mcs.Spec.Items = mcs.Spec.Items[:len(mcs.Spec.Items)-1]
 		return err
 	}
+
 	return nil
 }
 
@@ -276,29 +277,29 @@ func (r *remoteCluster) createClusterServiceInfo(service *v1.Service, clusterID 
 
 // serviceDeleted is called when an object is deleted
 func (r *remoteCluster) serviceDeleted(key string) error {
-	r.remoteServicesMutex.Lock()
-	defer r.remoteServicesMutex.Unlock()
+	r.controller.remoteServicesMutex.Lock()
+	defer r.controller.remoteServicesMutex.Unlock()
 
-	if rs, exists := r.remoteServices[key]; exists {
-		if len(rs.Spec.Items) == 1 {
-			err := r.federator.Delete(r.remoteServices[key])
+	if mcs, exists := r.controller.remoteServices[key]; exists {
+		if len(mcs.Spec.Items) == 1 {
+			err := r.controller.federator.Delete(mcs)
 			if err != nil {
 				return err
 			}
 
-			delete(r.remoteServices, key)
+			delete(r.controller.remoteServices, key)
 
 			klog.Infof("Service %q has been deleted from cluster %q - deleted MultiClusterService", key, r.clusterID)
 		} else {
-			for i, service := range rs.Spec.Items {
+			for i, service := range mcs.Spec.Items {
 				if service.ClusterID == r.clusterID {
-					rs.Spec.Items[i] = rs.Spec.Items[len(rs.Spec.Items)-1]
-					rs.Spec.Items = rs.Spec.Items[:len(rs.Spec.Items)-1]
+					mcs.Spec.Items[i] = mcs.Spec.Items[len(mcs.Spec.Items)-1]
+					mcs.Spec.Items = mcs.Spec.Items[:len(mcs.Spec.Items)-1]
 					break
 				}
 			}
 
-			err := r.federator.Distribute(r.remoteServices[key])
+			err := r.controller.federator.Distribute(mcs)
 			if err != nil {
 				return err
 			}
