@@ -36,7 +36,7 @@ type LightHouseController struct {
 	federator federate.Federator
 
 	// Indirection hook for unit tests to supply fake client sets
-	newClientset func(kubeConfig *rest.Config) (kubernetes.Interface, error)
+	newClientset func(clusterID string, kubeConfig *rest.Config) (kubernetes.Interface, error)
 }
 
 type remoteCluster struct {
@@ -55,8 +55,8 @@ func New(federator federate.Federator) *LightHouseController {
 		remoteClusters:      make(remoteClustersMap),
 		remoteClustersMutex: &sync.Mutex{},
 
-		newClientset: func(c *rest.Config) (kubernetes.Interface, error) {
-			return kubernetes.NewForConfig(c)
+		newClientset: func(clusterID string, kubeConfig *rest.Config) (kubernetes.Interface, error) {
+			return kubernetes.NewForConfig(kubeConfig)
 		},
 	}
 }
@@ -108,7 +108,7 @@ func (r *LightHouseController) OnRemove(clusterID string) {
 }
 
 func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConfig *rest.Config) {
-	clientSet, err := r.newClientset(kubeConfig)
+	clientSet, err := r.newClientset(clusterID, kubeConfig)
 	if err != nil {
 		klog.Errorf("Error creating client set for cluster %q: %v", clusterID, err)
 		return
