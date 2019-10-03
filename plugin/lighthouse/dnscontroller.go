@@ -44,9 +44,10 @@ func (c *DNSController) Start(kubeConfig *rest.Config) error {
 	klog.Infof("Starting DNSController")
 	mcsClient, err := c.newClientset(kubeConfig)
 	if err != nil {
-		klog.Errorf("error building submariner clientset for cluster  %v", err)
+		klog.Errorf("Error creating client set: %v", err)
 		return err
 	}
+
 	mcsInformerFactory := mcsinformer.NewSharedInformerFactoryWithOptions(mcsClient, 0,
 		mcsinformer.WithNamespace(meta_v1.NamespaceAll))
 
@@ -54,28 +55,28 @@ func (c *DNSController) Start(kubeConfig *rest.Config) error {
 	clusterInformer := mcsV1.MultiClusterServices().Informer()
 	clusterInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			klog.Infof("Callback received for AddFunc")
 			key, err := cache.MetaNamespaceKeyFunc(obj)
+			klog.V(2).Infof("MulitClusterService %q added", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		UpdateFunc: func(obj interface{}, new interface{}) {
-			klog.Infof("Callback received for AddFunc")
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			key = "Update" + key
+			key, err := cache.MetaNamespaceKeyFunc(new)
+			klog.V(2).Infof("MulitClusterService %q updated", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			klog.Infof("Callback received for DeleteFunc")
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			klog.V(2).Infof("MulitClusterService %q deleted", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 	})
+
 	c.serviceInformer = clusterInformer
 	go c.run()
 	return nil
@@ -102,21 +103,22 @@ func (c *DNSController) runWorker() {
 			klog.Infof("Lighthouse watcher for cluster stopped")
 			return
 		}
+
 		key := keyObj.(string)
 		func() {
 			defer c.queue.Done(key)
-
 			obj, exists, err := c.serviceInformer.GetIndexer().GetByKey(key)
+
 			if err != nil {
 				klog.Errorf("error processing %s (will retry): %v", key, err)
 				// requeue the item to work on later
 				c.queue.AddRateLimited(key)
 				return
 			}
+
 			if !exists {
 				c.multiClusterServiceDeleted(key)
 			} else {
-
 				c.multiClusterServiceCreatedOrUpdated(obj, key)
 			}
 			c.queue.Forget(key)
