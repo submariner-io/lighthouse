@@ -20,9 +20,15 @@ cd ${TOPDIR}
 git clone -b v${COREDNS_VERSION} ${COREDNS_GIT}
 cd ${TOPDIR}/coredns
 sed -i '/^kubernetes:kubernetes/a lighthouse:github.com/submariner-io/lighthouse/plugin/lighthouse' plugin.cfg
+sed -i '/^\tgithub.com\/prometheus\/common\ v0.6.0/a \\tgithub.com\/submariner-io\/lighthouse\ v0.0.0-20190903104548-989676a12c1d' go.mod
+sed -i '/^replace github.com\/miekg\/dns\sv1.1.3 => github.com\/miekg\/dns\sv1.1.14/a replace\ k8s.io\/apimachinery\ v0.0.0-20190629003722-e20a3a656cff\ =>\ k8s.io\/apimachinery\ v0.0.0-20190313205120-d7deff9243b1' go.mod
+sed -i '/^replace github.com\/miekg\/dns\sv1.1.3 => github.com\/miekg\/dns\sv1.1.14/a replace\ github.com\/openzipkin-contrib\/zipkin-go-opentracing\ =>\ github.com\/openzipkin-contrib\/zipkin-go-opentracing\ v0.3.5' go.mod
+sed -i '/^replace github.com\/miekg\/dns\sv1.1.3 => github.com\/miekg\/dns\sv1.1.14/a replace\ github.com/bronze1man/goStrongswanVici\ =>\ github.com/mangelajo/goStrongswanVici\ v0.0.0-20190223031456-9a5ae4453bd' go.mod
 go mod vendor
 mkdir -p ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/plugin/ ${BUILD_DIR}
 cp -R ${TOPDIR}/plugin ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/
+mkdir -p ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/pkg/ ${BUILD_DIR}
+cp -R ${TOPDIR}/pkg ${TOPDIR}/coredns/vendor/github.com/submariner-io/lighthouse/
 cp Dockerfile ${BUILD_DIR}
 make BINARY=${BUILD_DIR}/coredns SYSTEM=GOOS=linux GOARCH=amd64
 docker build -t ${DOCKER_TAG} ${BUILD_DIR}
