@@ -9,24 +9,24 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 )
 
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	log.Infof("Lighthouse plugin serving the DNS request")
 	state := request.Request{W: w, Req: r}
+
+	log.Debugf("Request received for %q", state.QName())
 
 	a := new(dns.Msg)
 	a.SetReply(r)
 	a.Authoritative = true
-	log.Infof("Request received for  %q ", state.QName())
+
 	query := strings.Split(state.QName(), ".")
 	svcName := query[0]
-	nameSpace := query[1]
-	service := lh.lookup(svcName, nameSpace)
+	namespace := query[1]
+	service, found := lh.multiClusterServices.get(namespace, svcName)
 
-	if service == nil || len(service.Spec.Items) == 0 {
+	if !found || len(service.Spec.Items) == 0 {
 		// We can't handle this,let another plugin take an attempt
 		// NOTE: Once we have options enabled, this will only be done if
 		//       fallthrough is enabled.
@@ -64,7 +64,4 @@ func (lh *Lighthouse) Error(str string) error {
 // Name implements the Handler interface.
 func (lh *Lighthouse) Name() string {
 	return "lighthouse"
-}
-func (lh *Lighthouse) lookup(svcName string, nameSpace string) *mcservice.MultiClusterService {
-	return lh.RemoteServiceMap[svcName+nameSpace]
 }

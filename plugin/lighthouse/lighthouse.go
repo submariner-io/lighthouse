@@ -10,6 +10,6 @@ import (
 var log = clog.NewWithPlugin("lighthouse")
 
 type Lighthouse struct {
-	Next             plugin.Handler
-	RemoteServiceMap remoteServiceMap
+	Next                 plugin.Handler
+	multiClusterServices *multiClusterServiceMap
 }

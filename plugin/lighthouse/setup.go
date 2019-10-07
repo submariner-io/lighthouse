@@ -2,18 +2,13 @@ package lighthouse
 
 import (
 	"flag"
-
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-
-	"github.com/coredns/coredns/core/dnsserver"
-	"github.com/coredns/coredns/plugin"
-	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	"fmt"
 
 	"github.com/caddyserver/caddy"
+	"github.com/coredns/coredns/core/dnsserver"
+	"github.com/coredns/coredns/plugin"
+	"k8s.io/client-go/tools/clientcmd"
 )
-
-type remoteServiceMap map[string]*mcservice.MultiClusterService
 
 var (
 	masterURL  string
@@ -33,7 +28,8 @@ func init() {
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
 // for parsing any extra options the this plugin may have. The first token this function sees is "lighthouse".
 func setupLighthouse(c *caddy.Controller) error {
-	klog.Infof("setupLighthouse")
+	log.Debug("In setupLighthouse")
+
 	c.Next() // Ignore "lighthouse" and give us the next token.
 	if c.NextArg() {
 		// If there was another token, return an error, because we currently don't have any configuration.
@@ -41,23 +37,28 @@ func setupLighthouse(c *caddy.Controller) error {
 		// can present a slightly nicer error message to the user.
 		return plugin.Error("lighthouse", c.ArgErr())
 	}
-	rsMap := make(remoteServiceMap)
-	lpController := New(rsMap)
+
 	cfg, err := BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		klog.Fatalf("error building kubeconfig: %s", err.Error())
+		return fmt.Errorf("error building kubeconfig: %v", err)
 	}
-	err = lpController.Start(cfg)
+
+	mcsMap := new(multiClusterServiceMap)
+	dnsController := newController(mcsMap)
+
+	err = dnsController.start(cfg)
 	if err != nil {
-		klog.Fatalf("error starting the controller: %s", err.Error())
+		return fmt.Errorf("error starting the controller: %v", err)
 	}
+
 	c.OnShutdown(func() error {
-		lpController.Stop()
+		dnsController.stop()
 		return nil
 	})
+
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		return &Lighthouse{Next: next, RemoteServiceMap: rsMap}
+		return &Lighthouse{Next: next, multiClusterServices: mcsMap}
 	})
 
 	// All OK, return a nil error.
