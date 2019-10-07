@@ -25,7 +25,7 @@ type Lighthouse struct {
 	Next    plugin.Handler
 	Fall    fall.F
 	Zones   []string
-	RemoteServiceMap remoteServiceMap
+	multiClusterServices *multiClusterServiceMap
 }
 
 var _ plugin.Handler = &Lighthouse{}
