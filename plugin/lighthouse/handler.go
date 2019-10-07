@@ -41,10 +41,10 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	
 	query := strings.Split(state.QName(), ".")
 	svcName := query[0]
-	nameSpace := query[1]
-	service := lh.lookup(svcName, nameSpace)
+	namespace := query[1]
+	service, found := lh.multiClusterServices.get(namespace, svcName)
 
-	if service == nil || len(service.Spec.Items) == 0 {
+	if !found || len(service.Spec.Items) == 0 {
 		// We couldn't find record for this service name
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
 	}
@@ -86,8 +86,4 @@ func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.Resp
 	} else {
 		return code, lh.error(error)
 	}
-}
-
-func (lh *Lighthouse) lookup(svcName string, nameSpace string) *mcservice.MultiClusterService {
-	return lh.RemoteServiceMap[svcName+nameSpace]
 }

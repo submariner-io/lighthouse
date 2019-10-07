@@ -6,112 +6,121 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	fakeMCSClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	fakeClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("Lighthouse Controller", func() {
+var _ = Describe("Lighthouse plugin controller", func() {
 	klog.InitFlags(nil)
 
-	Describe("Lighthouse MulticlusterService Creation", testMCSService)
+	Describe("MultiClusterService lifecycle notifications", testMCSLifecycleNotifications)
 })
 
-func testMCSService() {
+func testMCSLifecycleNotifications() {
 	const nameSpace1 = "testNS1"
 	const serviceName1 = "service1"
 
 	var (
-		multiClusterService         *mcservice.MultiClusterService
-		updatedMultiClusterService1 *mcservice.MultiClusterService
-		controller                  *DNSController
-		fakeClientset               mcsClientset.Interface
+		multiClusterService *lighthousev1.MultiClusterService
+		controller          *DNSController
+		fakeClientset       lighthouseClientset.Interface
 	)
 
 	BeforeEach(func() {
 		multiClusterService = newMultiClusterService("1", nameSpace1, serviceName1)
-		rsMap := make(remoteServiceMap)
-		controller = New(rsMap)
-		fakeClientset = fakeMCSClientSet.NewSimpleClientset()
+		mcsMap := new(multiClusterServiceMap)
+		controller = newController(mcsMap)
+		fakeClientset = fakeClientSet.NewSimpleClientset()
 
-		controller.newClientset = func(c *rest.Config) (mcsClientset.Interface, error) {
+		controller.newClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return fakeClientset, nil
 		}
-		Expect(controller.Start(&rest.Config{})).To(Succeed())
+		Expect(controller.start(&rest.Config{})).To(Succeed())
 	})
 
 	AfterEach(func() {
-		controller.Stop()
+		controller.stop()
 	})
 
-	createService := func(mcService *mcservice.MultiClusterService, nameSpace string) error {
-		_, err := fakeClientset.LighthouseV1().MultiClusterServices(nameSpace).Create(mcService)
+	createService := func(mcService *lighthousev1.MultiClusterService) error {
+		_, err := fakeClientset.LighthouseV1().MultiClusterServices(mcService.Namespace).Create(mcService)
 		return err
 	}
 
-	updateService := func(mcService *mcservice.MultiClusterService, nameSpace string) error {
-		_, err := fakeClientset.LighthouseV1().MultiClusterServices(nameSpace).Update(mcService)
+	updateService := func(mcService *lighthousev1.MultiClusterService) error {
+		_, err := fakeClientset.LighthouseV1().MultiClusterServices(mcService.Namespace).Update(mcService)
 		return err
 	}
 
-	deleteService := func(mcService *mcservice.MultiClusterService, nameSpace string) error {
-		err := fakeClientset.LighthouseV1().MultiClusterServices(nameSpace).Delete(mcService.Name, &metav1.DeleteOptions{})
+	deleteService := func(mcService *lighthousev1.MultiClusterService) error {
+		err := fakeClientset.LighthouseV1().MultiClusterServices(mcService.Namespace).Delete(mcService.Name, &metav1.DeleteOptions{})
 		return err
 	}
 
-	testOnAdd := func(mcsService *mcservice.MultiClusterService) {
-		Expect(createService(mcsService, nameSpace1)).To(Succeed())
-		key := mcsService.Namespace + "/" + mcsService.Name
-		Eventually(controller.remoteServiceMap).Should(HaveKey(key))
-		Eventually(controller.remoteServiceMap[key]).Should(BeEquivalentTo(mcsService))
+	testOnAdd := func(mcsService *lighthousev1.MultiClusterService) {
+		Expect(createService(mcsService)).To(Succeed())
+
+		verifyCachedMultiClusterService(controller, mcsService)
 	}
 
-	testOnUpdate := func(mcsService *mcservice.MultiClusterService) {
-		Expect(updateService(mcsService, nameSpace1)).To(Succeed())
-		key := mcsService.Namespace + "/" + mcsService.Name
-		Eventually(controller.remoteServiceMap).Should(HaveKey(key))
-		//TODO asuryana Update is failing need to fix it.
-		//Eventually(controller.remoteServiceMap[key]).Should(BeEquivalentTo(mcsService))
+	testOnUpdate := func(mcsService *lighthousev1.MultiClusterService) {
+		Expect(updateService(mcsService)).To(Succeed())
+
+		verifyCachedMultiClusterService(controller, mcsService)
 	}
 
-	testOnRemove := func(mcsService *mcservice.MultiClusterService) {
+	testOnRemove := func(mcsService *lighthousev1.MultiClusterService) {
 		testOnAdd(mcsService)
-		Expect(deleteService(multiClusterService, nameSpace1)).To(Succeed())
-		key1 := mcsService.Namespace + "/" + mcsService.Name
-		Eventually(controller.remoteServiceMap).ShouldNot(HaveKey(key1))
+
+		Expect(deleteService(multiClusterService)).To(Succeed())
+
+		Eventually(func() bool {
+			_, ok := controller.multiClusterServices.get(mcsService.Namespace, mcsService.Name)
+			return ok
+		}).Should(BeFalse())
 	}
 
 	When("a MultiClusterService is added", func() {
-		It("the remote service map should have the MultiClusterService", func() {
+		It("it should be added to the MultiClusterService map", func() {
 			testOnAdd(multiClusterService)
 		})
 	})
 
 	When("a MultiClusterService is updated", func() {
-		It("the remote service map should have the updated MultiClusterService", func() {
-			updatedMultiClusterService1 = newMultiClusterService("2", nameSpace1, serviceName1)
+		It("it should be updated in the MultiClusterService map", func() {
 			testOnAdd(multiClusterService)
-			testOnUpdate(updatedMultiClusterService1)
+			testOnUpdate(newMultiClusterService("2", nameSpace1, serviceName1))
 		})
 	})
 
 	When("a MultiClusterService is deleted", func() {
-		It("the remote service map should not have  the MultiClusterService", func() {
+		It("it should be removed to the MultiClusterService map", func() {
 			testOnRemove(multiClusterService)
 		})
 	})
 }
 
-func newMultiClusterService(id string, nameSpace string, serviceName string) *mcservice.MultiClusterService {
-	return &mcservice.MultiClusterService{
+func verifyCachedMultiClusterService(controller *DNSController, expected *lighthousev1.MultiClusterService) {
+	Eventually(func() *lighthousev1.MultiClusterServiceSpec {
+		mcs, ok := controller.multiClusterServices.get(expected.Namespace, expected.Name)
+		if ok {
+			return &mcs.Spec
+		}
+		return nil
+	}).Should(Equal(&expected.Spec))
+}
+
+func newMultiClusterService(id string, namespace string, name string) *lighthousev1.MultiClusterService {
+	return &lighthousev1.MultiClusterService{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: nameSpace,
+			Name:      name,
+			Namespace: namespace,
 		},
-		Spec: mcservice.MultiClusterServiceSpec{
-			Items: []mcservice.ClusterServiceInfo{
-				mcservice.ClusterServiceInfo{
+		Spec: lighthousev1.MultiClusterServiceSpec{
+			Items: []lighthousev1.ClusterServiceInfo{
+				lighthousev1.ClusterServiceInfo{
 					ClusterID: "cluster" + id,
 					ServiceIP: "192.168.56.2" + id,
 				},
