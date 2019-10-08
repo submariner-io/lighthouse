@@ -14,7 +14,9 @@ var (
 	masterURL  string
 	kubeconfig string
 )
-var BuildConfigFromFlags = clientcmd.BuildConfigFromFlags
+
+// Hook for unit tests
+var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
@@ -38,9 +40,9 @@ func setupLighthouse(c *caddy.Controller) error {
 		return plugin.Error("lighthouse", c.ArgErr())
 	}
 
-	cfg, err := BuildConfigFromFlags(masterURL, kubeconfig)
+	cfg, err := buildKubeConfigFunc(masterURL, kubeconfig)
 	if err != nil {
-		return fmt.Errorf("error building kubeconfig: %v", err)
+		return plugin.Error("lighthouse", fmt.Errorf("error building kubeconfig: %v", err))
 	}
 
 	mcsMap := new(multiClusterServiceMap)
@@ -48,7 +50,7 @@ func setupLighthouse(c *caddy.Controller) error {
 
 	err = dnsController.start(cfg)
 	if err != nil {
-		return fmt.Errorf("error starting the controller: %v", err)
+		return plugin.Error("lighthouse", fmt.Errorf("error starting the controller: %v", err))
 	}
 
 	c.OnShutdown(func() error {
