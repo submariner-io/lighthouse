@@ -283,6 +283,20 @@ func testResourceDistribution() {
 			t.verifyDeletedMCService(serviceName1, serviceNS1)
 		})
 	})
+
+	When("a deleted cluster Service is not present in the MultiClusterService", func() {
+		It("should not delete the MultiClusterService", func() {
+			t.createServiceAndVerifyDistribute(serviceName1, serviceNS1, serviceIP1, eastCluster)
+
+			t.setupExpectDelete().MaxTimes(0)
+			key, _ := cache.MetaNamespaceKeyFunc(newService(serviceName1, serviceNS1, serviceIP1))
+			t.controller.remoteClusters[westCluster].queue.Add(key)
+
+			Consistently(t.deleteCalled).ShouldNot(Receive(), "Delete was unexpectedly called")
+			verifyMultiClusterService(t.checkCachedMCService(serviceName1, serviceNS1), serviceName1, serviceNS1,
+				&lighthousev1.ClusterServiceInfo{ClusterID: eastCluster, ServiceIP: serviceIP1})
+		})
+	})
 }
 
 func verifyMultiClusterService(mcs *lighthousev1.MultiClusterService, name, namespace string, serviceInfo ...*lighthousev1.ClusterServiceInfo) {
@@ -408,11 +422,11 @@ func (t *testDriver) checkCachedMCService(name, namespace string) *lighthousev1.
 }
 
 func (t *testDriver) getCachedMCService(name, namespace string) (*lighthousev1.MultiClusterService, bool) {
-	t.controller.remoteServicesMutex.Lock()
-	defer t.controller.remoteServicesMutex.Unlock()
+	t.controller.multiClusterServicesMutex.Lock()
+	defer t.controller.multiClusterServicesMutex.Unlock()
 
 	key, _ := cache.MetaNamespaceKeyFunc(newService(name, namespace, ""))
-	mcs, exists := t.controller.remoteServices[key]
+	mcs, exists := t.controller.multiClusterServices[key]
 	return mcs, exists
 }
 
@@ -434,9 +448,9 @@ func (t *testDriver) initMultiClusterService(name, namespace, clusterIP, cluster
 	key, err := cache.MetaNamespaceKeyFunc(service)
 	Expect(err).To(Succeed())
 
-	t.controller.remoteServicesMutex.Lock()
-	defer t.controller.remoteServicesMutex.Unlock()
-	t.controller.remoteServices[key] = &lighthousev1.MultiClusterService{
+	t.controller.multiClusterServicesMutex.Lock()
+	defer t.controller.multiClusterServicesMutex.Unlock()
+	t.controller.multiClusterServices[key] = &lighthousev1.MultiClusterService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.ObjectMeta.Name,
 			Namespace: service.ObjectMeta.Namespace,

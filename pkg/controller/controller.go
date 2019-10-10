@@ -4,30 +4,26 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/submariner-io/admiral/pkg/federate"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-
-	"github.com/submariner-io/admiral/pkg/federate"
-	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
-	core_v1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
-type remoteServiceMap map[string]*mcservice.MultiClusterService
+type multiClusterServiceMap map[string]*lighthousev1.MultiClusterService
 type remoteClustersMap map[string]*remoteCluster
 
 type LightHouseController struct {
-	// remoteServices is a map that holds the remote services that are discovered.
-	remoteServices      remoteServiceMap
-	remoteServicesMutex *sync.Mutex
+	// multiClusterServices is a map that holds the MultiClusterService resources to distribute.
+	multiClusterServices      multiClusterServiceMap
+	multiClusterServicesMutex *sync.Mutex
 
 	// remoteClusters is a map of remote clusters, which have been discovered
 	remoteClusters      remoteClustersMap
@@ -49,11 +45,11 @@ type remoteCluster struct {
 
 func New(federator federate.Federator) *LightHouseController {
 	return &LightHouseController{
-		federator:           federator,
-		remoteServices:      make(remoteServiceMap),
-		remoteServicesMutex: &sync.Mutex{},
-		remoteClusters:      make(remoteClustersMap),
-		remoteClustersMutex: &sync.Mutex{},
+		federator:                 federator,
+		multiClusterServices:      make(multiClusterServiceMap),
+		multiClusterServicesMutex: &sync.Mutex{},
+		remoteClusters:            make(remoteClustersMap),
+		remoteClustersMutex:       &sync.Mutex{},
 
 		newClientset: func(clusterID string, kubeConfig *rest.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(kubeConfig)
@@ -116,14 +112,14 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 
 	serviceInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return clientSet.CoreV1().Services(meta_v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return clientSet.CoreV1().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return clientSet.CoreV1().Services(meta_v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return clientSet.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
-		&v1.Service{},
+		&corev1.Service{},
 		0,
 		cache.Indexers{},
 	)
@@ -153,7 +149,8 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 		},
 	})
 
-	go remoteCluster.run()
+	go remoteCluster.serviceInformer.Run(remoteCluster.stopCh)
+	go remoteCluster.runWorker()
 }
 
 func (r *LightHouseController) removeServiceWatcher(clusterID string) {
@@ -169,12 +166,6 @@ func (r *remoteCluster) close() {
 	close(r.stopCh)
 	r.queue.ShutDown()
 	klog.Infof("Watcher queue shutdown for cluster %q", r.clusterID)
-}
-
-func (r *remoteCluster) run() {
-	defer utilruntime.HandleCrash()
-	go r.serviceInformer.Run(r.stopCh)
-	go r.runWorker()
 }
 
 func (r *remoteCluster) runWorker() {
@@ -221,15 +212,15 @@ func (r *remoteCluster) runWorker() {
 func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 	klog.V(2).Infof("In remoteCluster serviceCreated for cluster %q, service %#v", r.clusterID, obj)
 
-	service := obj.(*core_v1.Service)
+	service := obj.(*corev1.Service)
 
-	r.controller.remoteServicesMutex.Lock()
-	defer r.controller.remoteServicesMutex.Unlock()
+	r.controller.multiClusterServicesMutex.Lock()
+	defer r.controller.multiClusterServicesMutex.Unlock()
 
-	mcs, exists := r.controller.remoteServices[key]
+	mcs, exists := r.controller.multiClusterServices[key]
 	if !exists {
-		mcs = r.createLightHouseCRD(service, r.clusterID)
-		r.controller.remoteServices[key] = mcs
+		mcs = r.newMultiClusterService(service, r.clusterID)
+		r.controller.multiClusterServices[key] = mcs
 
 		klog.Infof("Creating a new MultiClusterService with service %q from cluster %q", key, r.clusterID)
 	} else {
@@ -240,7 +231,7 @@ func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 			}
 		}
 
-		mcs.Spec.Items = append(mcs.Spec.Items, r.createClusterServiceInfo(service, r.clusterID))
+		mcs.Spec.Items = append(mcs.Spec.Items, r.newClusterServiceInfo(service, r.clusterID))
 
 		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
 	}
@@ -254,22 +245,22 @@ func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 	return nil
 }
 
-func (r *remoteCluster) createLightHouseCRD(service *v1.Service, clusterID string) *mcservice.MultiClusterService {
-	return &mcservice.MultiClusterService{
-		ObjectMeta: meta_v1.ObjectMeta{
+func (r *remoteCluster) newMultiClusterService(service *corev1.Service, clusterID string) *lighthousev1.MultiClusterService {
+	return &lighthousev1.MultiClusterService{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.ObjectMeta.Name,
 			Namespace: service.ObjectMeta.Namespace,
 		},
-		Spec: mcservice.MultiClusterServiceSpec{
-			Items: []mcservice.ClusterServiceInfo{
-				r.createClusterServiceInfo(service, clusterID),
+		Spec: lighthousev1.MultiClusterServiceSpec{
+			Items: []lighthousev1.ClusterServiceInfo{
+				r.newClusterServiceInfo(service, clusterID),
 			},
 		},
 	}
 }
 
-func (r *remoteCluster) createClusterServiceInfo(service *v1.Service, clusterID string) mcservice.ClusterServiceInfo {
-	return mcservice.ClusterServiceInfo{
+func (r *remoteCluster) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev1.ClusterServiceInfo {
+	return lighthousev1.ClusterServiceInfo{
 		ClusterID: clusterID,
 		ServiceIP: service.Spec.ClusterIP,
 	}
@@ -277,30 +268,39 @@ func (r *remoteCluster) createClusterServiceInfo(service *v1.Service, clusterID 
 
 // serviceDeleted is called when an object is deleted
 func (r *remoteCluster) serviceDeleted(key string) error {
-	r.controller.remoteServicesMutex.Lock()
-	defer r.controller.remoteServicesMutex.Unlock()
+	r.controller.multiClusterServicesMutex.Lock()
+	defer r.controller.multiClusterServicesMutex.Unlock()
 
-	if mcs, exists := r.controller.remoteServices[key]; exists {
-		if len(mcs.Spec.Items) == 1 {
+	if mcs, exists := r.controller.multiClusterServices[key]; exists {
+		var clusterServiceInfo *lighthousev1.ClusterServiceInfo
+		for i, info := range mcs.Spec.Items {
+			if info.ClusterID == r.clusterID {
+				mcs.Spec.Items[i] = mcs.Spec.Items[len(mcs.Spec.Items)-1]
+				mcs.Spec.Items = mcs.Spec.Items[:len(mcs.Spec.Items)-1]
+				clusterServiceInfo = &info
+				break
+			}
+		}
+
+		if clusterServiceInfo == nil {
+			klog.Infof("Service %q deleted from cluster %q not present in MultiClusterService", key, r.clusterID)
+			return nil
+		}
+
+		if len(mcs.Spec.Items) == 0 {
 			err := r.controller.federator.Delete(mcs)
 			if err != nil {
+				mcs.Spec.Items = append(mcs.Spec.Items, *clusterServiceInfo)
 				return err
 			}
 
-			delete(r.controller.remoteServices, key)
+			delete(r.controller.multiClusterServices, key)
 
 			klog.Infof("Service %q has been deleted from cluster %q - deleted MultiClusterService", key, r.clusterID)
 		} else {
-			for i, service := range mcs.Spec.Items {
-				if service.ClusterID == r.clusterID {
-					mcs.Spec.Items[i] = mcs.Spec.Items[len(mcs.Spec.Items)-1]
-					mcs.Spec.Items = mcs.Spec.Items[:len(mcs.Spec.Items)-1]
-					break
-				}
-			}
-
 			err := r.controller.federator.Distribute(mcs)
 			if err != nil {
+				mcs.Spec.Items = append(mcs.Spec.Items, *clusterServiceInfo)
 				return err
 			}
 
