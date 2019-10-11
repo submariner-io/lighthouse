@@ -8,7 +8,7 @@ ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} DAPPER_ENV=REPO DAPPE
 RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
-    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor
+    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
 # Requirements:
 # Component       | Usage
