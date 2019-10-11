@@ -16,6 +16,9 @@ COREDNS_GIT="https://github.com/coredns/coredns.git"
 DOCKER_TAG="lighthouse-coredns:dev"
 BUILD_DIR="build/linux/amd64"
 
+echo "!!!!!!!Go version: $(go version)"
+echo "GOPATH: $GOPATH"
+echo "PWD: $(pwd)"
 cd ${TOPDIR}
 git clone -b v${COREDNS_VERSION} ${COREDNS_GIT}
 cd ${TOPDIR}/coredns
