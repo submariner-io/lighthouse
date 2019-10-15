@@ -81,7 +81,7 @@ func (c *DNSController) stop() {
 	close(c.stopCh)
 	c.queue.ShutDown()
 
-	klog.Infof(" DNSController sopped")
+	klog.Infof(" DNSController stopped")
 }
 
 func (c *DNSController) runWorker() {

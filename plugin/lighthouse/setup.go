@@ -4,11 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -32,7 +31,7 @@ func init() {
 // for parsing any extra options the this plugin may have. The first token this function sees is "lighthouse".
 func setupLighthouse(c *caddy.Controller) error {
 	log.Debug("In setupLighthouse")
-	
+
 	l, err := lighthouseParse(c)
 	if err != nil {
 		return plugin.Error("lighthouse", err)
@@ -64,9 +63,9 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		dnsController.stop()
 		return nil
 	})
-	
-	lh := Lighthouse{multiClusterServices: mcsMap}
-	
+
+	lh := &Lighthouse{multiClusterServices: mcsMap}
+
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
 	if c.Next() {
@@ -90,8 +89,8 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 			}
 		}
 	}
-	
-	return &lh, nil
+
+	return lh, nil
 }
 
 func init() {
