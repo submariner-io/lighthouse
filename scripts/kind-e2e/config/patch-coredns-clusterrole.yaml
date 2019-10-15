@@ -1,0 +1,11 @@
+- apiGroups:
+  - lighthouse.submariner.io
+  resources:
+  - multiclusterservices
+  verbs:
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - get
