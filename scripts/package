@@ -22,3 +22,6 @@ LIGHTHOUSE_IMAGE=${REPO}/lighthouse-controller:${TAG}
 docker build -t ${IMAGE} .
 
 echo "Built lighthouse-controller to image: ${IMAGE}"
+
+# clean up controller image
+rm lighthouse-controller
