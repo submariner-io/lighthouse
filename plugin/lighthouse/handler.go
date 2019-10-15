@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	mcservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 )
 
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
-	
+
 	log.Debugf("Request received for  %q ", state.QName())
 
 	qname := state.QName()
@@ -38,7 +38,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		// We only support svc type queries i.e. *.svc.*
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
 	}
-	
+
 	query := strings.Split(state.QName(), ".")
 	svcName := query[0]
 	namespace := query[1]

@@ -22,9 +22,9 @@ var (
 var log = clog.NewWithPlugin("lighthouse")
 
 type Lighthouse struct {
-	Next    plugin.Handler
-	Fall    fall.F
-	Zones   []string
+	Next                 plugin.Handler
+	Fall                 fall.F
+	Zones                []string
 	multiClusterServices *multiClusterServiceMap
 }
 
