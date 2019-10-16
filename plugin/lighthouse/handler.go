@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
@@ -13,6 +14,8 @@ import (
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
+
+	log.Debugf("Request received for  %q ", state.QName())
 
 	qname := state.QName()
 	// qname: mysvc.default.svc.example.org.
@@ -36,15 +39,21 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
 	}
 
-	ip := lh.lookup(pReq.service)
-	if ip == "" {
+	query := strings.Split(state.QName(), ".")
+	svcName := query[0]
+	namespace := query[1]
+	service, found := lh.multiClusterServices.get(namespace, svcName)
+
+	if !found || len(service.Spec.Items) == 0 {
 		// We couldn't find record for this service name
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
 	}
 
+	serviceInfo := service.Spec.Items[0]
+
 	rr := new(dns.A)
 	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
-	rr.A = net.ParseIP(ip).To4()
+	rr.A = net.ParseIP(serviceInfo.ServiceIP).To4()
 
 	a := new(dns.Msg)
 	a.SetReply(r)
@@ -69,10 +78,6 @@ func (lh *Lighthouse) Name() string {
 
 func (lh *Lighthouse) error(str string) error {
 	return plugin.Error(lh.Name(), errors.New(str))
-}
-
-func (lh *Lighthouse) lookup(service string) string {
-	return lh.SvcsMap[service]
 }
 
 func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.ResponseWriter, r *dns.Msg, code int, error string) (int, error) {

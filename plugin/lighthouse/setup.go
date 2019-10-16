@@ -1,13 +1,22 @@
 package lighthouse
 
 import (
-	"os"
-	"strings"
+	"flag"
+	"fmt"
 
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"k8s.io/client-go/tools/clientcmd"
 )
+
+var (
+	masterURL  string
+	kubeconfig string
+)
+
+// Hook for unit tests
+var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
@@ -21,6 +30,8 @@ func init() {
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
 // for parsing any extra options the this plugin may have. The first token this function sees is "lighthouse".
 func setupLighthouse(c *caddy.Controller) error {
+	log.Debug("In setupLighthouse")
+
 	l, err := lighthouseParse(c)
 	if err != nil {
 		return plugin.Error("lighthouse", err)
@@ -35,7 +46,26 @@ func setupLighthouse(c *caddy.Controller) error {
 }
 
 func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
-	lh := Lighthouse{}
+	cfg, err := buildKubeConfigFunc(masterURL, kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("error building kubeconfig: %v", err)
+	}
+
+	mcsMap := new(multiClusterServiceMap)
+	dnsController := newController(mcsMap)
+
+	err = dnsController.start(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error starting the controller: %v", err)
+	}
+
+	c.OnShutdown(func() error {
+		dnsController.stop()
+		return nil
+	})
+
+	lh := &Lighthouse{multiClusterServices: mcsMap}
+
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
 	if c.Next() {
@@ -58,24 +88,12 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 				}
 			}
 		}
-		lh.SvcsMap = setupServicesMap()
-		return &lh, nil
 	}
-	return &lh, nil
+
+	return lh, nil
 }
 
-func setupServicesMap() ServicesMap {
-	svcs := make(ServicesMap)
-	svcArray := os.Getenv("LIGHTHOUSE_SVCS")
-	if svcArray == "" {
-		return svcs
-	}
-	strArray := strings.Split(svcArray, ",")
-	for _, str := range strArray {
-		svc := strings.Split(str, "=")
-		if len(svc) == 2 {
-			svcs[svc[0]] = svc[1]
-		}
-	}
-	return svcs
+func init() {
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
