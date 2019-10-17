@@ -56,9 +56,7 @@ func buildKubeFedFederator(stopCh <-chan struct{}) federate.Federator {
 	if err != nil {
 		klog.Fatalf("Error attempting to load kubeconfig: %s", err.Error())
 	}
-	federator, err := kubefed.New(kubeConfig,
-
-		stopCh)
+	federator, err := kubefed.New(kubeConfig, stopCh)
 	if err != nil {
 		klog.Fatalf("Error creating kubefed federator: %s", err.Error())
 	}
