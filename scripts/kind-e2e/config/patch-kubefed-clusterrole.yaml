@@ -1,0 +1,4 @@
+---
+- op: add
+  path: "/rules/3/verbs/4"
+  value: create

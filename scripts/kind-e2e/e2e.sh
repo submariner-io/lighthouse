@@ -173,6 +173,12 @@ function setup_cluster3_gateway() {
 
 function setup_lighthouse_controller () {
     trap_commands
+    for i in 1 2 3; do
+      echo "Installing lighthouse CRD in cluster${i}..."
+      kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-crd.yaml
+    done
+    kubefedctl enable MulticlusterService
+    kubectl --context=cluster1 patch clusterrole  -n kube-federation-system  kubefed-role  --type json -p "$(cat ${PRJ_ROOT}/scripts/kind-e2e/config/patch-kubefed-clusterrole.yaml)"
     docker tag submariner-io/lighthouse-controller:dev lighthouse-controller:local
     kind --name cluster1 load docker-image lighthouse-controller:local
     kubectl --context=cluster1 apply -f ${PRJ_ROOT}/package/lighthouse-controller-deployment.yaml
@@ -187,7 +193,10 @@ function update_coredns_deployment() {
         kind --name cluster${i} load docker-image lighthouse-coredns:dev_${uuid} --loglevel=debug
         kubectl --context=cluster${i} set image -n kube-system deploy/coredns coredns=lighthouse-coredns:dev_${uuid}
         echo "Waiting for coredns deployment to be Ready on cluster${i}."
-        kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=120s
+        kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=60s
+        echo "Updating coredns clusterrole in to cluster${i}..."
+        cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
+        kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
     done
     docker rmi lighthouse-coredns:dev_${uuid}
 }
@@ -223,6 +232,7 @@ function test_connection() {
 function test_e2e_service_discovery() {
     trap_commands
     echo "Updating coredns deployment on cluster2 with cluster3 service nginx service ip"
+    kubefedctl federate namespace default
     kubectl --context=cluster2 -n kube-system set env deployment/coredns LIGHTHOUSE_SVCS="nginx-demo=${nginx_svc_ip_cluster3}"
     kubectl --context=cluster2 rollout status -n kube-system deploy/coredns --timeout=60s
     echo "Testing service discovery between clusters - $netshoot_pod cluster2 --> nginx service cluster3"
