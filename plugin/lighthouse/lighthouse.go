@@ -21,12 +21,11 @@ var (
 // friends to log.
 var log = clog.NewWithPlugin("lighthouse")
 
-type ServicesMap map[string]string
 type Lighthouse struct {
 	Next    plugin.Handler
 	Fall    fall.F
 	Zones   []string
-	SvcsMap ServicesMap
+	RemoteServiceMap remoteServiceMap
 }
 
 var _ plugin.Handler = &Lighthouse{}
