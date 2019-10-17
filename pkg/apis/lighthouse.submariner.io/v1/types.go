@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"net"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,7 +37,7 @@ type ClusterServiceInfo struct {
 
 	//The cluster IP of the service running in the cluster that is identified by the
 	//ClusterID field. This field is not optional.
-	ServiceIP net.IP `json:"serviceIP"`
+	ServiceIP string `json:"serviceIP"`
 
 	//+optional
 	//The port in which the service listens at.This is an optional field.

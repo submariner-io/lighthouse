@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/multiclusterservice/v1"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

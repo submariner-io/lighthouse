@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/multiclusterservice/v1"
-	fakelighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/multiclusterservice/v1/fake"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1"
+	fakelighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
