@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"net"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,15 +14,12 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/submariner-io/admiral/pkg/federate"
-	multiclusterservice "github.com/submariner-io/lighthouse/pkg/apis/multiclusterservice/v1"
+	multiclusterservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
-
-// arbitrary event channel size
-const eventChannelSize = 1000
 
 type LightHouseController struct {
 	//remoteServices is a map that holds the remote services that are discovered.
@@ -32,19 +28,18 @@ type LightHouseController struct {
 	// remoteClusters is a map of remote clusters, which have been discovered
 	remoteClusters map[string]*RemoteCluster
 
-	// processingMutex is used to avoid synchronization issues when handling
-	// objects inside the controller, it's a generalistic lock, although
-	// later in time we can come up with a more granular implementation.
 	processingMutex *sync.Mutex
 
 	federator federate.Federator
+
+	// Indirection hook for unit tests to supply fake client sets
+	newClientset func(kubeConfig *rest.Config) (kubernetes.Interface, error)
 }
 
 type RemoteCluster struct {
 	stopCh chan struct{}
 
 	ClusterID       string
-	ClientSet       kubernetes.Interface
 	serviceInformer cache.SharedIndexInformer
 	queue           workqueue.RateLimitingInterface
 }
@@ -56,6 +51,10 @@ func New(federator federate.Federator) *LightHouseController {
 		remoteServices:  make(map[string]*multiclusterservice.MultiClusterService),
 		remoteClusters:  make(map[string]*RemoteCluster),
 		processingMutex: &sync.Mutex{},
+
+		newClientset: func(c *rest.Config) (kubernetes.Interface, error) {
+			return kubernetes.NewForConfig(c)
+		},
 	}
 }
 
@@ -80,7 +79,7 @@ func (c *LightHouseController) Stop() {
 func (c *LightHouseController) OnAdd(clusterID string, kubeConfig *rest.Config) {
 	klog.Infof("adding cluster: %s", clusterID)
 
-	clientSet, err := kubernetes.NewForConfig(kubeConfig)
+	clientSet, err := c.newClientset(kubeConfig)
 	if err != nil {
 		klog.Errorf("error creating clientset for cluster %s: %s", clusterID, err.Error())
 		return
@@ -95,9 +94,9 @@ func (c *LightHouseController) OnUpdate(clusterID string, kubeConfig *rest.Confi
 }
 
 func (c *LightHouseController) OnRemove(clusterID string) {
-	//TODO asuryana need to implement
-	klog.Infof("removing cluster: %s", clusterID)
-	klog.Fatalf("Not implemented yet")
+	c.processingMutex.Lock()
+	defer c.processingMutex.Unlock()
+	c.removeServiceWatcher(clusterID)
 }
 
 func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSet kubernetes.Interface) {
@@ -117,7 +116,6 @@ func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSe
 	remoteCluster := &RemoteCluster{
 		stopCh:          make(chan struct{}),
 		ClusterID:       clusterID,
-		ClientSet:       clientSet,
 		serviceInformer: serviceInformer,
 		queue:           workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 	}
@@ -140,6 +138,15 @@ func (c *LightHouseController) startNewServiceWatcher(clusterID string, clientSe
 	})
 
 	go c.Run(remoteCluster)
+}
+
+func (c *LightHouseController) removeServiceWatcher(clusterID string) {
+	remoteCluster := c.remoteClusters[clusterID]
+	if remoteCluster != nil {
+		klog.V(2).Infof("stopping watcher for %s", clusterID)
+		remoteCluster.close()
+		delete(c.remoteClusters, clusterID)
+	}
 }
 
 func (rc *RemoteCluster) close() {
@@ -167,7 +174,6 @@ func (c *RemoteCluster) HasSynced() bool {
 }
 
 func (c *LightHouseController) runWorker(remoteCluster *RemoteCluster) {
-	// processNextWorkItem will automatically wait until there's work available
 	for {
 		key, shutdown := remoteCluster.queue.Get()
 		if shutdown {
@@ -196,7 +202,6 @@ func (c *LightHouseController) runWorker(remoteCluster *RemoteCluster) {
 
 func (c *LightHouseController) ObjectCreated(obj interface{}, clusterID string) {
 	klog.Info("ServiceHandler.ObjectCreated")
-	// assert the type to a Pod object to pull out relevant data
 	service := obj.(*core_v1.Service)
 	serviceName := service.ObjectMeta.Name
 	if rs, exists := c.remoteServices[serviceName]; !exists {
@@ -206,8 +211,10 @@ func (c *LightHouseController) ObjectCreated(obj interface{}, clusterID string) 
 		klog.Infof("An addService event was received for a Service already in our cache: %s, updating instead", serviceName)
 		rs.Spec.Items = append(rs.Spec.Items, c.createClusterServiceInfo(service, clusterID))
 	}
-	//TODO asuryana need to distribute the CRD.
-	//c.federator.Distribute(service)
+	err := c.federator.Distribute(c.remoteServices[serviceName])
+	if err != nil {
+		fmt.Println("  Distribute failed", err)
+	}
 }
 
 func (c *LightHouseController) createLightHouseCRD(service *v1.Service, clusterID string) *multiclusterservice.MultiClusterService {
@@ -217,7 +224,8 @@ func (c *LightHouseController) createLightHouseCRD(service *v1.Service, clusterI
 		}
 	clusterInfo := &multiclusterservice.MultiClusterService{
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name: service.ObjectMeta.Name,
+			Name:      service.ObjectMeta.Name,
+			Namespace: service.ObjectMeta.Namespace,
 		},
 		Spec: multiclusterservice.MultiClusterServiceSpec{
 			Items: *multiClusterServiceInfo,
@@ -228,18 +236,28 @@ func (c *LightHouseController) createLightHouseCRD(service *v1.Service, clusterI
 
 func (c *LightHouseController) createClusterServiceInfo(service *v1.Service, clusterID string) multiclusterservice.ClusterServiceInfo {
 	return multiclusterservice.ClusterServiceInfo{
-		ClusterID:     clusterID,
-		ServiceIP:     net.ParseIP(service.Spec.ClusterIP),
-		ClusterDomain: "example.org",
+		ClusterID: clusterID,
+		ServiceIP: service.Spec.ClusterIP,
 	}
 }
 
 // ObjectDeleted is called when an object is deleted
 func (c *LightHouseController) ObjectDeleted(obj interface{}) {
+	service := obj.(*core_v1.Service)
+	serviceName := service.ObjectMeta.Name
+	if _, exists := c.remoteServices[serviceName]; exists {
+		err := c.federator.Delete(c.remoteServices[serviceName])
+		if err != nil {
+			fmt.Println("  Delete failed for service.", err)
+		}
+		delete(c.remoteServices, serviceName)
+		klog.Infof("Service is deleted from the map: %s", serviceName)
+	}
 	fmt.Println("ServiceHandler.ObjectDeleted")
 }
 
 // ObjectUpdated is called when an object is updated
 func (c *LightHouseController) ObjectUpdated(objOld, objNew interface{}) {
+	//TODO asuryana
 	fmt.Println("ServiceHandler.ObjectUpdated")
 }
