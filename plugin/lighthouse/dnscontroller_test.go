@@ -29,7 +29,7 @@ func testMCSLifecycleNotifications() {
 	)
 
 	BeforeEach(func() {
-		multiClusterService = newMultiClusterService("1", nameSpace1, serviceName1)
+		multiClusterService = newMultiClusterService(nameSpace1, serviceName1, "192.168.56.21", "cluster1")
 		mcsMap := new(multiClusterServiceMap)
 		controller = newController(mcsMap)
 		fakeClientset = fakeClientSet.NewSimpleClientset()
@@ -91,7 +91,7 @@ func testMCSLifecycleNotifications() {
 	When("a MultiClusterService is updated", func() {
 		It("it should be updated in the MultiClusterService map", func() {
 			testOnAdd(multiClusterService)
-			testOnUpdate(newMultiClusterService("2", nameSpace1, serviceName1))
+			testOnUpdate(newMultiClusterService(nameSpace1, serviceName1, "192.168.56.22", "cluster2"))
 		})
 	})
 
@@ -112,7 +112,7 @@ func verifyCachedMultiClusterService(controller *DNSController, expected *lighth
 	}).Should(Equal(&expected.Spec))
 }
 
-func newMultiClusterService(id string, namespace string, name string) *lighthousev1.MultiClusterService {
+func newMultiClusterService(namespace, name, serviceIP, clusterID string) *lighthousev1.MultiClusterService {
 	return &lighthousev1.MultiClusterService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -121,8 +121,8 @@ func newMultiClusterService(id string, namespace string, name string) *lighthous
 		Spec: lighthousev1.MultiClusterServiceSpec{
 			Items: []lighthousev1.ClusterServiceInfo{
 				lighthousev1.ClusterServiceInfo{
-					ClusterID: "cluster" + id,
-					ServiceIP: "192.168.56.2" + id,
+					ClusterID: clusterID,
+					ServiceIP: serviceIP,
 				},
 			},
 		},
