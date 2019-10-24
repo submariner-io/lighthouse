@@ -6,4 +6,6 @@ source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
 docker tag lighthouse-coredns:dev quay.io/submariner/lighthouse-coredns:latest
 docker tag lighthouse-coredns:dev quay.io/submariner/lighthouse-coredns:"${TRAVIS_COMMIT:0:7}"
+docker tag lighthouse-controller:dev quay.io/submariner/lighthouse-controller:latest
+docker tag lighthouse-controller:dev quay.io/submariner/lighthouse-controller:"${TRAVIS_COMMIT:0:7}"
 for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "quay.io/submariner/lighthouse"); do docker push $i; done
