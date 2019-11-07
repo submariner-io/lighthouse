@@ -10,19 +10,18 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	service1   = "service1"
 	namespace1 = "namespace1"
+	namespace2 = "namespace2"
 	serviceIP  = "100.96.156.175"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
-	Context("Fallthrough is not configured", testDnsServer)
-	Context("Fallthrough is configured", testNext)
+	Context("Fallthrough not configured", testWithoutFallback)
+	Context("Fallthrough configured", testWithFallback)
 })
 
 type FailingResponseWriter struct {
@@ -34,11 +33,10 @@ func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
 
-func testDnsServer() {
+func testWithoutFallback() {
 	var (
 		rec *dnstest.Recorder
 		lh  *Lighthouse
-		tc  test.Case
 	)
 
 	BeforeEach(func() {
@@ -50,108 +48,107 @@ func testDnsServer() {
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
-	When("TypeA DNS query for service that exists", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service is present.
+	When("type A DNS query for an existing service", func() {
+		It("should succeed and write an A record response", func() {
+			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
 				},
-			}
-		})
-		It("Should return A record", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
-			respErr := test.SortAndCheck(rec.Msg, tc)
-			Expect(respErr).NotTo(HaveOccurred())
+			})
 		})
 	})
 
-	When("TypeA DNS query for service that doesn't exist", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc2.default.svc.cluster.local.",
+	When("type A DNS query for an existing service with a different namespace", func() {
+		It("should succeed and write an A record response", func() {
+			lh.multiClusterServices.put(newMultiClusterService(namespace2, service1, serviceIP, "clusterID"))
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace2 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("type A DNS query for a non-existent service", func() {
+		It("should return RcodeNameError", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "unknown." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
-			}
-		})
-		It("Should return RcodeNameError", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+			})
 		})
 	})
 
-	When("Type A DNS query for pod", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc2.default.pod.cluster.local.",
+	When("type A DNS query for a non-existent service with a different namespace", func() {
+		It("should return RcodeNameError", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
-			}
-		})
-		It("Should return RcodeNameError", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+			})
 		})
 	})
 
-	When("Type AAAA DNS query", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc.default.svc.cluster.local.",
+	When("type A DNS query for a pod", func() {
+		It("should return RcodeNameError", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".pod.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeNameError,
+			})
+		})
+	})
+
+	When("type A DNS query for a non-existent zone", func() {
+		It("should return RcodeNameError", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.cluster.east.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotZone,
+			})
+		})
+	})
+
+	When("type AAAA DNS query", func() {
+		It("should return error RcodeNotImplemented", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeNotImplemented,
-			}
-		})
-		It("Should return error RcodeNotImplemented", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+			})
 		})
 	})
 
-	When("WriteMsg fails", func() {
+	When("writing the response message fails", func() {
 		BeforeEach(func() {
-			tc = test.Case{
-				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
-				Qtype: dns.TypeA,
-				Rcode: dns.RcodeServerFailure,
-			}
-			lh.Zones = []string{"cluster.local."}
 			rec = dnstest.NewRecorder(&FailingResponseWriter{errorMsg: "write failed"})
 		})
 
-		It("Should return error RcodeServerFailure", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+		It("should return error RcodeServerFailure", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeServerFailure,
+			})
 		})
 	})
 }
 
-func testNext() {
+func testWithFallback() {
 	var (
 		rec *dnstest.Recorder
 		lh  *Lighthouse
-		tc  test.Case
 	)
 
 	BeforeEach(func() {
 		lh = &Lighthouse{
+			Zones:                []string{"cluster.local."},
 			Fall:                 fall.F{Zones: []string{"cluster.local."}},
 			Next:                 test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
 			multiClusterServices: setupMultiClusterServiceMap(),
@@ -160,90 +157,72 @@ func testNext() {
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
-	When("Zones not configured", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc2.default.svc.cluster.local.", Qtype: dns.TypeA,
+	When("type A DNS query for a non-matching lighthouse zone and matching fallthrough zone", func() {
+		It("should invoke the next plugin", func() {
+			lh.Fall = fall.F{Zones: []string{"cluster.local.", "cluster.east."}}
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.east.",
+				Qtype: dns.TypeA,
 				Rcode: dns.RcodeBadCookie,
-			}
-		})
-		It("Should call next plugin", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+			})
 		})
 	})
 
-	When("Type AAAA DNS query", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc.default.svc.cluster.local.", Qtype: dns.TypeAAAA,
-				Rcode: dns.RcodeBadCookie,
-			}
-			lh.Zones = []string{"cluster.local."}
-		})
-		It("Should call next plugin", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+	When("type A DNS query for a non-matching lighthouse zone and non-matching fallthrough zone", func() {
+		It("should not invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.east.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotZone,
+			})
 		})
 	})
 
-	When("Type A DNS query for pod", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc.default.pod.cluster.local.", Qtype: dns.TypeA,
+	When("type AAAA DNS query", func() {
+		It("should invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeBadCookie,
-			}
-			lh.Zones = []string{"cluster.local."}
-		})
-		It("Should call next plugin", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+			})
 		})
 	})
 
-	When("DNS query for service that doesn't exist", func() {
-		BeforeEach(func() {
-			tc = test.Case{
-				// service does not exist, expect error.
-				Qname: "mysvc2.default.svc.cluster.local.", Qtype: dns.TypeA,
+	When("type A DNS query for a pod", func() {
+		It("should invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".pod.cluster.local.",
+				Qtype: dns.TypeA,
 				Rcode: dns.RcodeBadCookie,
-			}
-			lh.Zones = []string{"cluster.local."}
+			})
 		})
-		It("Should call next plugin", func() {
-			m := tc.Msg()
-			code, err := lh.ServeDNS(context.TODO(), rec, m)
-			Expect(err).To(HaveOccurred())
-			Expect(code).Should(Equal(tc.Rcode))
+	})
+
+	When("type A DNS query for a non-existent service", func() {
+		It("should invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "unknown." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeBadCookie,
+			})
 		})
 	})
 }
 
+func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
+	code, err := lh.ServeDNS(context.TODO(), rec, tc.Msg())
+
+	Expect(code).Should(Equal(tc.Rcode))
+	if tc.Rcode == dns.RcodeSuccess {
+		Expect(err).To(Succeed())
+		Expect(test.SortAndCheck(rec.Msg, tc)).To(Succeed())
+	} else {
+		Expect(err).To(HaveOccurred())
+	}
+}
+
 func setupMultiClusterServiceMap() *multiClusterServiceMap {
 	mcsMap := new(multiClusterServiceMap)
-	mcsMap.put(&lighthousev1.MultiClusterService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      service1,
-			Namespace: namespace1,
-		},
-		Spec: lighthousev1.MultiClusterServiceSpec{
-			Items: []lighthousev1.ClusterServiceInfo{
-				lighthousev1.ClusterServiceInfo{
-					ClusterID: "clusterID",
-					ServiceIP: serviceIP,
-				},
-			},
-		},
-	})
-
+	mcsMap.put(newMultiClusterService(namespace1, service1, serviceIP, "clusterID"))
 	return mcsMap
 }
