@@ -16,11 +16,9 @@ require (
 	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v0.3.3
-	sigs.k8s.io/controller-runtime v0.1.12
-	sigs.k8s.io/kubefed v0.1.0-rc3
 )
 
-replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd
+replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda
 
 replace k8s.io/client-go => k8s.io/client-go v0.0.0-20190521190702-177766529176
 
