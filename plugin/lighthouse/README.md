@@ -6,10 +6,14 @@
 
 ## Description
 
-*Lighthouse* is an external plugin for CoreDNS that allows Cross Cluster Service
-Discovery between kubernetes clusters connected by [*Submariner*](https://github.com/submariner-io/submariner)
+*Lighthouse*  plugin allows Cross Cluster Service Discovery between Kubernetes 
+clusters connected by [*Submariner*](https://github.com/submariner-io/submariner).
 
-This is still in early proof-of-concept state.
+If the default Kubernetes plugin fails to resolve a DNS request, the lighthouse plugin will try to resolve it
+using the information it gathered from other clusters that have joined the submariner control plane. On a successful resolution,
+lighthouse plugin returns the cluster IP of the service in the remote cluster. Submariner ensures that this IP
+is reachable.
+
 
 ## Syntax
 
@@ -19,24 +23,6 @@ to be present.
 ```
 lighthouse
 ```
-
-## External Plugin
-
-*Lighthouse* is an *external* plugin, which means it is not included in CoreDNS releases.  To use *lighthouse*,
-you'll need to build a CoreDNS image with *lighthouse*.
-
-Steps to build lighthouse:
-
-* Clone https://github.com/coredns/coredns into `$GOPATH/src/github.com/coredns`
-* Add this plugin to [plugin.cfg](https://github.com/coredns/coredns/blob/master/plugin.cfg) per instructions therein.
-```
-kubernetes:kubernetes
-lighthouse:github.com/submariner-io/lighthouse/plugin/lighthouse
-```
-* `make -f Makefile.release DOCKER=your-docker-repo release`
-* `make -f Makefile.release DOCKER=your-docker-repo docker`
-* `make -f Makefile.release DOCKER=your-docker-repo docker-push`
-
 ## Examples
 
 ```
