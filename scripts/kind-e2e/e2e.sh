@@ -290,7 +290,7 @@ function test_with_e2e_tests {
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
     go test -args -ginkgo.v -ginkgo.randomizeAllSpecs \
-        -dp-context cluster2 -dp-context cluster3  \
+         -dp-context cluster1  -dp-context cluster2 -dp-context cluster3  \
         -report-dir ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/junit 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
 }
