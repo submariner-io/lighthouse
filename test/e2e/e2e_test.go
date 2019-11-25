@@ -3,7 +3,8 @@ package e2e
 import (
 	"testing"
 
-	"github.com/submariner-io/submariner/test/e2e/framework"
+	_ "github.com/submariner-io/lighthouse/test/e2e/dataplane"
+	"github.com/submariner-io/lighthouse/test/e2e/framework"
 )
 
 func init() {
