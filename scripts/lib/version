@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# This should only be sourced
+if [ "${0##*/}" = "version" ]; then
+    echo "Don't run me, source me" >&2
+    exit 1
+fi
+
+COMMIT=$(git rev-parse --short HEAD)
+GIT_TAG=$(git tag -l --contains HEAD | head -n 1)
+
+if [[ -n "$GIT_TAG" ]]; then
+    VERSION=${GIT_TAG#"v"}
+else
+    VERSION="dev"
+fi
