@@ -26,16 +26,16 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 	f.NewNginxDeployment(framework.ClusterC)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
-	service := f.NewNginxService(framework.ClusterC)
+	_ = f.NewNginxService(framework.ClusterC)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
-	netShootDeployment := f.NewNetShootDeployment(framework.ClusterB, service.Service.Spec.ClusterIP)
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 	cmd := []string{"curl", "nginx-demo"}
 	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
 		Command:       cmd,
 		Namespace:     f.Namespace,
-		PodName:       netShootDeployment.PodList.Items[0].Name,
-		ContainerName: netShootDeployment.PodList.Items[0].Spec.Containers[0].Name,
+		PodName:       netshootPodList.Items[0].Name,
+		ContainerName: netshootPodList.Items[0].Spec.Containers[0].Name,
 		CaptureStdout: true,
 		CaptureStderr: true,
 	}, framework.ClusterB)

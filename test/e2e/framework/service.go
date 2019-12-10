@@ -9,25 +9,7 @@ import (
 
 type ServiceType int
 
-const (
-	InvalidServicePodType ServiceType = iota
-	NginxService
-)
-
-type Service struct {
-	Service   *corev1.Service
-	framework *Framework
-	Cluster   ClusterIndex
-}
-
-func (f *Framework) NewNginxService(Cluster ClusterIndex) *Service {
-
-	service := &Service{framework: f, Cluster: Cluster}
-	service.buildNginxService()
-	return service
-}
-
-func (s *Service) buildNginxService() {
+func (f *Framework) NewNginxService(cluster ClusterIndex) *corev1.Service {
 	var port int32 = 80
 	nginxService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -54,9 +36,10 @@ func (s *Service) buildNginxService() {
 		},
 	}
 
-	sc := s.framework.ClusterClients[s.Cluster].CoreV1().Services(s.framework.Namespace)
-	s.Service = AwaitUntil("create service", func() (interface{}, error) {
+	sc := f.ClusterClients[cluster].CoreV1().Services(f.Namespace)
+	service := AwaitUntil("create service", func() (interface{}, error) {
 		return sc.Create(&nginxService)
 
 	}, NoopCheckResult).(*v1.Service)
+	return service
 }

@@ -391,7 +391,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions, index ClusterIndex) (st
 		if err == nil {
 			break
 		}
-		time.Sleep(time.Millisecond * 10000)
+		time.Sleep(time.Millisecond * 5000)
 		Logf("Retrying due to error  %+v", err)
 	}
 	if options.PreserveWhitespace {

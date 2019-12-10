@@ -9,29 +9,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Deployment struct {
-	PodList   *v1.PodList
-	framework *Framework
-	cluster   ClusterIndex
-	serviceIP string
-}
-
-func (f *Framework) NewNetShootDeployment(Cluster ClusterIndex, ServiceIP string) *Deployment {
-	deployment := &Deployment{framework: f, cluster: Cluster, serviceIP: ServiceIP}
-	deployment.buildNetshootDeployment()
-	return deployment
-}
-
-func (f *Framework) NewNginxDeployment(Cluster ClusterIndex) *Deployment {
-	deployment := &Deployment{framework: f, cluster: Cluster}
-	deployment.buildNginxDeployment()
-	return deployment
-}
-
-func (d *Deployment) AwaitReady() {
-	pods := d.framework.ClusterClients[d.cluster].CoreV1().Pods(d.framework.Namespace)
-	d.PodList, _ = pods.List(metav1.ListOptions{})
-	d.PodList = AwaitUntil("get pod", func() (interface{}, error) {
+func awaitReady(f *Framework, cluster ClusterIndex) *v1.PodList {
+	pods := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
+	podList := AwaitUntil("get pod", func() (interface{}, error) {
 		podList, err := pods.List(metav1.ListOptions{})
 		if nil != err {
 			Logf("Error while retrieving podlist")
@@ -54,11 +34,12 @@ func (d *Deployment) AwaitReady() {
 		}
 		return true, nil // pod is running
 	}).(*v1.PodList)
+	return podList
 }
 
-func (d *Deployment) buildNetshootDeployment() {
+func (f *Framework) NewNetShootDeployment(cluster ClusterIndex) *v1.PodList {
 	var replicaCount int32 = 1
-	netShootDeployment := appsv1.Deployment{
+	netShootDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "netshoot",
 			Labels: map[string]string{
@@ -95,19 +76,14 @@ func (d *Deployment) buildNetshootDeployment() {
 		},
 	}
 
-	pc := d.framework.ClusterClients[d.cluster].AppsV1().Deployments(d.framework.Namespace)
-
-	_ = AwaitUntil("create deployment", func() (interface{}, error) {
-		return pc.Create(&netShootDeployment)
-
-	}, NoopCheckResult).(*appsv1.Deployment)
-	d.AwaitReady()
+	podList := create(f, cluster, netShootDeployment)
+	return podList
 }
 
-func (d *Deployment) buildNginxDeployment() {
+func (f *Framework) NewNginxDeployment(cluster ClusterIndex) *v1.PodList {
 	var replicaCount int32 = 1
 	var port int32 = 80
-	nginxDeployment := appsv1.Deployment{
+	nginxDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginx-demo",
 		},
@@ -144,11 +120,16 @@ func (d *Deployment) buildNginxDeployment() {
 		},
 	}
 
-	pc := d.framework.ClusterClients[d.cluster].AppsV1().Deployments(d.framework.Namespace)
+	podList := create(f, cluster, nginxDeployment)
+	return podList
+}
+
+func create(f *Framework, cluster ClusterIndex, deployment *appsv1.Deployment) *v1.PodList {
+	pc := f.ClusterClients[cluster].AppsV1().Deployments(f.Namespace)
 
 	_ = AwaitUntil("create deployment", func() (interface{}, error) {
-		return pc.Create(&nginxDeployment)
-
+		return pc.Create(deployment)
 	}, NoopCheckResult).(*appsv1.Deployment)
-	d.AwaitReady()
+
+	return awaitReady(f, cluster)
 }
