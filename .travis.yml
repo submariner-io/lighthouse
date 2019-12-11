@@ -16,7 +16,11 @@ after_success:
       make e2e status=keep;
     fi
 deploy:
-  provider: script
-  script: bash scripts/release
-  on:
-    branch: master
+  - provider: script
+    script: bash scripts/release
+    on:
+      branch: master
+  - provider: script
+    script: bash scripts/release
+    on:
+      tags: true

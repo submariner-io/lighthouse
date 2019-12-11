@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 set -e
 
-source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+source $(dirname $0)/lib/version
+source $(dirname $0)/lib/debug_functions
+
+if [[ ${VERSION} != "dev" ]]; then
+    DOCKER_TAG=${VERSION}
+else
+    DOCKER_TAG="latest"
+fi
+
+REPO=${REPO:-quay.io/submariner}
 
 echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
-docker tag lighthouse-coredns:dev quay.io/submariner/lighthouse-coredns:latest
-docker tag lighthouse-coredns:dev quay.io/submariner/lighthouse-coredns:"${TRAVIS_COMMIT:0:7}"
-for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "quay.io/submariner/lighthouse"); do docker push $i; done
+docker tag lighthouse-coredns:${VERSION} ${REPO}/lighthouse-coredns:${DOCKER_TAG}
+docker tag lighthouse-coredns:${VERSION} ${REPO}/lighthouse-coredns:"${COMMIT:0:7}"
+docker tag lighthouse-controller:${VERSION} ${REPO}/lighthouse-controller:${DOCKER_TAG}
+docker tag lighthouse-controller:${VERSION} ${REPO}/lighthouse-controller:"${COMMIT:0:7}"
+for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "${REPO}/.*:(${DOCKER_TAG}|${COMMIT:0:7})"); do docker push $i; done

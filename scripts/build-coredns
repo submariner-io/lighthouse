@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+source $(dirname $0)/../scripts/lib/version
 source $(dirname $0)/../scripts/lib/debug_functions
 
 function cleanup {
@@ -13,7 +14,7 @@ trap cleanup EXIT
 COREDNS_VERSION=$5
 TOPDIR=$(git rev-parse --show-toplevel)
 COREDNS_GIT="https://github.com/coredns/coredns.git"
-DOCKER_TAG="lighthouse-coredns:dev"
+COREDNS_IMAGE="lighthouse-coredns:${VERSION}"
 BUILD_DIR="build/linux/amd64"
 
 cd ${TOPDIR}
@@ -25,8 +26,9 @@ sed -i '$a replace\ github.com\/openzipkin-contrib\/zipkin-go-opentracing\ =>\ g
 sed -i '$a replace\ github.com/bronze1man/goStrongswanVici\ =>\ github.com/mangelajo/goStrongswanVici\ v0.0.0-20190223031456-9a5ae4453bd' go.mod
 sed -i '$a replace\ github.com/submariner-io/lighthouse\ =>\ '"${TOPDIR}" go.mod
 
+
 mkdir -p ${BUILD_DIR}
 cp Dockerfile ${BUILD_DIR}
-
 make BINARY=${BUILD_DIR}/coredns SYSTEM=GOOS=linux GOARCH=amd64
-docker build -t ${DOCKER_TAG} ${BUILD_DIR}
+docker build -t ${COREDNS_IMAGE} ${BUILD_DIR}
+echo "Built ighthouse-coredns to image: ${COREDNS_IMAGE}"
