@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lighthouse-dnsserver
+  namespace: kube-system
+  labels:
+    app: lighthouse-dnsserver
+spec:
+  selector:
+    matchLabels:
+      app: lighthouse-dnsserver
+  template:
+    metadata:
+      labels:
+        app: lighthouse-dnsserver
+    spec:
+      containers:
+      - name: lighthouse-dnsserver
+        image: lighthouse-dnsserver:dev
+      serviceAccount: coredns     # for production we need to create our own service account and
+      serviceAccountName: coredns # provide access to KubeFedClusters
