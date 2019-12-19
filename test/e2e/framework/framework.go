@@ -17,6 +17,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 
 	"github.com/onsi/ginkgo"
+	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -73,8 +74,9 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	ClusterClients []*kubeclientset.Clientset
-	federator      []federate.Federator
+	ClusterClients    []*kubeclientset.Clientset
+	LighthouseClients []*lighthouseClientset.Clientset
+	federator         []federate.Federator
 
 	SkipNamespaceCreation bool            // Whether to skip creating a namespace
 	Namespace             string          // Every test has a namespace at least unless creation is skipped
@@ -128,6 +130,7 @@ func (f *Framework) BeforeEach() {
 	for idx, context := range TestContext.KubeContexts {
 		client := f.createKubernetesClient(context)
 		f.ClusterClients = append(f.ClusterClients, client)
+		f.LighthouseClients = append(f.LighthouseClients, f.createLighthouseClient(context))
 		stopCh := make(chan struct{})
 		var federator federate.Federator
 		switch ClusterIndex(idx) {
@@ -158,15 +161,31 @@ func (f *Framework) BeforeEach() {
 						TestContext.KubeConfig)
 					os.Exit(1)
 				}
-			default: // On the other clusters we use the same name to make tracing easier
-				continue
-				//f.CreateNamespace(clientSet, f.Namespace, namespaceLabels)
+			default: // On the other clusters it will be distributed using admiral
+				awaitForNameSpace(f, idx)
 			}
 		}
 	} else {
 		f.UniqueName = string(uuid.NewUUID())
 	}
 
+}
+
+func awaitForNameSpace(f *Framework, cluster int) *v1.Namespace {
+	namespace := AwaitUntil("get pod", func() (interface{}, error) {
+		namespace, err := f.ClusterClients[cluster].CoreV1().Namespaces().Get(f.Namespace, metav1.GetOptions{})
+		if nil != err {
+			Logf("Error while retrieving podlist")
+			return nil, nil
+		}
+		return namespace, nil
+	}, func(result interface{}) (bool, error) {
+		if result == nil {
+			return false, nil
+		}
+		return true, nil // pod is running
+	}).(*v1.Namespace)
+	return namespace
 }
 
 func (f *Framework) createKubernetesClient(context string) *kubeclientset.Clientset {
@@ -204,6 +223,19 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 	if restConfig.NegotiatedSerializer == nil {
 		restConfig.NegotiatedSerializer = scheme.Codecs
 	}
+	return clientSet
+}
+
+func (f *Framework) createLighthouseClient(context string) *lighthouseClientset.Clientset {
+	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
+	if err != nil {
+		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
+			TestContext.KubeConfig, context)
+		Errorf("loadConfig err: %s", err.Error())
+		os.Exit(1)
+	}
+	clientSet, err := lighthouseClientset.NewForConfig(restConfig)
+	Expect(err).NotTo(HaveOccurred())
 	return clientSet
 }
 
