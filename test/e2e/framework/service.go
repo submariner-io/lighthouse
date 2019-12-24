@@ -1,6 +1,9 @@
 package framework
 
 import (
+	"fmt"
+
+	. "github.com/onsi/ginkgo"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +48,7 @@ func (f *Framework) NewNginxService(cluster ClusterIndex) *corev1.Service {
 }
 
 func (f *Framework) DeleteService(cluster ClusterIndex, serviceName string) {
+	By(fmt.Sprintf("Deleting service %q on %q", serviceName, TestContext.KubeContexts[cluster]))
 	AwaitUntil("delete service", func() (interface{}, error) {
 		return nil, f.ClusterClients[cluster].CoreV1().Services(f.Namespace).Delete(serviceName, &metav1.DeleteOptions{})
 	}, NoopCheckResult)

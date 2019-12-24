@@ -56,7 +56,6 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
 
-	By(fmt.Sprintf("Deleting Nginx service %q", nginxServiceClusterC.Name))
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
@@ -83,12 +82,10 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterB, netshootPodList, true)
 
-	By(fmt.Sprintf("Deleting Nginx service %q", nginxServiceClusterB.Name))
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
 
-	By(fmt.Sprintf("Deleting Nginx service %q on %q", nginxServiceClusterC.Name, clusterCName))
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
