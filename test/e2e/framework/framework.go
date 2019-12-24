@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/client-go/kubernetes"
@@ -158,9 +159,8 @@ func (f *Framework) BeforeEach() {
 						TestContext.KubeConfig)
 					os.Exit(1)
 				}
-			default: // On the other clusters we use the same name to make tracing easier
-				continue
-				//f.CreateNamespace(clientSet, f.Namespace, namespaceLabels)
+			default: // On the other clusters it will be distributed using admiral
+				awaitNameSpace(f, idx)
 			}
 		}
 	} else {
@@ -169,30 +169,28 @@ func (f *Framework) BeforeEach() {
 
 }
 
+func awaitNameSpace(f *Framework, cluster int) {
+	_ = AwaitUntil("get namespace", func() (interface{}, error) {
+		namespace, err := f.ClusterClients[cluster].CoreV1().Namespaces().Get(f.Namespace, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		return namespace, nil
+	}, func(result interface{}) (bool, error) {
+		if result == nil {
+			return false, nil
+		}
+		return true, nil
+	}).(*v1.Namespace)
+}
+
 func (f *Framework) createKubernetesClient(context string) *kubeclientset.Clientset {
 
-	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
-	if err != nil {
-		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
-			TestContext.KubeConfig, context)
-		Errorf("loadConfig err: %s", err.Error())
-		os.Exit(1)
-	}
-
-	testDesc := ginkgo.CurrentGinkgoTestDescription()
-	if len(testDesc.ComponentTexts) > 0 {
-		componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-		restConfig.UserAgent = fmt.Sprintf(
-			"%v -- %v",
-			rest.DefaultKubernetesUserAgent(),
-			componentTexts)
-	}
-
-	restConfig.QPS = f.Options.ClientQPS
-	restConfig.Burst = f.Options.ClientBurst
-	if f.Options.GroupVersion != nil {
-		restConfig.GroupVersion = f.Options.GroupVersion
-	}
+	restConfig := f.createRestConfig(context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -205,6 +203,30 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 		restConfig.NegotiatedSerializer = scheme.Codecs
 	}
 	return clientSet
+}
+
+func (f *Framework) createRestConfig(context string) *rest.Config {
+	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
+	if err != nil {
+		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
+			TestContext.KubeConfig, context)
+		Errorf("loadConfig err: %s", err.Error())
+		os.Exit(1)
+	}
+	testDesc := ginkgo.CurrentGinkgoTestDescription()
+	if len(testDesc.ComponentTexts) > 0 {
+		componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+		restConfig.UserAgent = fmt.Sprintf(
+			"%v -- %v",
+			rest.DefaultKubernetesUserAgent(),
+			componentTexts)
+	}
+	restConfig.QPS = f.Options.ClientQPS
+	restConfig.Burst = f.Options.ClientBurst
+	if f.Options.GroupVersion != nil {
+		restConfig.GroupVersion = f.Options.GroupVersion
+	}
+	return restConfig
 }
 
 func (f *Framework) buildKubeFedFederator(stopCh <-chan struct{}, context string) federate.Federator {

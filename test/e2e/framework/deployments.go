@@ -9,10 +9,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func awaitReady(f *Framework, cluster ClusterIndex) *v1.PodList {
-	pods := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
+func awaitReady(f *Framework, cluster ClusterIndex, appName string) *v1.PodList {
 	podList := AwaitUntil("get pod", func() (interface{}, error) {
-		podList, err := pods.List(metav1.ListOptions{})
+		podList, err := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=" + appName})
 		if nil != err {
 			Logf("Error while retrieving podlist")
 			return nil, err
@@ -126,10 +125,10 @@ func (f *Framework) NewNginxDeployment(cluster ClusterIndex) *v1.PodList {
 
 func create(f *Framework, cluster ClusterIndex, deployment *appsv1.Deployment) *v1.PodList {
 	pc := f.ClusterClients[cluster].AppsV1().Deployments(f.Namespace)
-
+	appName := deployment.Spec.Template.ObjectMeta.Labels["app"]
 	_ = AwaitUntil("create deployment", func() (interface{}, error) {
 		return pc.Create(deployment)
 	}, NoopCheckResult).(*appsv1.Deployment)
 
-	return awaitReady(f, cluster)
+	return awaitReady(f, cluster, appName)
 }
