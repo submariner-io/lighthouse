@@ -17,7 +17,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 
 	"github.com/onsi/ginkgo"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -75,9 +74,8 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	ClusterClients    []*kubeclientset.Clientset
-	LighthouseClients []*lighthouseClientset.Clientset
-	federator         []federate.Federator
+	ClusterClients []*kubeclientset.Clientset
+	federator      []federate.Federator
 
 	SkipNamespaceCreation bool            // Whether to skip creating a namespace
 	Namespace             string          // Every test has a namespace at least unless creation is skipped
@@ -131,7 +129,6 @@ func (f *Framework) BeforeEach() {
 	for idx, context := range TestContext.KubeContexts {
 		client := f.createKubernetesClient(context)
 		f.ClusterClients = append(f.ClusterClients, client)
-		f.LighthouseClients = append(f.LighthouseClients, f.createLighthouseClient(context))
 		stopCh := make(chan struct{})
 		var federator federate.Federator
 		switch ClusterIndex(idx) {
@@ -172,8 +169,8 @@ func (f *Framework) BeforeEach() {
 
 }
 
-func awaitNameSpace(f *Framework, cluster int) *v1.Namespace {
-	return AwaitUntil("get namespace", func() (interface{}, error) {
+func awaitNameSpace(f *Framework, cluster int) {
+	_ = AwaitUntil("get namespace", func() (interface{}, error) {
 		namespace, err := f.ClusterClients[cluster].CoreV1().Namespaces().Get(f.Namespace, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return nil, nil
@@ -199,20 +196,6 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 
 	// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 	// as they are required when creating a REST client.
-	if restConfig.GroupVersion == nil {
-		restConfig.GroupVersion = &schema.GroupVersion{}
-	}
-	if restConfig.NegotiatedSerializer == nil {
-		restConfig.NegotiatedSerializer = scheme.Codecs
-	}
-	return clientSet
-}
-
-func (f *Framework) createLighthouseClient(context string) *lighthouseClientset.Clientset {
-	restConfig := f.createRestConfig(context)
-	clientSet, err := lighthouseClientset.NewForConfig(restConfig)
-	Expect(err).NotTo(HaveOccurred())
-
 	if restConfig.GroupVersion == nil {
 		restConfig.GroupVersion = &schema.GroupVersion{}
 	}

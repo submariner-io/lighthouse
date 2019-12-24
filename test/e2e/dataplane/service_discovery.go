@@ -54,13 +54,11 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(stdout).To(ContainSubstring("Welcome to nginx!"))
 
-	By(fmt.Sprintf("Executing dig to verify Nginx service is discoverable and service IP in cluster %q is returned", framework.ClusterC))
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
 
 	By(fmt.Sprintf("Deleting Nginx service %q", nginxServiceClusterC.Name))
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	By(fmt.Sprintf("Executing dig to verify Nginx service is no longer discoverable"))
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
@@ -68,13 +66,13 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
 	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterCName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
@@ -83,19 +81,16 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Executing dig to verify Nginx service is discoverable and service IP in cluster %q is returned", clusterBName))
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterB, netshootPodList, true)
 
 	By(fmt.Sprintf("Deleting Nginx service %q", nginxServiceClusterB.Name))
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	By(fmt.Sprintf("Executing dig to verify Nginx service is discoverable and service IP in cluster %q is returned", clusterCName))
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
 
-	By(fmt.Sprintf("Deleting Nginx service %q", nginxServiceClusterC.Name))
+	By(fmt.Sprintf("Deleting Nginx service %q on %q", nginxServiceClusterC.Name, clusterCName))
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	By(fmt.Sprintf("Executing dig to verify Nginx service is no longer discoverable"))
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
@@ -106,7 +101,11 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 	serviceIP := service.Spec.ClusterIP
 
 	cmd := []string{"dig", "@" + kubeDnsServiceIP, service.Name + "." + f.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
-	By(fmt.Sprintf("Executing %q to verify discovery of Nginx service IP %q", strings.Join(cmd, " "), serviceIP))
+	op := "is"
+	if !shouldContain {
+		op += " not"
+	}
+	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
 		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
 			Command:       cmd,
