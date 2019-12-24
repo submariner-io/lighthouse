@@ -45,36 +45,7 @@ func (f *Framework) NewNginxService(cluster ClusterIndex) *corev1.Service {
 }
 
 func (f *Framework) DeleteService(cluster ClusterIndex, serviceName string) {
-	sc := f.ClusterClients[cluster].CoreV1().Services(f.Namespace)
-	_ = sc.Delete(serviceName, &metav1.DeleteOptions{})
-	_ = AwaitUntil("service delete", func() (interface{}, error) {
-		service, err := sc.Get(serviceName, metav1.GetOptions{})
-		if nil != err {
-			Logf("Error while retrieving podlist")
-			return nil, nil
-		}
-		return service, nil
-	}, func(result interface{}) (bool, error) {
-		if result != nil {
-			return false, nil
-		}
-		return true, nil // pod is running
-	})
-}
-
-func (f *Framework) AwaitForMcsCrdDelete(cluster ClusterIndex, serviceName string) {
-	sc := f.LighthouseClients[cluster].LighthouseV1().MultiClusterServices(f.Namespace)
-	_ = AwaitUntil("service delete", func() (interface{}, error) {
-		service, err := sc.Get(serviceName, metav1.GetOptions{})
-		if nil != err {
-			Logf("Error while retrieving podlist")
-			return nil, nil
-		}
-		return service, nil
-	}, func(result interface{}) (bool, error) {
-		if result != nil {
-			return false, nil
-		}
-		return true, nil // pod is running
-	})
+	AwaitUntil("delete service", func() (interface{}, error) {
+		return nil, f.ClusterClients[cluster].CoreV1().Services(f.Namespace).Delete(serviceName, &metav1.DeleteOptions{})
+	}, NoopCheckResult)
 }

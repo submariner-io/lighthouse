@@ -75,7 +75,7 @@ func (f *Framework) NewNetShootDeployment(cluster ClusterIndex) *v1.PodList {
 		},
 	}
 
-	podList := create(f, cluster, netShootDeployment, "netshoot")
+	podList := create(f, cluster, netShootDeployment)
 	return podList
 }
 
@@ -119,13 +119,13 @@ func (f *Framework) NewNginxDeployment(cluster ClusterIndex) *v1.PodList {
 		},
 	}
 
-	podList := create(f, cluster, nginxDeployment, "nginx-demo")
+	podList := create(f, cluster, nginxDeployment)
 	return podList
 }
 
-func create(f *Framework, cluster ClusterIndex, deployment *appsv1.Deployment, appName string) *v1.PodList {
+func create(f *Framework, cluster ClusterIndex, deployment *appsv1.Deployment) *v1.PodList {
 	pc := f.ClusterClients[cluster].AppsV1().Deployments(f.Namespace)
-
+	appName := deployment.Spec.Template.ObjectMeta.Labels["app"]
 	_ = AwaitUntil("create deployment", func() (interface{}, error) {
 		return pc.Create(deployment)
 	}, NoopCheckResult).(*appsv1.Deployment)
