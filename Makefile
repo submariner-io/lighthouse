@@ -3,6 +3,7 @@ version ?= 1.14.3
 logging ?= false
 kubefed ?= true
 coredns ?= 1.5.2
+lhmode ?= plugin
 
 TARGETS := $(shell ls scripts)
 
@@ -14,7 +15,7 @@ TARGETS := $(shell ls scripts)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(coredns)
+	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(coredns) $(lhmode)
 
 .DEFAULT_GOAL := ci
 
