@@ -211,6 +211,23 @@ function update_coredns_configmap() {
     done
 
 }
+
+function deploy_lighthouse_dnsserver() {
+   trap_commands
+    docker tag lighthouse-dnsserver:${VERSION} lighthouse-dnsserver:local
+    for i in 2 3; do
+        echo "Updating coredns clusterrole in to cluster${i}..."
+        cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
+        kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
+        echo "Deploying Lighthouse DNS server in cluster${i}..."
+        kind --name cluster${i} load docker-image lighthouse-dnsserver:local
+        kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-dnsserver-deployment.yaml
+        lh_dnsserver_clusterip=$(kubectl --context=cluster${i} -n kube-system get svc -l app=lighthouse-dnsserver | awk 'FNR == 2 {print $3}')
+        sed "s|forward\ .\ lighthouse-dnsserver|forward\ .\ $lh_dnsserver_clusterip|g" ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-dnsserver-cm-cluster${i}.yaml > /tmp/coredns-dnsserver-cm-cluster${i}.yaml
+        kubectl --context=cluster${i} -n kube-system replace -f  /tmp/coredns-dnsserver-cm-cluster${i}.yaml
+    done
+}
+
 function test_connection() {
     trap_commands
     nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
@@ -325,6 +342,7 @@ function cleanup {
 ### Main ###
 
 if [[ $1 = clean ]]; then
+    echo Cleaning
     cleanup
     exit 0
 fi
@@ -355,11 +373,15 @@ setup_cluster3_gateway
 test_connection
 if [[ $4 = true ]]; then
     setup_lighthouse_controller
+    if [[ $6 = plugin ]]; then
+        update_coredns_configmap
+        update_coredns_deployment
+    else
+        deploy_lighthouse_dnsserver
+    fi
+    test_e2e_service_discovery
+    test_with_e2e_tests
 fi
-update_coredns_configmap
-update_coredns_deployment
-test_e2e_service_discovery
-test_with_e2e_tests
 
 if [[ $1 = keep ]]; then
     echo "your 3 virtual clusters are deployed and working properly."

@@ -37,7 +37,6 @@ func NewController(remoteServiceMap *MultiClusterServiceMap) *Controller {
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	klog.Infof("Starting DNSController")
-	klog.Errorf("Starting DNSController")
 
 	clientSet, err := c.newClientset(kubeConfig)
 	if err != nil {
@@ -81,7 +80,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	return nil
 }
 
-func (c *Controller) stop() {
+func (c *Controller) Stop() {
 	close(c.stopCh)
 	c.queue.ShutDown()
 
