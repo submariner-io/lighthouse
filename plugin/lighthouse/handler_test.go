@@ -10,6 +10,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	v1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -63,7 +67,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.multiClusterServices.put(newMultiClusterService(namespace2, service1, serviceIP, "clusterID"))
+			lh.multiClusterServices.Put(newMultiClusterService(namespace2, service1, serviceIP, "clusterID"))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -221,8 +225,25 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 	}
 }
 
-func setupMultiClusterServiceMap() *multiClusterServiceMap {
-	mcsMap := new(multiClusterServiceMap)
-	mcsMap.put(newMultiClusterService(namespace1, service1, serviceIP, "clusterID"))
+func setupMultiClusterServiceMap() *multiclusterservice.Map {
+	mcsMap := new(multiclusterservice.Map)
+	mcsMap.Put(newMultiClusterService(namespace1, service1, serviceIP, "clusterID"))
 	return mcsMap
+}
+
+func newMultiClusterService(namespace, name, serviceIP, clusterID string) *v1.MultiClusterService {
+	return &lighthousev1.MultiClusterService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: lighthousev1.MultiClusterServiceSpec{
+			Items: []lighthousev1.ClusterServiceInfo{
+				lighthousev1.ClusterServiceInfo{
+					ClusterID: clusterID,
+					ServiceIP: serviceIP,
+				},
+			},
+		},
+	}
 }

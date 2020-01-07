@@ -1,4 +1,4 @@
-package lighthouse
+package multiclusterservice
 
 import (
 	"sync"
@@ -6,11 +6,11 @@ import (
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 )
 
-type multiClusterServiceMap struct {
+type Map struct {
 	syncMap sync.Map
 }
 
-func (m *multiClusterServiceMap) get(namespace, name string) (*lighthousev1.MultiClusterService, bool) {
+func (m *Map) Get(namespace, name string) (*lighthousev1.MultiClusterService, bool) {
 	value, ok := m.syncMap.Load(keyFunc(namespace, name))
 	if ok {
 		return value.(*lighthousev1.MultiClusterService), true
@@ -19,11 +19,11 @@ func (m *multiClusterServiceMap) get(namespace, name string) (*lighthousev1.Mult
 	return nil, false
 }
 
-func (m *multiClusterServiceMap) put(mcs *lighthousev1.MultiClusterService) {
+func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
 	m.syncMap.Store(keyFunc(mcs.Namespace, mcs.Name), mcs)
 }
 
-func (m *multiClusterServiceMap) remove(namespace, name string) {
+func (m *Map) Remove(namespace, name string) {
 	m.syncMap.Delete(keyFunc(namespace, name))
 }
 
