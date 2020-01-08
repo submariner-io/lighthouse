@@ -1,15 +1,23 @@
-package dnscontroller
+package handler
 
 import (
 	"net"
 	"strings"
 
-	"k8s.io/klog"
-
 	"github.com/miekg/dns"
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+	"k8s.io/klog"
 )
 
-func (lh Lighthouse) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+type handler struct {
+	multiClusterServices *multiclusterservice.Map
+}
+
+func New(multiClusterServices *multiclusterservice.Map) dns.Handler {
+	return &handler{multiClusterServices: multiClusterServices}
+}
+
+func (h *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	klog.Errorf("Serving  DNSRequest")
 	msg := dns.Msg{}
 	msg.SetReply(r)
@@ -22,7 +30,7 @@ func (lh Lighthouse) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		svcName := query[0]
 		namespace := query[1]
 		klog.Infof("The service name %q, and namespace %q", svcName, namespace)
-		service, found := lh.MultiClusterServices.Get(namespace, svcName)
+		service, found := h.multiClusterServices.Get(namespace, svcName)
 		if !found || len(service.Spec.Items) == 0 {
 			klog.Infof("No record found for service %q", domain)
 			msg.Rcode = dns.RcodeNameError

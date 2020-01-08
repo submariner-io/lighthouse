@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/miekg/dns"
-	"github.com/submariner-io/lighthouse/pkg/dnsserver/dnscontroller"
+	"github.com/submariner-io/lighthouse/pkg/dnsserver/handler"
 	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
 	"github.com/submariner-io/submariner/pkg/signals"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,7 +37,7 @@ func main() {
 	}
 
 	srv := &dns.Server{Addr: ":" + strconv.Itoa(53), Net: "udp"}
-	srv.Handler = &dnscontroller.Lighthouse{MultiClusterServices: mcsMap}
+	srv.Handler = handler.New(mcsMap)
 	if err := srv.ListenAndServe(); err != nil {
 		klog.Fatalf("Failed to set udp listener %s\n", err.Error())
 		return
