@@ -20,10 +20,10 @@ var (
 var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 func main() {
-	klog.Infof("Starting DNSController")
+	klog.Infof("Starting DNS server")
 	cfg, err := buildKubeConfigFunc(masterURL, kubeconfig)
 	if err != nil {
-		klog.Fatalf("error building kubeconfig: %v", err)
+		klog.Fatalf("Error building kubeconfig: %v", err)
 		return
 	}
 	stopCh := signals.SetupSignalHandler()
@@ -32,14 +32,14 @@ func main() {
 	mcsController := multiclusterservice.NewController(mcsMap)
 	err = mcsController.Start(cfg)
 	if err != nil {
-		klog.Fatalf("Error starting the controller: %v", err)
+		klog.Fatalf("Error starting the MultiClusterService controller: %v", err)
 		return
 	}
 
 	srv := &dns.Server{Addr: ":" + strconv.Itoa(53), Net: "udp"}
 	srv.Handler = handler.New(mcsMap)
 	if err := srv.ListenAndServe(); err != nil {
-		klog.Fatalf("Failed to set udp listener %s\n", err.Error())
+		klog.Fatalf("Failed to start DNS server: %v", err)
 		return
 	}
 
