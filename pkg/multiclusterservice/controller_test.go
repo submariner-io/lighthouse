@@ -1,4 +1,4 @@
-package lighthouse
+package multiclusterservice
 
 import (
 	"k8s.io/client-go/rest"
@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("Lighthouse plugin controller", func() {
+var _ = Describe("MultiClusterService controller", func() {
 	klog.InitFlags(nil)
 
 	Describe("MultiClusterService lifecycle notifications", testMCSLifecycleNotifications)
@@ -24,24 +24,24 @@ func testMCSLifecycleNotifications() {
 
 	var (
 		multiClusterService *lighthousev1.MultiClusterService
-		controller          *DNSController
+		controller          *Controller
 		fakeClientset       lighthouseClientset.Interface
 	)
 
 	BeforeEach(func() {
 		multiClusterService = newMultiClusterService(nameSpace1, serviceName1, "192.168.56.21", "cluster1")
-		mcsMap := new(multiClusterServiceMap)
-		controller = newController(mcsMap)
+		mcsMap := new(Map)
+		controller = NewController(mcsMap)
 		fakeClientset = fakeClientSet.NewSimpleClientset()
 
 		controller.newClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return fakeClientset, nil
 		}
-		Expect(controller.start(&rest.Config{})).To(Succeed())
+		Expect(controller.Start(&rest.Config{})).To(Succeed())
 	})
 
 	AfterEach(func() {
-		controller.stop()
+		controller.Stop()
 	})
 
 	createService := func(mcService *lighthousev1.MultiClusterService) error {
@@ -77,7 +77,7 @@ func testMCSLifecycleNotifications() {
 		Expect(deleteService(multiClusterService)).To(Succeed())
 
 		Eventually(func() bool {
-			_, ok := controller.multiClusterServices.get(mcsService.Namespace, mcsService.Name)
+			_, ok := controller.multiClusterServices.Get(mcsService.Namespace, mcsService.Name)
 			return ok
 		}).Should(BeFalse())
 	}
@@ -102,9 +102,9 @@ func testMCSLifecycleNotifications() {
 	})
 }
 
-func verifyCachedMultiClusterService(controller *DNSController, expected *lighthousev1.MultiClusterService) {
+func verifyCachedMultiClusterService(controller *Controller, expected *lighthousev1.MultiClusterService) {
 	Eventually(func() *lighthousev1.MultiClusterServiceSpec {
-		mcs, ok := controller.multiClusterServices.get(expected.Namespace, expected.Name)
+		mcs, ok := controller.multiClusterServices.Get(expected.Namespace, expected.Name)
 		if ok {
 			return &mcs.Spec
 		}

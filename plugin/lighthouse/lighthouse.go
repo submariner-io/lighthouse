@@ -6,6 +6,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
 )
 
 const (
@@ -25,7 +26,7 @@ type Lighthouse struct {
 	Next                 plugin.Handler
 	Fall                 fall.F
 	Zones                []string
-	multiClusterServices *multiClusterServiceMap
+	multiClusterServices *multiclusterservice.Map
 }
 
 var _ plugin.Handler = &Lighthouse{}

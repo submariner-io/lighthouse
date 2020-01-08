@@ -7,6 +7,7 @@ import (
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -51,16 +52,16 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error building kubeconfig: %v", err)
 	}
 
-	mcsMap := new(multiClusterServiceMap)
-	dnsController := newController(mcsMap)
+	mcsMap := new(multiclusterservice.Map)
+	mcsController := multiclusterservice.NewController(mcsMap)
 
-	err = dnsController.start(cfg)
+	err = mcsController.Start(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error starting the controller: %v", err)
 	}
 
 	c.OnShutdown(func() error {
-		dnsController.stop()
+		mcsController.Stop()
 		return nil
 	})
 

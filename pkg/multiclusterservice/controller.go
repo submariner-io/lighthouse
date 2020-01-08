@@ -1,4 +1,4 @@
-package lighthouse
+package multiclusterservice
 
 import (
 	"fmt"
@@ -13,18 +13,18 @@ import (
 	"k8s.io/klog"
 )
 
-type DNSController struct {
+type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
 	newClientset         func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
 	serviceInformer      cache.SharedIndexInformer
 	queue                workqueue.RateLimitingInterface
 	stopCh               chan struct{}
-	multiClusterServices *multiClusterServiceMap
+	multiClusterServices *Map
 }
 
-func newController(remoteServiceMap *multiClusterServiceMap) *DNSController {
+func NewController(remoteServiceMap *Map) *Controller {
 
-	return &DNSController{
+	return &Controller{
 		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		newClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return lighthouseClientset.NewForConfig(c)
@@ -35,8 +35,8 @@ func newController(remoteServiceMap *multiClusterServiceMap) *DNSController {
 	}
 }
 
-func (c *DNSController) start(kubeConfig *rest.Config) error {
-	klog.Infof("Starting DNSController")
+func (c *Controller) Start(kubeConfig *rest.Config) error {
+	klog.Infof("Starting MultiClusterService Controller")
 
 	clientSet, err := c.newClientset(kubeConfig)
 	if err != nil {
@@ -77,14 +77,14 @@ func (c *DNSController) start(kubeConfig *rest.Config) error {
 	return nil
 }
 
-func (c *DNSController) stop() {
+func (c *Controller) Stop() {
 	close(c.stopCh)
 	c.queue.ShutDown()
 
-	klog.Infof(" DNSController stopped")
+	klog.Infof("MultiClusterService Controller stopped")
 }
 
-func (c *DNSController) runWorker() {
+func (c *Controller) runWorker() {
 	for {
 		keyObj, shutdown := c.queue.Get()
 		if shutdown {
@@ -115,15 +115,15 @@ func (c *DNSController) runWorker() {
 	}
 }
 
-func (c *DNSController) multiClusterServiceCreatedOrUpdated(obj interface{}, key string) {
+func (c *Controller) multiClusterServiceCreatedOrUpdated(obj interface{}, key string) {
 	klog.V(2).Infof("In multiClusterServiceCreatedOrUpdated for key %q, service: %#v, ", key, obj)
 
-	c.multiClusterServices.put(obj.(*lighthousev1.MultiClusterService))
+	c.multiClusterServices.Put(obj.(*lighthousev1.MultiClusterService))
 }
 
-func (c *DNSController) multiClusterServiceDeleted(key string) {
+func (c *Controller) multiClusterServiceDeleted(key string) {
 	klog.V(2).Infof("In multiClusterServiceDeleted for key %q", key)
 
 	namespace, name, _ := cache.SplitMetaNamespaceKey(key)
-	c.multiClusterServices.remove(namespace, name)
+	c.multiClusterServices.Remove(namespace, name)
 }
