@@ -1,5 +1,9 @@
 package dnscontroller
 
+import (
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+)
+
 type Lighthouse struct {
-	MultiClusterServices *MultiClusterServiceMap
+	MultiClusterServices *multiclusterservice.Map
 }

@@ -4,14 +4,12 @@ import (
 	"flag"
 	"strconv"
 
-	"k8s.io/klog"
-
-	"github.com/submariner-io/lighthouse/pkg/dnsserver/dnscontroller"
-	"github.com/submariner-io/submariner/pkg/signals"
-
-	"k8s.io/client-go/tools/clientcmd"
-
 	"github.com/miekg/dns"
+	"github.com/submariner-io/lighthouse/pkg/dnsserver/dnscontroller"
+	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+	"github.com/submariner-io/submariner/pkg/signals"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 var (
@@ -30,9 +28,9 @@ func main() {
 	}
 	stopCh := signals.SetupSignalHandler()
 
-	mcsMap := new(dnscontroller.MultiClusterServiceMap)
-	dnsController := dnscontroller.NewController(mcsMap)
-	err = dnsController.Start(cfg)
+	mcsMap := new(multiclusterservice.Map)
+	mcsController := multiclusterservice.NewController(mcsMap)
+	err = mcsController.Start(cfg)
 	if err != nil {
 		klog.Fatalf("Error starting the controller: %v", err)
 		return
@@ -46,7 +44,7 @@ func main() {
 	}
 
 	<-stopCh
-	dnsController.Stop()
+	mcsController.Stop()
 }
 
 func init() {
