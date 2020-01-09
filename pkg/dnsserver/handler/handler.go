@@ -41,7 +41,7 @@ func (h *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			klog.Infof("Record IP %q found for service %q", serviceInfo.ServiceIP, svcName)
 
 			msg.Answer = append(msg.Answer, &dns.A{
-				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET},
 				A:   net.ParseIP(serviceInfo.ServiceIP),
 			})
 		}
