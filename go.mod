@@ -10,7 +10,7 @@ require (
 	github.com/miekg/dns v1.1.15
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.0
 	github.com/submariner-io/admiral v0.0.0-20190829090417-2e381e854f60
 	github.com/submariner-io/submariner v0.0.2-0.20190828132721-a11a9a84c90d
 	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
