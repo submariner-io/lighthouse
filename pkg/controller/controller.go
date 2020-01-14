@@ -43,6 +43,8 @@ type remoteCluster struct {
 	controller      *LightHouseController
 }
 
+const submarinerIpamGlobalIp = "submariner.io/globalIp"
+
 func New(federator federate.Federator) *LightHouseController {
 	return &LightHouseController{
 		federator:                 federator,
@@ -141,6 +143,9 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 				remoteCluster.queue.Add(key)
 			}
 		},
+		UpdateFunc: func(old, newObj interface{}) {
+			r.handleUpdateService(old, newObj, remoteCluster)
+		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -160,6 +165,29 @@ func (r *LightHouseController) removeServiceWatcher(clusterID string) {
 		remoteCluster.close()
 		delete(r.remoteClusters, clusterID)
 	}
+}
+
+func (r *LightHouseController) handleUpdateService(old interface{}, newObj interface{}, remoteCluster *remoteCluster) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(newObj); err != nil {
+		return
+	}
+	oldGlobalIp := getGlobalIpFromService(old.(*corev1.Service))
+	newGlobalIp := getGlobalIpFromService(newObj.(*corev1.Service))
+	if oldGlobalIp != newGlobalIp {
+		remoteCluster.queue.Add(key)
+	}
+}
+
+func getGlobalIpFromService(service *corev1.Service) string {
+	if service != nil {
+		annotations := service.GetAnnotations()
+		if annotations != nil {
+			return annotations[submarinerIpamGlobalIp]
+		}
+	}
+	return ""
 }
 
 func (r *remoteCluster) close() {
@@ -210,7 +238,7 @@ func (r *remoteCluster) runWorker() {
 }
 
 func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
-	klog.V(2).Infof("In remoteCluster serviceCreated for cluster %q, service %#v", r.clusterID, obj)
+	klog.V(6).Infof("In remoteCluster serviceCreated for cluster %q, service %#v", r.clusterID, obj)
 
 	service := obj.(*corev1.Service)
 
@@ -221,19 +249,26 @@ func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 	if !exists {
 		mcs = r.newMultiClusterService(service, r.clusterID)
 		r.controller.multiClusterServices[key] = mcs
-
 		klog.Infof("Creating a new MultiClusterService with service %q from cluster %q", key, r.clusterID)
 	} else {
-		for _, info := range mcs.Spec.Items {
+		isUpdate := false
+		newCsi := r.newClusterServiceInfo(service, r.clusterID)
+		for i, info := range mcs.Spec.Items {
 			if info.ClusterID == r.clusterID {
-				klog.V(2).Infof("Cluster %q already exists for MultiClusterService %q", r.clusterID, key)
-				return nil
+				if info.ServiceIP == newCsi.ServiceIP {
+					klog.V(2).Infof("Cluster %q already exists for MultiClusterService %q", r.clusterID, key)
+					return nil
+				} else {
+					isUpdate = true
+					mcs.Spec.Items[i] = newCsi
+					klog.V(2).Infof("Updating ServiceIp for MultiClusterService %s on Cluster %s from %s to %s", key, r.clusterID, info.ServiceIP, newCsi.ServiceIP)
+				}
 			}
 		}
-
-		mcs.Spec.Items = append(mcs.Spec.Items, r.newClusterServiceInfo(service, r.clusterID))
-
-		klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
+		if !isUpdate {
+			mcs.Spec.Items = append(mcs.Spec.Items, r.newClusterServiceInfo(service, r.clusterID))
+			klog.Infof("Adding service from cluster %q to existing MultiClusterService %q", r.clusterID, key)
+		}
 	}
 
 	err := r.controller.federator.Distribute(mcs)
@@ -260,9 +295,13 @@ func (r *remoteCluster) newMultiClusterService(service *corev1.Service, clusterI
 }
 
 func (r *remoteCluster) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev1.ClusterServiceInfo {
+	mcsIp := getGlobalIpFromService(service)
+	if mcsIp == "" {
+		mcsIp = service.Spec.ClusterIP
+	}
 	return lighthousev1.ClusterServiceInfo{
 		ClusterID: clusterID,
-		ServiceIP: service.Spec.ClusterIP,
+		ServiceIP: mcsIp,
 	}
 }
 
