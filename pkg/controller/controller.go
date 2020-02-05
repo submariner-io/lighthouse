@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -17,8 +18,13 @@ import (
 	"k8s.io/klog"
 )
 
+var namespaceExclusionList = [...]string{"kubefed", "operator", "submariner"}
+
 type multiClusterServiceMap map[string]*lighthousev1.MultiClusterService
 type remoteClustersMap map[string]*remoteCluster
+
+var skipNamespaces = map[string]bool{"kube-system": true, "submariner": true, "submariner-operator": true, "kubefed-operator": true}
+var skipServices = map[string]bool{"kubernetes": true}
 
 type LightHouseController struct {
 	// multiClusterServices is a map that holds the MultiClusterService resources to distribute.
@@ -41,6 +47,7 @@ type remoteCluster struct {
 	serviceInformer cache.SharedIndexInformer
 	queue           workqueue.RateLimitingInterface
 	controller      *LightHouseController
+	clientset       kubernetes.Interface
 }
 
 const submarinerIpamGlobalIp = "submariner.io/globalIp"
@@ -60,6 +67,7 @@ func New(federator federate.Federator) *LightHouseController {
 }
 
 func (r *LightHouseController) Start() error {
+	klog.V(2).Infof("Namespaces excluded: [Exact: %v, Partial: %v] Services excluded: [Exact: %v]", skipNamespaces, namespaceExclusionList, skipServices)
 	err := r.federator.WatchClusters(r)
 	if err != nil {
 		return fmt.Errorf("could not register cluster watch: %v", err)
@@ -132,6 +140,7 @@ func (r *LightHouseController) startNewServiceWatcher(clusterID string, kubeConf
 		serviceInformer: serviceInformer,
 		queue:           workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		controller:      r,
+		clientset:       clientSet,
 	}
 
 	r.remoteClusters[clusterID] = remoteCluster
@@ -244,7 +253,10 @@ func (r *remoteCluster) serviceCreated(obj interface{}, key string) error {
 
 	r.controller.multiClusterServicesMutex.Lock()
 	defer r.controller.multiClusterServicesMutex.Unlock()
-
+	if !r.canFederateNamespace(service.Namespace) || !r.canFederateService(service.Name) {
+		return nil
+	}
+	r.federateNamespace(service.Namespace)
 	mcs, exists := r.controller.multiClusterServices[key]
 	if !exists {
 		mcs = r.newMultiClusterService(service, r.clusterID)
@@ -347,4 +359,37 @@ func (r *remoteCluster) serviceDeleted(key string) error {
 		}
 	}
 	return nil
+}
+
+func (r *remoteCluster) canFederateService(service string) bool {
+	return !skipServices[service]
+}
+
+func (r *remoteCluster) canFederateNamespace(namespace string) bool {
+	if !skipNamespaces[namespace] {
+		for _, element := range namespaceExclusionList {
+			if strings.Contains(namespace, element) {
+				klog.V(4).Infof("Adding namespace %s to exclusion list", namespace)
+				skipNamespaces[namespace] = true
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func (r *remoteCluster) federateNamespace(namespace string) {
+	ns, err := r.clientset.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
+	if err != nil {
+		klog.Warningf("Failed to get namespace %s details from cluster  %s", namespace, r.clusterID)
+		return
+	}
+	ns.SetNamespace(namespace)
+	err = r.controller.federator.Distribute(ns)
+	if err != nil {
+		klog.Warningf("Failed to federate namespace %s", namespace)
+	}
+	skipNamespaces[namespace] = true
+	klog.V(4).Infof("Federated namespace %s", namespace)
 }
