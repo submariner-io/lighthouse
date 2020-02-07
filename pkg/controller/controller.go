@@ -18,13 +18,15 @@ import (
 	"k8s.io/klog"
 )
 
-var namespaceExclusionList = [...]string{"kubefed", "operator", "submariner"}
+var namespaceExclusionList = [...]string{"kubefed", "operator", "submariner", "openshift"}
 
 type multiClusterServiceMap map[string]*lighthousev1.MultiClusterService
 type remoteClustersMap map[string]*remoteCluster
 
+//TODO: skip lists should be user configurable at init
 var skipNamespaces = map[string]bool{"kube-system": true, "submariner": true, "submariner-operator": true, "kubefed-operator": true}
 var skipServices = map[string]bool{"kubernetes": true}
+var federatedNamespaces = make(map[string]bool)
 
 type LightHouseController struct {
 	// multiClusterServices is a map that holds the MultiClusterService resources to distribute.
@@ -380,6 +382,10 @@ func (r *remoteCluster) canFederateNamespace(namespace string) bool {
 }
 
 func (r *remoteCluster) federateNamespace(namespace string) {
+	if federatedNamespaces[namespace] {
+		//Namespace already federated
+		return
+	}
 	ns, err := r.clientset.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
 	if err != nil {
 		klog.Warningf("Failed to get namespace %s details from cluster  %s", namespace, r.clusterID)
@@ -390,6 +396,6 @@ func (r *remoteCluster) federateNamespace(namespace string) {
 	if err != nil {
 		klog.Warningf("Failed to federate namespace %s", namespace)
 	}
-	skipNamespaces[namespace] = true
+	federatedNamespaces[namespace] = true
 	klog.V(4).Infof("Federated namespace %s", namespace)
 }
