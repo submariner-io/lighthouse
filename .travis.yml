@@ -8,6 +8,9 @@ branches:
 git:
   depth: false
 
+install:
+  - sudo apt-get install moreutils # make ts available
+
 services:
   - docker
 before_script:
