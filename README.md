@@ -32,7 +32,7 @@ The typical workflow is as follows.
 - A pod tries to resolve a Service name.
 - The Kubernetes plugin in CoreDNS will try to resolve the request. If no records are present the request will be sent to Lighthouse plugin.
 - Lighthouse CRD has built a cache, which was distributed by Lighthouse controller. The Lighthouse plugin will try to resolve the request according to its cache.
-- If a record exists it will be returned, otherwise the plugin will pass the request to the next plugin registered in kube-dns.
+- If a record exists it will be returned, otherwise the plugin will pass the request to the next plugin registered in CoreDNS.
 
 ![Lighthouse CoreDNS WorkFlow](https://raw.githubusercontent.com/submariner-io/lighthouse/master/docs/img/coreDNSWorkFlow.png)
 
