@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
+	"github.com/submariner-io/submariner/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,7 +13,7 @@ import (
 
 type ServiceType int
 
-func (f *Framework) NewNginxService(cluster ClusterIndex) *corev1.Service {
+func (f *Framework) NewNginxService(cluster framework.ClusterIndex) *corev1.Service {
 	var port int32 = 80
 	nginxService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -40,16 +41,16 @@ func (f *Framework) NewNginxService(cluster ClusterIndex) *corev1.Service {
 	}
 
 	sc := f.ClusterClients[cluster].CoreV1().Services(f.Namespace)
-	service := AwaitUntil("create service", func() (interface{}, error) {
+	service := framework.AwaitUntil("create service", func() (interface{}, error) {
 		return sc.Create(&nginxService)
 
-	}, NoopCheckResult).(*v1.Service)
+	}, framework.NoopCheckResult).(*v1.Service)
 	return service
 }
 
-func (f *Framework) DeleteService(cluster ClusterIndex, serviceName string) {
-	By(fmt.Sprintf("Deleting service %q on %q", serviceName, TestContext.KubeContexts[cluster]))
-	AwaitUntil("delete service", func() (interface{}, error) {
+func (f *Framework) DeleteService(cluster framework.ClusterIndex, serviceName string) {
+	By(fmt.Sprintf("Deleting service %q on %q", serviceName, framework.TestContext.KubeContexts[cluster]))
+	framework.AwaitUntil("delete service", func() (interface{}, error) {
 		return nil, f.ClusterClients[cluster].CoreV1().Services(f.Namespace).Delete(serviceName, &metav1.DeleteOptions{})
-	}, NoopCheckResult)
+	}, framework.NoopCheckResult)
 }

@@ -7,14 +7,15 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/test/e2e/framework"
+	lhFramework "github.com/submariner-io/lighthouse/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
-	f := framework.NewDefaultFramework("dataplane-sd")
+	f := lhFramework.New("dataplane-sd")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
 		It("should be able to discover the remote service successfully", func() {
@@ -30,7 +31,7 @@ var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
 
 })
 
-func RunServiceDiscoveryTest(f *framework.Framework) {
+func RunServiceDiscoveryTest(f *lhFramework.Framework) {
 	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
 	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
 
@@ -42,7 +43,7 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 	cmd := []string{"curl", nginxServiceClusterC.Name}
-	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+	stdout, _, err := f.ExecWithOptions(lhFramework.ExecOptions{
 		Command:       cmd,
 		Namespace:     f.Namespace,
 		PodName:       netshootPodList.Items[0].Name,
@@ -61,7 +62,7 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
-func RunServiceDiscoveryLocalTest(f *framework.Framework) {
+func RunServiceDiscoveryLocalTest(f *lhFramework.Framework) {
 	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
 	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
 
@@ -91,7 +92,7 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
-func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
+func verifyClusterIpWithDig(f *lhFramework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
 	kubeDnsService, _ := f.ClusterClients[cluster].CoreV1().Services("kube-system").Get("kube-dns", metav1.GetOptions{})
 	kubeDnsServiceIP := kubeDnsService.Spec.ClusterIP
 
@@ -104,7 +105,7 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 	}
 	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := f.ExecWithOptions(lhFramework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,
 			PodName:       targetPod.Items[0].Name,
@@ -116,11 +117,16 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 			return nil, err
 		}
 		return stdout, nil
-	}, func(result interface{}) (bool, error) {
+	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
-		if (doesContain && !shouldContain) || (!doesContain && shouldContain) {
-			return false, nil
+		if doesContain && !shouldContain {
+			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
-		return true, nil
+
+		if !doesContain && shouldContain {
+			return false, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
+		}
+
+		return true, "", nil
 	})
 }
