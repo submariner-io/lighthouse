@@ -3,7 +3,6 @@ package framework
 import (
 	"strings"
 
-	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	restclient "k8s.io/client-go/rest"
@@ -44,17 +43,4 @@ func loadSingleConfig(configPath, context string) (*restclient.Config, *clientcm
 		return nil, nil, errors.Errorf("error creating default client config: %v", err.Error())
 	}
 	return cfg, c, nil
-}
-
-func ExpectNoError(err error, explain ...interface{}) {
-	ExpectNoErrorWithOffset(1, err, explain...)
-}
-
-// ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
-// (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
-func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
-	if err != nil {
-		Logf("Unexpected error occurred: %v", err)
-	}
-	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
 }
