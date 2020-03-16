@@ -6,7 +6,7 @@ require (
 	github.com/caddyserver/caddy v1.0.1
 	github.com/coredns/coredns v1.5.2
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.4.2
 	github.com/miekg/dns v1.1.15
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
