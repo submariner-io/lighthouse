@@ -4,6 +4,8 @@ language: go
 branches:
   only:
   - master
+  - /^v\d+\.\d+\.\d+.*$/
+  - /^release-\d+.\d+.*$/
 
 git:
   depth: false
@@ -31,5 +33,11 @@ deploy:
       branch: master
   - provider: script
     script: bash scripts/release
+    on:
+      branch: /^release-\d+.\d+.*$/
+
+  - provider: script
+    script: bash scripts/release $TRAVIS_TAG
+    skip_cleanup: true
     on:
       tags: true
