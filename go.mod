@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.0.0-20190829090417-2e381e854f60
 	github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da
-	github.com/submariner-io/submariner v0.1.0
+	github.com/submariner-io/submariner v0.2.0
 	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
 	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
 	k8s.io/client-go v11.0.0+incompatible
