@@ -256,10 +256,6 @@ github.com/submariner-io/shipyard v0.0.0-20200322060547-ffcda8757e51 h1:9nx5T+Nf
 github.com/submariner-io/shipyard v0.0.0-20200322060547-ffcda8757e51/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
 github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da h1:UdL2BuLqaFepyEI9BpSVZBYsxIF19hTxPkKbYohJtuM=
 github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
-github.com/submariner-io/submariner v0.0.2-0.20190828132721-a11a9a84c90d h1:IWLdQxR9mDgVNEBTyI0cjFNn8AXiLkRIPw5grQGTtzs=
-github.com/submariner-io/submariner v0.0.2-0.20190828132721-a11a9a84c90d/go.mod h1:CTCPMZnhq6v/2+iMNcyED6TI6RjU8r+m0XIkNe1PkEo=
-github.com/submariner-io/submariner v0.1.0 h1:qyaloepsAfqrSRkkCNNDUGRz2XMAke0tg5px7mfWxSU=
-github.com/submariner-io/submariner v0.1.0/go.mod h1:CUeiMmxtT5UfYynBy4NECqLy/NoTROVaxcG3SIotF94=
 github.com/tinylib/msgp v1.1.0/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/vishvananda/netlink v1.0.0/go.mod h1:+SR5DhBJrl6ZM7CoCKvpw5BKroDKQ+PJqOg65H/2ktk=

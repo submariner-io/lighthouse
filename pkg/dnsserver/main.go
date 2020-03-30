@@ -7,9 +7,9 @@ import (
 	"github.com/miekg/dns"
 	"github.com/submariner-io/lighthouse/pkg/dnsserver/handler"
 	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
-	"github.com/submariner-io/submariner/pkg/signals"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var (
