@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+source ${SCRIPTS_DIR}/lib/debug_functions
+source ${SCRIPTS_DIR}/lib/version
+
+function load_image() {
+    docker pull ${1}:latest
+    docker tag ${1}:latest ${1}:$VERSION
+}
+
+load_image quay.io/submariner/submariner
+load_image quay.io/submariner/submariner-route-agent
+load_image quay.io/submariner/submariner-globalnet
+
+${SCRIPTS_DIR}/deploy.sh "$@"
