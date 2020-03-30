@@ -7,7 +7,7 @@ lhmode ?= plugin
 deploytool ?= helm
 globalnet ?= false
 
-TARGETS := $(shell ls scripts)
+TARGETS := $(shell ls scripts | grep -v deploy)
 SCRIPTS_DIR ?= /opt/shipyard/scripts
 
 .dapper:
@@ -24,7 +24,7 @@ clusters: ci
 	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
 
 deploy: clusters
-	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
+	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: build deploy
 	./.dapper -m bind scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging) --kubefed $(kubefed) --lhmode $(lhmode)
