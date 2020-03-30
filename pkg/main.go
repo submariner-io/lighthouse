@@ -8,10 +8,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate/kubefed"
 	multiclusterservice "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	"github.com/submariner-io/lighthouse/pkg/controller"
-	"github.com/submariner-io/submariner/pkg/signals"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var kubeConfig string
