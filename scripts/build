@@ -12,4 +12,5 @@ if [[ $1 != clean ]]; then
        ./build-coredns "$@"
     fi
     ./build-controller "$@"
+    ./build-agent "$@"
 fi
