@@ -5,14 +5,11 @@ source $(dirname $0)/../scripts/lib/debug_functions
 
 cd $(dirname $0)
 
-if [[ $1 = clean ]]; then
-    ./../scripts/kind-e2e/e2e.sh clean
-else
+if [[ $1 != clean ]]; then
     if [[ $4 = dnsserver ]]; then
         ./build-dnsserver "$@"
     else
        ./build-coredns "$@"
     fi
     ./build-controller "$@"
-    ./../scripts/kind-e2e/e2e.sh "$@"
 fi

@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source $(dirname $0)/lib/debug_functions
+
 trap "chown -R $DAPPER_UID:$DAPPER_GID ." exit
 
 mkdir -p bin output
