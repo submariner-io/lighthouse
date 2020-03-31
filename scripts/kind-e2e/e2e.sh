@@ -34,6 +34,12 @@ function setup_lighthouse_controller () {
     docker tag lighthouse-controller:${VERSION} lighthouse-controller:local
     kind --name cluster1 load docker-image lighthouse-controller:local
     kubectl --context=cluster1 apply -f ${PRJ_ROOT}/package/lighthouse-controller-deployment.yaml
+    for i in 2 3; do
+      echo "Installing lighthouse-agent in cluster${i}..."
+      docker tag lighthouse-agent:${VERSION} lighthouse-agent:local
+      kind --name cluster${i} load docker-image lighthouse-agent:local
+      kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-agent-deployment.yaml
+    done
 }
 
 function update_coredns_deployment() {

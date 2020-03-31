@@ -6,6 +6,7 @@ require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/coredns v1.5.2
 	github.com/golang/mock v1.3.1
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.29
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0

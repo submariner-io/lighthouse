@@ -12,4 +12,6 @@ docker tag lighthouse-coredns:${VERSION} ${REPO}/lighthouse-coredns:${DOCKER_TAG
 docker tag lighthouse-coredns:${VERSION} ${REPO}/lighthouse-coredns:"${COMMIT:0:7}"
 docker tag lighthouse-controller:${VERSION} ${REPO}/lighthouse-controller:${DOCKER_TAG#"v"}
 docker tag lighthouse-controller:${VERSION} ${REPO}/lighthouse-controller:"${COMMIT:0:7}"
+docker tag lighthouse-agent:${VERSION} ${REPO}/lighthouse-agent:${DOCKER_TAG#"v"}
+docker tag lighthouse-agent:${VERSION} ${REPO}/lighthouse-agent:"${COMMIT:0:7}"
 for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "${REPO}/.*:(${DOCKER_TAG#v}|${COMMIT:0:7})"); do docker push $i; done
