@@ -76,30 +76,6 @@ function deploy_lighthouse_dnsserver() {
     done
 }
 
-function test_e2e_service_discovery() {
-    echo "Updating coredns deployment on cluster2 with cluster3 service nginx service ip"
-    if kubectl describe federatednamespace default > /dev/null 2>&1; then
-        echo "Namespace default already federated..."
-    else
-        kubefedctl federate namespace default
-    fi
-    nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
-    netshoot_pod=$(kubectl --context=cluster2 get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
-    kubectl --context=cluster2 -n kube-system set env deployment/coredns LIGHTHOUSE_SVCS="nginx-demo=${nginx_svc_ip_cluster3}"
-    kubectl --context=cluster2 rollout status -n kube-system deploy/coredns --timeout=60s
-    echo "Testing service discovery between clusters - $netshoot_pod cluster2 --> nginx service cluster3"
-    attempt_counter=0
-    max_attempts=5
-    until $(kubectl --context=cluster2 exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail nginx-demo); do
-        if [[ ${attempt_counter} -eq ${max_attempts} ]];then
-          echo "Max attempts reached, connection test failed!"
-          exit 1
-        fi
-        attempt_counter=$(($attempt_counter+1))
-    done
-    echo "Service Discovery test was successful!"
-}
-
 function enable_logging() {
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo "Elasticsearch stack already installed, skipping..."
@@ -178,7 +154,6 @@ if [[ $kubefed = true ]]; then
     else
         deploy_lighthouse_dnsserver
     fi
-    test_e2e_service_discovery
     test_with_e2e_tests
 fi
 
