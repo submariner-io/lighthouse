@@ -35,7 +35,7 @@ func New(spec *AgentSpecification, config InformerConfigStruct) *Controller {
 		excludeNamespaces: exclusionNSMap,
 	}
 
-	klog.Info("Setting up event handlers")
+	klog.Info("Setting up event handlers...")
 	config.ServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: agentController.enqueueService,
 		UpdateFunc: func(old, newObj interface{}) {
