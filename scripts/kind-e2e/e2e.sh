@@ -24,16 +24,11 @@ source ${SCRIPTS_DIR}/lib/utils
 
 ### Functions ###
 
-function setup_lighthouse_controller () {
+function setup_lighthouse () {
     for i in 1 2 3; do
       echo "Installing lighthouse CRD in cluster${i}..."
       kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-crd.yaml
     done
-    kubefedctl enable MulticlusterService
-    kubectl --context=cluster1 patch clusterrole  -n kube-federation-system  kubefed-role  --type json -p "$(cat ${PRJ_ROOT}/scripts/kind-e2e/config/patch-kubefed-clusterrole.yaml)"
-    docker tag lighthouse-controller:${VERSION} lighthouse-controller:local
-    kind --name cluster1 load docker-image lighthouse-controller:local
-    kubectl --context=cluster1 apply -f ${PRJ_ROOT}/package/lighthouse-controller-deployment.yaml
     for i in 2 3; do
       echo "Installing lighthouse-agent in cluster${i}..."
       docker tag lighthouse-agent:${VERSION} lighthouse-agent:local
@@ -99,22 +94,6 @@ function enable_logging() {
     fi
 }
 
-function enable_kubefed() {
-    if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
-        echo "Kubefed already installed, skipping setup..."
-    else
-        helm init --client-only
-        helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
-        helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
-        for i in 1 2 3; do
-            kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
-        done
-        echo "Waiting for kubefed control plain to be ready..."
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
-    fi
-}
-
 function test_with_e2e_tests {
     cd ${DAPPER_SOURCE}/test/e2e
 
@@ -145,23 +124,19 @@ elif [[ $status != keep && $status != create ]]; then
 fi
 
 PRJ_ROOT=$(git rev-parse --show-toplevel)
-KUBEFED_NS=kube-federation-system
 
 if [[ $logging = true ]]; then
     enable_logging
 fi
 
-if [[ $kubefed = true ]]; then
-    enable_kubefed
-    setup_lighthouse_controller
-    if [[ $lhmode = plugin ]]; then
-        update_coredns_configmap
-        update_coredns_deployment
-    else
-        deploy_lighthouse_dnsserver
-    fi
-    test_with_e2e_tests
+setup_lighthouse
+if [[ $lhmode = plugin ]]; then
+    update_coredns_configmap
+    update_coredns_deployment
+else
+    deploy_lighthouse_dnsserver
 fi
+#test_with_e2e_tests
 
 if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly."

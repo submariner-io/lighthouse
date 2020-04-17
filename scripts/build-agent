@@ -13,7 +13,7 @@ GO111MODULE=on CGO_ENABLED=0 go build -ldflags "-X main.VERSION=${VERSION}" -o b
 LIGHTHOUSE_AGENT_IMAGE=lighthouse-agent:${VERSION}
 cd ./package
 cp ../bin/lighthouse-agent lighthouse-agent
-docker build -t ${LIGHTHOUSE_AGENT_IMAGE} -f Dockerfile.agent .
+docker build -t ${LIGHTHOUSE_AGENT_IMAGE} .
 
 echo "Built lighthouse-agent to image: ${LIGHTHOUSE_AGENT_IMAGE}"
 
