@@ -2,12 +2,11 @@ package main
 
 import (
 	"flag"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
+	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -19,10 +18,8 @@ var (
 	kubeConfig string
 )
 
-const defaultResync = 0 * time.Minute
-
 func main() {
-	var agentSpec controller.AgentSpecification
+	agentSpec := controller.AgentSpecification{}
 	klog.InitFlags(nil)
 	flag.Parse()
 
@@ -30,27 +27,27 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-
+	klog.Infof("AgentSpec: %v", agentSpec)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	err = lighthousev1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Exitf("Error adding lighthouse V1 to the scheme: %v", err)
+	}
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	if err != nil {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
-	clientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("error building k8s clientset: %s", err.Error())
-	}
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, defaultResync)
-	informerConfig := controller.InformerConfigStruct{
-		KubeClientSet:   clientSet,
-		ServiceInformer: informerFactory.Core().V1().Services(),
 	}
 	klog.Infof("Starting submariner-lighthouse-agent %v", agentSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
-	lightHouseAgent := controller.New(&agentSpec, informerConfig)
+	lightHouseAgent, err := controller.New(&agentSpec, cfg)
 
-	informerFactory.Start(stopCh)
+	if err != nil {
+		klog.Fatalf("Failed to create lighthouse agent: %v", err)
+	}
 
 	if err := lightHouseAgent.Run(stopCh); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)

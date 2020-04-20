@@ -89,6 +89,7 @@ github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
 github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633/go.mod h1:otzb+WCGbkyDHkqmQmT5YD2WR4BBwUdeQoFo8l/7tVs=
 github.com/evanphx/json-patch v0.0.0-20180908160633-36442dbdb585/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
+github.com/evanphx/json-patch v4.1.0+incompatible h1:K1MDoo4AZ4wU0GIU/fPmtZg7VpzLjCxu+UwBD1FvwOc=
 github.com/evanphx/json-patch v4.1.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch v4.5.0+incompatible h1:ouOWdg56aJriqS0huScTkVXPC5IcNrDCXZ6OoTAWu7M=
 github.com/evanphx/json-patch v4.5.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
@@ -387,6 +388,8 @@ github.com/submariner-io/admiral v0.0.0-20190829090417-2e381e854f60/go.mod h1:yj
 github.com/submariner-io/admiral v0.0.0-20200410211149-7b5755669155 h1:5uDYul0dpa/2CghQfMyc2/gyw/LabEGhjnk9U9l9dx4=
 github.com/submariner-io/admiral v0.0.0-20200414145731-d2d212783235 h1:q0l8HByvXA81FHm7T7mB267/G26aXkm5qYghfyiap9k=
 github.com/submariner-io/admiral v0.0.0-20200414145731-d2d212783235/go.mod h1:LQLwQPh+PMV/88sBi3EPt5sZ8wWjyD04HkNhuAbHmxE=
+github.com/submariner-io/admiral v0.0.0-20200417073818-3db8d8d127ef h1:fNG31cavAT7a8k1kGBVZsu2FgWKqK6645uqqPXBMiI4=
+github.com/submariner-io/admiral v0.0.0-20200417073818-3db8d8d127ef/go.mod h1:LQLwQPh+PMV/88sBi3EPt5sZ8wWjyD04HkNhuAbHmxE=
 github.com/submariner-io/shipyard v0.0.0-20200322060547-ffcda8757e51 h1:9nx5T+NfRPZlOwXtOohP9xyThyAnhho+Fpqj96uaoeo=
 github.com/submariner-io/shipyard v0.0.0-20200322060547-ffcda8757e51/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
 github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da h1:UdL2BuLqaFepyEI9BpSVZBYsxIF19hTxPkKbYohJtuM=
