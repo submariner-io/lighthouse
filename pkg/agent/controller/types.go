@@ -1,28 +1,19 @@
 package controller
 
 import (
-	kubeInformers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"k8s.io/client-go/rest"
 )
 
 type Controller struct {
-	kubeClientSet     kubernetes.Interface
-	serviceWorkqueue  workqueue.RateLimitingInterface
-	servicesSynced    cache.InformerSynced
+	clusterID         string
+	restConfig        *rest.Config
 	excludeNamespaces map[string]bool
+	svcSyncer         *broker.Syncer
 }
 
 type AgentSpecification struct {
 	ClusterID string
 	Namespace string
-	Token     string
-	Broker    string
 	ExcludeNS []string
-}
-
-type InformerConfigStruct struct {
-	KubeClientSet   kubernetes.Interface
-	ServiceInformer kubeInformers.ServiceInformer
 }
