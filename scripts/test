@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source $(dirname $0)/lib/debug_functions
+
 cd $(dirname $0)/..
 
 source scripts/lib/find_functions
@@ -11,4 +13,4 @@ PACKAGES=$(find_go_pkg_dirs)
 
 echo Running tests in ${PACKAGES}
 [ "${ARCH}" == "amd64" ] && RACE=-race
-ginkgo ${RACE} -cover ${PACKAGES}
+ginkgo -v ${RACE} -cover ${PACKAGES}
