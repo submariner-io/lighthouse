@@ -104,9 +104,7 @@ func (c *Controller) runWorker() {
 				return
 			}
 
-			if !exists {
-				c.multiClusterServiceDeleted(obj, key)
-			} else {
+			if exists {
 				c.multiClusterServiceCreatedOrUpdated(obj, key)
 			}
 

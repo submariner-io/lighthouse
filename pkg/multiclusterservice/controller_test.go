@@ -1,6 +1,9 @@
 package multiclusterservice
 
 import (
+	"reflect"
+	"sort"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 
@@ -77,7 +80,7 @@ func testMCSLifecycleNotifications() {
 		Expect(deleteService(multiClusterService)).To(Succeed())
 
 		Eventually(func() bool {
-			_, ok := controller.multiClusterServices.Get(mcsService.Namespace, mcsService.Name)
+			_, ok := controller.multiClusterServices.GetIps(mcsService.Namespace, mcsService.Name)
 			return ok
 		}).Should(BeFalse())
 	}
@@ -116,15 +119,15 @@ func testMCSLifecycleNotifications() {
 }
 
 func verifyCachedMultiClusterService(controller *Controller, expected *lighthousev1.MultiClusterService) {
-	Eventually(func() *RemoteService {
+	Eventually(func() []string {
 		name := expected.Annotations["origin-name"]
 		namespace := expected.Annotations["origin-namespace"]
-		mcs, ok := controller.multiClusterServices.Get(namespace, name)
+		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
 		if ok {
-			return mcs
+			return ipList
 		}
 		return nil
-	}).Should(Equal(newRemoteService(expected)))
+	}).Should(Equal([]string{expected.Spec.Items[0].ServiceIP}))
 }
 
 func verifyUpdatedCachedMultiClusterService(controller *Controller, first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService) {
@@ -132,18 +135,21 @@ func verifyUpdatedCachedMultiClusterService(controller *Controller, first *light
 	Eventually(func() bool {
 		name := first.Annotations["origin-name"]
 		namespace := first.Annotations["origin-namespace"]
-		rs, ok := controller.multiClusterServices.Get(namespace, name)
+		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
 		if ok {
-			return validateRemoteService(first, second, rs)
+			return validateIpList(first, second, ipList)
 		}
 		return false
 	}).Should(BeTrue())
 }
 
-func validateRemoteService(first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService, rs *RemoteService) bool {
+func validateIpList(first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService, ipList []string) bool {
 	firstClusterInfo := first.Spec.Items[0]
 	secondClusterInfo := second.Spec.Items[0]
-	return rs.ClusterInfo[firstClusterInfo.ClusterID] == firstClusterInfo.ServiceIP && rs.ClusterInfo[secondClusterInfo.ClusterID] == secondClusterInfo.ServiceIP
+	ips := []string{firstClusterInfo.ServiceIP, secondClusterInfo.ServiceIP}
+	sort.Strings(ips)
+	sort.Strings(ipList)
+	return reflect.DeepEqual(ipList, ips)
 }
 
 func newMultiClusterService(namespace, name, serviceIP, clusterID string) *lighthousev1.MultiClusterService {
@@ -165,21 +171,4 @@ func newMultiClusterService(namespace, name, serviceIP, clusterID string) *light
 			},
 		},
 	}
-}
-
-func newRemoteService(mcs *lighthousev1.MultiClusterService) *RemoteService {
-	name := mcs.Annotations["origin-name"]
-	namespace := mcs.Annotations["origin-namespace"]
-	remoteService := &RemoteService{
-		key:         namespace + "/" + name,
-		ClusterInfo: map[string]string{},
-	}
-	for _, info := range mcs.Spec.Items {
-		remoteService.ClusterInfo[info.ClusterID] = info.ServiceIP
-	}
-	remoteService.IpList = make([]string, 0)
-	for _, v := range remoteService.ClusterInfo {
-		remoteService.IpList = append(remoteService.IpList, v)
-	}
-	return remoteService
 }

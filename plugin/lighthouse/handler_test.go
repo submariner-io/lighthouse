@@ -243,7 +243,7 @@ func newMultiClusterService(namespace, name, serviceIP, clusterID string) *v1.Mu
 		},
 		Spec: lighthousev1.MultiClusterServiceSpec{
 			Items: []lighthousev1.ClusterServiceInfo{
-				lighthousev1.ClusterServiceInfo{
+				{
 					ClusterID: clusterID,
 					ServiceIP: serviceIP,
 				},
