@@ -52,7 +52,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error building kubeconfig: %v", err)
 	}
 
-	mcsMap := new(multiclusterservice.Map)
+	mcsMap := multiclusterservice.NewMap()
 	mcsController := multiclusterservice.NewController(mcsMap)
 
 	err = mcsController.Start(cfg)

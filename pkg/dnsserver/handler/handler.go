@@ -33,16 +33,16 @@ func (h *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		klog.Infof("Serving DNS request for domain %q, service name %q, namespace %q", domain, svcName, namespace)
 
 		service, found := h.multiClusterServices.Get(namespace, svcName)
-		if !found || len(service.Spec.Items) == 0 {
+		if !found || len(service.IpList) == 0 {
 			klog.Infof("No record found for service %q", svcName)
 			msg.Rcode = dns.RcodeNameError
 		} else {
-			serviceInfo := service.Spec.Items[0]
-			klog.Infof("Record IP %q found for service %q", serviceInfo.ServiceIP, svcName)
+			serviceIp := service.IpList[0]
+			klog.Infof("Record IP %q found for service %q", serviceIp, svcName)
 
 			msg.Answer = append(msg.Answer, &dns.A{
 				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET},
-				A:   net.ParseIP(serviceInfo.ServiceIP),
+				A:   net.ParseIP(serviceIp),
 			})
 		}
 	default:

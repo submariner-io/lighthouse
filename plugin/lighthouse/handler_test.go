@@ -226,7 +226,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 }
 
 func setupMultiClusterServiceMap() *multiclusterservice.Map {
-	mcsMap := new(multiclusterservice.Map)
+	mcsMap := multiclusterservice.NewMap()
 	mcsMap.Put(newMultiClusterService(namespace1, service1, serviceIP, "clusterID"))
 	return mcsMap
 }
@@ -236,6 +236,10 @@ func newMultiClusterService(namespace, name, serviceIP, clusterID string) *v1.Mu
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				"origin-name":      name,
+				"origin-namespace": namespace,
+			},
 		},
 		Spec: lighthousev1.MultiClusterServiceSpec{
 			Items: []lighthousev1.ClusterServiceInfo{

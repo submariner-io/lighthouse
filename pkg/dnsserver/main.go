@@ -28,7 +28,7 @@ func main() {
 	}
 	stopCh := signals.SetupSignalHandler()
 
-	mcsMap := new(multiclusterservice.Map)
+	mcsMap := multiclusterservice.NewMap()
 	mcsController := multiclusterservice.NewController(mcsMap)
 	err = mcsController.Start(cfg)
 	if err != nil {
