@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[parse] Test parese DNS request", func() {
+var _ = Describe("[parse] Test parse DNS request", func() {
 	Context("When request is valid", testParseValid)
 	Context("When request is invalid", testParseInvalid)
 })
