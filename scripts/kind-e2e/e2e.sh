@@ -3,18 +3,14 @@
 ## Process command line flags ##
 
 source /usr/share/shflags/shflags
-DEFINE_string 'kubefed' 'false' "Deploy with kubefed"
-DEFINE_string 'lhmode' '' "Mode to deploy (plugin or not)"
 DEFINE_string 'logging' 'false' "Deploy with logging"
 DEFINE_string 'status' 'onetime' "Status flag (onetime, create, keep, clean)"
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
-kubefed="${FLAGS_kubefed}"
-lhmode="${FLAGS_lhmode}"
 logging="${FLAGS_logging}"
 status="${FLAGS_status}"
-echo "Running with: kubefed=${kubefed}, logging=${logging}, status=${status}"
+echo "Running with: logging=${logging}, status=${status}"
 
 set -em
 
@@ -60,21 +56,6 @@ function update_coredns_configmap() {
         kubectl --context=cluster${i} -n kube-system describe cm coredns
     done
 
-}
-
-function deploy_lighthouse_dnsserver() {
-    docker tag lighthouse-dnsserver:${VERSION} lighthouse-dnsserver:local
-    for i in 2 3; do
-        echo "Updating coredns clusterrole in to cluster${i}..."
-        cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
-        kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
-        echo "Deploying Lighthouse DNS server in cluster${i}..."
-        kind --name cluster${i} load docker-image lighthouse-dnsserver:local
-        kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-dnsserver-deployment.yaml
-        lh_dnsserver_clusterip=$(kubectl --context=cluster${i} -n kube-system get svc -l app=lighthouse-dnsserver | awk 'FNR == 2 {print $3}')
-        sed "s|forward\ .\ lighthouse-dnsserver|forward\ .\ $lh_dnsserver_clusterip|g" ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-dnsserver-cm-cluster${i}.yaml > /tmp/coredns-dnsserver-cm-cluster${i}.yaml
-        kubectl --context=cluster${i} -n kube-system replace -f  /tmp/coredns-dnsserver-cm-cluster${i}.yaml
-    done
 }
 
 function enable_logging() {
@@ -130,12 +111,9 @@ if [[ $logging = true ]]; then
 fi
 
 setup_lighthouse
-if [[ $lhmode = plugin ]]; then
-    update_coredns_configmap
-    update_coredns_deployment
-else
-    deploy_lighthouse_dnsserver
-fi
+update_coredns_configmap
+update_coredns_deployment
+
 #test_with_e2e_tests
 
 if [[ $status = keep || $status = create ]]; then

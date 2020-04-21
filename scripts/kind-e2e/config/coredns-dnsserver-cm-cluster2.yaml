@@ -8,7 +8,6 @@ data:
            #fallthrough in-addr.arpa ip6.arpa
              fallthrough
         }
-        forward . lighthouse-dnsserver
     }
     .:53 {
         errors

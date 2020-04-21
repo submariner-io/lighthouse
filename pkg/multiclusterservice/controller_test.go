@@ -1,6 +1,9 @@
 package multiclusterservice
 
 import (
+	"reflect"
+	"sort"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 
@@ -30,7 +33,7 @@ func testMCSLifecycleNotifications() {
 
 	BeforeEach(func() {
 		multiClusterService = newMultiClusterService(nameSpace1, serviceName1, "192.168.56.21", "cluster1")
-		mcsMap := new(Map)
+		mcsMap := NewMap()
 		controller = NewController(mcsMap)
 		fakeClientset = fakeClientSet.NewSimpleClientset()
 
@@ -77,9 +80,16 @@ func testMCSLifecycleNotifications() {
 		Expect(deleteService(multiClusterService)).To(Succeed())
 
 		Eventually(func() bool {
-			_, ok := controller.multiClusterServices.Get(mcsService.Namespace, mcsService.Name)
+			_, ok := controller.multiClusterServices.GetIps(mcsService.Namespace, mcsService.Name)
 			return ok
 		}).Should(BeFalse())
+	}
+
+	testOnDoubleAdd := func(first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService) {
+		Expect(createService(first)).To(Succeed())
+		Expect(createService(second)).To(Succeed())
+
+		verifyUpdatedCachedMultiClusterService(controller, first, second)
 	}
 
 	When("a MultiClusterService is added", func() {
@@ -91,7 +101,13 @@ func testMCSLifecycleNotifications() {
 	When("a MultiClusterService is updated", func() {
 		It("it should be updated in the MultiClusterService map", func() {
 			testOnAdd(multiClusterService)
-			testOnUpdate(newMultiClusterService(nameSpace1, serviceName1, "192.168.56.22", "cluster2"))
+			testOnUpdate(newMultiClusterService(nameSpace1, serviceName1, "192.168.56.22", "cluster1"))
+		})
+	})
+
+	When("same MultiClusterService is added in another cluster", func() {
+		It("it should be added to existing MultiClusterService map", func() {
+			testOnDoubleAdd(multiClusterService, newMultiClusterService(nameSpace1, serviceName1, "192.168.56.22", "cluster2"))
 		})
 	})
 
@@ -103,24 +119,52 @@ func testMCSLifecycleNotifications() {
 }
 
 func verifyCachedMultiClusterService(controller *Controller, expected *lighthousev1.MultiClusterService) {
-	Eventually(func() *lighthousev1.MultiClusterServiceSpec {
-		mcs, ok := controller.multiClusterServices.Get(expected.Namespace, expected.Name)
+	Eventually(func() []string {
+		name := expected.Annotations["origin-name"]
+		namespace := expected.Annotations["origin-namespace"]
+		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
 		if ok {
-			return &mcs.Spec
+			return ipList
 		}
 		return nil
-	}).Should(Equal(&expected.Spec))
+	}).Should(Equal([]string{expected.Spec.Items[0].ServiceIP}))
+}
+
+func verifyUpdatedCachedMultiClusterService(controller *Controller, first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService) {
+	// We can't just compare first and second coz map iteration order is not fixed
+	Eventually(func() bool {
+		name := first.Annotations["origin-name"]
+		namespace := first.Annotations["origin-namespace"]
+		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
+		if ok {
+			return validateIpList(first, second, ipList)
+		}
+		return false
+	}).Should(BeTrue())
+}
+
+func validateIpList(first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService, ipList []string) bool {
+	firstClusterInfo := first.Spec.Items[0]
+	secondClusterInfo := second.Spec.Items[0]
+	ips := []string{firstClusterInfo.ServiceIP, secondClusterInfo.ServiceIP}
+	sort.Strings(ips)
+	sort.Strings(ipList)
+	return reflect.DeepEqual(ipList, ips)
 }
 
 func newMultiClusterService(namespace, name, serviceIP, clusterID string) *lighthousev1.MultiClusterService {
 	return &lighthousev1.MultiClusterService{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      name + "-" + namespace + "-" + clusterID,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				"origin-name":      name,
+				"origin-namespace": namespace,
+			},
 		},
 		Spec: lighthousev1.MultiClusterServiceSpec{
 			Items: []lighthousev1.ClusterServiceInfo{
-				lighthousev1.ClusterServiceInfo{
+				{
 					ClusterID: clusterID,
 					ServiceIP: serviceIP,
 				},

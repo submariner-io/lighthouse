@@ -66,7 +66,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			klog.V(2).Infof("MultiClusterService %q deleted", key)
 			if err == nil {
-				c.queue.Add(key)
+				c.multiClusterServiceDeleted(obj, key)
 			}
 		},
 	})
@@ -104,9 +104,7 @@ func (c *Controller) runWorker() {
 				return
 			}
 
-			if !exists {
-				c.multiClusterServiceDeleted(key)
-			} else {
+			if exists {
 				c.multiClusterServiceCreatedOrUpdated(obj, key)
 			}
 
@@ -121,9 +119,20 @@ func (c *Controller) multiClusterServiceCreatedOrUpdated(obj interface{}, key st
 	c.multiClusterServices.Put(obj.(*lighthousev1.MultiClusterService))
 }
 
-func (c *Controller) multiClusterServiceDeleted(key string) {
-	klog.V(2).Infof("In multiClusterServiceDeleted for key %q", key)
-
-	namespace, name, _ := cache.SplitMetaNamespaceKey(key)
-	c.multiClusterServices.Remove(namespace, name)
+func (c *Controller) multiClusterServiceDeleted(obj interface{}, key string) {
+	var mcs *lighthousev1.MultiClusterService
+	var ok bool
+	if mcs, ok = obj.(*lighthousev1.MultiClusterService); !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Failed to get deleted multiclusterservice object for %s", key)
+			return
+		}
+		mcs, ok = tombstone.Obj.(*lighthousev1.MultiClusterService)
+		if !ok {
+			klog.Errorf("Failed to convert deleted tombstone object %v  to multiclusterservice", tombstone.Obj)
+			return
+		}
+	}
+	c.multiClusterServices.Remove(mcs)
 }

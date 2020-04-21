@@ -6,25 +6,78 @@ import (
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 )
 
-type Map struct {
-	syncMap sync.Map
+type serviceInfo struct {
+	key         string
+	clusterInfo map[string]string
+	ipList      []string
 }
 
-func (m *Map) Get(namespace, name string) (*lighthousev1.MultiClusterService, bool) {
-	value, ok := m.syncMap.Load(keyFunc(namespace, name))
-	if ok {
-		return value.(*lighthousev1.MultiClusterService), true
-	}
+type Map struct {
+	svcMap map[string]*serviceInfo
+	sync.RWMutex
+}
 
+func (m *Map) GetIps(namespace string, name string) ([]string, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
+		return val.ipList, len(val.ipList) > 0
+	}
 	return nil, false
 }
 
-func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
-	m.syncMap.Store(keyFunc(mcs.Namespace, mcs.Name), mcs)
+func NewMap() *Map {
+	return &Map{
+		svcMap: make(map[string]*serviceInfo),
+	}
 }
 
-func (m *Map) Remove(namespace, name string) {
-	m.syncMap.Delete(keyFunc(namespace, name))
+func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
+	if name, ok := mcs.Annotations["origin-name"]; ok {
+		namespace := mcs.Annotations["origin-namespace"]
+		key := keyFunc(namespace, name)
+		m.Lock()
+		defer m.Unlock()
+		remoteService, ok := m.svcMap[key]
+		if !ok {
+			remoteService = &serviceInfo{
+				key:         key,
+				clusterInfo: make(map[string]string),
+			}
+		}
+		for _, info := range mcs.Spec.Items {
+			remoteService.clusterInfo[info.ClusterID] = info.ServiceIP
+		}
+		remoteService.ipList = make([]string, 0)
+		for _, v := range remoteService.clusterInfo {
+			remoteService.ipList = append(remoteService.ipList, v)
+		}
+		m.svcMap[key] = remoteService
+	}
+}
+
+func (m *Map) Remove(mcs *lighthousev1.MultiClusterService) {
+	if name, ok := mcs.Annotations["origin-name"]; ok {
+		namespace := mcs.Annotations["origin-namespace"]
+		key := keyFunc(namespace, name)
+		m.Lock()
+		defer m.Unlock()
+		remoteService, ok := m.svcMap[key]
+		if !ok {
+			return
+		}
+		for _, info := range mcs.Spec.Items {
+			delete(remoteService.clusterInfo, info.ClusterID)
+		}
+		if len(remoteService.clusterInfo) == 0 {
+			delete(m.svcMap, key)
+		} else {
+			remoteService.ipList = make([]string, 0)
+			for _, v := range remoteService.clusterInfo {
+				remoteService.ipList = append(remoteService.ipList, v)
+			}
+		}
+	}
 }
 
 func keyFunc(namespace, name string) string {

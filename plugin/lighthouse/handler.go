@@ -46,19 +46,18 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	query := strings.Split(qname, ".")
 	svcName := query[0]
 	namespace := query[1]
-	service, found := lh.multiClusterServices.Get(namespace, svcName)
+	ipList, found := lh.multiClusterServices.GetIps(namespace, svcName)
 
-	if !found || len(service.Spec.Items) == 0 {
+	if !found {
 		// We couldn't find record for this service name
 		log.Debugf("No record found for service %q", qname)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
 	}
-
-	serviceInfo := service.Spec.Items[0]
+	serviceIp := ipList[0]
 
 	rr := new(dns.A)
 	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
-	rr.A = net.ParseIP(serviceInfo.ServiceIP).To4()
+	rr.A = net.ParseIP(serviceIp).To4()
 
 	a := new(dns.Msg)
 	a.SetReply(r)

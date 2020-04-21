@@ -1,9 +1,7 @@
 status ?= onetime
 version ?= 1.14.6
 logging ?= false
-kubefed ?= true
 coredns ?= 1.5.2
-lhmode ?= plugin
 deploytool ?= helm
 globalnet ?= false
 
@@ -27,10 +25,10 @@ deploy: clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: build deploy
-	./.dapper -m bind scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging) --kubefed $(kubefed) --lhmode $(lhmode)
+	./.dapper -m bind scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging)
 
 $(TARGETS): .dapper
-	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(coredns) $(lhmode)
+	./.dapper -m bind $@ $(status) $(version) $(logging) $(coredns)
 
 .DEFAULT_GOAL := ci
 
