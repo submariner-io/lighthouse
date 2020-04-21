@@ -7,7 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	lhFramework "github.com/submariner-io/lighthouse/test/e2e/framework"
+
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -15,7 +15,7 @@ import (
 )
 
 var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
-	f := lhFramework.New("dataplane-sd").Framework
+	f := framework.NewFramework("dataplane-sd")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
 		It("should be able to discover the remote service successfully", func() {

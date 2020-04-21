@@ -4,9 +4,11 @@ logging ?= false
 coredns ?= 1.5.2
 deploytool ?= helm
 globalnet ?= false
+lighthouse ?= true
 
 TARGETS := $(shell ls scripts | grep -v deploy)
 SCRIPTS_DIR ?= /opt/shipyard/scripts
+DEPLOY_ARGS = --lighthouse ${lighthouse}
 
 .dapper:
 	@echo Downloading dapper
@@ -19,10 +21,10 @@ cleanup: .dapper
 	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
 clusters: ci
-	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
+	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet) 
 
 deploy: clusters
-	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
+	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool) --lighthouse $(lighthouse)
 
 e2e: build deploy
 	./.dapper -m bind scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging)
