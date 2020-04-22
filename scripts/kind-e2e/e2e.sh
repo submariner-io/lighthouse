@@ -35,18 +35,18 @@ function setup_lighthouse () {
 
 function update_coredns_deployment() {
     uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
-    docker tag lighthouse-coredns:${VERSION} lighthouse-coredns:${VERSION}_${uuid}
+    docker tag lighthouse-coredns:${VERSION#"v"} lighthouse-coredns:${VERSION#"v"}_${uuid}
     for i in 1 2 3; do
         echo "Updating coredns images in to cluster${i}..."
-        kind --name cluster${i} load docker-image lighthouse-coredns:${VERSION}_${uuid} --loglevel=debug
-        kubectl --context=cluster${i} set image -n kube-system deploy/coredns coredns=lighthouse-coredns:${VERSION}_${uuid}
+        kind --name cluster${i} load docker-image lighthouse-coredns:${VERSION#"v"}_${uuid} --loglevel=debug
+        kubectl --context=cluster${i} set image -n kube-system deploy/coredns coredns=lighthouse-coredns:${VERSION#"v"}_${uuid}
         echo "Waiting for coredns deployment to be Ready on cluster${i}."
         kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=60s
         echo "Updating coredns clusterrole in to cluster${i}..."
         cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
         kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
     done
-    docker rmi lighthouse-coredns:${VERSION}_${uuid}
+    docker rmi lighthouse-coredns:${VERSION#"v"}_${uuid}
 }
 
 function update_coredns_configmap() {

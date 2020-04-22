@@ -14,7 +14,7 @@ trap cleanup EXIT
 COREDNS_VERSION=$4
 TOPDIR=$(git rev-parse --show-toplevel)
 COREDNS_GIT="https://github.com/coredns/coredns.git"
-COREDNS_IMAGE="lighthouse-coredns:${VERSION}"
+COREDNS_IMAGE="lighthouse-coredns:${VERSION#"v"}"
 BUILD_DIR="build/linux/amd64"
 
 cd ${TOPDIR}
