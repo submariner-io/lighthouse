@@ -27,7 +27,7 @@ function setup_lighthouse () {
     done
     for i in 2 3; do
       echo "Installing lighthouse-agent in cluster${i}..."
-      docker tag lighthouse-agent:${VERSION} lighthouse-agent:local
+      docker tag lighthouse-agent:${VERSION#"v"} lighthouse-agent:local
       kind --name cluster${i} load docker-image lighthouse-agent:local
       kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-agent-deployment.yaml
     done
