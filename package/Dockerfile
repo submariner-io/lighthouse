@@ -2,10 +2,10 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 WORKDIR /var/submariner
 
-COPY lighthouse-controller.sh /usr/local/bin
+COPY lighthouse-agent.sh /usr/local/bin
 
-RUN chmod +x /usr/local/bin/lighthouse-controller.sh
+RUN chmod +x /usr/local/bin/lighthouse-agent.sh
 
-COPY lighthouse-controller /usr/local/bin
+COPY lighthouse-agent /usr/local/bin
 
-ENTRYPOINT lighthouse-controller.sh
+ENTRYPOINT lighthouse-agent.sh

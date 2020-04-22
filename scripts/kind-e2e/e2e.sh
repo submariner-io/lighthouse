@@ -3,18 +3,14 @@
 ## Process command line flags ##
 
 source /usr/share/shflags/shflags
-DEFINE_string 'kubefed' 'false' "Deploy with kubefed"
-DEFINE_string 'lhmode' '' "Mode to deploy (plugin or not)"
 DEFINE_string 'logging' 'false' "Deploy with logging"
 DEFINE_string 'status' 'onetime' "Status flag (onetime, create, keep, clean)"
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
-kubefed="${FLAGS_kubefed}"
-lhmode="${FLAGS_lhmode}"
 logging="${FLAGS_logging}"
 status="${FLAGS_status}"
-echo "Running with: kubefed=${kubefed}, logging=${logging}, status=${status}"
+echo "Running with: logging=${logging}, status=${status}"
 
 set -em
 
@@ -24,16 +20,11 @@ source ${SCRIPTS_DIR}/lib/utils
 
 ### Functions ###
 
-function setup_lighthouse_controller () {
+function setup_lighthouse () {
     for i in 1 2 3; do
       echo "Installing lighthouse CRD in cluster${i}..."
       kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-crd.yaml
     done
-    kubefedctl enable MulticlusterService
-    kubectl --context=cluster1 patch clusterrole  -n kube-federation-system  kubefed-role  --type json -p "$(cat ${PRJ_ROOT}/scripts/kind-e2e/config/patch-kubefed-clusterrole.yaml)"
-    docker tag lighthouse-controller:${VERSION} lighthouse-controller:local
-    kind --name cluster1 load docker-image lighthouse-controller:local
-    kubectl --context=cluster1 apply -f ${PRJ_ROOT}/package/lighthouse-controller-deployment.yaml
     for i in 2 3; do
       echo "Installing lighthouse-agent in cluster${i}..."
       docker tag lighthouse-agent:${VERSION} lighthouse-agent:local
@@ -67,21 +58,6 @@ function update_coredns_configmap() {
 
 }
 
-function deploy_lighthouse_dnsserver() {
-    docker tag lighthouse-dnsserver:${VERSION} lighthouse-dnsserver:local
-    for i in 2 3; do
-        echo "Updating coredns clusterrole in to cluster${i}..."
-        cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
-        kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
-        echo "Deploying Lighthouse DNS server in cluster${i}..."
-        kind --name cluster${i} load docker-image lighthouse-dnsserver:local
-        kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-dnsserver-deployment.yaml
-        lh_dnsserver_clusterip=$(kubectl --context=cluster${i} -n kube-system get svc -l app=lighthouse-dnsserver | awk 'FNR == 2 {print $3}')
-        sed "s|forward\ .\ lighthouse-dnsserver|forward\ .\ $lh_dnsserver_clusterip|g" ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-dnsserver-cm-cluster${i}.yaml > /tmp/coredns-dnsserver-cm-cluster${i}.yaml
-        kubectl --context=cluster${i} -n kube-system replace -f  /tmp/coredns-dnsserver-cm-cluster${i}.yaml
-    done
-}
-
 function enable_logging() {
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo "Elasticsearch stack already installed, skipping..."
@@ -96,22 +72,6 @@ function enable_logging() {
             kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/config/filebeat.yaml
             kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
-    fi
-}
-
-function enable_kubefed() {
-    if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
-        echo "Kubefed already installed, skipping setup..."
-    else
-        helm init --client-only
-        helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
-        helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
-        for i in 1 2 3; do
-            kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
-        done
-        echo "Waiting for kubefed control plain to be ready..."
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
     fi
 }
 
@@ -145,23 +105,16 @@ elif [[ $status != keep && $status != create ]]; then
 fi
 
 PRJ_ROOT=$(git rev-parse --show-toplevel)
-KUBEFED_NS=kube-federation-system
 
 if [[ $logging = true ]]; then
     enable_logging
 fi
 
-if [[ $kubefed = true ]]; then
-    enable_kubefed
-    setup_lighthouse_controller
-    if [[ $lhmode = plugin ]]; then
-        update_coredns_configmap
-        update_coredns_deployment
-    else
-        deploy_lighthouse_dnsserver
-    fi
-    test_with_e2e_tests
-fi
+setup_lighthouse
+update_coredns_configmap
+update_coredns_deployment
+
+#test_with_e2e_tests
 
 if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly."
