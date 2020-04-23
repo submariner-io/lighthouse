@@ -114,7 +114,7 @@ setup_lighthouse
 update_coredns_configmap
 update_coredns_deployment
 
-#test_with_e2e_tests
+test_with_e2e_tests
 
 if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly."
