@@ -92,7 +92,7 @@ run_parallel "2 3" update_coredns_configmap
 import_image lighthouse-coredns
 run_parallel "{1..3}" update_coredns_deployment
 
-#test_with_e2e_tests
+test_with_e2e_tests
 
 if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly."
