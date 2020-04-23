@@ -20,19 +20,6 @@ source ${SCRIPTS_DIR}/lib/utils
 
 ### Functions ###
 
-function setup_lighthouse () {
-    for i in 1 2 3; do
-      echo "Installing lighthouse CRD in cluster${i}..."
-      kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-crd.yaml
-    done
-    for i in 2 3; do
-      echo "Installing lighthouse-agent in cluster${i}..."
-      docker tag lighthouse-agent:${VERSION#"v"} lighthouse-agent:local
-      kind --name cluster${i} load docker-image lighthouse-agent:local
-      kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/package/lighthouse-agent-deployment.yaml
-    done
-}
-
 function update_coredns_deployment() {
     uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
     docker tag lighthouse-coredns:${VERSION#"v"} lighthouse-coredns:${VERSION#"v"}_${uuid}
@@ -110,7 +97,6 @@ if [[ $logging = true ]]; then
     enable_logging
 fi
 
-setup_lighthouse
 update_coredns_configmap
 update_coredns_deployment
 
