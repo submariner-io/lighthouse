@@ -18,13 +18,13 @@ SCRIPTS_DIR ?= /opt/shipyard/scripts
 cleanup: .dapper
 	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
-clusters: ci
+clusters:
 	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
 
-deploy: clusters
+deploy: build clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
 
-e2e: build deploy
+e2e: deploy
 	./.dapper -m bind scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging)
 
 $(TARGETS): .dapper
