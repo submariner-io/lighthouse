@@ -15,34 +15,25 @@ echo "Running with: logging=${logging}, status=${status}"
 set -em
 
 source ${SCRIPTS_DIR}/lib/debug_functions
+source ${SCRIPTS_DIR}/lib/deploy_funcs
 source ${SCRIPTS_DIR}/lib/version
 source ${SCRIPTS_DIR}/lib/utils
 
 ### Functions ###
 
 function update_coredns_deployment() {
-    uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
-    docker tag lighthouse-coredns:${VERSION#"v"} lighthouse-coredns:${VERSION#"v"}_${uuid}
-    for i in 1 2 3; do
-        echo "Updating coredns images in to cluster${i}..."
-        kind --name cluster${i} load docker-image lighthouse-coredns:${VERSION#"v"}_${uuid} --loglevel=debug
-        kubectl --context=cluster${i} set image -n kube-system deploy/coredns coredns=lighthouse-coredns:${VERSION#"v"}_${uuid}
-        echo "Waiting for coredns deployment to be Ready on cluster${i}."
-        kubectl --context=cluster${i} rollout status -n kube-system deploy/coredns --timeout=60s
-        echo "Updating coredns clusterrole in to cluster${i}..."
-        cat <(kubectl get --context=cluster${i} clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns.yaml
-        kubectl apply --context=cluster${i} -n kube-system -f /tmp/clusterroledns.yaml
-    done
-    docker rmi lighthouse-coredns:${VERSION#"v"}_${uuid}
+    echo "Updating coredns to patched image}..."
+    kubectl set image -n kube-system deploy/coredns coredns=localhost:5000/lighthouse-coredns:local
+    echo "Waiting for coredns deployment to be Ready on cluster${i}."
+    kubectl rollout status -n kube-system deploy/coredns --timeout=60s
+    echo "Updating coredns clusterrole in to cluster${i}..."
+    cat <(kubectl get clusterrole system:coredns -n kube-system -o yaml) ${PRJ_ROOT}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns-${cluster}.yaml
+    kubectl apply -n kube-system -f /tmp/clusterroledns-${cluster}.yaml
 }
 
 function update_coredns_configmap() {
-    for i in 2 3; do
-        echo "Updating coredns configMap in cluster${i}..."
-        kubectl --context=cluster${i} -n kube-system replace -f ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-cm.yaml
-        kubectl --context=cluster${i} -n kube-system describe cm coredns
-    done
-
+    kubectl -n kube-system replace -f ${PRJ_ROOT}/scripts/kind-e2e/config/coredns-cm.yaml
+    kubectl -n kube-system describe cm coredns
 }
 
 function enable_logging() {
@@ -97,8 +88,9 @@ if [[ $logging = true ]]; then
     enable_logging
 fi
 
-update_coredns_configmap
-update_coredns_deployment
+run_parallel "2 3" update_coredns_configmap
+import_image lighthouse-coredns
+run_parallel "{1..3}" update_coredns_deployment
 
 #test_with_e2e_tests
 
