@@ -1,7 +1,0 @@
----
-- op: add
-  path: "/rules/3/verbs/4"
-  value: create
-- op: add
-  path: "/rules/3/verbs/5"
-  value: delete
