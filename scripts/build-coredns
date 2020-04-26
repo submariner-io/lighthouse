@@ -11,7 +11,7 @@ function cleanup {
 
 trap cleanup EXIT
 
-COREDNS_VERSION=$4
+COREDNS_VERSION=$2
 TOPDIR=$(git rev-parse --show-toplevel)
 COREDNS_GIT="https://github.com/coredns/coredns.git"
 COREDNS_IMAGE="lighthouse-coredns:${VERSION#"v"}"

@@ -14,9 +14,9 @@ git:
 jobs:
   include:
   - env: CMD="make ci"
-  - env: CMD="make e2e status=keep delpoytool=operator"
+  - env: CMD="make e2e delpoytool=operator"
          RELEASE=true
-  - env: CMD="make e2e status=keep deploytool=helm"
+  - env: CMD="make e2e deploytool=helm"
 
 install:
   - sudo apt-get install moreutils # make ts available
@@ -34,6 +34,9 @@ after_success:
       set -o pipefail;
       $CMD 2>&1 | ts '[%H:%M:%.S]' -s;
     fi
+  - echo "Testing cleaning up clusters";
+    set -o pipefail;
+    make cleanup 2>&1 | ts '[%H:%M:%.S]' -s
 deploy:
   - provider: script
     script: bash scripts/release
