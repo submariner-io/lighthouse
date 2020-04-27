@@ -3,14 +3,11 @@ set -e
 
 source ${SCRIPTS_DIR}/lib/debug_functions
 source ${SCRIPTS_DIR}/lib/version
+source ${SCRIPTS_DIR}/lib/deploy_funcs
 
-function load_image() {
-    docker pull ${1}:latest
-    docker tag ${1}:latest ${1}:$VERSION
-}
-
-load_image quay.io/submariner/submariner
-load_image quay.io/submariner/submariner-route-agent
-load_image quay.io/submariner/submariner-globalnet
+import_image quay.io/submariner/submariner
+import_image quay.io/submariner/submariner-route-agent
+import_image quay.io/submariner/submariner-globalnet
+import_image lighthouse-agent
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
