@@ -15,6 +15,7 @@ jobs:
   include:
   - env: CMD="make ci"
   - env: CMD="make e2e status=keep delpoytool=operator"
+         RELEASE=true
   - env: CMD="make e2e status=keep deploytool=helm"
 
 install:
@@ -38,6 +39,7 @@ deploy:
     script: bash scripts/release
     on:
       branch: master
+      condition: $RELEASE = true
   - provider: script
     script: bash scripts/release
     on:
@@ -48,3 +50,4 @@ deploy:
     skip_cleanup: true
     on:
       tags: true
+      condition: $RELEASE = true
