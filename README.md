@@ -9,7 +9,7 @@ The lighthouse architecture is explained in detail at [Lighthouse Architecture](
 You will need docker installed in your system, and at least 8GB of RAM.
 Run:
 ```bash
-   make e2e status=keep
+   make e2e
 ```
 
 # Testing
