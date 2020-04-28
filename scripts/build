@@ -5,7 +5,5 @@ source $(dirname $0)/../scripts/lib/debug_functions
 
 cd $(dirname $0)
 
-if [[ $1 != clean ]]; then
-    ./build-coredns "$@"
-    ./build-agent "$@"
-fi
+./build-coredns "$@"
+./build-agent "$@"
