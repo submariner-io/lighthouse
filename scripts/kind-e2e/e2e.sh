@@ -4,6 +4,7 @@ source ${SCRIPTS_DIR}/lib/debug_functions
 source ${SCRIPTS_DIR}/lib/deploy_funcs
 source ${SCRIPTS_DIR}/lib/version
 source ${SCRIPTS_DIR}/lib/utils
+source ${SCRIPTS_DIR}/lib/cluster_settings
 
 ### Functions ###
 
@@ -36,9 +37,9 @@ function test_with_e2e_tests {
 declare_kubeconfig
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 
-run_parallel "2 3" update_coredns_configmap
+run_subm_clusters update_coredns_configmap
 import_image lighthouse-coredns
-run_parallel "{1..3}" update_coredns_deployment
+run_subm_clusters update_coredns_deployment
 
 test_with_e2e_tests
 
