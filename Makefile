@@ -1,7 +1,6 @@
 version ?= 1.14.6
 coredns ?= 1.5.2
 deploytool ?= helm
-globalnet ?= false
 
 TARGETS := $(shell ls scripts | grep -v deploy)
 SCRIPTS_DIR ?= /opt/shipyard/scripts
@@ -24,10 +23,10 @@ cleanup: .dapper
 	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
 clusters:
-	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
+	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version)
 
 deploy: build clusters
-	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ --globalnet $(globalnet) $(DEPLOY_ARGS)
+	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ $(DEPLOY_ARGS)
 
 e2e: deploy
 	./.dapper -m bind scripts/kind-e2e/e2e.sh
