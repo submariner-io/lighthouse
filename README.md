@@ -2,26 +2,10 @@
 Lighthouse provides DNS discovery to Kubernetes clusters connected by [Submariner](https://github.com/submariner-io/submariner) in multi-cluster connected environments. The solution is compatible with any CNI (Container Network Interfaces) plugin.
 
 # Architecture
-The lighthouse architecture is explained in detail at [Lighthouse Architecture](https://submariner-io.github.io/architecture/components/lighthouse/) 
+The lighthouse architecture is explained in detail at [Lighthouse Architecture](https://submariner-io.github.io/architecture/components/lighthouse/).
 
+# Contribute
+We welcome any contributions and please refer [Contribution Guide](https://submariner-io.github.io/contributing/lighthouse/) for more details.
 
-# Setup development environment
-You will need docker installed in your system, and at least 8GB of RAM.
-Run:
-```bash
-   make e2e
-```
-
-# Testing
-
-## To run end-to-end tests:
-```bash
-   make e2e
-```
-
-## To run unit tests:
-```bash
-   make test
-```
-
-
+# Build and Test
+To build and test your code follow the steps in [Building and Testing](https://submariner-io.github.io/contributing/building_testing/).
