@@ -39,17 +39,17 @@ after_success:
     make cleanup 2>&1 | ts '[%H:%M:%.S]' -s
 deploy:
   - provider: script
-    script: bash scripts/release
+    script: make build BUILD_ARGS="--nocache" release release_images="lighthouse-agent lighthouse-coredns"
     on:
       branch: master
       condition: $RELEASE = true
   - provider: script
-    script: bash scripts/release
+    script: make build BUILD_ARGS="--nocache" release release_images="lighthouse-agent lighthouse-coredns"
     on:
       branch: /^release-\d+.\d+.*$/
 
   - provider: script
-    script: bash scripts/release $TRAVIS_TAG
+    script: make build BUILD_ARGS="--nocache" release release_images="lighthouse-agent lighthouse-coredns" release_tag="$TRAVIS_TAG"
     skip_cleanup: true
     on:
       tags: true
