@@ -23,7 +23,7 @@ cleanup: .dapper
 	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
 clusters:
-	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version)
+	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) $(CLUSTERS_ARGS)
 
 deploy: build clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ $(DEPLOY_ARGS)
