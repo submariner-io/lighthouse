@@ -13,7 +13,7 @@ git:
 
 jobs:
   include:
-  - env: CMD="make ci"
+  - env: CMD="make test validate"
   - env: CMD="make e2e deploytool=operator"
          RELEASE=true
   - env: CMD="make e2e deploytool=helm"
