@@ -32,8 +32,8 @@ function install_service_export() {
 ### Main ###
 
 declare_kubeconfig
-import_image lighthouse-agent
-import_image lighthouse-coredns
+import_image quay.io/submariner/lighthouse-agent
+import_image quay.io/submariner/lighthouse-coredns
 
 run_subm_clusters update_coredns_configmap
 run_subm_clusters update_coredns_deployment

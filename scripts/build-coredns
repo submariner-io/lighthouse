@@ -12,9 +12,10 @@ function cleanup {
 trap cleanup EXIT
 
 COREDNS_VERSION=$1
+EXTRA_FLAGS="${@:2}"
+
 TOPDIR=$(git rev-parse --show-toplevel)
 COREDNS_GIT="https://github.com/coredns/coredns.git"
-COREDNS_IMAGE="lighthouse-coredns:${VERSION#"v"}"
 BUILD_DIR="build/linux/amd64"
 
 cd ${TOPDIR}
@@ -30,11 +31,9 @@ function buildit() {
     make BINARY=${BUILD_DIR}/coredns SYSTEM=GOOS=linux GOARCH=amd64
 }
 
-# TODO: For some reason fails the irst time, fix it?
-buildit || true
-buildit
+# TODO: For some reason fails the first time, fix it?
+buildit || buildit
 
-mkdir -p ${BUILD_DIR}
 cp Dockerfile ${BUILD_DIR}
-docker build -t ${COREDNS_IMAGE} ${BUILD_DIR}
-echo "Built ighthouse-coredns to image: ${COREDNS_IMAGE}"
+cd ${BUILD_DIR}
+${SCRIPTS_DIR}/build_image.sh -i lighthouse-coredns -f Dockerfile ${EXTRA_FLAGS}
