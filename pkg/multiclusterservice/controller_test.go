@@ -119,15 +119,18 @@ func testMCSLifecycleNotifications() {
 }
 
 func verifyCachedMultiClusterService(controller *Controller, expected *lighthousev1.MultiClusterService) {
+	
 	Eventually(func() []string {
 		name := expected.Annotations["origin-name"]
 		namespace := expected.Annotations["origin-namespace"]
-		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
-		if ok {
-			return ipList
+		ipList, okList := controller.multiClusterServices.GetIps(namespace, name)
+		bestIP, okBest := controller.multiClusterServices.GetBestIP(namespace, name)	
+		if !okList || !okBest || !validateIpSelection(bestIP, ipList) {
+			return nil
 		}
-		return nil
-	}).Should(Equal([]string{expected.Spec.Items[0].ServiceIP}))
+		return ipList
+		
+	}).Should(Equal(([]string{expected.Spec.Items[0].ServiceIP})))
 }
 
 func verifyUpdatedCachedMultiClusterService(controller *Controller, first *lighthousev1.MultiClusterService, second *lighthousev1.MultiClusterService) {
@@ -135,11 +138,13 @@ func verifyUpdatedCachedMultiClusterService(controller *Controller, first *light
 	Eventually(func() bool {
 		name := first.Annotations["origin-name"]
 		namespace := first.Annotations["origin-namespace"]
-		ipList, ok := controller.multiClusterServices.GetIps(namespace, name)
-		if ok {
-			return validateIpList(first, second, ipList)
+		ipList, okList := controller.multiClusterServices.GetIps(namespace, name)
+		bestIP, okBest := controller.multiClusterServices.GetBestIP(namespace, name)
+		if !okList || !okBest {
+			return false
 		}
-		return false
+		return validateIpList(first, second, ipList) && validateIpSelection(bestIP, ipList)
+		
 	}).Should(BeTrue())
 }
 
@@ -151,6 +156,18 @@ func validateIpList(first *lighthousev1.MultiClusterService, second *lighthousev
 	sort.Strings(ipList)
 	return reflect.DeepEqual(ipList, ips)
 }
+
+func validateIpSelection(ip string, ipList []string) bool {
+	// Round Robin selection test, keeping state outside of the service
+	rrCount := 0
+    inc := func() {
+        rrCount++
+	}
+	
+	defer inc()
+	return ip == ipList[rrCount/len(ipList)]
+}
+
 
 func newMultiClusterService(namespace, name, serviceIP, clusterID string) *lighthousev1.MultiClusterService {
 	return &lighthousev1.MultiClusterService{

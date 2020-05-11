@@ -10,6 +10,8 @@ type serviceInfo struct {
 	key         string
 	clusterInfo map[string]string
 	ipList      []string
+	rrCount     int // Counter for Round Ronbin IP selection, will be replaced by metirces object
+
 }
 
 type Map struct {
@@ -17,6 +19,22 @@ type Map struct {
 	sync.RWMutex
 }
 
+// NEW
+func (m *Map) GetBestIP(namespace string, name string) (string, bool) {
+	m.RLock()
+	defer m.RUnlock()
+
+	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
+		ipsCount := len(val.ipList)
+		if ipsCount < 1 { return "", false  }
+		selIP := val.ipList[val.rrCount%ipsCount]
+		val.rrCount++
+		return selIP ,true
+	}
+	return "", false
+}
+
+// OLD
 func (m *Map) GetIps(namespace string, name string) ([]string, bool) {
 	m.RLock()
 	defer m.RUnlock()
