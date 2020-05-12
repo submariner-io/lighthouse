@@ -108,6 +108,7 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		return stdout, nil
 	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
+		By(fmt.Sprintf("Validating dig result: %q", result))
 		if doesContain && !shouldContain {
 			return false || logOnly, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
@@ -115,13 +116,12 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		if !doesContain && shouldContain {
 			return false || logOnly, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
 		}
-		By(fmt.Sprintf("Validating dig result: %q", result))
 
 		return true, "", nil
 	})
 }
 
-func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.Pod, target string, shouldPass bool) {
+func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.Pod, target string, expectingSuccess bool) {
 	cmd := []string{"curl", target}
 	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
 		Command:       cmd,
@@ -131,7 +131,7 @@ func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.P
 		CaptureStdout: true,
 		CaptureStderr: true,
 	}, framework.ClusterB)
-	if shouldPass {
+	if expectingSuccess {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stdout).To(ContainSubstring("Welcome to nginx!"))
 	} else {
