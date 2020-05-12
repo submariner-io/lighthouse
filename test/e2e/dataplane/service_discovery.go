@@ -41,24 +41,13 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
-	cmd := []string{"curl", nginxServiceClusterC.Name}
-	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
-		Command:       cmd,
-		Namespace:     f.Namespace,
-		PodName:       netshootPodList.Items[0].Name,
-		ContainerName: netshootPodList.Items[0].Spec.Containers[0].Name,
-		CaptureStdout: true,
-		CaptureStderr: true,
-	}, framework.ClusterB)
 
-	Expect(err).NotTo(HaveOccurred())
-	Expect(stdout).To(ContainSubstring("Welcome to nginx!"))
-
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true, true)
+	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, true)
 
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
+	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *framework.Framework) {
@@ -80,18 +69,19 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterB, netshootPodList, true)
+	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterB, netshootPodList, true, false)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true, true)
+	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, true)
 
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
+	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false, false)
 }
 
-func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
+func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool, logOnly bool) {
 	kubeDnsService, _ := framework.KubeClients[cluster].CoreV1().Services("kube-system").Get("kube-dns", metav1.GetOptions{})
 	kubeDnsServiceIP := kubeDnsService.Spec.ClusterIP
 
@@ -118,14 +108,33 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		return stdout, nil
 	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
+		By(fmt.Sprintf("Validating dig result: %q", result))
 		if doesContain && !shouldContain {
-			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
+			return false || logOnly, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
 
 		if !doesContain && shouldContain {
-			return false, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
+			return false || logOnly, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
 		}
 
 		return true, "", nil
 	})
+}
+
+func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.Pod, target string, expectingSuccess bool) {
+	cmd := []string{"curl", target}
+	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		Command:       cmd,
+		Namespace:     f.Namespace,
+		PodName:       pod.Name,
+		ContainerName: pod.Spec.Containers[0].Name,
+		CaptureStdout: true,
+		CaptureStderr: true,
+	}, framework.ClusterB)
+	if expectingSuccess {
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stdout).To(ContainSubstring("Welcome to nginx!"))
+	} else {
+		Expect(err).To(HaveOccurred())
+	}
 }
