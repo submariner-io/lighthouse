@@ -24,6 +24,11 @@ function update_coredns_configmap() {
     kubectl -n kube-system describe cm coredns
 }
 
+function install_service_export() {
+    kubectl apply -f ${PRJ_ROOT}/package/lighthouse-crd.yaml
+    kubectl get crds | grep serviceexport
+}
+
 function test_with_e2e_tests {
     cd ${DAPPER_SOURCE}/test/e2e
 
@@ -41,6 +46,8 @@ PRJ_ROOT=$(git rev-parse --show-toplevel)
 run_subm_clusters update_coredns_configmap
 import_image lighthouse-coredns
 run_subm_clusters update_coredns_deployment
+
+run_subm_clusters install_service_export
 
 test_with_e2e_tests
 

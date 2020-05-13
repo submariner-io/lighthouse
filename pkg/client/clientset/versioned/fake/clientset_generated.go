@@ -22,6 +22,8 @@ import (
 	clientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1"
 	fakelighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1/fake"
+	lighthousev2alpha1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v2alpha1"
+	fakelighthousev2alpha1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v2alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -74,4 +76,9 @@ var _ clientset.Interface = &Clientset{}
 // LighthouseV1 retrieves the LighthouseV1Client
 func (c *Clientset) LighthouseV1() lighthousev1.LighthouseV1Interface {
 	return &fakelighthousev1.FakeLighthouseV1{Fake: &c.Fake}
+}
+
+// LighthouseV2alpha1 retrieves the LighthouseV2alpha1Client
+func (c *Clientset) LighthouseV2alpha1() lighthousev2alpha1.LighthouseV2alpha1Interface {
+	return &fakelighthousev2alpha1.FakeLighthouseV2alpha1{Fake: &c.Fake}
 }

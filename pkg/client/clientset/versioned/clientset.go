@@ -20,6 +20,7 @@ package versioned
 
 import (
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1"
+	lighthousev2alpha1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v2alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -28,18 +29,25 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	LighthouseV1() lighthousev1.LighthouseV1Interface
+	LighthouseV2alpha1() lighthousev2alpha1.LighthouseV2alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	lighthouseV1 *lighthousev1.LighthouseV1Client
+	lighthouseV1       *lighthousev1.LighthouseV1Client
+	lighthouseV2alpha1 *lighthousev2alpha1.LighthouseV2alpha1Client
 }
 
 // LighthouseV1 retrieves the LighthouseV1Client
 func (c *Clientset) LighthouseV1() lighthousev1.LighthouseV1Interface {
 	return c.lighthouseV1
+}
+
+// LighthouseV2alpha1 retrieves the LighthouseV2alpha1Client
+func (c *Clientset) LighthouseV2alpha1() lighthousev2alpha1.LighthouseV2alpha1Interface {
+	return c.lighthouseV2alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -62,6 +70,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.lighthouseV2alpha1, err = lighthousev2alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -75,6 +87,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.lighthouseV1 = lighthousev1.NewForConfigOrDie(c)
+	cs.lighthouseV2alpha1 = lighthousev2alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -84,6 +97,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.lighthouseV1 = lighthousev1.New(c)
+	cs.lighthouseV2alpha1 = lighthousev2alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
