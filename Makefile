@@ -8,6 +8,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
+E2E_ARGS=cluster1 cluster2 cluster3
 
 ifeq ($(deploytool),operator)
 DEPLOY_ARGS += --deploytool operator --deploytool_broker_args '--service-discovery'
@@ -21,9 +22,6 @@ build:
 
 deploy: build clusters
 	./scripts/$@ $(DEPLOY_ARGS)
-
-e2e: deploy
-	./scripts/kind-e2e/e2e.sh
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
