@@ -1,12 +1,16 @@
 package controller
 
 import (
+	"fmt"
+
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 )
@@ -15,23 +19,20 @@ const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 )
 
-var excludeSvcList = map[string]bool{"kubernetes": true, "openshift": true}
-
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
-	exclusionNSMap := map[string]bool{"kube-system": true, "submariner": true, "openshift": true,
-		"submariner-operator": true, "kubefed-operator": true}
-	for _, v := range spec.ExcludeNS {
-		exclusionNSMap[v] = true
+	clientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
 	}
 	agentController := &Controller{
-		clusterID:         spec.ClusterID,
-		restConfig:        cfg,
-		excludeNamespaces: exclusionNSMap,
+		clusterID:     spec.ClusterID,
+		restConfig:    cfg,
+		kubeClientSet: clientSet,
 	}
 	svcResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace: metav1.NamespaceAll,
-		LocalResourceType:    &corev1.Service{},
-		LocalTransform:       agentController.localServiceToRemoteMcs,
+		LocalResourceType:    &lighthousev2a1.ServiceExport{},
+		LocalTransform:       agentController.serviceExportToRemoteMcs,
 		BrokerResourceType:   &lighthousev1.MultiClusterService{},
 	}
 	syncerConf := broker.SyncerConfig{
@@ -67,9 +68,11 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) localServiceToRemoteMcs(obj runtime.Object) runtime.Object {
-	svc := obj.(*corev1.Service)
-	if !a.isValidService(svc.Namespace, svc.Name) {
+func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object {
+	svcExport := obj.(*lighthousev2a1.ServiceExport)
+	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("No matching service for %v", svcExport)
 		return nil
 	}
 	mcs := &lighthousev1.MultiClusterService{
@@ -98,13 +101,6 @@ func (a *Controller) newClusterServiceInfo(service *corev1.Service, clusterID st
 		ClusterID: clusterID,
 		ServiceIP: mcsIp,
 	}
-}
-
-func (a *Controller) isValidService(namespace string, serviceName string) bool {
-	if a.excludeNamespaces[namespace] || excludeSvcList[serviceName] {
-		return false
-	}
-	return true
 }
 
 func getGlobalIpFromService(service *corev1.Service) string {

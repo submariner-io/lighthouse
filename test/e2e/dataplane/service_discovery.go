@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	submarinerIpamGlobalIp = "submariner.io/globalIp"
 )
 
 var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
-	f := framework.NewFramework("dataplane-sd")
+	f := lhframework.NewFramework("dataplane-sd")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
 		It("should be able to discover the remote service successfully", func() {
@@ -31,7 +33,7 @@ var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
 
 })
 
-func RunServiceDiscoveryTest(f *framework.Framework) {
+func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
 	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
 
@@ -40,18 +42,20 @@ func RunServiceDiscoveryTest(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
+	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true, true)
-	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+
+	f.DeleteServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
-func RunServiceDiscoveryLocalTest(f *framework.Framework) {
+func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
 	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
 
@@ -59,36 +63,41 @@ func RunServiceDiscoveryLocalTest(f *framework.Framework) {
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
-	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+	// don't need ServiceExport for local service
+	nginxServiceClusterB := f.Framework.NewNginxService(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
+	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterB, netshootPodList, true, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterB, netshootPodList, true)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, true, true)
-	verifyCurl(f, framework.ClusterB, netshootPodList.Items[0], nginxServiceClusterC.Name, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+
+	f.DeleteServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
 
-	verifyClusterIpWithDig(f, framework.ClusterB, nginxServiceClusterC, netshootPodList, false, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
 }
 
-func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool, logOnly bool) {
-	kubeDnsService, _ := framework.KubeClients[cluster].CoreV1().Services("kube-system").Get("kube-dns", metav1.GetOptions{})
-	kubeDnsServiceIP := kubeDnsService.Spec.ClusterIP
+func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
+	var serviceIP string
+	var ok bool
 
-	serviceIP := service.Spec.ClusterIP
+	if serviceIP, ok = service.Annotations[submarinerIpamGlobalIp]; !ok {
+		serviceIP = service.Spec.ClusterIP
+	}
 
-	cmd := []string{"dig", "@" + kubeDnsServiceIP, service.Name + "." + f.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
+	cmd := []string{"dig", service.Name + "." + f.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
 	op := "is"
 	if !shouldContain {
 		op += " not"
@@ -106,41 +115,19 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		if err != nil {
 			return nil, err
 		}
+
 		return stdout, nil
 	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
-		By(fmt.Sprintf("Validating dig result: %q", result))
+		By(fmt.Sprintf("Validating that dig result %s %q", op, result))
 		if doesContain && !shouldContain {
-			return false || logOnly, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
+			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
 
 		if !doesContain && shouldContain {
-			return false || logOnly, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
+			return false, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
 		}
 
 		return true, "", nil
 	})
-}
-
-func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.Pod, target string, expectingSuccess bool) {
-	var err error
-	cmd := []string{"curl", target}
-	By(fmt.Sprintf("Executing %q to verify service %q is discoverable, expectingSuccess to be %t", strings.Join(cmd, " "), target, expectingSuccess))
-	for retryCount := 0; retryCount < 5; retryCount++ {
-		_, _, err = f.ExecWithOptions(framework.ExecOptions{
-			Command:       cmd,
-			Namespace:     f.Namespace,
-			PodName:       pod.Name,
-			ContainerName: pod.Spec.Containers[0].Name,
-			CaptureStdout: true,
-			CaptureStderr: true,
-		}, cluster)
-		if err == nil && !expectingSuccess {
-			By(fmt.Sprintf("Retrying curl because got no error when expected to get one"))
-			time.Sleep(time.Second)
-		} else {
-			break
-		}
-	}
-	Expect(expectingSuccess).To(Equal(err == nil))
 }
