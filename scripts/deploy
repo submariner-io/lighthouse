@@ -15,12 +15,12 @@ function update_coredns_deployment() {
     echo "Waiting for coredns deployment to be Ready on cluster${i}."
     kubectl rollout status -n kube-system deploy/coredns --timeout=60s
     echo "Updating coredns clusterrole in to cluster${i}..."
-    cat <(kubectl get clusterrole system:coredns -n kube-system -o yaml) ${DAPPER_SOURCE}/scripts/kind-e2e/config/patch-coredns-clusterrole.yaml >/tmp/clusterroledns-${cluster}.yaml
+    cat <(kubectl get clusterrole system:coredns -n kube-system -o yaml) ${DAPPER_SOURCE}/scripts/resources/patch-coredns-clusterrole.yaml >/tmp/clusterroledns-${cluster}.yaml
     kubectl apply -n kube-system -f /tmp/clusterroledns-${cluster}.yaml
 }
 
 function update_coredns_configmap() {
-    kubectl -n kube-system replace -f ${DAPPER_SOURCE}/scripts/kind-e2e/config/coredns-cm.yaml
+    kubectl -n kube-system replace -f ${DAPPER_SOURCE}/scripts/resources/coredns-cm.yaml
     kubectl -n kube-system describe cm coredns
 }
 
