@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -122,19 +123,24 @@ func verifyClusterIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 }
 
 func verifyCurl(f *framework.Framework, cluster framework.ClusterIndex, pod v1.Pod, target string, expectingSuccess bool) {
+	var err error
 	cmd := []string{"curl", target}
-	stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
-		Command:       cmd,
-		Namespace:     f.Namespace,
-		PodName:       pod.Name,
-		ContainerName: pod.Spec.Containers[0].Name,
-		CaptureStdout: true,
-		CaptureStderr: true,
-	}, framework.ClusterB)
-	if expectingSuccess {
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stdout).To(ContainSubstring("Welcome to nginx!"))
-	} else {
-		Expect(err).To(HaveOccurred())
+	By(fmt.Sprintf("Executing %q to verify service %q is discoverable, expectingSuccess to be %t", strings.Join(cmd, " "), target, expectingSuccess))
+	for retryCount := 0; retryCount < 5; retryCount++ {
+		_, _, err = f.ExecWithOptions(framework.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace,
+			PodName:       pod.Name,
+			ContainerName: pod.Spec.Containers[0].Name,
+			CaptureStdout: true,
+			CaptureStderr: true,
+		}, cluster)
+		if err == nil && !expectingSuccess {
+			By(fmt.Sprintf("Retrying curl because got no error when expected to get one"))
+			time.Sleep(time.Second)
+		} else {
+			break
+		}
 	}
+	Expect(expectingSuccess).To(Equal(err == nil))
 }
