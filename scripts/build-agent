@@ -4,18 +4,18 @@ set -e
 source $(dirname $0)/../scripts/lib/version
 source $(dirname $0)/../scripts/lib/debug_functions
 
+extra_flags="$@"
+
 cd $(dirname $0)/..
 mkdir -p bin
 echo Building lighthouse-agent version ${VERSION}
 go mod vendor
 GO111MODULE=on CGO_ENABLED=0 go build -ldflags "-X main.VERSION=${VERSION}" -o bin/lighthouse-agent ./pkg/agent/main.go
 
-LIGHTHOUSE_AGENT_IMAGE=lighthouse-agent:${VERSION}
 cd ./package
 cp ../bin/lighthouse-agent lighthouse-agent
-docker build -t ${LIGHTHOUSE_AGENT_IMAGE} .
 
-echo "Built lighthouse-agent to image: ${LIGHTHOUSE_AGENT_IMAGE}"
+${SCRIPTS_DIR}/build_image.sh -i lighthouse-agent -f Dockerfile ${extra_flags}
 
 # clean up agent image
 rm lighthouse-agent

@@ -1,10 +1,10 @@
 FROM quay.io/submariner/shipyard-dapper-base
 
-ENV DAPPER_ENV="REPO TAG" \
+ENV DAPPER_ENV="REPO TAG QUAY_USERNAME QUAY_PASSWORD TRAVIS_COMMIT CLUSTERS_ARGS DEPLOY_ARGS RELEASE_ARGS" \
     DAPPER_SOURCE=/go/src/github.com/submariner-io/lighthouse DAPPER_DOCKER_SOCKET=true
 ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
 
 WORKDIR ${DAPPER_SOURCE}
 
-ENTRYPOINT ["./scripts/entry"]
-CMD ["ci"]
+ENTRYPOINT ["/opt/shipyard/scripts/entry"]
+CMD ["sh"]
