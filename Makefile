@@ -19,7 +19,7 @@ else
 DEPLOY_ARGS += --deploytool helm --deploytool_broker_args '--set submariner.serviceDiscovery=true' --deploytool_submariner_args '--set submariner.serviceDiscovery=true,lighthouse.image.repository=localhost:5000/lighthouse-agent,serviceAccounts.lighthouse.create=true'
 endif
 
-build:
+build: vendor/modules.txt
 	./scripts/build-agent $(BUILD_ARGS)
 	./scripts/build-coredns $(coredns) $(BUILD_ARGS)
 
