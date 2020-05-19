@@ -25,3 +25,11 @@ type ServiceExportListerExpansion interface{}
 // ServiceExportNamespaceListerExpansion allows custom methods to be added to
 // ServiceExportNamespaceLister.
 type ServiceExportNamespaceListerExpansion interface{}
+
+// ServiceImportListerExpansion allows custom methods to be added to
+// ServiceImportLister.
+type ServiceImportListerExpansion interface{}
+
+// ServiceImportNamespaceListerExpansion allows custom methods to be added to
+// ServiceImportNamespaceLister.
+type ServiceImportNamespaceListerExpansion interface{}

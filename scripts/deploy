@@ -25,9 +25,10 @@ function update_coredns_configmap() {
     kubectl -n kube-system describe cm coredns
 }
 
-function install_service_export() {
+function install_service_import() {
+    #TODO: Delete this once operator and helm changes are merged
     kubectl apply -f ${DAPPER_SOURCE}/package/lighthouse-crd.yaml
-    kubectl get crds | grep serviceexport
+    kubectl get crds | grep serviceimport
 }
 
 ### Main ###
@@ -38,6 +39,6 @@ import_image quay.io/submariner/lighthouse-coredns
 
 run_subm_clusters update_coredns_configmap
 run_subm_clusters update_coredns_deployment
-#run_subm_clusters install_service_export
+run_subm_clusters install_service_import
 
 ${SCRIPTS_DIR}/deploy.sh "$@"

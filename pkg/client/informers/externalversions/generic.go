@@ -60,6 +60,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=lighthouse.submariner.io, Version=v2alpha1
 	case v2alpha1.SchemeGroupVersion.WithResource("serviceexports"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Lighthouse().V2alpha1().ServiceExports().Informer()}, nil
+	case v2alpha1.SchemeGroupVersion.WithResource("serviceimports"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Lighthouse().V2alpha1().ServiceImports().Informer()}, nil
 
 	}
 
