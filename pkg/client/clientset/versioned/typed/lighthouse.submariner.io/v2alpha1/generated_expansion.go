@@ -19,3 +19,5 @@ limitations under the License.
 package v2alpha1
 
 type ServiceExportExpansion interface{}
+
+type ServiceImportExpansion interface{}

@@ -1,12 +1,12 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: serviceexports.lighthouse.submariner.io
+  name: serviceimports.lighthouse.submariner.io
 spec:
   group: lighthouse.submariner.io
   version: v2alpha1
   names:
-    kind: ServiceExport
-    plural: serviceexports
-    singular: serviceexport
+    kind: ServiceImport
+    plural: serviceimports
+    singular: serviceimport
   scope: Namespaced

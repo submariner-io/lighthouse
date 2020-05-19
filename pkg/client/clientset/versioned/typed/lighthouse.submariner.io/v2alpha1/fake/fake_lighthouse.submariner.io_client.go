@@ -32,6 +32,10 @@ func (c *FakeLighthouseV2alpha1) ServiceExports(namespace string) v2alpha1.Servi
 	return &FakeServiceExports{c, namespace}
 }
 
+func (c *FakeLighthouseV2alpha1) ServiceImports(namespace string) v2alpha1.ServiceImportInterface {
+	return &FakeServiceImports{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeLighthouseV2alpha1) RESTClient() rest.Interface {

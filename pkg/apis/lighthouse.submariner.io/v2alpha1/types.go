@@ -69,3 +69,60 @@ type ServiceExportList struct {
 	metav1.ListMeta `json:"metadata"`
 	Items           []ServiceExport `json:"items"`
 }
+
+//+genclient
+//+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +genclient:noStatus
+
+// ServiceImport declares that the specified service is imported from other clusters.
+type ServiceImport struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// +optional
+	Spec ServiceImportSpec `json:"spec,omitempty"`
+}
+
+// ServiceImportSpec contains the current status of an imported service and the
+// information necessary to consume it.
+type ServiceImportSpec struct {
+	// +patchStrategy=merge
+	// +patchMergeKey=port
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
+	Ports []corev1.ServicePort `json:"ports"`
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=cluster
+	// +listType=map
+	// +listMapKey=cluster
+	Clusters []ClusterSpec `json:"clusters"`
+	// +optional
+	IP string `json:"ip,omitempty"`
+}
+
+// ClusterSpec contains service configuration mapped to a specific cluster
+type ClusterSpec struct {
+	Cluster string `json:"cluster"`
+	// +optional
+	// +listType=set
+	TopologyKeys []string `json:"topologyKeys"`
+	// +optional
+	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses"`
+	// +optional
+	SessionAffinity corev1.ServiceAffinity `json:"sessionAffinity"`
+	// +optional
+	SessionAffinityConfig *corev1.SessionAffinityConfig `json:"sessionAffinityConfig"`
+	// +optional
+	IPs []string `json:"ips,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+//ServiceImportList is a list of serviceimport objects.
+type ServiceImportList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []ServiceImport `json:"items"`
+}

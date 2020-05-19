@@ -28,6 +28,7 @@ import (
 type LighthouseV2alpha1Interface interface {
 	RESTClient() rest.Interface
 	ServiceExportsGetter
+	ServiceImportsGetter
 }
 
 // LighthouseV2alpha1Client is used to interact with features provided by the lighthouse.submariner.io group.
@@ -37,6 +38,10 @@ type LighthouseV2alpha1Client struct {
 
 func (c *LighthouseV2alpha1Client) ServiceExports(namespace string) ServiceExportInterface {
 	return newServiceExports(c, namespace)
+}
+
+func (c *LighthouseV2alpha1Client) ServiceImports(namespace string) ServiceImportInterface {
+	return newServiceImports(c, namespace)
 }
 
 // NewForConfig creates a new LighthouseV2alpha1Client for the given config.
