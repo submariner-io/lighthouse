@@ -37,6 +37,6 @@ import_image quay.io/submariner/lighthouse-coredns
 
 run_subm_clusters update_coredns_configmap
 run_subm_clusters update_coredns_deployment
-run_subm_clusters install_service_export
+#run_subm_clusters install_service_export
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
