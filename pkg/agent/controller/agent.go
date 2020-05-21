@@ -19,7 +19,7 @@ var excludeSvcList = map[string]bool{"kubernetes": true, "openshift": true}
 
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	exclusionNSMap := map[string]bool{"kube-system": true, "submariner": true, "openshift": true,
-		"submariner-operator": true, "kubefed-operator": true}
+		"submariner-operator": true}
 	for _, v := range spec.ExcludeNS {
 		exclusionNSMap[v] = true
 	}
