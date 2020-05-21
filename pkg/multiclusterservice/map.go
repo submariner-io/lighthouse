@@ -2,7 +2,7 @@ package multiclusterservice
 
 import (
 	"sync"
-
+	"sync/atomic"
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 )
 
@@ -10,7 +10,7 @@ type serviceInfo struct {
 	key         string
 	clusterInfo map[string]string
 	ipList      []string
-	rrCount     int // Counter for Round Ronbin IP selection, will be replaced by metirces object
+	rrCount     uint64 // Counter for Round Robin IP selection, will be replaced by metircs object
 
 }
 
@@ -25,10 +25,10 @@ func (m *Map) GetBestIP(namespace string, name string) (string, bool) {
 	defer m.RUnlock()
 
 	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
-		ipsCount := len(val.ipList)
+		ipsCount := uint64(len(val.ipList))
 		if ipsCount < 1 { return "", false  }
-		selIP := val.ipList[val.rrCount%ipsCount]
-		val.rrCount++
+		selIP := val.ipList[atomic.LoadUint64(&val.rrCount)%ipsCount]
+		atomic.AddUint64(&val.rrCount, 1)
 		return selIP ,true
 	}
 	return "", false
