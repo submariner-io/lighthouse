@@ -16,7 +16,7 @@ const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 )
 
-var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
+var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("dataplane-sd")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
@@ -34,59 +34,59 @@ var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
-	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
+	clusterBName := framework.TestContext.KubeContexts[framework.ClusterA]
+	clusterCName := framework.TestContext.KubeContexts[framework.ClusterB]
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterCName))
-	f.NewNginxDeployment(framework.ClusterC)
+	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
-	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
-	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	nginxServiceClusterC := f.NewNginxService(framework.ClusterB)
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterC, netshootPodList, true)
 
-	f.DeleteServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
-	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
+	f.DeleteService(framework.ClusterB, nginxServiceClusterC.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterC, netshootPodList, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
-	clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
-	f.NewNginxDeployment(framework.ClusterB)
+	f.NewNginxDeployment(framework.ClusterA)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 	// don't need ServiceExport for local service
-	nginxServiceClusterB := f.Framework.NewNginxService(framework.ClusterB)
+	nginxServiceClusterB := f.Framework.NewNginxService(framework.ClusterA)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
-	f.NewNginxDeployment(framework.ClusterC)
+	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
-	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
-	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	nginxServiceClusterC := f.NewNginxService(framework.ClusterB)
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterB)
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterB, netshootPodList, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
 
-	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
+	f.DeleteService(framework.ClusterA, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterC, netshootPodList, true)
 
-	f.DeleteServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
-	f.DeleteService(framework.ClusterC, nginxServiceClusterC.Name)
+	f.DeleteService(framework.ClusterB, nginxServiceClusterC.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterB, nginxServiceClusterC, netshootPodList, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterC, netshootPodList, false)
 }
 
 func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
