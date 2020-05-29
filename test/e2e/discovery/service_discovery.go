@@ -1,4 +1,4 @@
-package dataplane
+package discovery
 
 import (
 	"fmt"
@@ -16,8 +16,8 @@ const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 )
 
-var _ = Describe("[dataplane] Test Service Discovery Across Clusters", func() {
-	f := lhframework.NewFramework("dataplane-sd")
+var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
+	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
 		It("should be able to discover the remote service successfully", func() {
