@@ -14,6 +14,7 @@ import (
 
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	superclusterDomain     = "supercluster.local"
 )
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
@@ -46,13 +47,13 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
@@ -75,21 +76,21 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
-
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, true)
+	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, clusterADomain, true)
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
 
-func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
+func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, domain string, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
@@ -97,7 +98,7 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		serviceIP = service.Spec.ClusterIP
 	}
 
-	cmd := []string{"dig", service.Name + "." + f.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
+	cmd := []string{"dig", service.Name + "." + f.Namespace + ".svc." + domain, "+short"}
 	op := "is"
 	if !shouldContain {
 		op += " not"
@@ -130,4 +131,29 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 
 		return true, "", nil
 	})
+}
+
+func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *v1.PodList) string {
+	/*
+		Kubernetes adds --cluster-domain config to all pods' /etc/resolve.conf exactly as follows:
+			search <namespace>.svc.cluster.local svc.cluster.local cluster.local <custom-domains>
+	*/
+	cmd := []string{"cat", "/etc/resolv.conf"}
+	if stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		Command:       cmd,
+		Namespace:     f.Namespace,
+		PodName:       targetPod.Items[0].Name,
+		ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+		CaptureStdout: true,
+		CaptureStderr: true,
+	}, cluster); err == nil {
+		for _, line := range strings.Split(stdout, "\n") {
+			if strings.Contains(line, "search") {
+				ss := strings.Split(line, " ")
+				return ss[3]
+			}
+		}
+	}
+	//Backup option. Ideally we should never hit this.
+	return "cluster" + strconv.Itoa(int(cluster+1)) + ".local"
 }
