@@ -46,13 +46,13 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
+	verifyServiceIpWithDig(f, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
+	verifyServiceIpWithDig(f, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
@@ -76,37 +76,42 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, true)
+	verifyServiceIpWithDig(f, framework.ClusterA, nginxServiceClusterA, netshootPodList, true)
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
+	verifyServiceIpWithDig(f, framework.ClusterA, nginxServiceClusterB, netshootPodList, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
+	verifyServiceIpWithDig(f, framework.ClusterA, nginxServiceClusterB, netshootPodList, false)
 }
 
-func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
+func verifyServiceIpWithDig(lhframework *lhframework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
 	if serviceIP, ok = service.Annotations[submarinerIpamGlobalIp]; !ok {
 		serviceIP = service.Spec.ClusterIP
 	}
-
-	cmd := []string{"dig", service.Name + "." + f.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
+	var cmd []string
+	lighthouseDnsDeployment := lhframework.GetDeployment(cluster, "submariner-lighthouse-coredns", "submariner-operator")
+	if lighthouseDnsDeployment == nil {
+		cmd = []string{"dig", service.Name + "." + lhframework.Framework.Namespace + ".svc.cluster" + strconv.Itoa(int(cluster+1)) + ".local", "+short"}
+	} else {
+		cmd = []string{"dig", service.Name + "." + lhframework.Framework.Namespace + ".svc.supercluster.local", "+short"}
+	}
 	op := "is"
 	if !shouldContain {
 		op += " not"
 	}
 	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := lhframework.Framework.ExecWithOptions(framework.ExecOptions{
 			Command:       cmd,
-			Namespace:     f.Namespace,
+			Namespace:     lhframework.Framework.Namespace,
 			PodName:       targetPod.Items[0].Name,
 			ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
 			CaptureStdout: true,

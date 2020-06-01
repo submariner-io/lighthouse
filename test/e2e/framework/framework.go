@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
@@ -73,4 +74,16 @@ func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name str
 	//TODO: Add a WaitUntilDeleted method for this
 	By("Waiting for mcs cleanup...")
 	time.Sleep(cleanupWait)
+}
+
+func (f *Framework) GetDeployment(cluster framework.ClusterIndex, deploymentName string, namespace string) *appsv1.Deployment {
+	By(fmt.Sprintf("Retrive the deployment  %s.%s on %q", deploymentName, namespace, framework.TestContext.ClusterIDs[cluster]))
+	deployment, _, _ := framework.AwaitResultOrError("list deployments", func() (interface{}, error) {
+		return framework.KubeClients[cluster].AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+	}, framework.NoopCheckResult)
+
+	if deployment == nil {
+		return nil
+	}
+	return deployment.(*appsv1.Deployment)
 }
