@@ -34,8 +34,8 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
-	clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
@@ -56,8 +56,8 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
-	clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
