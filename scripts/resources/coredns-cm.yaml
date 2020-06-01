@@ -8,10 +8,9 @@ data:
         kubernetes cluster1.local in-addr.arpa ip6.arpa {
            pods insecure
            upstream
-           #fallthrough in-addr.arpa ip6.arpa
-           fallthrough
+           fallthrough in-addr.arpa ip6.arpa
         }
-        lighthouse cluster1.local cluster2.local {
+        lighthouse supercluster.local {
            fallthrough
         }
         prometheus :9153
