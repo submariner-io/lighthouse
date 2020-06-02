@@ -10,19 +10,14 @@ source ${SCRIPTS_DIR}/lib/version
 
 ### Functions ###
 
-function update_coredns_deployment() {
-    echo "Updating coredns to patched image}..."
-    kubectl set image -n kube-system deploy/coredns coredns=localhost:5000/lighthouse-coredns:local
-    echo "Waiting for coredns deployment to be Ready on cluster${i}."
-    kubectl rollout status -n kube-system deploy/coredns --timeout=60s
-    echo "Updating coredns clusterrole in to cluster${i}..."
-    cat <(kubectl get clusterrole system:coredns -n kube-system -o yaml) ${DAPPER_SOURCE}/scripts/resources/patch-coredns-clusterrole.yaml >/tmp/clusterroledns-${cluster}.yaml
-    kubectl apply -n kube-system -f /tmp/clusterroledns-${cluster}.yaml
-}
-
 function update_coredns_configmap() {
-    kubectl -n kube-system replace -f ${DAPPER_SOURCE}/scripts/resources/coredns-cm.yaml
-    kubectl -n kube-system describe cm coredns
+    kubectl get cm -n kube-system coredns -o yaml > /tmp/coremap.yaml
+    if !(grep -q supercluster /tmp/coremap.yaml); then
+        CLUSTER_IP=`kubectl get svc -n submariner-operator submariner-lighthouse-coredns | tail -n 1| awk '{print $3;}'`
+        sed 's/dnsip/'${CLUSTER_IP}'/g' scripts/resources/coredns-cm.yaml > /tmp/coredns-cm-${CLUSTER_IP}.yaml
+        kubectl -n kube-system replace -f /tmp/coredns-cm-${CLUSTER_IP}.yaml
+        kubectl -n kube-system describe cm coredns
+    fi
 }
 
 function install_service_export() {
@@ -36,8 +31,8 @@ declare_kubeconfig
 import_image quay.io/submariner/lighthouse-agent
 import_image quay.io/submariner/lighthouse-coredns
 
-run_subm_clusters update_coredns_configmap
-run_subm_clusters update_coredns_deployment
 #run_subm_clusters install_service_export
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
+
+run_subm_clusters update_coredns_configmap
