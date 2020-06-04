@@ -5,13 +5,12 @@ data:
         errors
         health
         log
-        kubernetes cluster2.local in-addr.arpa ip6.arpa {
+        kubernetes cluster1.local in-addr.arpa ip6.arpa {
            pods insecure
            upstream
-           #fallthrough in-addr.arpa ip6.arpa
-           fallthrough
+           fallthrough in-addr.arpa ip6.arpa
         }
-        lighthouse cluster2.local cluster3.local {
+        lighthouse supercluster.local {
            fallthrough
         }
         prometheus :9153

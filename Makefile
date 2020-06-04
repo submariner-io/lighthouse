@@ -8,7 +8,10 @@ ifneq (,$(DAPPER_HOST_ARCH))
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
-E2E_ARGS=cluster1 cluster2 cluster3
+CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
+CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
+DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
+E2E_ARGS=cluster1 cluster2
 
 ifeq ($(deploytool),operator)
 DEPLOY_ARGS += --deploytool operator --deploytool_broker_args '--service-discovery'

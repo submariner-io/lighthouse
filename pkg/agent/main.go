@@ -6,6 +6,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,6 +35,10 @@ func main() {
 	err = lighthousev1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		klog.Exitf("Error adding lighthouse V1 to the scheme: %v", err)
+	}
+	err = lighthousev2a1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Exitf("Error adding lighthouse V2alpha1 to the scheme: %v", err)
 	}
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	if err != nil {
