@@ -22,7 +22,7 @@ endif
 
 # Targets to make
 
-build:
+build: vendor/modules.txt
 	./scripts/build-agent $(BUILD_ARGS)
 	./scripts/build-coredns $(coredns) $(BUILD_ARGS)
 
