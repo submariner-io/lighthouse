@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        globalnet: ['', '--globalnet']
+        globalnet: ['', 'globalnet']
         deploytool: ['operator', 'helm']
     steps:
       - uses: actions/checkout@master
@@ -27,11 +27,8 @@ jobs:
           free -h
 
       - name: Run E2E deployment and tests
-        env:
-          CLUSTERS_ARGS: ${{ matrix.globalnet }}
-          DEPLOY_ARGS: ${{ matrix.globalnet }}
         run: |
-          make e2e deploytool=${{ matrix.deploytool }}
+          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }}"
 
       - name: Post Mortem
         if: failure()
