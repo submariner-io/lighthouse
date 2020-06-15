@@ -8,7 +8,7 @@ require (
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.29
-	github.com/onsi/ginkgo v1.12.3
+	github.com/onsi/ginkgo v1.13.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.0.0-20200417073818-3db8d8d127ef
