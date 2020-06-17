@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/caddyserver/caddy v1.0.5
-	github.com/coredns/coredns v1.5.2
+	github.com/coredns/coredns v1.6.9
 	github.com/elazarl/goproxy v0.0.0-20200426045556-49ad98f6dac1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.29
@@ -13,10 +13,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.3.1-0.20200617155518-f51143431ba7
 	github.com/submariner-io/shipyard v0.3.0
-	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
-	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
+	k8s.io/api v0.17.4
+	k8s.io/apimachinery v0.17.4
 	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/klog v0.4.0
+	k8s.io/klog v1.0.0
 	sigs.k8s.io/controller-runtime v0.1.12
 )
 
