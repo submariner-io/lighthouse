@@ -13,11 +13,11 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.3.1-0.20200617155518-f51143431ba7
 	github.com/submariner-io/shipyard v0.3.0
-	k8s.io/api v0.0.0-20190313235455-40a48860b5ab
-	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
+	k8s.io/api v0.18.2
+	k8s.io/apimachinery v0.18.2
 	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/klog v0.4.0
-	sigs.k8s.io/controller-runtime v0.1.12
+	k8s.io/klog v1.0.0
+	sigs.k8s.io/controller-runtime v0.6.0
 )
 
 replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda
