@@ -30,7 +30,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	if state.QType() != dns.TypeA {
 		// We only support TypeA
 		log.Debugf("Only TypeA queries are supported yet")
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, "Only TypeA supported")
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only TypeA supported")
 	}
 
 	zone = qname[len(qname)-len(zone):] // maintain case of original query

@@ -124,7 +124,7 @@ func testWithoutFallback() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeAAAA,
-				Rcode: dns.RcodeNotImplemented,
+				Rcode: dns.RcodeNameError,
 			})
 		})
 	})
