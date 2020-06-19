@@ -3,6 +3,7 @@ package lighthouse
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -26,11 +27,10 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		log.Debugf("Request does not match configured zones %v", lh.Zones)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotZone, "No matching zone found")
 	}
-
-	if state.QType() != dns.TypeA {
-		// We only support TypeA
-		log.Debugf("Only TypeA queries are supported yet")
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, "Only TypeA supported")
+	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA {
+		msg := fmt.Sprintf("Query of type %d is not supported", state.QType())
+		log.Debugf(msg)
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, msg)
 	}
 
 	zone = qname[len(qname)-len(zone):] // maintain case of original query
@@ -55,6 +55,11 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 	serviceIp := ipList[0]
 
+	if state.QType() == dns.TypeAAAA {
+		log.Debugf("Returning empty response for TypeAAAA query")
+		return lh.emptyIpv6Response(state)
+	}
+
 	rr := new(dns.A)
 	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
 	rr.A = net.ParseIP(serviceIp).To4()
@@ -72,6 +77,25 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return dns.RcodeServerFailure, lh.error("failed to write response")
 	}
 
+	return dns.RcodeSuccess, nil
+}
+
+func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
+
+	rr := new(dns.AAAA)
+	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeAAAA, Class: state.QClass()}
+	rr.AAAA = net.IPv6unspecified
+
+	a := new(dns.Msg)
+	a.SetReply(state.Req)
+	a.Authoritative = true
+
+	wErr := state.W.WriteMsg(a)
+	if wErr != nil {
+		// Error writing reply msg
+		log.Errorf("Failed to write message %#v: %v", a, wErr)
+		return dns.RcodeServerFailure, lh.error("failed to write response")
+	}
 	return dns.RcodeSuccess, nil
 }
 

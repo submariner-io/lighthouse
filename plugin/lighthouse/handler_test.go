@@ -120,11 +120,12 @@ func testWithoutFallback() {
 	})
 
 	When("type AAAA DNS query", func() {
-		It("should return error RcodeNotImplemented", func() {
+		It("should return empty record", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
-				Qtype: dns.TypeAAAA,
-				Rcode: dns.RcodeNotImplemented,
+				Qname:  service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype:  dns.TypeAAAA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
 			})
 		})
 	})
@@ -183,11 +184,12 @@ func testWithFallback() {
 	})
 
 	When("type AAAA DNS query", func() {
-		It("should invoke the next plugin", func() {
+		It("should return empty record", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
-				Qtype: dns.TypeAAAA,
-				Rcode: dns.RcodeBadCookie,
+				Qname:  service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype:  dns.TypeAAAA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
 			})
 		})
 	})
