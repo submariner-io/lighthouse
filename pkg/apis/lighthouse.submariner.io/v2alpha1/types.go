@@ -108,7 +108,7 @@ type ServiceImportSpec struct {
 	// +optional
 	SessionAffinityConfig *corev1.SessionAffinityConfig `json:"sessionAffinityConfig"`
 	// +optional
-	MultiClusterIPs []string `json:"ips,omitempty"`
+	Items []ClusterServiceInfo `json:"clusterServiceInfo"`
 }
 
 // ServicePort represents the port on which the service is exposed
@@ -138,6 +138,17 @@ type ServicePort struct {
 
 	// The port that will be exposed by this service.
 	Port int32 `json:"port"`
+}
+
+//ClusterServiceInfo provides information about service in each cluster.
+type ClusterServiceInfo struct {
+	//The unique identity of the cluster where the service is available. This field is
+	//not optional.
+	ClusterID string `json:"clusterID"`
+
+	//The cluster IP of the service running in the cluster that is identified by the
+	//ClusterID field. This field is not optional.
+	ServiceIP string `json:"serviceIP"`
 }
 
 // ServiceImportStatus describes derived state of an imported service.
