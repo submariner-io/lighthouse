@@ -1,0 +1,7 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+WORKDIR /var/submariner
+
+COPY bin/lighthouse-agent package/lighthouse-agent.sh /usr/local/bin/
+
+ENTRYPOINT lighthouse-agent.sh

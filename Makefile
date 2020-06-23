@@ -22,17 +22,22 @@ endif
 
 # Targets to make
 
-build: vendor/modules.txt
-	./scripts/build-agent $(BUILD_ARGS)
+images: package/.image.lighthouse-agent
 	./scripts/build-coredns $(coredns) $(BUILD_ARGS)
 
-deploy: build clusters
+# Explicitly depend on the binary, since if it doesn't exist Shipyard won't find it
+package/.image.lighthouse-agent: bin/lighthouse-agent
+
+bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
+	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go
+
+deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS)
+.PHONY: $(TARGETS) images
 
 else
 

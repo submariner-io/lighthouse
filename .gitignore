@@ -4,9 +4,11 @@
 bin
 dist
 output
+package/.image.*
 /vendor
 /submariner
 .project
 .settings
+.shflags
 *.coverprofile
 .shflags
