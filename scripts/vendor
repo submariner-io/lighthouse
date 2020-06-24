@@ -1,9 +1,0 @@
-#!/bin/bash
-set -e
-
-cd $(dirname $0)/..
-echo "Downloading go modules to cache ----"
-go mod download
-echo "Download finished ------------------"
-echo ""
-go mod vendor
