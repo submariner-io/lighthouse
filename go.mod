@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.4.1
-	github.com/submariner-io/shipyard v0.4.0
+	github.com/submariner-io/shipyard v0.4.1
 	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
 	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
 	k8s.io/client-go v11.0.0+incompatible
