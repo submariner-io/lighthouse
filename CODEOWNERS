@@ -4,3 +4,5 @@
 Makefile* 		@mkolesnik
 Dockerfile.dapper 	@mkolesnik
 package/ 		@mkolesnik
+go.mod @skitt
+go.sum @skitt
