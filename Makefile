@@ -15,7 +15,7 @@ E2E_ARGS=cluster1 cluster2
 # Process extra flags from the `using=a,b,c` optional flag
 
 ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --deploytool_broker_args '--set submariner.serviceDiscovery=true' --deploytool_submariner_args '--set submariner.serviceDiscovery=true,lighthouse.image.repository=localhost:5000/lighthouse-agent,serviceAccounts.lighthouse.create=true'
+override DEPLOY_ARGS += --deploytool_broker_args '--set submariner.serviceDiscovery=true' --deploytool_submariner_args '--set submariner.serviceDiscovery=true,lighthouse.image.repository=localhost:5000/lighthouse-agent,lighthouse.image.tag=local,lighthouseCoredns.image.repository=localhost:5000/lighthouse-coredns,lighthouseCoredns.image.tag=local,serviceAccounts.lighthouse.create=true'
 else
 override DEPLOY_ARGS += --deploytool_broker_args '--service-discovery'
 endif
