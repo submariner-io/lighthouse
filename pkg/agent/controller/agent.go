@@ -6,12 +6,15 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 )
 
@@ -24,10 +27,17 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
 	}
+
+	lighthouseClient, err := lighthouseClientset.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("Error building lighthouseClient %s", err.Error())
+	}
+
 	agentController := &Controller{
-		clusterID:     spec.ClusterID,
-		restConfig:    cfg,
-		kubeClientSet: clientSet,
+		clusterID:        spec.ClusterID,
+		restConfig:       cfg,
+		kubeClientSet:    clientSet,
+		lighthouseClient: lighthouseClient,
 	}
 	svcResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace: metav1.NamespaceAll,
@@ -89,7 +99,41 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 			},
 		},
 	}
+	err = a.updateExportedServiceStatus(svcExport)
+	if err != nil {
+		klog.Errorf("Updating status failed %v", svcExport)
+	}
 	return mcs
+}
+
+func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport) error {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(export.Namespace).Get(export.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			klog.Infof("Export Service not found, hence ignoring %v", export)
+			return nil
+		} else if err != nil {
+			klog.Errorf("Error retrieving the object %v", export)
+			return err
+		}
+		msg := "Service written to the broker Successfully"
+		exportCondtion := lighthousev2a1.ServiceExportCondition{
+			Type:               lighthousev2a1.ServiceExportExported,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: nil,
+			Reason:             nil,
+			Message:            &msg,
+		}
+		toUpdate.Status = lighthousev2a1.ServiceExportStatus{
+			Conditions: []lighthousev2a1.ServiceExportCondition{
+				exportCondtion,
+			},
+		}
+		_, err = a.lighthouseClient.LighthouseV2alpha1().ServiceExports(toUpdate.Namespace).Update(toUpdate)
+
+		return err
+	})
+	return retryErr
 }
 
 func (a *Controller) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev1.ClusterServiceInfo {
