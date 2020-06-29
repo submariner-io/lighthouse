@@ -1,6 +1,9 @@
 apiVersion: v1
 data:
   Corefile: |
+    supercluster.local:53 {
+        forward . dnsip
+    }
     .:53 {
         errors
         health
@@ -9,9 +12,6 @@ data:
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
-        }
-        lighthouse supercluster.local {
-           fallthrough
         }
         prometheus :9153
         forward . /etc/resolv.conf
