@@ -46,9 +46,9 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	se := f.GetServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(se.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	Expect(*se.Status.Conditions[0].Message).To(Equal("Service written to the broker Successfully"))
+	Expect(*se.Status.Conditions[0].Message).To(Equal("Service was successfully synced to the broker"))
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
@@ -80,9 +80,9 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	se := f.GetServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(se.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	Expect(*se.Status.Conditions[0].Message).To(Equal("Service written to the broker Successfully"))
+	Expect(*se.Status.Conditions[0].Message).To(Equal("Service was successfully synced to the broker"))
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)

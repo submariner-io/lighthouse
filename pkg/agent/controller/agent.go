@@ -101,7 +101,7 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 	}
 	err = a.updateExportedServiceStatus(svcExport)
 	if err != nil {
-		klog.Errorf("Updating status failed %v", svcExport)
+		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
 	return mcs
 }
@@ -113,10 +113,9 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 			klog.Infof("Export Service not found, hence ignoring %v", export)
 			return nil
 		} else if err != nil {
-			klog.Errorf("Error retrieving the object %v", export)
 			return err
 		}
-		msg := "Service written to the broker Successfully"
+		msg := "Service was successfully synced to the broker"
 		exportCondtion := lighthousev2a1.ServiceExportCondition{
 			Type:               lighthousev2a1.ServiceExportExported,
 			Status:             corev1.ConditionTrue,
