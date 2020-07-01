@@ -20,6 +20,7 @@ import (
 
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	dummyServiceIp         = "127.0.0.1"
 )
 
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
@@ -78,36 +79,33 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object {
+func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) (runtime.Object, bool) {
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
+	_, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		// service export was deleted
+		return a.getMcsToDelete(svcExport.Name, svcExport.Namespace), false
+	}
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("No matching service for %v", svcExport)
-		return nil
+		// couldn't get the service, update status and re-queue
+		err = a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, "Service to be exported doesn't exist yet", corev1.ConditionFalse)
+		if err != nil {
+			klog.Errorf("Error updating status for %#v: %v", svcExport, err)
+		}
+		return nil, true
 	}
-	mcs := &lighthousev1.MultiClusterService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: svc.Name + "-" + svc.Namespace + "-" + a.clusterID,
-			Annotations: map[string]string{
-				"origin-name":      svc.Name,
-				"origin-namespace": svc.Namespace,
-			},
-		},
-		Spec: lighthousev1.MultiClusterServiceSpec{
-			Items: []lighthousev1.ClusterServiceInfo{
-				a.newClusterServiceInfo(svc, a.clusterID),
-			},
-		},
-	}
-	err = a.updateExportedServiceStatus(svcExport, "Service was successfully synced to the broker",
+
+	mcs := a.svcToMCS(svc)
+	err = a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportExported, "Service was successfully synced to the broker",
 		corev1.ConditionTrue)
 	if err != nil {
 		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
-	return mcs
+	return mcs, false
 }
 
-func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
+func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, conditionType lighthousev2a1.ServiceExportConditionType, msg string,
 	status corev1.ConditionStatus) error {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(export.Namespace).Get(export.Name, metav1.GetOptions{})
@@ -118,7 +116,7 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 			return err
 		}
 		exportCondtion := lighthousev2a1.ServiceExportCondition{
-			Type:               lighthousev2a1.ServiceExportExported,
+			Type:               conditionType,
 			Status:             status,
 			LastTransitionTime: nil,
 			Reason:             nil,
@@ -137,9 +135,14 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 }
 
 func (a *Controller) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev1.ClusterServiceInfo {
-	mcsIp := getGlobalIpFromService(service)
-	if mcsIp == "" {
-		mcsIp = service.Spec.ClusterIP
+	mcsIp := ""
+	if service != nil {
+		mcsIp = getGlobalIpFromService(service)
+		if mcsIp == "" {
+			mcsIp = service.Spec.ClusterIP
+		}
+	} else {
+		mcsIp = dummyServiceIp
 	}
 	return lighthousev1.ClusterServiceInfo{
 		ClusterID: clusterID,
@@ -155,4 +158,40 @@ func getGlobalIpFromService(service *corev1.Service) string {
 		}
 	}
 	return ""
+}
+
+func (a *Controller) svcToMCS(svc *corev1.Service) *lighthousev1.MultiClusterService {
+	mcs := &lighthousev1.MultiClusterService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: svc.Name + "-" + svc.Namespace + "-" + a.clusterID,
+			Annotations: map[string]string{
+				"origin-name":      svc.Name,
+				"origin-namespace": svc.Namespace,
+			},
+		},
+		Spec: lighthousev1.MultiClusterServiceSpec{
+			Items: []lighthousev1.ClusterServiceInfo{
+				a.newClusterServiceInfo(svc, a.clusterID),
+			},
+		},
+	}
+	return mcs
+}
+
+func (a *Controller) getMcsToDelete(name string, namespace string) *lighthousev1.MultiClusterService {
+	mcs := &lighthousev1.MultiClusterService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name + "-" + namespace + "-" + a.clusterID,
+			Annotations: map[string]string{
+				"origin-name":      name,
+				"origin-namespace": namespace,
+			},
+		},
+		Spec: lighthousev1.MultiClusterServiceSpec{
+			Items: []lighthousev1.ClusterServiceInfo{
+				a.newClusterServiceInfo(nil, a.clusterID),
+			},
+		},
+	}
+	return mcs
 }

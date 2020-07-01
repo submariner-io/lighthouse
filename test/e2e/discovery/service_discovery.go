@@ -33,6 +33,12 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
+	When("service export is created before the service", func() {
+		It("should resolve the service", func() {
+			RunServiceExportTest(f)
+		})
+	})
+
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
@@ -96,6 +102,28 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
+
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
+}
+
+func RunServiceExportTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	By(fmt.Sprintf("Creating an Nginx ServiceExport on on %q", clusterBName))
+	f.NewServiceExport(framework.ClusterB, "nginx-demo", f.Namespace)
+	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
+
+	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
