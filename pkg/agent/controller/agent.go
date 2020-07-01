@@ -99,14 +99,16 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 			},
 		},
 	}
-	err = a.updateExportedServiceStatus(svcExport)
+	err = a.updateExportedServiceStatus(svcExport, "Service was successfully synced to the broker",
+		corev1.ConditionTrue)
 	if err != nil {
 		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
 	return mcs
 }
 
-func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport) error {
+func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
+	status corev1.ConditionStatus) error {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(export.Namespace).Get(export.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -115,10 +117,9 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 		} else if err != nil {
 			return err
 		}
-		msg := "Service was successfully synced to the broker"
 		exportCondtion := lighthousev2a1.ServiceExportCondition{
 			Type:               lighthousev2a1.ServiceExportExported,
-			Status:             corev1.ConditionTrue,
+			Status:             status,
 			LastTransitionTime: nil,
 			Reason:             nil,
 			Message:            &msg,
