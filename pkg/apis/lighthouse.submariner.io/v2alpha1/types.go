@@ -146,9 +146,10 @@ type ClusterServiceInfo struct {
 	// not optional.
 	ClusterID string `json:"clusterID"`
 
-	//The cluster IP of the service running in the cluster that is identified by the
-	//ClusterID field. This field is not optional.
-	ServiceIP string `json:"serviceIP"`
+	// The cluster IP of the service running in the cluster that is identified by the
+	// ClusterID field. In the case of headless services it will be list of pod IPs
+	// that backs the service. This field is not optional.
+	ServiceIPs []string `json:"serviceIPs"`
 }
 
 // ServiceImportStatus describes derived state of an imported service.
