@@ -89,7 +89,7 @@ type ServiceImport struct {
 type ServiceImportType string
 
 const (
-	// SuperclusterIP are only accessible via the Supercluster IP.
+	// Services are only accessible via their supercluster IP.
 	SuperclusterIP ServiceImportType = "SuperclusterIP"
 	// Headless services allow backend pods to be addressed directly.
 	Headless ServiceImportType = "Headless"
@@ -140,10 +140,10 @@ type ServicePort struct {
 	Port int32 `json:"port"`
 }
 
-//ClusterServiceInfo provides information about service in each cluster.
+// ClusterServiceInfo provides information about services in other clusters.
 type ClusterServiceInfo struct {
-	//The unique identity of the cluster where the service is available. This field is
-	//not optional.
+	// The unique identity of the cluster where the service is available. This field is
+	// not optional.
 	ClusterID string `json:"clusterID"`
 
 	//The cluster IP of the service running in the cluster that is identified by the
