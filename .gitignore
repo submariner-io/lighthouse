@@ -3,10 +3,13 @@
 .tmp
 bin
 dist
+junit.xml
 output
+package/.image.*
 /vendor
 /submariner
 .project
 .settings
+.shflags
 *.coverprofile
 .shflags

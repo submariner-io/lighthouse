@@ -20,18 +20,11 @@ function update_coredns_configmap() {
     fi
 }
 
-function install_service_export() {
-    kubectl apply -f ${DAPPER_SOURCE}/package/lighthouse-crd.yaml
-    kubectl get crds | grep serviceexport
-}
-
 ### Main ###
 
 declare_kubeconfig
 import_image quay.io/submariner/lighthouse-agent
 import_image quay.io/submariner/lighthouse-coredns
-
-#run_subm_clusters install_service_export
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
 

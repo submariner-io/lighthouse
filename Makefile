@@ -11,6 +11,8 @@ CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_sett
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 E2E_ARGS=cluster1 cluster2
+override UNIT_TEST_ARGS += test/e2e
+override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
@@ -22,17 +24,24 @@ endif
 
 # Targets to make
 
-build: vendor/modules.txt
-	./scripts/build-agent $(BUILD_ARGS)
+images: package/.image.lighthouse-agent
 	./scripts/build-coredns $(coredns) $(BUILD_ARGS)
 
-deploy: build clusters
+# Explicitly depend on the binary, since if it doesn't exist Shipyard won't find it
+package/.image.lighthouse-agent: bin/lighthouse-agent
+
+bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
+	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go
+
+deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
+
+test: unit-test
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS)
+.PHONY: $(TARGETS) images test validate
 
 else
 
