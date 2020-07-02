@@ -20,6 +20,12 @@ function update_coredns_configmap() {
     fi
 }
 
+function install_service_import() {
+    #TODO: Delete this once operator and helm changes are merged
+    kubectl apply -f ${DAPPER_SOURCE}/package/lighthouse-crd.yaml
+    kubectl get crds | grep serviceimport
+}
+
 ### Main ###
 
 declare_kubeconfig

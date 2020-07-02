@@ -107,8 +107,6 @@ type ServiceImportSpec struct {
 	SessionAffinity corev1.ServiceAffinity `json:"sessionAffinity"`
 	// +optional
 	SessionAffinityConfig *corev1.SessionAffinityConfig `json:"sessionAffinityConfig"`
-	// +optional
-	Items []ClusterServiceInfo `json:"clusterServiceInfo"`
 }
 
 // ServicePort represents the port on which the service is exposed
@@ -140,18 +138,6 @@ type ServicePort struct {
 	Port int32 `json:"port"`
 }
 
-// ClusterServiceInfo provides information about services in other clusters.
-type ClusterServiceInfo struct {
-	// The unique identity of the cluster where the service is available. This field is
-	// not optional.
-	ClusterID string `json:"clusterID"`
-
-	// The cluster IP of the service running in the cluster that is identified by the
-	// ClusterID field. In the case of headless services it will be list of pod IPs
-	// that backs the service. This field is not optional.
-	ServiceIPs []string `json:"serviceIPs"`
-}
-
 // ServiceImportStatus describes derived state of an imported service.
 type ServiceImportStatus struct {
 	// +optional
@@ -165,6 +151,12 @@ type ServiceImportStatus struct {
 // ClusterStatus contains service configuration mapped to a specific source cluster
 type ClusterStatus struct {
 	Cluster string `json:"cluster"`
+
+	// The cluster IP of the service running in the cluster that is identified by the
+	// ClusterID field. In the case of headless services it will be list of pod IPs
+	// that backs the service.
+	// +optional
+	IPs []string `json:"ips,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
