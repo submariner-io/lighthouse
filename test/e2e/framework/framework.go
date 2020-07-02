@@ -64,6 +64,22 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name string
 	return serviceExport
 }
 
+func (f *Framework) AwaitServiceExportStatusCondition(cluster framework.ClusterIndex, name string, namespace string) *v2alpha1.ServiceExport {
+	se := LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace)
+	By(fmt.Sprintf("Retrieving serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
+	serviceExport := framework.AwaitUntil("retrieve serviceExport", func() (interface{}, error) {
+		return se.Get(name, metav1.GetOptions{})
+
+	}, func(result interface{}) (bool, string, error) {
+		se := result.(*v2alpha1.ServiceExport)
+		if len(se.Status.Conditions) == 0 {
+			return false, "Status.Conditions is empty", nil
+		}
+		return true, "", nil
+	}).(*v2alpha1.ServiceExport)
+	return serviceExport
+}
+
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name string, namespace string) {
 	By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("delete service export", func() (interface{}, error) {
