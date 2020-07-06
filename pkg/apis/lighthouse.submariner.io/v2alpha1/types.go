@@ -152,9 +152,8 @@ type ServiceImportStatus struct {
 type ClusterStatus struct {
 	Cluster string `json:"cluster"`
 
-	// The cluster IP of the service running in the cluster that is identified by the
-	// ClusterID field. In the case of headless services it will be list of pod IPs
-	// that backs the service.
+	// The IP(s) of the service running in the cluster.  In the case of a headless service, it is the list of pod IPs
+	// that back the service.
 	// +optional
 	IPs []string `json:"ips,omitempty"`
 }
