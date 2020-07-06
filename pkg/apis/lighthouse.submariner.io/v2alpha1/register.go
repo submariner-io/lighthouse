@@ -33,6 +33,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		SchemeGroupVersion,
 		&ServiceExport{},
 		&ServiceExportList{},
+		&ServiceImport{},
+		&ServiceImportList{},
 	)
 
 	// register the type in the scheme
