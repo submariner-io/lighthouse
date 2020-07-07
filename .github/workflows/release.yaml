@@ -34,16 +34,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build the latest images
+        env:
+          BUILD_ARGS: --nocache
+        run: make images
+
       - name: Release the lighthouse images
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
           RELEASE_ARGS: lighthouse-agent lighthouse-coredns
-          BUILD_ARGS: --nocache
         run: |
           if [[ $GITHUB_REF =~ "/tags/" ]]; then
               tags="${GITHUB_REF##*/}"
               { echo $tags | grep -q -v -; } && tags+=" latest"
               RELEASE_ARGS+=" --tag \"$tags\""
           fi
-          make build release
+          make release
