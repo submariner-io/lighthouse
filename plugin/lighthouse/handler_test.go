@@ -10,9 +10,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
-	v1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
-	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,8 +44,8 @@ func testWithoutFallback() {
 
 	BeforeEach(func() {
 		lh = &Lighthouse{
-			Zones:                []string{"cluster.local."},
-			multiClusterServices: setupMultiClusterServiceMap(),
+			Zones:          []string{"cluster.local."},
+			serviceImports: setupServiceImportMap(),
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -67,7 +66,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.multiClusterServices.Put(newMultiClusterService(namespace2, service1, serviceIP, "clusterID"))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, serviceIP, "clusterID"))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -153,10 +152,10 @@ func testWithFallback() {
 
 	BeforeEach(func() {
 		lh = &Lighthouse{
-			Zones:                []string{"cluster.local."},
-			Fall:                 fall.F{Zones: []string{"cluster.local."}},
-			Next:                 test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
-			multiClusterServices: setupMultiClusterServiceMap(),
+			Zones:          []string{"cluster.local."},
+			Fall:           fall.F{Zones: []string{"cluster.local."}},
+			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
+			serviceImports: setupServiceImportMap(),
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -227,14 +226,14 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 	}
 }
 
-func setupMultiClusterServiceMap() *multiclusterservice.Map {
-	mcsMap := multiclusterservice.NewMap()
-	mcsMap.Put(newMultiClusterService(namespace1, service1, serviceIP, "clusterID"))
-	return mcsMap
+func setupServiceImportMap() *serviceimport.Map {
+	siMap := serviceimport.NewMap()
+	siMap.Put(newServiceImport(namespace1, service1, serviceIP, "clusterID"))
+	return siMap
 }
 
-func newMultiClusterService(namespace, name, serviceIP, clusterID string) *v1.MultiClusterService {
-	return &lighthousev1.MultiClusterService{
+func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
+	return &lighthousev2a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -243,11 +242,11 @@ func newMultiClusterService(namespace, name, serviceIP, clusterID string) *v1.Mu
 				"origin-namespace": namespace,
 			},
 		},
-		Spec: lighthousev1.MultiClusterServiceSpec{
-			Items: []lighthousev1.ClusterServiceInfo{
+		Status: lighthousev2a1.ServiceImportStatus{
+			Clusters: []lighthousev2a1.ClusterStatus{
 				{
-					ClusterID: clusterID,
-					ServiceIP: serviceIP,
+					Cluster: clusterID,
+					IPs:     []string{serviceIP},
 				},
 			},
 		},

@@ -46,7 +46,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	query := strings.Split(qname, ".")
 	svcName := query[0]
 	namespace := query[1]
-	ipList, found := lh.multiClusterServices.GetIps(namespace, svcName)
+	ipList, found := lh.serviceImports.GetIps(namespace, svcName)
 
 	if !found {
 		// We couldn't find record for this service name

@@ -6,11 +6,11 @@ require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/coredns v1.5.2
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/miekg/dns v1.1.29
+	github.com/miekg/dns v1.1.30
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
-	github.com/submariner-io/admiral v0.4.1
+	github.com/submariner-io/admiral v0.4.2-0.20200706185424-d52c64ccd7ba
 	github.com/submariner-io/shipyard v0.4.1
 	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
 	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d

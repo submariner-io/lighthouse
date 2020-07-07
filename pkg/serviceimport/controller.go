@@ -1,9 +1,9 @@
-package multiclusterservice
+package serviceimport
 
 import (
 	"fmt"
 
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lighthouseInformers "github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,11 +15,11 @@ import (
 
 type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
-	newClientset         func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
-	serviceInformer      cache.SharedIndexInformer
-	queue                workqueue.RateLimitingInterface
-	stopCh               chan struct{}
-	multiClusterServices *Map
+	newClientset    func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
+	serviceInformer cache.SharedIndexInformer
+	queue           workqueue.RateLimitingInterface
+	stopCh          chan struct{}
+	serviceImports  *Map
 }
 
 func NewController(remoteServiceMap *Map) *Controller {
@@ -30,13 +30,13 @@ func NewController(remoteServiceMap *Map) *Controller {
 			return lighthouseClientset.NewForConfig(c)
 
 		},
-		multiClusterServices: remoteServiceMap,
-		stopCh:               make(chan struct{}),
+		serviceImports: remoteServiceMap,
+		stopCh:         make(chan struct{}),
 	}
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
-	klog.Infof("Starting MultiClusterService Controller")
+	klog.Infof("Starting ServiceImport Controller")
 
 	clientSet, err := c.newClientset(kubeConfig)
 	if err != nil {
@@ -46,27 +46,27 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	informerFactory := lighthouseInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,
 		lighthouseInformers.WithNamespace(metav1.NamespaceAll))
 
-	c.serviceInformer = informerFactory.Lighthouse().V1().MultiClusterServices().Informer()
+	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("MultiClusterService %q added", key)
+			klog.V(2).Infof("ServiceImport %q added", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		UpdateFunc: func(obj interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(2).Infof("MultiClusterService %q updated", key)
+			klog.V(2).Infof("ServiceImport %q updated", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("MultiClusterService %q deleted", key)
+			klog.V(2).Infof("ServiceImport %q deleted", key)
 			if err == nil {
-				c.multiClusterServiceDeleted(obj, key)
+				c.serviceImportDeleted(obj, key)
 			}
 		},
 	})
@@ -81,14 +81,14 @@ func (c *Controller) Stop() {
 	close(c.stopCh)
 	c.queue.ShutDown()
 
-	klog.Infof("MultiClusterService Controller stopped")
+	klog.Infof("ServiceImport Controller stopped")
 }
 
 func (c *Controller) runWorker() {
 	for {
 		keyObj, shutdown := c.queue.Get()
 		if shutdown {
-			klog.Infof("Lighthouse watcher for MultiClusterServices stopped")
+			klog.Infof("Lighthouse watcher for ServiceImports stopped")
 			return
 		}
 
@@ -105,7 +105,7 @@ func (c *Controller) runWorker() {
 			}
 
 			if exists {
-				c.multiClusterServiceCreatedOrUpdated(obj, key)
+				c.serviceImportCreatedOrUpdated(obj, key)
 			}
 
 			c.queue.Forget(key)
@@ -113,26 +113,26 @@ func (c *Controller) runWorker() {
 	}
 }
 
-func (c *Controller) multiClusterServiceCreatedOrUpdated(obj interface{}, key string) {
-	klog.V(2).Infof("In multiClusterServiceCreatedOrUpdated for key %q, service: %#v, ", key, obj)
+func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}, key string) {
+	klog.V(2).Infof("In serviceImportCreatedOrUpdated for key %q, service: %#v, ", key, obj)
 
-	c.multiClusterServices.Put(obj.(*lighthousev1.MultiClusterService))
+	c.serviceImports.Put(obj.(*lighthousev2a1.ServiceImport))
 }
 
-func (c *Controller) multiClusterServiceDeleted(obj interface{}, key string) {
-	var mcs *lighthousev1.MultiClusterService
+func (c *Controller) serviceImportDeleted(obj interface{}, key string) {
+	var mcs *lighthousev2a1.ServiceImport
 	var ok bool
-	if mcs, ok = obj.(*lighthousev1.MultiClusterService); !ok {
+	if mcs, ok = obj.(*lighthousev2a1.ServiceImport); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			klog.Errorf("Failed to get deleted multiclusterservice object for %s", key)
+			klog.Errorf("Failed to get deleted serviceimport object for %s", key)
 			return
 		}
-		mcs, ok = tombstone.Obj.(*lighthousev1.MultiClusterService)
+		mcs, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
 		if !ok {
-			klog.Errorf("Failed to convert deleted tombstone object %v  to multiclusterservice", tombstone.Obj)
+			klog.Errorf("Failed to convert deleted tombstone object %v  to serviceimport", tombstone.Obj)
 			return
 		}
 	}
-	c.multiClusterServices.Remove(mcs)
+	c.serviceImports.Remove(mcs)
 }

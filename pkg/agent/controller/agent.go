@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
@@ -42,8 +41,8 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	svcResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace: metav1.NamespaceAll,
 		LocalResourceType:    &lighthousev2a1.ServiceExport{},
-		LocalTransform:       agentController.serviceExportToRemoteMcs,
-		BrokerResourceType:   &lighthousev1.MultiClusterService{},
+		LocalTransform:       agentController.serviceExportToRemoteServiceImport,
+		BrokerResourceType:   &lighthousev2a1.ServiceImport{},
 	}
 	syncerConf := broker.SyncerConfig{
 		LocalRestConfig: cfg,
@@ -78,14 +77,15 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object {
+func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object) (runtime.Object, bool) {
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("No matching service for %v", svcExport)
-		return nil
+		return nil, false
 	}
-	mcs := &lighthousev1.MultiClusterService{
+
+	serviceImport := &lighthousev2a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svc.Name + "-" + svc.Namespace + "-" + a.clusterID,
 			Annotations: map[string]string{
@@ -93,9 +93,12 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 				"origin-namespace": svc.Namespace,
 			},
 		},
-		Spec: lighthousev1.MultiClusterServiceSpec{
-			Items: []lighthousev1.ClusterServiceInfo{
-				a.newClusterServiceInfo(svc, a.clusterID),
+		Spec: lighthousev2a1.ServiceImportSpec{
+			Type: lighthousev2a1.SuperclusterIP,
+		},
+		Status: lighthousev2a1.ServiceImportStatus{
+			Clusters: []lighthousev2a1.ClusterStatus{
+				a.newClusterStatus(svc, a.clusterID),
 			},
 		},
 	}
@@ -104,7 +107,7 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 	if err != nil {
 		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
-	return mcs
+	return serviceImport, false
 }
 
 func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
@@ -136,14 +139,14 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 	return retryErr
 }
 
-func (a *Controller) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev1.ClusterServiceInfo {
+func (a *Controller) newClusterStatus(service *corev1.Service, clusterID string) lighthousev2a1.ClusterStatus {
 	mcsIp := getGlobalIpFromService(service)
 	if mcsIp == "" {
 		mcsIp = service.Spec.ClusterIP
 	}
-	return lighthousev1.ClusterServiceInfo{
-		ClusterID: clusterID,
-		ServiceIP: mcsIp,
+	return lighthousev2a1.ClusterStatus{
+		Cluster: clusterID,
+		IPs:     []string{mcsIp},
 	}
 }
 
