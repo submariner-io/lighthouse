@@ -1,4 +1,4 @@
-package multiclusterservice
+package serviceimport
 
 import (
 	"testing"

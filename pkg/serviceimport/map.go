@@ -1,9 +1,9 @@
-package multiclusterservice
+package serviceimport
 
 import (
 	"sync"
 
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 )
 
 type serviceInfo struct {
@@ -32,9 +32,9 @@ func NewMap() *Map {
 	}
 }
 
-func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
-	if name, ok := mcs.Annotations["origin-name"]; ok {
-		namespace := mcs.Annotations["origin-namespace"]
+func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
+	if name, ok := serviceImport.Annotations["origin-name"]; ok {
+		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)
 		m.Lock()
 		defer m.Unlock()
@@ -45,8 +45,8 @@ func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
 				clusterInfo: make(map[string]string),
 			}
 		}
-		for _, info := range mcs.Spec.Items {
-			remoteService.clusterInfo[info.ClusterID] = info.ServiceIP
+		for _, info := range serviceImport.Status.Clusters {
+			remoteService.clusterInfo[info.Cluster] = info.IPs[0]
 		}
 		remoteService.ipList = make([]string, 0)
 		for _, v := range remoteService.clusterInfo {
@@ -56,9 +56,9 @@ func (m *Map) Put(mcs *lighthousev1.MultiClusterService) {
 	}
 }
 
-func (m *Map) Remove(mcs *lighthousev1.MultiClusterService) {
-	if name, ok := mcs.Annotations["origin-name"]; ok {
-		namespace := mcs.Annotations["origin-namespace"]
+func (m *Map) Remove(serviceImport *lighthousev2a1.ServiceImport) {
+	if name, ok := serviceImport.Annotations["origin-name"]; ok {
+		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)
 		m.Lock()
 		defer m.Unlock()
@@ -66,8 +66,8 @@ func (m *Map) Remove(mcs *lighthousev1.MultiClusterService) {
 		if !ok {
 			return
 		}
-		for _, info := range mcs.Spec.Items {
-			delete(remoteService.clusterInfo, info.ClusterID)
+		for _, info := range serviceImport.Status.Clusters {
+			delete(remoteService.clusterInfo, info.Cluster)
 		}
 		if len(remoteService.clusterInfo) == 0 {
 			delete(m.svcMap, key)
