@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMultiClusterService(t *testing.T) {
+func TestServiceImport(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "MultiClusterService Suite")
+	RunSpecs(t, "ServiceImport	 Suite")
 }

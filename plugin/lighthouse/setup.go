@@ -52,20 +52,20 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error building kubeconfig: %v", err)
 	}
 
-	mcsMap := serviceimport.NewMap()
-	mcsController := serviceimport.NewController(mcsMap)
+	siMap := serviceimport.NewMap()
+	siController := serviceimport.NewController(siMap)
 
-	err = mcsController.Start(cfg)
+	err = siController.Start(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error starting the controller: %v", err)
 	}
 
 	c.OnShutdown(func() error {
-		mcsController.Stop()
+		siController.Stop()
 		return nil
 	})
 
-	lh := &Lighthouse{serviceImports: mcsMap}
+	lh := &Lighthouse{serviceImports: siMap}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)

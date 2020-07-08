@@ -66,7 +66,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(serviceImport(namespace2, service1, serviceIP, "clusterID"))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, serviceIP, "clusterID"))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -227,12 +227,12 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 }
 
 func setupServiceImportMap() *serviceimport.Map {
-	mcsMap := serviceimport.NewMap()
-	mcsMap.Put(serviceImport(namespace1, service1, serviceIP, "clusterID"))
-	return mcsMap
+	siMap := serviceimport.NewMap()
+	siMap.Put(newServiceImport(namespace1, service1, serviceIP, "clusterID"))
+	return siMap
 }
 
-func serviceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
+func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
 	return &lighthousev2a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

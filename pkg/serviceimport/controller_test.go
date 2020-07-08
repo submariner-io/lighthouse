@@ -18,10 +18,10 @@ import (
 var _ = Describe("ServiceImport controller", func() {
 	klog.InitFlags(nil)
 
-	Describe("ServiceImport lifecycle notifications", testMCSLifecycleNotifications)
+	Describe("ServiceImport lifecycle notifications", testLifecycleNotifications)
 })
 
-func testMCSLifecycleNotifications() {
+func testLifecycleNotifications() {
 	const nameSpace1 = "testNS1"
 	const serviceName1 = "service1"
 

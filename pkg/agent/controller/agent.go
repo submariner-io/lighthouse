@@ -78,12 +78,12 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) (runtime.Object, bool) {
+func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object {
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("No matching service for %v", svcExport)
-		return nil, true
+		return nil
 	}
 
 	serviceImport := &lighthousev2a1.ServiceImport{
@@ -95,11 +95,7 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) (runtime.Objec
 			},
 		},
 		Spec: lighthousev2a1.ServiceImportSpec{
-			Ports:                 nil,
-			IP:                    "",
-			Type:                  lighthousev2a1.SuperclusterIP,
-			SessionAffinity:       "",
-			SessionAffinityConfig: nil,
+			Type: lighthousev2a1.SuperclusterIP,
 		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{
@@ -112,7 +108,7 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) (runtime.Objec
 	if err != nil {
 		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
-	return serviceImport, false
+	return serviceImport
 }
 
 func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
