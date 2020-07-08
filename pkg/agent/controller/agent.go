@@ -96,14 +96,14 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) (runtime.Objec
 		},
 		Spec: lighthousev2a1.ServiceImportSpec{
 			Ports:                 nil,
-			IP:                    "10.10.10.10",
-			Type:                  "",
+			IP:                    "",
+			Type:                  lighthousev2a1.SuperclusterIP,
 			SessionAffinity:       "",
 			SessionAffinityConfig: nil,
 		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{
-				a.newClusterServiceInfo(svc, a.clusterID),
+				a.newClusterStatus(svc, a.clusterID),
 			},
 		},
 	}
@@ -144,7 +144,7 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 	return retryErr
 }
 
-func (a *Controller) newClusterServiceInfo(service *corev1.Service, clusterID string) lighthousev2a1.ClusterStatus {
+func (a *Controller) newClusterStatus(service *corev1.Service, clusterID string) lighthousev2a1.ClusterStatus {
 	mcsIp := getGlobalIpFromService(service)
 	if mcsIp == "" {
 		mcsIp = service.Spec.ClusterIP
