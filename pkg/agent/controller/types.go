@@ -9,6 +9,7 @@ import (
 
 type Controller struct {
 	clusterID        string
+	globalnetEnabled bool
 	restConfig       *rest.Config
 	kubeClientSet    kubernetes.Interface
 	lighthouseClient lighthouseClientset.Interface
@@ -16,6 +17,7 @@ type Controller struct {
 }
 
 type AgentSpecification struct {
-	ClusterID string
-	Namespace string
+	ClusterID        string
+	Namespace        string
+	GlobalnetEnabled bool `split_words:"true"`
 }
