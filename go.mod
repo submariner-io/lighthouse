@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
-	github.com/submariner-io/admiral v0.4.2-0.20200706185424-d52c64ccd7ba
+	github.com/submariner-io/admiral v0.4.2-0.20200708140629-b9748dabd781
 	github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3
 	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
 	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
