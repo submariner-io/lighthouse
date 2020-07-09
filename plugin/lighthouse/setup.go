@@ -7,7 +7,7 @@ import (
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-	"github.com/submariner-io/lighthouse/pkg/multiclusterservice"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -52,20 +52,20 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error building kubeconfig: %v", err)
 	}
 
-	mcsMap := multiclusterservice.NewMap()
-	mcsController := multiclusterservice.NewController(mcsMap)
+	siMap := serviceimport.NewMap()
+	siController := serviceimport.NewController(siMap)
 
-	err = mcsController.Start(cfg)
+	err = siController.Start(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error starting the controller: %v", err)
 	}
 
 	c.OnShutdown(func() error {
-		mcsController.Stop()
+		siController.Stop()
 		return nil
 	})
 
-	lh := &Lighthouse{multiClusterServices: mcsMap}
+	lh := &Lighthouse{serviceImports: siMap}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
