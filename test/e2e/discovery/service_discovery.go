@@ -44,6 +44,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -53,9 +54,15 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
+	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
+		nginxServiceClusterB = svc
+		f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterB, nginxServiceClusterB)
+	}
+
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportDelete(framework.ClusterA, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
@@ -78,6 +85,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -87,13 +95,20 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
+
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, clusterADomain, true)
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
 
+	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
+		nginxServiceClusterB = svc
+		f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterB, nginxServiceClusterB)
+	}
+
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportDelete(framework.ClusterA, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
