@@ -3,18 +3,17 @@ package controller
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/util/retry"
-
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 )
 
@@ -42,7 +41,7 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	svcResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace: metav1.NamespaceAll,
 		LocalResourceType:    &lighthousev2a1.ServiceExport{},
-		LocalTransform:       agentController.serviceExportToRemoteMcs,
+		LocalTransform:       agentController.serviceExportToRemoteServiceImport,
 		BrokerResourceType:   &lighthousev2a1.ServiceImport{},
 	}
 	syncerConf := broker.SyncerConfig{
@@ -78,12 +77,12 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object {
+func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object) (runtime.Object, bool) {
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("No matching service for %v", svcExport)
-		return nil
+		return nil, false
 	}
 
 	serviceImport := &lighthousev2a1.ServiceImport{
@@ -108,7 +107,7 @@ func (a *Controller) serviceExportToRemoteMcs(obj runtime.Object) runtime.Object
 	if err != nil {
 		klog.Errorf("Error updating status for %#v: %v", svcExport, err)
 	}
-	return serviceImport
+	return serviceImport, false
 }
 
 func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
