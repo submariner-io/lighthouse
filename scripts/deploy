@@ -17,11 +17,13 @@ function update_coredns_configmap() {
         sed 's/dnsip/'${CLUSTER_IP}'/g' scripts/resources/coredns-cm.yaml > /tmp/coredns-cm-${CLUSTER_IP}.yaml
         kubectl -n kube-system replace -f /tmp/coredns-cm-${CLUSTER_IP}.yaml
         kubectl -n kube-system describe cm coredns
-    fi
+    else 
+        run_subm_clusters install_service_import
+    fi 
 }
 
 function install_service_import() {
-    #TODO: Delete this once operator and helm changes are merged
+    #TODO: Delete this once operator changes are available
     kubectl apply -f ${DAPPER_SOURCE}/package/lighthouse-crd.yaml
     kubectl get crds | grep serviceimport
 }
@@ -31,8 +33,6 @@ function install_service_import() {
 declare_kubeconfig
 import_image quay.io/submariner/lighthouse-agent
 import_image quay.io/submariner/lighthouse-coredns
-
-run_subm_clusters install_service_import
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
 
