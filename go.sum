@@ -356,6 +356,8 @@ github.com/submariner-io/shipyard v0.4.0 h1:bO8yk6OVGX5vGGREzY1+aV4pt9d1lcL0+TuX
 github.com/submariner-io/shipyard v0.4.0/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
 github.com/submariner-io/shipyard v0.4.1 h1:Rpf7c7XUZC3+CM1WKZepyR+FyvUC2JPeJpgG8Qi7Y7Y=
 github.com/submariner-io/shipyard v0.4.1/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
+github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3 h1:/hFqrqJ9ZnyOtRcSsHbpVIjdn430N+HhaE18TY+pNxY=
+github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3/go.mod h1:2OrKoDmJSo1jVurxiVH9FqGFmDwshIU7Vgu9pFLBsYo=
 github.com/timewasted/linode v0.0.0-20160829202747-37e84520dcf7/go.mod h1:imsgLplxEC/etjIhdr3dNzV3JeT27LbVu5pYWm0JCBY=
 github.com/tinylib/msgp v1.1.0/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
