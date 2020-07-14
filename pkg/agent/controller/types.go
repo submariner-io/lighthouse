@@ -1,19 +1,19 @@
 package controller
 
 import (
+	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type Controller struct {
-	clusterID        string
-	globalnetEnabled bool
-	restConfig       *rest.Config
-	kubeClientSet    kubernetes.Interface
-	lighthouseClient lighthouseClientset.Interface
-	svcSyncer        *broker.Syncer
+	clusterID           string
+	globalnetEnabled    bool
+	kubeClientSet       kubernetes.Interface
+	lighthouseClient    lighthouseClientset.Interface
+	serviceExportSyncer *broker.Syncer
+	serviceSyncer       syncer.Interface
 }
 
 type AgentSpecification struct {
