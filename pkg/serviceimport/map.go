@@ -26,6 +26,15 @@ func (m *Map) GetIps(namespace, name string) ([]string, bool) {
 	return nil, false
 }
 
+func (m *Map) GetClusterInfo(namespace string, name string) (map[string]string, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
+		return val.clusterInfo, len(val.ipList) > 0
+	}
+	return nil, false
+}
+
 func NewMap() *Map {
 	return &Map{
 		svcMap: make(map[string]*serviceInfo),

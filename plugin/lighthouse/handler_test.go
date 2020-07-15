@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -20,6 +21,7 @@ const (
 	namespace1 = "namespace1"
 	namespace2 = "namespace2"
 	serviceIP  = "100.96.156.175"
+	clusterID  = "clusterID"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
@@ -46,6 +48,7 @@ func testWithoutFallback() {
 		lh = &Lighthouse{
 			Zones:          []string{"cluster.local."},
 			serviceImports: setupServiceImportMap(),
+			clusters:       setupClustersMap(),
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -66,7 +69,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(newServiceImport(namespace2, service1, serviceIP, "clusterID"))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, serviceIP, clusterID))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -228,8 +231,17 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
-	siMap.Put(newServiceImport(namespace1, service1, serviceIP, "clusterID"))
+	siMap.Put(newServiceImport(namespace1, service1, serviceIP, clusterID))
 	return siMap
+}
+
+func setupClustersMap() *gateway.Map {
+	clustersMap := map[string]bool{
+		clusterID: true,
+	}
+	gwMap := gateway.NewMap()
+	gwMap.Store(clustersMap)
+	return gwMap
 }
 
 func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
