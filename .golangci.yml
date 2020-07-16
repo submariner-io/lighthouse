@@ -47,4 +47,4 @@ linters:
     #- unparam
     - unused
     - varcheck
-    #- whitespace
+    - whitespace
