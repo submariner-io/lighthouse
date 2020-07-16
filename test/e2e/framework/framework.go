@@ -2,13 +2,13 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
@@ -94,7 +94,7 @@ func (f *Framework) GetService(cluster framework.ClusterIndex, name string, name
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 }
 
-func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, sourceCluster framework.ClusterIndex, svc *v1.Service) *lighthousev2a1.ServiceImport {
+func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, svc *v1.Service) *lighthousev2a1.ServiceImport {
 	var serviceIP string
 
 	if framework.TestContext.GlobalnetEnabled {
@@ -102,32 +102,44 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 	} else {
 		serviceIP = svc.Spec.ClusterIP
 	}
-	siName := svc.Name + "-" + svc.Namespace + "-" + framework.TestContext.ClusterIDs[sourceCluster]
-	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
-	By(fmt.Sprintf("Retrieving ServiceImport %s on %q", siName, framework.TestContext.ClusterIDs[targetCluster]))
-	return framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.Get(siName, metav1.GetOptions{})
 
+	var retServiceImport *lighthousev2a1.ServiceImport
+	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
+	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
+	By(fmt.Sprintf("Retrieving ServiceImport for %s on %q", siNamePrefix, framework.TestContext.ClusterIDs[targetCluster]))
+	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
+		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
-		si := result.(*lighthousev2a1.ServiceImport)
-		if si.Status.Clusters[0].IPs[0] != serviceIP {
-			return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s", si.Status.Clusters[0].IPs[0], serviceIP), nil
+		siList := result.(*lighthousev2a1.ServiceImportList)
+		for _, si := range siList.Items {
+			if strings.HasPrefix(si.Name, siNamePrefix) {
+				if si.Status.Clusters[0].IPs[0] != serviceIP {
+					return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s", si.Status.Clusters[0].IPs[0], serviceIP), nil
+				}
+				retServiceImport = &si
+				return true, "", nil
+			}
 		}
-		return true, "", nil
-	}).(*lighthousev2a1.ServiceImport)
+
+		return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
+	})
+	return retServiceImport
 }
 
-func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, sourceCluster framework.ClusterIndex, name string, namespace string) {
-	siName := name + "-" + namespace + "-" + framework.TestContext.ClusterIDs[sourceCluster]
+func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, name string, namespace string) {
+	siNamePrefix := name + "-" + namespace
 	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		_, err := si.Get(siName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
+		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
-		return result.(bool), "", nil
+		siList := result.(*lighthousev2a1.ServiceImportList)
+		for _, si := range siList.Items {
+			if strings.HasPrefix(si.Name, siNamePrefix) {
+				return false, fmt.Sprintf("ServiceImport with name prefix %s still exists", siNamePrefix), nil
+			}
+		}
+
+		return true, "", nil
 	})
 }
 

@@ -62,13 +62,13 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
 		nginxServiceClusterB = svc
-		f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterB, nginxServiceClusterB)
+		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
@@ -108,13 +108,13 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
 		nginxServiceClusterB = svc
-		f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterB, nginxServiceClusterB)
+		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
@@ -139,13 +139,13 @@ func RunServiceExportTest(f *lhframework.Framework) {
 
 	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
 		nginxServiceClusterB = svc
-		f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterB, nginxServiceClusterB)
+		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
