@@ -81,7 +81,6 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 }
 
 func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
-
 	rr := new(dns.AAAA)
 	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeAAAA, Class: state.QClass()}
 	rr.AAAA = net.IPv6unspecified

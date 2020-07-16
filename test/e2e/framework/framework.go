@@ -61,7 +61,6 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name string
 	By(fmt.Sprintf("Creating serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
 		return se.Create(&nginxServiceExport)
-
 	}, framework.NoopCheckResult).(*v2alpha1.ServiceExport)
 	return serviceExport
 }
@@ -71,7 +70,6 @@ func (f *Framework) AwaitServiceExportStatusCondition(cluster framework.ClusterI
 	By(fmt.Sprintf("Retrieving serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("retrieve serviceExport", func() (interface{}, error) {
 		return se.Get(name, metav1.GetOptions{})
-
 	}, func(result interface{}) (bool, string, error) {
 		se := result.(*v2alpha1.ServiceExport)
 		if len(se.Status.Conditions) == 0 {
@@ -148,7 +146,6 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name string
 		svc := framework.KubeClients[cluster].CoreV1().Services(namespace)
 		svcObj := framework.AwaitUntil("retrieve service", func() (interface{}, error) {
 			return svc.Get(name, metav1.GetOptions{})
-
 		}, func(result interface{}) (bool, string, error) {
 			svc := result.(*v1.Service)
 			globalIp := svc.Annotations[submarinerIpamGlobalIp]
