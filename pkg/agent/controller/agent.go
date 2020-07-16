@@ -98,18 +98,20 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		// Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		return nil, true
 	} else if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport, fmt.Sprintf("Error obtaining service: %v", err), lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, fmt.Sprintf("Error obtaining service: %v", err), lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		klog.Errorf("Unable to get service for %#v: %v", svc, err)
 		return nil, true
 	}
 	if a.globalnetEnabled && getGlobalIpFromService(svc) == "" {
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, "Service doesn't have global IP yet", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, "Service doesn't have global IP yet", lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		return nil, true
 	}
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
@@ -145,7 +147,8 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+	a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionFalse)
 
 	return serviceImport, false
 }
