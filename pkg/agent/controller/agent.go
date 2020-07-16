@@ -63,11 +63,11 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 			serviceResourceConfig,
 		},
 	}
-	syncer, err := broker.NewSyncer(syncerConf)
+	syncerObj, err := broker.NewSyncer(syncerConf)
 	if err != nil {
 		return nil, err
 	}
-	agentController.svcSyncer = syncer
+	agentController.svcSyncer = syncerObj
 
 	return agentController, nil
 }
@@ -98,7 +98,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		//Update the status and requeue
+		// Update the status and requeue
 		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
 		return nil, true
 	} else if err != nil {

@@ -17,7 +17,7 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) GetIps(namespace string, name string) ([]string, bool) {
+func (m *Map) GetIps(namespace, name string) ([]string, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {

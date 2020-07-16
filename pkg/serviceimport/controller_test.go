@@ -130,7 +130,7 @@ func verifyCachedServiceImport(controller *Controller, expected *lighthousev2a1.
 	}).Should(Equal([]string{expected.Status.Clusters[0].IPs[0]}))
 }
 
-func verifyUpdatedCachedServiceImport(controller *Controller, first *lighthousev2a1.ServiceImport, second *lighthousev2a1.ServiceImport) {
+func verifyUpdatedCachedServiceImport(controller *Controller, first, second *lighthousev2a1.ServiceImport) {
 	// We can't just compare first and second coz map iteration order is not fixed
 	Eventually(func() bool {
 		name := first.Annotations["origin-name"]
@@ -143,7 +143,7 @@ func verifyUpdatedCachedServiceImport(controller *Controller, first *lighthousev
 	}).Should(BeTrue())
 }
 
-func validateIpList(first *lighthousev2a1.ServiceImport, second *lighthousev2a1.ServiceImport, ipList []string) bool {
+func validateIpList(first, second *lighthousev2a1.ServiceImport, ipList []string) bool {
 	firstClusterInfo := first.Status.Clusters[0]
 	secondClusterInfo := second.Status.Clusters[0]
 	ips := []string{firstClusterInfo.IPs[0], secondClusterInfo.IPs[0]}

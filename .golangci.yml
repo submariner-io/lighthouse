@@ -2,10 +2,9 @@ linters-settings:
   gocritic:
     enabled-tags:
       - diagnostic
-      #- opinionated
+      - opinionated
       #- performance
-      #- style
-    disabled-checks:
+      - style
   gocyclo:
     min-complexity: 15
   lll:

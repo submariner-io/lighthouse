@@ -63,7 +63,7 @@ type ServiceExportCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-//ServiceExportList is a list of serviceexport objects.
+// ServiceExportList is a list of serviceexport objects.
 type ServiceExportList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -160,7 +160,7 @@ type ClusterStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-//ServiceImportList is a list of serviceimport objects.
+// ServiceImportList is a list of serviceimport objects.
 type ServiceImportList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

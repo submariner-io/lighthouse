@@ -10,7 +10,6 @@ import (
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -150,7 +149,7 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
 
-func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *v1.PodList, domain string, shouldContain bool) {
+func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList, domain string, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
@@ -193,7 +192,7 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 	})
 }
 
-func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *v1.PodList) string {
+func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *corev1.PodList) string {
 	/*
 		Kubernetes adds --cluster-domain config to all pods' /etc/resolve.conf exactly as follows:
 			search <namespace>.svc.cluster.local svc.cluster.local cluster.local <custom-domains>
@@ -214,6 +213,6 @@ func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, ta
 			}
 		}
 	}
-	//Backup option. Ideally we should never hit this.
+	// Backup option. Ideally we should never hit this.
 	return "cluster" + strconv.Itoa(int(cluster+1)) + ".local"
 }
