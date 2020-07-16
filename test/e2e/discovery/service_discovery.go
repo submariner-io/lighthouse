@@ -149,7 +149,8 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
 }
 
-func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList, domain string, shouldContain bool) {
+func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
+	domain string, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
