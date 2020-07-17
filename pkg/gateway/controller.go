@@ -16,9 +16,13 @@ import (
 	"k8s.io/klog"
 )
 
+type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
+
+// Indirection hook for unit tests to supply fake client sets
+var NewClientset NewClientsetFunc
+
 type Controller struct {
-	// Indirection hook for unit tests to supply fake client sets
-	newClientset func(kubeConfig *rest.Config) (dynamic.Interface, error)
+	newClientset NewClientsetFunc
 	informer     cache.Controller
 	store        cache.Store
 	queue        workqueue.RateLimitingInterface
@@ -28,20 +32,27 @@ type Controller struct {
 
 func NewController(gwMap *Map) *Controller {
 	return &Controller{
-		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		newClientset: func(c *rest.Config) (dynamic.Interface, error) {
-			return dynamic.NewForConfig(c)
+		newClientset: getNewClientsetFunc(),
+		queue:        workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		stopCh:       make(chan struct{}),
+		gwStatusMap:  gwMap,
+	}
+}
 
-		},
-		stopCh:      make(chan struct{}),
-		gwStatusMap: gwMap,
+func getNewClientsetFunc() NewClientsetFunc {
+	if NewClientset != nil {
+		return NewClientset
+	}
+
+	return func(c *rest.Config) (dynamic.Interface, error) {
+		return dynamic.NewForConfig(c)
 	}
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	klog.Infof("Starting Gateways Controller")
 
-	gwClientset, err := getCheckedClientset(kubeConfig)
+	gwClientset, err := c.getCheckedClientset(kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -205,11 +216,12 @@ func (c *Controller) getClusterStatus(clusterId string) bool {
 	return gwMap[clusterId]
 }
 
-func getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
-	clientSet, err := dynamic.NewForConfig(kubeConfig)
+func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
+	clientSet, err := c.newClientset(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client set: %v", err)
 	}
+
 	gvr, _ := schema.ParseResourceArg("gateways.v1.submariner.io")
 	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
 	_, err = gwClient.List(metav1.ListOptions{})

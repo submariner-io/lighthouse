@@ -10,6 +10,10 @@ import (
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/lighthouse/pkg/gateway"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
+	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest"
 )
 
@@ -25,6 +29,16 @@ func (f *fakeHandler) Name() string {
 }
 
 var _ = Describe("Plugin setup", func() {
+	BeforeEach(func() {
+		gateway.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
+			return fakeClient.NewSimpleDynamicClient(runtime.NewScheme()), nil
+		}
+	})
+
+	AfterEach(func() {
+		gateway.NewClientset = nil
+	})
+
 	Context("Parsing correct configurations", testCorrectConfig)
 	Context("Parsing incorrect configurations", testIncorrectConfig)
 	Context("Plugin registration", testPluginRegistration)

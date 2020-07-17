@@ -159,6 +159,7 @@ func testWithFallback() {
 			Fall:           fall.F{Zones: []string{"cluster.local."}},
 			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
 			serviceImports: setupServiceImportMap(),
+			clusters:       setupClustersMap(),
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
