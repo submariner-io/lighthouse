@@ -117,7 +117,7 @@ func (c *Controller) runWorker() {
 				return
 			}
 			if exists {
-				c.gatewayCreatedOrUpdated(obj)
+				c.gatewayCreatedOrUpdated(obj.(*unstructured.Unstructured))
 			}
 			c.queue.Forget(key)
 		}()
@@ -125,28 +125,29 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) gatewayDeleted(obj interface{}, key string) {
+	var resource *unstructured.Unstructured
 	var ok bool
-	if _, ok = obj.(*unstructured.Unstructured); !ok {
+	if resource, ok = obj.(*unstructured.Unstructured); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Could not convert object %v to DeletedFinalStateUnknown", obj)
 			return
 		}
-		_, ok = tombstone.Obj.(*unstructured.Unstructured)
+
+		resource, ok = tombstone.Obj.(*unstructured.Unstructured)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %v to Unstructured", tombstone.Obj)
 			return
 		}
 	}
-	key, _ = cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 
-	haStatus, _, _ := getGatewayStatus(obj)
+	haStatus, _, _ := getGatewayStatus(resource)
 	if haStatus == "active" {
 		c.gwStatusMap.Store(make(map[string]bool))
 	}
 }
 
-func (c *Controller) gatewayCreatedOrUpdated(obj interface{}) {
+func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 
 	haStatus, connections, ok := getGatewayStatus(obj)
 	if !ok || haStatus != "active" {
@@ -192,28 +193,23 @@ func (c *Controller) gatewayCreatedOrUpdated(obj interface{}) {
 	}
 }
 
-func getGatewayStatus(obj interface{}) (string, []interface{}, bool) {
-	status, found, err := unstructured.NestedMap(obj.(*unstructured.Unstructured).Object, "status")
+func getGatewayStatus(obj *unstructured.Unstructured) (string, []interface{}, bool) {
+	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
-		klog.Errorf("status field not found in %#v", obj)
+		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
 		return "", nil, false
 	}
 	haStatus, found, err := unstructured.NestedString(status, "haStatus")
 	if !found || err != nil {
-		klog.Errorf("haStatus field not found in %#v, found, err", status, found, err)
+		klog.Errorf("haStatus field not found in %#v, err was: %v", status, err)
 		return "", nil, false
 	}
 	connections, found, err := unstructured.NestedSlice(status, "connections")
 	if !found || err != nil {
-		klog.Errorf("connections field not found in %#v, found, err", status, found, err)
+		klog.Errorf("connections field not found in %#v, err was: %v", status, err)
 		return haStatus, nil, false
 	}
 	return haStatus, connections, true
-}
-
-func (c *Controller) getClusterStatus(clusterId string) bool {
-	gwMap := c.gwStatusMap.Get()
-	return gwMap[clusterId]
 }
 
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
