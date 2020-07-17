@@ -49,7 +49,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 	var serviceIp string
 	clusterInfo, found := lh.serviceImports.GetClusterInfo(namespace, svcName)
-	for cluster, _ := range lh.clusters.Get() {
+	for cluster := range lh.clusters.Get() {
 		if val, ok := clusterInfo[cluster]; ok {
 			log.Errorf("Found IP %v for connected cluster %q", val, cluster)
 			serviceIp = val
