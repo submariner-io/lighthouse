@@ -61,8 +61,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error starting the ServiceImport controller: %v", err)
 	}
 
-	gwMap := gateway.NewMap()
-	gwController := gateway.NewController(gwMap)
+	gwController := gateway.NewController()
 	err = gwController.Start(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error starting the Gateway controller: %v", err)
@@ -74,7 +73,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil
 	})
 
-	lh := &Lighthouse{serviceImports: siMap, clusters: gwMap}
+	lh := &Lighthouse{serviceImports: siMap, clusterStatus: gwController}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)

@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,21 +24,24 @@ type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
 var NewClientset NewClientsetFunc
 
 type Controller struct {
-	newClientset NewClientsetFunc
-	informer     cache.Controller
-	store        cache.Store
-	queue        workqueue.RateLimitingInterface
-	stopCh       chan struct{}
-	gwStatusMap  *Map
+	newClientset     NewClientsetFunc
+	informer         cache.Controller
+	store            cache.Store
+	queue            workqueue.RateLimitingInterface
+	stopCh           chan struct{}
+	clusterStatusMap atomic.Value
+	gatewayAvailable bool
 }
 
-func NewController(gwMap *Map) *Controller {
-	return &Controller{
-		newClientset: getNewClientsetFunc(),
-		queue:        workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		stopCh:       make(chan struct{}),
-		gwStatusMap:  gwMap,
+func NewController() *Controller {
+	controller := &Controller{
+		newClientset:     getNewClientsetFunc(),
+		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		stopCh:           make(chan struct{}),
+		gatewayAvailable: true,
 	}
+	controller.clusterStatusMap.Store(make(map[string]bool))
+	return controller
 }
 
 func getNewClientsetFunc() NewClientsetFunc {
@@ -50,12 +55,16 @@ func getNewClientsetFunc() NewClientsetFunc {
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
-	klog.Infof("Starting Gateways Controller")
-
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
+	if errors.IsNotFound(err) {
+		klog.Infof("gateways resource not found, disabling Gateway status controller")
+		c.gatewayAvailable = false
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	klog.Infof("Starting Gateway status Controller")
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return gwClientset.List(metav1.ListOptions{})
@@ -92,10 +101,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 }
 
 func (c *Controller) Stop() {
-	close(c.stopCh)
-	c.queue.ShutDown()
-
-	klog.Infof("ServiceImport Controller stopped")
+	if c.gatewayAvailable {
+		close(c.stopCh)
+		c.queue.ShutDown()
+		klog.Infof("Gateway status Controller stopped")
+	}
 }
 
 func (c *Controller) runWorker() {
@@ -143,7 +153,7 @@ func (c *Controller) gatewayDeleted(obj interface{}, key string) {
 
 	haStatus, _, _ := getGatewayStatus(resource)
 	if haStatus == "active" {
-		c.gwStatusMap.Store(make(map[string]bool))
+		c.clusterStatusMap.Store(make(map[string]bool))
 	}
 }
 
@@ -154,7 +164,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 		return
 	}
 	var newMap map[string]bool
-	currentMap := c.gwStatusMap.Get()
+	currentMap := c.getClusterStatusMap()
 	for _, connection := range connections {
 		connectionMap := connection.(map[string]interface{})
 
@@ -189,7 +199,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 	}
 	if newMap != nil {
 		klog.Errorf("Updating the gateway status %#v", newMap)
-		c.gwStatusMap.Store(newMap)
+		c.clusterStatusMap.Store(newMap)
 	}
 }
 
@@ -210,6 +220,14 @@ func getGatewayStatus(obj *unstructured.Unstructured) (string, []interface{}, bo
 		return haStatus, nil, false
 	}
 	return haStatus, connections, true
+}
+
+func (c *Controller) getClusterStatusMap() map[string]bool {
+	return c.clusterStatusMap.Load().(map[string]bool)
+}
+
+func (c *Controller) IsConnected(clusterId string) bool {
+	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterId]
 }
 
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {

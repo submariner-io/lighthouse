@@ -49,17 +49,22 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 	var serviceIp string
 	clusterInfo, found := lh.serviceImports.GetClusterInfo(namespace, svcName)
-	for cluster := range lh.clusters.Get() {
-		if val, ok := clusterInfo[cluster]; ok {
-			log.Errorf("Found IP %v for connected cluster %q", val, cluster)
-			serviceIp = val
-			break
-		}
-	}
-	if !found || serviceIp == "" {
+
+	if !found {
 		// We couldn't find record for this service name
 		log.Debugf("No record found for service %q", qname)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
+	}
+
+	for k, v := range clusterInfo {
+		if lh.clusterStatus.IsConnected(k) {
+			serviceIp = v
+			break
+		}
+	}
+	if serviceIp == "" {
+		log.Debugf("Couldn't find a connected cluster for %q", qname)
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeServerFailure, "No connection to service clusters")
 	}
 
 	if state.QType() == dns.TypeAAAA {
