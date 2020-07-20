@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,6 +33,14 @@ type FailingResponseWriter struct {
 	errorMsg string
 }
 
+type MockClusterStatus struct {
+	clusterId string
+}
+
+func (m *MockClusterStatus) IsConnected(clusterId string) bool {
+	return clusterId == m.clusterId
+}
+
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
@@ -45,10 +52,12 @@ func testWithoutFallback() {
 	)
 
 	BeforeEach(func() {
+		mockCs := new(MockClusterStatus)
+		mockCs.clusterId = clusterID
 		lh = &Lighthouse{
 			Zones:          []string{"cluster.local."},
 			serviceImports: setupServiceImportMap(),
-			clusters:       setupClustersMap(),
+			clusterStatus:  mockCs,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -154,12 +163,14 @@ func testWithFallback() {
 	)
 
 	BeforeEach(func() {
+		mockCs := new(MockClusterStatus)
+		mockCs.clusterId = clusterID
 		lh = &Lighthouse{
 			Zones:          []string{"cluster.local."},
 			Fall:           fall.F{Zones: []string{"cluster.local."}},
 			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
 			serviceImports: setupServiceImportMap(),
-			clusters:       setupClustersMap(),
+			clusterStatus:  mockCs,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -234,15 +245,6 @@ func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
 	siMap.Put(newServiceImport(namespace1, service1, serviceIP, clusterID))
 	return siMap
-}
-
-func setupClustersMap() *gateway.Map {
-	clustersMap := map[string]bool{
-		clusterID: true,
-	}
-	gwMap := gateway.NewMap()
-	gwMap.Store(clustersMap)
-	return gwMap
 }
 
 func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
