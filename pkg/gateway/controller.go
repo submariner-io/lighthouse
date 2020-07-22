@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -48,10 +47,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	if NewClientset != nil {
 		return NewClientset
 	}
-
-	return func(c *rest.Config) (dynamic.Interface, error) {
-		return dynamic.NewForConfig(c)
-	}
+	return dynamic.NewForConfig
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
@@ -69,9 +65,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return gwClientset.List(metav1.ListOptions{})
 		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return gwClientset.Watch(options)
-		},
+		WatchFunc: gwClientset.Watch,
 	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -158,7 +152,6 @@ func (c *Controller) gatewayDeleted(obj interface{}, key string) {
 }
 
 func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
-
 	haStatus, connections, ok := getGatewayStatus(obj)
 	if !ok || haStatus != "active" {
 		return
@@ -195,26 +188,26 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 				delete(newMap, clusterId)
 			}
 		}
-
 	}
+
 	if newMap != nil {
 		klog.Errorf("Updating the gateway status %#v", newMap)
 		c.clusterStatusMap.Store(newMap)
 	}
 }
 
-func getGatewayStatus(obj *unstructured.Unstructured) (string, []interface{}, bool) {
+func getGatewayStatus(obj *unstructured.Unstructured) (haStatus string, connections []interface{}, gwStatus bool) {
 	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
 		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
 		return "", nil, false
 	}
-	haStatus, found, err := unstructured.NestedString(status, "haStatus")
+	haStatus, found, err = unstructured.NestedString(status, "haStatus")
 	if !found || err != nil {
 		klog.Errorf("haStatus field not found in %#v, err was: %v", status, err)
 		return "", nil, false
 	}
-	connections, found, err := unstructured.NestedSlice(status, "connections")
+	connections, found, err = unstructured.NestedSlice(status, "connections")
 	if !found || err != nil {
 		klog.Errorf("connections field not found in %#v, err was: %v", status, err)
 		return haStatus, nil, false
