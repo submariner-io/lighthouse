@@ -54,9 +54,11 @@ func main() {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
 
-	if err := lightHouseAgent.Run(stopCh); err != nil {
+	if err := lightHouseAgent.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
 	}
+
+	<-stopCh
 
 	klog.Info("All controllers stopped or exited. Stopping main loop")
 }
