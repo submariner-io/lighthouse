@@ -26,7 +26,7 @@ func (m *Map) GetIps(namespace, name string) ([]string, bool) {
 	return nil, false
 }
 
-func (m *Map) GetClusterInfo(namespace string, name string) (map[string]string, bool) {
+func (m *Map) GetClusterInfo(namespace, name string) (map[string]string, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
