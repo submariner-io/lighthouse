@@ -11,11 +11,12 @@ source ${SCRIPTS_DIR}/lib/version
 ### Functions ###
 
 function update_coredns_configmap() {
-    kubectl get cm -n kube-system coredns -o yaml > /tmp/coremap.yaml
-    if !(grep -q supercluster /tmp/coremap.yaml); then
+    kubectl get cm -n kube-system coredns -o yaml > /tmp/coremap-${cluster}.yaml
+    if !(grep -q supercluster /tmp/coremap-${cluster}.yaml); then
         CLUSTER_IP=`kubectl get svc -n submariner-operator submariner-lighthouse-coredns | tail -n 1| awk '{print $3;}'`
         sed 's/dnsip/'${CLUSTER_IP}'/g' scripts/resources/coredns-cm.yaml > /tmp/coredns-cm-${CLUSTER_IP}.yaml
-        kubectl -n kube-system replace -f /tmp/coredns-cm-${CLUSTER_IP}.yaml
+        sed -i -e "/Corefile:/r /tmp/coredns-cm-${CLUSTER_IP}.yaml" /tmp/coremap-${cluster}.yaml
+        kubectl -n kube-system replace -f /tmp/coremap-${cluster}.yaml
         kubectl -n kube-system describe cm coredns
     else 
         run_subm_clusters install_service_import
