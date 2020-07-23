@@ -3,6 +3,7 @@ package serviceimport
 import (
 	"fmt"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lighthouseInformers "github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
@@ -48,21 +49,21 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("ServiceImport %q added", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q added", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		UpdateFunc: func(obj interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(2).Infof("ServiceImport %q updated", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q updated", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("ServiceImport %q deleted", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q deleted", key)
 			if err == nil {
 				c.serviceImportDeleted(obj, key)
 			}
@@ -112,7 +113,7 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}, key string) {
-	klog.V(2).Infof("In serviceImportCreatedOrUpdated for key %q, service: %#v, ", key, obj)
+	klog.V(log.DEBUG).Infof("In serviceImportCreatedOrUpdated for key %q, service: %#v, ", key, obj)
 
 	c.serviceImports.Put(obj.(*lighthousev2a1.ServiceImport))
 }
