@@ -6,7 +6,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +50,8 @@ func createLighthouseClient(restConfig *rest.Config) *lighthouseClientset.Client
 	return clientSet
 }
 
-func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name string, namespace string) *v2alpha1.ServiceExport {
-	nginxServiceExport := v2alpha1.ServiceExport{
+func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *lighthousev2a1.ServiceExport {
+	nginxServiceExport := lighthousev2a1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -61,35 +60,34 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name string
 	By(fmt.Sprintf("Creating serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
 		return se.Create(&nginxServiceExport)
-
-	}, framework.NoopCheckResult).(*v2alpha1.ServiceExport)
+	}, framework.NoopCheckResult).(*lighthousev2a1.ServiceExport)
 	return serviceExport
 }
 
-func (f *Framework) AwaitServiceExportStatusCondition(cluster framework.ClusterIndex, name string, namespace string) *v2alpha1.ServiceExport {
+func (f *Framework) AwaitServiceExportStatusCondition(cluster framework.ClusterIndex, name,
+	namespace string) *lighthousev2a1.ServiceExport {
 	se := LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Retrieving serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("retrieve serviceExport", func() (interface{}, error) {
 		return se.Get(name, metav1.GetOptions{})
-
 	}, func(result interface{}) (bool, string, error) {
-		se := result.(*v2alpha1.ServiceExport)
+		se := result.(*lighthousev2a1.ServiceExport)
 		if len(se.Status.Conditions) == 0 {
 			return false, "Status.Conditions is empty", nil
 		}
 		return true, "", nil
-	}).(*v2alpha1.ServiceExport)
+	}).(*lighthousev2a1.ServiceExport)
 	return serviceExport
 }
 
-func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name string, namespace string) {
+func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {
 	By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("delete service export", func() (interface{}, error) {
 		return nil, LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace).Delete(name, &metav1.DeleteOptions{})
 	}, framework.NoopCheckResult)
 }
 
-func (f *Framework) GetService(cluster framework.ClusterIndex, name string, namespace string) (*v1.Service, error) {
+func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace string) (*v1.Service, error) {
 	By(fmt.Sprintf("Retrieving service %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 }
@@ -126,7 +124,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 	return retServiceImport
 }
 
-func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, name string, namespace string) {
+func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, name, namespace string) {
 	siNamePrefix := name + "-" + namespace
 	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
@@ -143,12 +141,11 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 	})
 }
 
-func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name string, namespace string) string {
+func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, namespace string) string {
 	if framework.TestContext.GlobalnetEnabled {
 		svc := framework.KubeClients[cluster].CoreV1().Services(namespace)
 		svcObj := framework.AwaitUntil("retrieve service", func() (interface{}, error) {
 			return svc.Get(name, metav1.GetOptions{})
-
 		}, func(result interface{}) (bool, string, error) {
 			svc := result.(*v1.Service)
 			globalIp := svc.Annotations[submarinerIpamGlobalIp]

@@ -2,10 +2,9 @@ linters-settings:
   gocritic:
     enabled-tags:
       - diagnostic
-      #- opinionated
+      - opinionated
       #- performance
-      #- style
-    disabled-checks:
+      - style
   gocyclo:
     min-complexity: 15
   lll:
@@ -34,7 +33,7 @@ linters:
     - govet
     - ineffassign
     - interfacer
-    #- lll
+    - lll
     - maligned
     - misspell
     - nakedret
@@ -47,4 +46,4 @@ linters:
     #- unparam
     - unused
     - varcheck
-    #- whitespace
+    - whitespace

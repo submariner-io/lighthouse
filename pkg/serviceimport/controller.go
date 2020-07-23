@@ -23,12 +23,10 @@ type Controller struct {
 }
 
 func NewController(remoteServiceMap *Map) *Controller {
-
 	return &Controller{
 		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		newClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return lighthouseClientset.NewForConfig(c)
-
 		},
 		serviceImports: remoteServiceMap,
 		stopCh:         make(chan struct{}),

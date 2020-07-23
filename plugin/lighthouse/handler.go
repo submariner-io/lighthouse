@@ -81,7 +81,6 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 }
 
 func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
-
 	rr := new(dns.AAAA)
 	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeAAAA, Class: state.QClass()}
 	rr.AAAA = net.IPv6unspecified
@@ -108,10 +107,10 @@ func (lh *Lighthouse) error(str string) error {
 	return plugin.Error(lh.Name(), errors.New(str))
 }
 
-func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.ResponseWriter, r *dns.Msg, code int, error string) (int, error) {
+func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.ResponseWriter, r *dns.Msg, code int, err string) (int, error) {
 	if lh.Fall.Through(name) {
 		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
 	} else {
-		return code, lh.error(error)
+		return code, lh.error(err)
 	}
 }

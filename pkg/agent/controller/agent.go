@@ -5,6 +5,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/util"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
@@ -36,38 +38,54 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		globalnetEnabled: spec.GlobalnetEnabled,
-		restConfig:       cfg,
 		kubeClientSet:    clientSet,
 		lighthouseClient: lighthouseClient,
 	}
+
 	svcExportResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace: metav1.NamespaceAll,
 		LocalResourceType:    &lighthousev2a1.ServiceExport{},
 		LocalTransform:       agentController.serviceExportToRemoteServiceImport,
 		BrokerResourceType:   &lighthousev2a1.ServiceImport{},
 	}
-	serviceResourceConfig := broker.ResourceConfig{
-		LocalSourceNamespace: metav1.NamespaceAll,
-		LocalResourceType:    &corev1.Service{},
-		LocalTransform:       agentController.serviceToRemoteServiceImport,
-		BrokerResourceType:   &lighthousev2a1.ServiceImport{},
-		BrokerTransform: func(from runtime.Object, op syncer.Operation) (runtime.Object, bool) {
-			return nil, false
-		},
-	}
+
 	syncerConf := broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalNamespace:  spec.Namespace,
 		ResourceConfigs: []broker.ResourceConfig{
 			svcExportResourceConfig,
-			serviceResourceConfig,
 		},
 	}
-	syncer, err := broker.NewSyncer(syncerConf)
+
+	agentController.serviceExportSyncer, err = broker.NewSyncer(syncerConf)
 	if err != nil {
 		return nil, err
 	}
-	agentController.svcSyncer = syncer
+
+	restMapper, err := util.BuildRestMapper(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	localClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dynamic client: %v", err)
+	}
+
+	agentController.serviceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:            "Service deletion",
+		SourceClient:    localClient,
+		SourceNamespace: metav1.NamespaceAll,
+		Direction:       syncer.LocalToRemote,
+		RestMapper:      restMapper,
+		Federator:       agentController.serviceExportSyncer.GetBrokerFederatorFor(svcExportResourceConfig.LocalResourceType),
+		ResourceType:    &corev1.Service{},
+		Transform:       agentController.serviceToRemoteServiceImport,
+	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	return agentController, nil
 }
@@ -80,9 +98,15 @@ func (a *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Starting syncer")
-	if err := a.svcSyncer.Start(stopCh); err != nil {
+
+	if err := a.serviceExportSyncer.Start(stopCh); err != nil {
 		return err
 	}
+
+	if err := a.serviceSyncer.Start(stopCh); err != nil {
+		return err
+	}
+
 	klog.Info("Lighthouse agent syncer started")
 	<-stopCh
 	klog.Info("Lighthouse Agent stopping")
@@ -98,18 +122,20 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		//Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		return nil, true
 	} else if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport, fmt.Sprintf("Error obtaining service: %v", err), lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, fmt.Sprintf("Error obtaining service: %v", err), lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		klog.Errorf("Unable to get service for %#v: %v", svc, err)
 		return nil, true
 	}
 	if a.globalnetEnabled && getGlobalIpFromService(svc) == "" {
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, "Service doesn't have global IP yet", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, "Service doesn't have global IP yet", lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse)
 		return nil, true
 	}
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
@@ -145,7 +171,8 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse)
+	a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionFalse)
 
 	return serviceImport, false
 }
