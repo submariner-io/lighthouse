@@ -21,11 +21,13 @@ const (
 	namespace2 = "namespace2"
 	serviceIP  = "100.96.156.175"
 	clusterID  = "clusterID"
+	clusterID2 = "clusterID2"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
 	Context("Fallthrough not configured", testWithoutFallback)
 	Context("Fallthrough configured", testWithFallback)
+	Context("Cluster connectivity status", testClusterStatus)
 })
 
 type FailingResponseWriter struct {
@@ -34,11 +36,15 @@ type FailingResponseWriter struct {
 }
 
 type MockClusterStatus struct {
-	clusterId string
+	clusterStatusMap map[string]bool
+}
+
+func NewMockClusterStatus() *MockClusterStatus {
+	return &MockClusterStatus{clusterStatusMap: make(map[string]bool)}
 }
 
 func (m *MockClusterStatus) IsConnected(clusterId string) bool {
-	return clusterId == m.clusterId
+	return m.clusterStatusMap[clusterId]
 }
 
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
@@ -52,8 +58,8 @@ func testWithoutFallback() {
 	)
 
 	BeforeEach(func() {
-		mockCs := new(MockClusterStatus)
-		mockCs.clusterId = clusterID
+		mockCs := NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
 		lh = &Lighthouse{
 			Zones:          []string{"cluster.local."},
 			serviceImports: setupServiceImportMap(),
@@ -163,8 +169,8 @@ func testWithFallback() {
 	)
 
 	BeforeEach(func() {
-		mockCs := new(MockClusterStatus)
-		mockCs.clusterId = clusterID
+		mockCs := NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
 		lh = &Lighthouse{
 			Zones:          []string{"cluster.local."},
 			Fall:           fall.F{Zones: []string{"cluster.local."}},
@@ -224,6 +230,86 @@ func testWithFallback() {
 				Qname: "unknown." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeBadCookie,
+			})
+		})
+	})
+}
+
+func testClusterStatus() {
+	var (
+		rec    *dnstest.Recorder
+		lh     *Lighthouse
+		mockCs *MockClusterStatus
+	)
+
+	BeforeEach(func() {
+		mockCs = NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
+		mockCs.clusterStatusMap[clusterID2] = true
+		lh = &Lighthouse{
+			Zones:          []string{"cluster.local."},
+			serviceImports: setupServiceImportMap(),
+			clusterStatus:  mockCs,
+		}
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, serviceIP, clusterID2))
+
+		rec = dnstest.NewRecorder(&test.ResponseWriter{})
+	})
+
+	When("service is in two clusters and both are connected", func() {
+		It("should succeed and write an A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("service is in two clusters and only one is connected", func() {
+		JustBeforeEach(func() {
+			mockCs.clusterStatusMap[clusterID] = false
+		})
+		It("should succeed and write an A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("service is present in two clusters and both are disconnected", func() {
+		JustBeforeEach(func() {
+			mockCs.clusterStatusMap[clusterID] = false
+			mockCs.clusterStatusMap[clusterID2] = false
+		})
+		It("should return RcodeServerFailure", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeServerFailure,
+			})
+		})
+	})
+
+	When("service is present in one cluster and it is disconnected", func() {
+		JustBeforeEach(func() {
+			mockCs.clusterStatusMap[clusterID] = false
+			delete(mockCs.clusterStatusMap, clusterID2)
+			lh.serviceImports = setupServiceImportMap()
+		})
+		It("should return RcodeServerFailure", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeServerFailure,
 			})
 		})
 	})

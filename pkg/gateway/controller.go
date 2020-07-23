@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +54,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
 	if errors.IsNotFound(err) {
-		klog.Infof("gateways resource not found, disabling Gateway status controller")
+		klog.Infof("Gateway resource not found, disabling Gateway status controller")
 		c.gatewayAvailable = false
 		return nil
 	}
@@ -75,17 +76,14 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		},
 		UpdateFunc: func(obj interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(2).Infof("GatewayStatus %q updated", key)
+			klog.V(log.DEBUG).Infof("GatewayStatus %q updated", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("GatewayStatus %q deleted", key)
-			if err == nil {
-				c.gatewayDeleted(obj, key)
-			}
+			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			klog.V(log.DEBUG).Infof("GatewayStatus %q deleted", key)
 		},
 	})
 	go c.informer.Run(c.stopCh)
@@ -95,11 +93,9 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 }
 
 func (c *Controller) Stop() {
-	if c.gatewayAvailable {
-		close(c.stopCh)
-		c.queue.ShutDown()
-		klog.Infof("Gateway status Controller stopped")
-	}
+	close(c.stopCh)
+	c.queue.ShutDown()
+	klog.Infof("Gateway status Controller stopped")
 }
 
 func (c *Controller) runWorker() {
@@ -125,29 +121,6 @@ func (c *Controller) runWorker() {
 			}
 			c.queue.Forget(key)
 		}()
-	}
-}
-
-func (c *Controller) gatewayDeleted(obj interface{}, key string) {
-	var resource *unstructured.Unstructured
-	var ok bool
-	if resource, ok = obj.(*unstructured.Unstructured); !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Could not convert object %v to DeletedFinalStateUnknown", obj)
-			return
-		}
-
-		resource, ok = tombstone.Obj.(*unstructured.Unstructured)
-		if !ok {
-			klog.Errorf("Could not convert object tombstone %v to Unstructured", tombstone.Obj)
-			return
-		}
-	}
-
-	haStatus, _, _ := getGatewayStatus(resource)
-	if haStatus == "active" {
-		c.clusterStatusMap.Store(make(map[string]bool))
 	}
 }
 
@@ -191,7 +164,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 	}
 
 	if newMap != nil {
-		klog.Errorf("Updating the gateway status %#v", newMap)
+		klog.Infof("Updating the gateway status %#v ", newMap)
 		c.clusterStatusMap.Store(newMap)
 	}
 }
