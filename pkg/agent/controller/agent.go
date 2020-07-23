@@ -24,6 +24,7 @@ import (
 
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	serviceUnavailable     = "ServiceUnavailable"
 )
 
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
@@ -136,13 +137,13 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
-		a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
-			corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
+			serviceUnavailable, "Service to be exported doesn't exist")
 		return nil, true
 	} else if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport, fmt.Sprintf("Error obtaining service: %v", err), lighthousev2a1.ServiceExportInitialized,
-			corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionUnknown,
+			"ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
 		klog.Errorf("Unable to get service for %#v: %v", svc, err)
 		return nil, true
 	}
@@ -150,8 +151,8 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, "Service doesn't have a global IP yet", lighthousev2a1.ServiceExportInitialized,
-			corev1.ConditionFalse)
+		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
+			"ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
 		return nil, true
 	}
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
@@ -162,8 +163,8 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 			a.newClusterStatus(svc, a.clusterID),
 		},
 	}
-	a.updateExportedServiceStatus(svcExport, "Service was successfully synced to the broker",
-		lighthousev2a1.ServiceExportExported, corev1.ConditionTrue)
+	a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
+		"", "Service was successfully synced to the broker")
 
 	return serviceImport, false
 }
@@ -188,14 +189,14 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport, "Service to be exported doesn't exist", lighthousev2a1.ServiceExportInitialized,
-		corev1.ConditionFalse)
+	a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
+		serviceUnavailable, "Service to be exported doesn't exist")
 
 	return serviceImport, false
 }
 
-func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, msg string,
-	conditionType lighthousev2a1.ServiceExportConditionType, status corev1.ConditionStatus) {
+func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, condType lighthousev2a1.ServiceExportConditionType,
+	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(export.Namespace).Get(export.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -204,18 +205,22 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 		} else if err != nil {
 			return err
 		}
+
+		now := metav1.Now()
 		exportCondtion := lighthousev2a1.ServiceExportCondition{
-			Type:               conditionType,
+			Type:               condType,
 			Status:             status,
-			LastTransitionTime: nil,
-			Reason:             nil,
+			LastTransitionTime: &now,
+			Reason:             &reason,
 			Message:            &msg,
 		}
+
 		toUpdate.Status = lighthousev2a1.ServiceExportStatus{
 			Conditions: []lighthousev2a1.ServiceExportCondition{
 				exportCondtion,
 			},
 		}
+
 		_, err = a.lighthouseClient.LighthouseV2alpha1().ServiceExports(toUpdate.Namespace).Update(toUpdate)
 
 		return err
