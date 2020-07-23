@@ -42,11 +42,7 @@ var _ = Describe("ServiceImport syncing", func() {
 		When("the Service doesn't initially exist", func() {
 			It("should initially update the ServiceExport status to Initialized and eventually sync a ServiceImport", func() {
 				t.createServiceExport()
-
-				t.awaitServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
-					Type:   lighthousev2a1.ServiceExportInitialized,
-					Status: corev1.ConditionFalse,
-				})
+				t.awaitServiceUnavailableStatus()
 
 				t.createService()
 				t.awaitServiceExported(t.service.Spec.ClusterIP)
@@ -75,10 +71,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.deleteService()
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
 			t.awaitNoServiceImport(t.localServiceImportClient)
-			t.awaitServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
-				Type:   lighthousev2a1.ServiceExportInitialized,
-				Status: corev1.ConditionFalse,
-			})
+			t.awaitServiceUnavailableStatus()
 		})
 	})
 })
@@ -106,9 +99,11 @@ var _ = Describe("Globalnet enabled", func() {
 
 	When("a local ServiceExport is created and the Service does not initially have a global IP", func() {
 		It("should eventually sync a ServiceImport with the global IP of the Service", func() {
+			reason := "ServiceGlobalIPUnavailable"
 			t.awaitServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
 				Type:   lighthousev2a1.ServiceExportInitialized,
 				Status: corev1.ConditionFalse,
+				Reason: &reason,
 			})
 
 			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
@@ -133,6 +128,7 @@ type testDriver struct {
 	service                   *corev1.Service
 	serviceExport             *lighthousev2a1.ServiceExport
 	stopCh                    chan struct{}
+	now                       time.Time
 }
 
 func newTestDiver() *testDriver {
@@ -143,6 +139,7 @@ func newTestDiver() *testDriver {
 	}}
 
 	BeforeEach(func() {
+		t.now = time.Now()
 		t.initialResources = nil
 		t.stopCh = make(chan struct{})
 
@@ -288,6 +285,9 @@ func (t *testDriver) awaitServiceExportStatus(expCond *lighthousev2a1.ServiceExp
 	Expect(found.Status.Conditions).To(HaveLen(1))
 	Expect(found.Status.Conditions[0].Type).To(Equal(expCond.Type))
 	Expect(found.Status.Conditions[0].Status).To(Equal(expCond.Status))
+	Expect(found.Status.Conditions[0].LastTransitionTime).To(Not(BeNil()))
+	Expect(found.Status.Conditions[0].LastTransitionTime.After(t.now)).To(BeTrue())
+	Expect(found.Status.Conditions[0].Reason).To(Equal(expCond.Reason))
 	Expect(found.Status.Conditions[0].Message).To(Not(BeNil()))
 }
 
@@ -295,8 +295,19 @@ func (t *testDriver) awaitServiceExported(serviceIP string) {
 	t.awaitServiceImport(t.brokerServiceImportClient, serviceIP)
 	t.awaitServiceImport(t.localServiceImportClient, serviceIP)
 
+	empty := ""
 	t.awaitServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
 		Type:   lighthousev2a1.ServiceExportExported,
 		Status: corev1.ConditionTrue,
+		Reason: &empty,
+	})
+}
+
+func (t *testDriver) awaitServiceUnavailableStatus() {
+	reason := "ServiceUnavailable"
+	t.awaitServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
+		Type:   lighthousev2a1.ServiceExportInitialized,
+		Status: corev1.ConditionFalse,
+		Reason: &reason,
 	})
 }
