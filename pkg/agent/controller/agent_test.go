@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
@@ -37,17 +38,17 @@ var _ = Describe("ServiceImport syncing", func() {
 			It("should correctly sync a ServiceImport and update the ServiceExport status", func() {
 				t.createService()
 				t.createServiceExport()
-				t.awaitServiceExported(t.service.Spec.ClusterIP)
+				t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
 			})
 		})
 
 		When("the Service doesn't initially exist", func() {
 			It("should initially update the ServiceExport status to Initialized and eventually sync a ServiceImport", func() {
 				t.createServiceExport()
-				t.awaitServiceUnavailableStatus()
+				t.awaitServiceUnavailableStatus(0)
 
 				t.createService()
-				t.awaitServiceExported(t.service.Spec.ClusterIP)
+				t.awaitServiceExported(t.service.Spec.ClusterIP, 1)
 			})
 		})
 	})
@@ -56,7 +57,7 @@ var _ = Describe("ServiceImport syncing", func() {
 		It("should delete the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
 
 			t.deleteServiceExport()
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
@@ -68,12 +69,12 @@ var _ = Describe("ServiceImport syncing", func() {
 		It("should delete the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			nextStatusIndex := t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
 
 			t.deleteService()
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
 			t.awaitNoServiceImport(t.localServiceImportClient)
-			t.awaitServiceUnavailableStatus()
+			t.awaitServiceUnavailableStatus(nextStatusIndex)
 		})
 	})
 
@@ -86,7 +87,8 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createService()
 			t.createServiceExport()
 
-			t.awaitServiceExportStatus(lighthousev2a1.ServiceExportInitialized, corev1.ConditionTrue, "AwaitingSync")
+			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+				corev1.ConditionTrue, "AwaitingSync"))
 
 			t.awaitNotServiceExportStatus(&lighthousev2a1.ServiceExportCondition{
 				Type:   lighthousev2a1.ServiceExportExported,
@@ -94,7 +96,28 @@ var _ = Describe("ServiceImport syncing", func() {
 			})
 
 			t.brokerServiceImportClient.PersistentFailOnCreate.Store("")
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+		})
+	})
+
+	When("the ServiceExportCondition list count reaches MaxExportStatusConditions", func() {
+		var oldMaxExportStatusConditions int
+
+		BeforeEach(func() {
+			oldMaxExportStatusConditions = controller.MaxExportStatusConditions
+			controller.MaxExportStatusConditions = 1
+		})
+
+		AfterEach(func() {
+			controller.MaxExportStatusConditions = oldMaxExportStatusConditions
+		})
+
+		It("should correctly truncate the ServiceExportCondition list", func() {
+			t.createService()
+			t.createServiceExport()
+
+			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportExported,
+				corev1.ConditionTrue, ""))
 		})
 	})
 })
@@ -116,19 +139,20 @@ var _ = Describe("Globalnet enabled", func() {
 		})
 
 		It("should sync a ServiceImport with the global IP of the Service", func() {
-			t.awaitServiceExported(globalIP)
+			t.awaitServiceExported(globalIP, 0)
 		})
 	})
 
 	When("a local ServiceExport is created and the Service does not initially have a global IP", func() {
 		It("should eventually sync a ServiceImport with the global IP of the Service", func() {
-			t.awaitServiceExportStatus(lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse, "ServiceGlobalIPUnavailable")
+			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+				corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
 			_, err := t.localServiceClient.CoreV1().Services(t.service.Namespace).Update(t.service)
 			Expect(err).To(Succeed())
 
-			t.awaitServiceExported(globalIP)
+			t.awaitServiceExported(globalIP, 1)
 		})
 	})
 })
@@ -273,9 +297,8 @@ func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
 	test.WaitForNoResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID)
 }
 
-func (t *testDriver) awaitServiceExportStatus(expType lighthousev2a1.ServiceExportConditionType,
-	expStatus corev1.ConditionStatus, expReason string) {
-	var found *lighthousev2a1.ServiceExport
+func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthousev2a1.ServiceExportCondition) {
+	var found []lighthousev2a1.ServiceExportCondition
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		se, err := t.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.service.Namespace).Get(t.service.Name, metav1.GetOptions{})
@@ -287,28 +310,37 @@ func (t *testDriver) awaitServiceExportStatus(expType lighthousev2a1.ServiceExpo
 			return false, err
 		}
 
-		found = se
+		found = se.Status.Conditions
 
-		return len(se.Status.Conditions) > 0 && se.Status.Conditions[0].Type == expType &&
-			se.Status.Conditions[0].Status == expStatus, nil
+		if (atIndex + len(expCond)) != len(se.Status.Conditions) {
+			return false, nil
+		}
+
+		j := atIndex
+		for _, exp := range expCond {
+			actual := se.Status.Conditions[j]
+			j++
+			Expect(actual.Type).To(Equal(exp.Type))
+			Expect(actual.Status).To(Equal(exp.Status))
+			Expect(actual.LastTransitionTime).To(Not(BeNil()))
+			Expect(actual.LastTransitionTime.After(t.now)).To(BeTrue())
+			Expect(actual.Reason).To(Not(BeNil()))
+			Expect(*actual.Reason).To(Equal(*exp.Reason))
+			Expect(actual.Message).To(Not(BeNil()))
+		}
+
+		return true, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
 		if found == nil {
 			Fail("ServiceExport not found")
 		}
+
+		Fail(format.Message(found, fmt.Sprintf("to contain at index %d", atIndex), expCond))
 	} else {
 		Expect(err).To(Succeed())
 	}
-
-	Expect(found.Status.Conditions).To(HaveLen(1))
-	Expect(found.Status.Conditions[0].Type).To(Equal(expType))
-	Expect(found.Status.Conditions[0].Status).To(Equal(expStatus))
-	Expect(found.Status.Conditions[0].LastTransitionTime).To(Not(BeNil()))
-	Expect(found.Status.Conditions[0].LastTransitionTime.After(t.now)).To(BeTrue())
-	Expect(found.Status.Conditions[0].Reason).To(Not(BeNil()))
-	Expect(*found.Status.Conditions[0].Reason).To(Equal(expReason))
-	Expect(found.Status.Conditions[0].Message).To(Not(BeNil()))
 }
 
 func (t *testDriver) awaitNotServiceExportStatus(notCond *lighthousev2a1.ServiceExportCondition) {
@@ -339,13 +371,27 @@ func (t *testDriver) awaitNotServiceExportStatus(notCond *lighthousev2a1.Service
 	}
 }
 
-func (t *testDriver) awaitServiceExported(serviceIP string) {
+func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int {
 	t.awaitServiceImport(t.brokerServiceImportClient, serviceIP)
 	t.awaitServiceImport(t.localServiceImportClient, serviceIP)
 
-	t.awaitServiceExportStatus(lighthousev2a1.ServiceExportExported, corev1.ConditionTrue, "")
+	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionTrue, "AwaitingSync"), newServiceExportCondition(lighthousev2a1.ServiceExportExported,
+		corev1.ConditionTrue, ""))
+
+	return statusIndex + 2
 }
 
-func (t *testDriver) awaitServiceUnavailableStatus() {
-	t.awaitServiceExportStatus(lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse, "ServiceUnavailable")
+func (t *testDriver) awaitServiceUnavailableStatus(atIndex int) {
+	t.awaitServiceExportStatus(atIndex, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionFalse, "ServiceUnavailable"))
+}
+
+func newServiceExportCondition(cType lighthousev2a1.ServiceExportConditionType,
+	status corev1.ConditionStatus, reason string) *lighthousev2a1.ServiceExportCondition {
+	return &lighthousev2a1.ServiceExportCondition{
+		Type:   cType,
+		Status: status,
+		Reason: &reason,
+	}
 }
