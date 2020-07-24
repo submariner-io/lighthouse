@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -28,6 +29,8 @@ const (
 	originName             = "origin-name"
 	originNamespace        = "origin-namespace"
 )
+
+var MaxExportStatusConditions = 10
 
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 	kubeClientSet, err := kubernetes.NewForConfig(cfg)
@@ -223,7 +226,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 		}
 
 		now := metav1.Now()
-		exportCondtion := lighthousev2a1.ServiceExportCondition{
+		exportCondition := lighthousev2a1.ServiceExportCondition{
 			Type:               condType,
 			Status:             status,
 			LastTransitionTime: &now,
@@ -231,10 +234,19 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			Message:            &msg,
 		}
 
-		toUpdate.Status = lighthousev2a1.ServiceExportStatus{
-			Conditions: []lighthousev2a1.ServiceExportCondition{
-				exportCondtion,
-			},
+		numCond := len(toUpdate.Status.Conditions)
+		if numCond > 0 && serviceExportConditionEqual(&toUpdate.Status.Conditions[numCond-1], &exportCondition) {
+			klog.V(log.DEBUG).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
+				namespace, name, toUpdate.Status.Conditions[numCond-1])
+			return nil
+		}
+
+		if numCond >= MaxExportStatusConditions {
+			copy(toUpdate.Status.Conditions[0:], toUpdate.Status.Conditions[1:])
+			toUpdate.Status.Conditions = toUpdate.Status.Conditions[:MaxExportStatusConditions]
+			toUpdate.Status.Conditions[MaxExportStatusConditions-1] = exportCondition
+		} else {
+			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, exportCondition)
 		}
 
 		_, err = a.lighthouseClient.LighthouseV2alpha1().ServiceExports(toUpdate.Namespace).Update(toUpdate)
@@ -244,6 +256,11 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 	if retryErr != nil {
 		klog.Errorf("Error updating status for ServiceExport (%s/%s): %v", namespace, name, retryErr)
 	}
+}
+
+func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {
+	return c1.Type == c2.Type && c1.Status == c2.Status && reflect.DeepEqual(c1.Reason, c2.Reason) &&
+		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
 func (a *Controller) newClusterStatus(service *corev1.Service, clusterID string) lighthousev2a1.ClusterStatus {

@@ -64,20 +64,28 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, names
 	return serviceExport
 }
 
-func (f *Framework) AwaitServiceExportStatusCondition(cluster framework.ClusterIndex, name,
-	namespace string) *lighthousev2a1.ServiceExport {
+func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
 	se := LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace)
-	By(fmt.Sprintf("Retrieving serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
-	serviceExport := framework.AwaitUntil("retrieve serviceExport", func() (interface{}, error) {
+	By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
+	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
 		return se.Get(name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		se := result.(*lighthousev2a1.ServiceExport)
 		if len(se.Status.Conditions) == 0 {
-			return false, "Status.Conditions is empty", nil
+			return false, "No ServiceExportConditions", nil
 		}
+
+		last := se.Status.Conditions[len(se.Status.Conditions)-1]
+		if last.Type != lighthousev2a1.ServiceExportExported {
+			return false, fmt.Sprintf("ServiceExportCondition Type is %v", last.Type), nil
+		}
+
+		if last.Status != v1.ConditionTrue {
+			return false, fmt.Sprintf("ServiceExportCondition Status is %v", last.Status), nil
+		}
+
 		return true, "", nil
-	}).(*lighthousev2a1.ServiceExport)
-	return serviceExport
+	})
 }
 
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {

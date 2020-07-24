@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
@@ -52,9 +51,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	Expect(se.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	Expect(*se.Status.Conditions[0].Message).To(Equal("Service was successfully synced to the broker"))
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
@@ -93,9 +90,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	se := f.AwaitServiceExportStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	Expect(se.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	Expect(*se.Status.Conditions[0].Message).To(Equal("Service was successfully synced to the broker"))
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
