@@ -17,6 +17,7 @@ func testParseValid() {
 		query    string
 		expected string // output from r.String()
 	}
+
 	When("SRV request", func() {
 		It("Should give no error", func() {
 			tc := parseTest{"_http._tcp.webs.mynamespace.svc.inter.webs.tests.", "http.tcp..webs.mynamespace.svc"}

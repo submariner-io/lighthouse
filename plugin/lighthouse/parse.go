@@ -27,19 +27,19 @@ type recordRequest struct {
 // parseRequest parses the qname to find all the elements we need for querying k8s. Anything
 // that is not parsed will have the wildcard "*" value (except r.endpoint).
 // Potential underscores are stripped from _port and _protocol.
+// 3 Possible cases:
+// 1. _port._protocol.service.namespace.pod|svc.zone
+// 2. (endpoint): endpoint.service.namespace.pod|svc.zone
+// 3. (service): service.namespace.pod|svc.zone
+//
+// Federations are handled in the federation plugin. And aren't parsed here.
 func parseRequest(state request.Request) (r recordRequest, err error) {
-	// 3 Possible cases:
-	// 1. _port._protocol.service.namespace.pod|svc.zone
-	// 2. (endpoint): endpoint.service.namespace.pod|svc.zone
-	// 3. (service): service.namespace.pod|svc.zone
-	//
-	// Federations are handled in the federation plugin. And aren't parsed here.
-
 	base, _ := dnsutil.TrimZone(state.Name(), state.Zone)
 	// return NODATA for apex queries
 	if base == "" || base == Svc || base == Pod {
 		return r, nil
 	}
+
 	segs := dns.SplitDomainName(base)
 
 	r.port = "*"
@@ -58,6 +58,7 @@ func parseRequest(state request.Request) (r recordRequest, err error) {
 	if last < 0 {
 		return r, nil
 	}
+
 	r.podOrSvc = segs[last]
 	if r.podOrSvc != "pod" && r.podOrSvc != Svc {
 		return r, errInvalidRequest
@@ -100,6 +101,7 @@ func stripUnderscore(s string) string {
 	if s[0] != '_' {
 		return s
 	}
+
 	return s[1:]
 }
 
@@ -112,5 +114,6 @@ func (r recordRequest) String() string {
 	s += "." + r.service
 	s += "." + r.namespace
 	s += "." + r.podOrSvc
+
 	return s
 }

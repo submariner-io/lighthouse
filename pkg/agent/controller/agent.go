@@ -140,11 +140,13 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	if op == syncer.Delete {
 		return serviceImport, false
 	}
+
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
+
 		return nil, true
 	} else if err != nil {
 		// some other error. Log and requeue
@@ -153,14 +155,17 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		klog.Errorf("Unable to get service for %#v: %v", svc, err)
 		return nil, true
 	}
+
 	if a.globalnetEnabled && getGlobalIpFromService(svc) == "" {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 			corev1.ConditionFalse, "ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
+
 		return nil, true
 	}
+
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
 		Type: lighthousev2a1.SuperclusterIP,
 	}
@@ -268,6 +273,7 @@ func (a *Controller) newClusterStatus(service *corev1.Service, clusterID string)
 	if mcsIp == "" {
 		mcsIp = service.Spec.ClusterIP
 	}
+
 	return lighthousev2a1.ClusterStatus{
 		Cluster: clusterID,
 		IPs:     []string{mcsIp},
@@ -293,5 +299,6 @@ func getGlobalIpFromService(service *corev1.Service) string {
 			return annotations[submarinerIpamGlobalIp]
 		}
 	}
+
 	return ""
 }

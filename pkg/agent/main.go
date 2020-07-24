@@ -21,29 +21,33 @@ var (
 
 func main() {
 	agentSpec := controller.AgentSpecification{}
+
 	klog.InitFlags(nil)
+
 	flag.Parse()
 
 	err := envconfig.Process("submariner", &agentSpec)
 	if err != nil {
 		klog.Fatal(err)
 	}
+
 	klog.Infof("AgentSpec: %v", agentSpec)
-	if err != nil {
-		klog.Fatal(err)
-	}
+
 	err = lighthousev1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		klog.Exitf("Error adding lighthouse V1 to the scheme: %v", err)
 	}
+
 	err = lighthousev2a1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		klog.Exitf("Error adding lighthouse V2alpha1 to the scheme: %v", err)
 	}
+
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	if err != nil {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
+
 	klog.Infof("Starting submariner-lighthouse-agent %v", agentSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
