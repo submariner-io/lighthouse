@@ -41,6 +41,7 @@ func NewController() *Controller {
 		gatewayAvailable: true,
 	}
 	controller.clusterStatusMap.Store(make(map[string]bool))
+
 	return controller
 }
 
@@ -48,6 +49,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	if NewClientset != nil {
 		return NewClientset
 	}
+
 	return dynamic.NewForConfig
 }
 
@@ -55,13 +57,18 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
 	if errors.IsNotFound(err) {
 		klog.Infof("Gateway resource not found, disabling Gateway status controller")
+
 		c.gatewayAvailable = false
+
 		return nil
 	}
+
 	if err != nil {
 		return err
 	}
+
 	klog.Infof("Starting Gateway status Controller")
+
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return gwClientset.List(metav1.ListOptions{})
@@ -86,6 +93,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 			klog.V(log.DEBUG).Infof("GatewayStatus %q deleted", key)
 		},
 	})
+
 	go c.informer.Run(c.stopCh)
 	go c.runWorker()
 
@@ -107,6 +115,7 @@ func (c *Controller) runWorker() {
 		}
 
 		key := keyObj.(string)
+
 		func() {
 			defer c.queue.Done(key)
 			obj, exists, err := c.store.GetByKey(key)
@@ -114,11 +123,14 @@ func (c *Controller) runWorker() {
 				klog.Errorf("Error retrieving gateway with key %q from the cache: %v", key, err)
 				// requeue the item to work on later
 				c.queue.AddRateLimited(key)
+
 				return
 			}
+
 			if exists {
 				c.gatewayCreatedOrUpdated(obj.(*unstructured.Unstructured))
 			}
+
 			c.queue.Forget(key)
 		}()
 	}
@@ -130,7 +142,9 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 		return
 	}
 	var newMap map[string]bool
+
 	currentMap := c.getClusterStatusMap()
+
 	for _, connection := range connections {
 		connectionMap := connection.(map[string]interface{})
 
@@ -138,6 +152,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 		if err != nil || !found {
 			klog.Errorf("status field not found in %#v", connectionMap)
 		}
+
 		clusterId, found, err := unstructured.NestedString(connectionMap, "endpoint", "cluster_id")
 		if !found || err != nil {
 			klog.Errorf("clusterId field not found in %#v", connectionMap)
@@ -150,6 +165,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 				if newMap == nil {
 					newMap = copyMap(currentMap)
 				}
+
 				newMap[clusterId] = true
 			}
 		} else {
@@ -175,16 +191,19 @@ func getGatewayStatus(obj *unstructured.Unstructured) (haStatus string, connecti
 		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
 		return "", nil, false
 	}
+
 	haStatus, found, err = unstructured.NestedString(status, "haStatus")
 	if !found || err != nil {
 		klog.Errorf("haStatus field not found in %#v, err was: %v", status, err)
 		return "", nil, false
 	}
+
 	connections, found, err = unstructured.NestedSlice(status, "connections")
 	if !found || err != nil {
 		klog.Errorf("connections field not found in %#v, err was: %v", status, err)
 		return haStatus, nil, false
 	}
+
 	return haStatus, connections, true
 }
 
@@ -214,5 +233,6 @@ func copyMap(src map[string]bool) map[string]bool {
 	for k, v := range src {
 		m[k] = v
 	}
+
 	return m
 }

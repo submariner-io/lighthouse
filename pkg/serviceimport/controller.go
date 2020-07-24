@@ -92,6 +92,7 @@ func (c *Controller) runWorker() {
 		}
 
 		key := keyObj.(string)
+
 		func() {
 			defer c.queue.Done(key)
 			obj, exists, err := c.serviceInformer.GetIndexer().GetByKey(key)
@@ -100,6 +101,7 @@ func (c *Controller) runWorker() {
 				klog.Errorf("Error retrieving service with key %q from the cache: %v", key, err)
 				// requeue the item to work on later
 				c.queue.AddRateLimited(key)
+
 				return
 			}
 
@@ -127,11 +129,13 @@ func (c *Controller) serviceImportDeleted(obj interface{}, key string) {
 			klog.Errorf("Failed to get deleted serviceimport object for %s", key)
 			return
 		}
+
 		mcs, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
 		if !ok {
 			klog.Errorf("Failed to convert deleted tombstone object %v  to serviceimport", tombstone.Obj)
 			return
 		}
 	}
+
 	c.serviceImports.Remove(mcs)
 }

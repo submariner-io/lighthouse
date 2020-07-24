@@ -47,13 +47,16 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
 	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
@@ -86,13 +89,16 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
 	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
 
@@ -125,10 +131,13 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
 	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
@@ -158,6 +167,7 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 	if !shouldContain {
 		op += " not"
 	}
+
 	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
 		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
@@ -194,6 +204,7 @@ func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, ta
 			search <namespace>.svc.cluster.local svc.cluster.local cluster.local <custom-domains>
 	*/
 	cmd := []string{"cat", "/etc/resolv.conf"}
+
 	if stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
 		Command:       cmd,
 		Namespace:     f.Namespace,
