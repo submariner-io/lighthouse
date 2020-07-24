@@ -25,6 +25,8 @@ import (
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 	serviceUnavailable     = "ServiceUnavailable"
+	originName             = "origin-name"
+	originNamespace        = "origin-namespace"
 )
 
 func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
@@ -68,10 +70,11 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 	}
 
 	svcExportResourceConfig := broker.ResourceConfig{
-		LocalSourceNamespace: metav1.NamespaceAll,
-		LocalResourceType:    &lighthousev2a1.ServiceExport{},
-		LocalTransform:       agentController.serviceExportToRemoteServiceImport,
-		BrokerResourceType:   &lighthousev2a1.ServiceImport{},
+		LocalSourceNamespace:  metav1.NamespaceAll,
+		LocalResourceType:     &lighthousev2a1.ServiceExport{},
+		LocalTransform:        agentController.serviceExportToRemoteServiceImport,
+		LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
+		BrokerResourceType:    &lighthousev2a1.ServiceImport{},
 	}
 
 	syncerConf.Scheme = scheme
@@ -137,13 +140,13 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
-		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
-			serviceUnavailable, "Service to be exported doesn't exist")
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 		return nil, true
 	} else if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionUnknown,
-			"ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
 		klog.Errorf("Unable to get service for %#v: %v", svc, err)
 		return nil, true
 	}
@@ -151,8 +154,8 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
-			"ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse, "ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
 		return nil, true
 	}
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
@@ -163,10 +166,23 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 			a.newClusterStatus(svc, a.clusterID),
 		},
 	}
-	a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
-		"", "Service was successfully synced to the broker")
+
+	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionTrue, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
 
 	return serviceImport, false
+}
+
+func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
+	if op != syncer.Create {
+		return
+	}
+
+	serviceImport := synced.(*lighthousev2a1.ServiceImport)
+
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[originName], serviceImport.GetAnnotations()[originNamespace],
+		lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
+		"", "Service was successfully synced to the broker")
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
@@ -189,18 +205,18 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport, lighthousev2a1.ServiceExportInitialized, corev1.ConditionFalse,
-		serviceUnavailable, "Service to be exported doesn't exist")
+	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 
 	return serviceImport, false
 }
 
-func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceExport, condType lighthousev2a1.ServiceExportConditionType,
+func (a *Controller) updateExportedServiceStatus(name, namespace string, condType lighthousev2a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(export.Namespace).Get(export.Name, metav1.GetOptions{})
+		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(namespace).Get(name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			klog.Infof("ServiceExport (%s/%s) not found - unable to update status", export.Namespace, export.Name)
+			klog.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
 		} else if err != nil {
 			return err
@@ -226,7 +242,7 @@ func (a *Controller) updateExportedServiceStatus(export *lighthousev2a1.ServiceE
 		return err
 	})
 	if retryErr != nil {
-		klog.Errorf("Error updating status for %#v: %v", export, retryErr)
+		klog.Errorf("Error updating status for ServiceExport (%s/%s): %v", namespace, name, retryErr)
 	}
 }
 
@@ -246,8 +262,8 @@ func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svcExport.Name + "-" + svcExport.Namespace + "-" + a.clusterID,
 			Annotations: map[string]string{
-				"origin-name":      svcExport.Name,
-				"origin-namespace": svcExport.Namespace,
+				originName:      svcExport.Name,
+				originNamespace: svcExport.Namespace,
 			},
 		},
 	}
