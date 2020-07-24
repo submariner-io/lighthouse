@@ -3,10 +3,12 @@ set -e -x
 
 trap "exit 1" SIGTERM SIGINT
 
+LIGHTHOUSE_VERBOSITY=${LIGHTHOUSE_VERBOSITY:-1}
+
 if [ "${LIGHTHOUSE_DEBUG}" == "true" ]; then
-    DEBUG="--debug -v=9"
+    DEBUG="-v=3"
 else
-    DEBUG="-v=4"
+    DEBUG="-v=${LIGHTHOUSE_VERBOSITY}"
 fi
 
 exec lighthouse-agent ${DEBUG} -alsologtostderr
