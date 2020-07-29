@@ -36,11 +36,11 @@ type ServiceExportConditionType string
 const (
 	// ServiceExportInitialized means the service export has been noticed
 	// by the controller, has passed validation, has appropriate finalizers
-	// set, and any required supercluster resources like the IP have been
+	// set, and any required clusterset resources like the IP have been
 	// reserved
 	ServiceExportInitialized ServiceExportConditionType = "Initialized"
 	// ServiceExportExported means that the service referenced by this
-	// service export has been synced to all clusters in the supercluster
+	// service export has been synced to all clusters in the clusterset
 	ServiceExportExported ServiceExportConditionType = "Exported"
 )
 
@@ -74,7 +74,7 @@ type ServiceExportList struct {
 //+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:noStatus
 
-// ServiceImport describes a service imported from clusters in a supercluster.
+// ServiceImport describes a service imported from clusters in a clusterset.
 type ServiceImport struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -89,8 +89,8 @@ type ServiceImport struct {
 type ServiceImportType string
 
 const (
-	// Services are only accessible via their supercluster IP.
-	SuperclusterIP ServiceImportType = "SuperclusterIP"
+	// Services are only accessible via their clusterset IP.
+	ClusterSetIP ServiceImportType = "ClusterSetIP"
 	// Headless services allow backend pods to be addressed directly.
 	Headless ServiceImportType = "Headless"
 )

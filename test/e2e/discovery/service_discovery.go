@@ -13,8 +13,12 @@ import (
 
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	clustersetDomain       = "clusterset.local"
 	superclusterDomain     = "supercluster.local"
 )
+
+// Both domains need to be checked, until the operator is updated to use clusterset
+var checkedDomains = []string{clustersetDomain, superclusterDomain}
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("discovery")
@@ -64,14 +68,14 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
@@ -102,7 +106,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, clusterADomain, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, []string{clusterADomain}, true)
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
 
@@ -111,14 +115,14 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 }
 
 func RunServiceExportTest(f *lhframework.Framework) {
@@ -145,16 +149,16 @@ func RunServiceExportTest(f *lhframework.Framework) {
 		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	}
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, true)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, superclusterDomain, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 }
 
 func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
-	domain string, shouldContain bool) {
+	domains []string, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
@@ -162,7 +166,11 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 		serviceIP = service.Spec.ClusterIP
 	}
 
-	cmd := []string{"dig", service.Name + "." + f.Namespace + ".svc." + domain, "+short"}
+	cmd := []string{"dig", "+short"}
+	for i := range domains {
+		cmd = append(cmd, service.Name+"."+f.Namespace+".svc."+domains[i])
+	}
+
 	op := "is"
 	if !shouldContain {
 		op += " not"

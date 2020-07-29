@@ -238,7 +238,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		},
 	}
 
-	if svcType == lighthousev2a1.SuperclusterIP {
+	if svcType == lighthousev2a1.ClusterSetIP {
 		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
 		cleared out when here's no backing Endpoint pods.
 		*/
@@ -260,7 +260,7 @@ func getServiceImportType(service *corev1.Service) (lighthousev2a1.ServiceImport
 		return lighthousev2a1.Headless, true
 	}
 
-	return lighthousev2a1.SuperclusterIP, true
+	return lighthousev2a1.ClusterSetIP, true
 }
 
 func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
@@ -330,7 +330,7 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 
 	ipList := getIPsFromEndpoint(ep)
 
-	if serviceImport.Spec.Type == lighthousev2a1.SuperclusterIP && len(ipList) > 0 {
+	if serviceImport.Spec.Type == lighthousev2a1.ClusterSetIP && len(ipList) > 0 {
 		/*
 			When there's no healthy pods, the IPs in the Endpoint will become empty and
 			thus we also clear the ServiceImport IPs to avoid clients sending a request
@@ -448,7 +448,7 @@ func (a *Controller) getServiceImport(svcExport *lighthousev2a1.ServiceExport) (
 }
 
 func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) []string {
-	if siType == lighthousev2a1.SuperclusterIP {
+	if siType == lighthousev2a1.ClusterSetIP {
 		mcsIp := getGlobalIpFromService(service)
 		if mcsIp == "" {
 			mcsIp = service.Spec.ClusterIP

@@ -12,7 +12,7 @@ source ${SCRIPTS_DIR}/lib/version
 
 function update_coredns_configmap() {
     kubectl get cm -n kube-system coredns -o yaml > /tmp/coremap-${cluster}.yaml
-    if !(grep -q supercluster /tmp/coremap-${cluster}.yaml); then
+    if !(grep -q clusterset /tmp/coremap-${cluster}.yaml); then
         CLUSTER_IP=`kubectl get svc -n submariner-operator submariner-lighthouse-coredns | tail -n 1| awk '{print $3;}'`
         sed 's/dnsip/'${CLUSTER_IP}'/g' scripts/resources/coredns-cm.yaml > /tmp/coredns-cm-${CLUSTER_IP}.yaml
         sed -i -e "/Corefile:/r /tmp/coredns-cm-${CLUSTER_IP}.yaml" /tmp/coremap-${cluster}.yaml

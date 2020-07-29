@@ -129,7 +129,7 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 			},
 		},
 		Spec: lighthousev2a1.ServiceImportSpec{
-			Type: lighthousev2a1.SuperclusterIP,
+			Type: lighthousev2a1.ClusterSetIP,
 		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{
