@@ -286,7 +286,7 @@ func (t *testDriver) awaitServiceImport(client dynamic.ResourceInterface, servic
 
 	Expect(serviceImport.GetAnnotations()["origin-name"]).To(Equal(t.service.Name))
 	Expect(serviceImport.GetAnnotations()["origin-namespace"]).To(Equal(t.service.Namespace))
-	Expect(serviceImport.Spec.Type).To(Equal(lighthousev2a1.SuperclusterIP))
+	Expect(serviceImport.Spec.Type).To(Equal(lighthousev2a1.ClusterSetIP))
 
 	Expect(serviceImport.Status.Clusters).To(HaveLen(1))
 	Expect(serviceImport.Status.Clusters[0].Cluster).To(Equal(clusterID))

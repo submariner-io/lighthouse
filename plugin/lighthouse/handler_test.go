@@ -86,7 +86,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, []string{serviceIP}, lighthousev2a1.ClusterSetIP))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -253,7 +253,7 @@ func testClusterStatus() {
 			serviceImports: setupServiceImportMap(),
 			clusterStatus:  mockCs,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP}, lighthousev2a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -273,7 +273,7 @@ func testClusterStatus() {
 
 	When("service is in two connected clusters and one has no IP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.SuperclusterIP))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.ClusterSetIP))
 		})
 		It("should succeed and write an A record response with the available IP", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -436,7 +436,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
-	siMap.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
+	siMap.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.ClusterSetIP))
 
 	return siMap
 }
