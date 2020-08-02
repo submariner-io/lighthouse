@@ -47,21 +47,14 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	svcName := query[0]
 	namespace := query[1]
 
-	var serviceIp string
-	clusterInfo, found := lh.serviceImports.GetClusterInfo(namespace, svcName)
-
+	serviceIp, found := lh.selectServiceIp(namespace, svcName)
 	if !found {
 		// We couldn't find record for this service name
 		log.Debugf("No record found for service %q", qname)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
 	}
 
-	for k, v := range clusterInfo {
-		if lh.clusterStatus.IsConnected(k) {
-			serviceIp = v
-			break
-		}
-	}
+
 	if serviceIp == "" {
 		log.Debugf("Couldn't find a connected cluster for %q", qname)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeServerFailure, "No connection to service clusters")
@@ -90,6 +83,24 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 
 	return dns.RcodeSuccess, nil
+}
+
+func (lh *Lighthouse) selectServiceIp(namespace, name string) (string, bool) {
+	queue, found := lh.serviceImports.GetQueue(namespace, name)
+	if !found {
+		return "", false
+	}
+
+	queueLength := len(queue)
+	for i := 0; i < queueLength; i++ {
+		counter, _ := lh.serviceImports.GetAndIncRRCounter(namespace, name)
+		clusterInfo := queue[counter%uint64(queueLength)]
+		if lh.clusterStatus.IsConnected(clusterInfo.Name) {
+			return clusterInfo.Ip, true
+		}
+	}
+
+	return "", true
 }
 
 func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
