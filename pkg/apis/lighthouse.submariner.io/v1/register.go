@@ -37,5 +37,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// register the type in the scheme
 	meta_v1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
 	return nil
 }

@@ -27,9 +27,11 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		log.Debugf("Request does not match configured zones %v", lh.Zones)
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotZone, "No matching zone found")
 	}
+
 	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA {
 		msg := fmt.Sprintf("Query of type %d is not supported", state.QType())
 		log.Debugf(msg)
+
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, msg)
 	}
 
@@ -118,6 +120,7 @@ func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
 		log.Errorf("Failed to write message %#v: %v", a, wErr)
 		return dns.RcodeServerFailure, lh.error("failed to write response")
 	}
+
 	return dns.RcodeSuccess, nil
 }
 

@@ -319,6 +319,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 	code, err := lh.ServeDNS(context.TODO(), rec, tc.Msg())
 
 	Expect(code).Should(Equal(tc.Rcode))
+
 	if tc.Rcode == dns.RcodeSuccess {
 		Expect(err).To(Succeed())
 		Expect(test.SortAndCheck(rec.Msg, tc)).To(Succeed())
@@ -330,6 +331,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
 	siMap.Put(newServiceImport(namespace1, service1, serviceIP, clusterID))
+
 	return siMap
 }
 

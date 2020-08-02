@@ -47,6 +47,7 @@ func beforeSuite() {
 func createLighthouseClient(restConfig *rest.Config) *lighthouseClientset.Clientset {
 	clientSet, err := lighthouseClientset.NewForConfig(restConfig)
 	Expect(err).To(Not(HaveOccurred()))
+
 	return clientSet
 }
 
@@ -61,6 +62,7 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, names
 	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
 		return se.Create(&nginxServiceExport)
 	}, framework.NoopCheckResult).(*lighthousev2a1.ServiceExport)
+
 	return serviceExport
 }
 
@@ -110,6 +112,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 	}
 
 	var retServiceImport *lighthousev2a1.ServiceImport
+
 	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
 	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	By(fmt.Sprintf("Retrieving ServiceImport for %s on %q", siNamePrefix, framework.TestContext.ClusterIDs[targetCluster]))
@@ -129,6 +132,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 
 		return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
 	})
+
 	return retServiceImport
 }
 
@@ -162,7 +166,9 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, names
 			}
 			return true, "", nil
 		}).(*v1.Service)
+
 		return svcObj.Annotations[submarinerIpamGlobalIp]
 	}
+
 	return ""
 }
