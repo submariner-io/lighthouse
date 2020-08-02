@@ -2,14 +2,30 @@ package serviceimport
 
 import (
 	"sync"
+	"sync/atomic"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 )
 
+type clusterInfo struct {
+	ip     string
+	name   string
+	weight uint64
+}
+
 type serviceInfo struct {
-	key         string
-	clusterInfo map[string]string
-	ipList      []string
+	key           string
+	clusterIPs    map[string]string
+	clustersQueue []clusterInfo
+	rrCount       uint64
+}
+
+func (si *serviceInfo) buildClusterInfoQueue() {
+	si.clustersQueue = make([]clusterInfo, 0)
+	for k, v := range si.clusterIPs {
+		c := clusterInfo{name: k, ip: v, weight: 0}
+		si.clustersQueue = append(si.clustersQueue, c)
+	}
 }
 
 type Map struct {
@@ -17,26 +33,37 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) GetIps(namespace, name string) ([]string, bool) {
-	m.RLock()
-	defer m.RUnlock()
+func (m *Map) SelectIP(namespace, name string, checkCluster func(string) bool) (string, bool) {
+	queue, counter := func() ([]clusterInfo, *uint64) {
+		m.RLock()
+		defer m.RUnlock()
 
-	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
-		return val.ipList, len(val.ipList) > 0
+		si, ok := m.svcMap[keyFunc(namespace, name)]
+		if !ok {
+			return nil, nil
+		}
+
+		return si.clustersQueue, &si.rrCount
+	}()
+
+	if queue == nil {
+		return "", false
 	}
 
-	return nil, false
-}
+	queueLength := len(queue)
+	for i := 0; i < queueLength; i++ {
+		c := atomic.LoadUint64(counter)
 
-func (m *Map) GetClusterInfo(namespace, name string) (map[string]string, bool) {
-	m.RLock()
-	defer m.RUnlock()
+		info := queue[c%uint64(queueLength)]
 
-	if val, ok := m.svcMap[keyFunc(namespace, name)]; ok {
-		return val.clusterInfo, len(val.ipList) > 0
+		atomic.AddUint64(counter, 1)
+
+		if checkCluster(info.name) {
+			return info.ip, true
+		}
 	}
 
-	return nil, false
+	return "", true
 }
 
 func NewMap() *Map {
@@ -56,19 +83,17 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 		remoteService, ok := m.svcMap[key]
 		if !ok {
 			remoteService = &serviceInfo{
-				key:         key,
-				clusterInfo: make(map[string]string),
+				key:        key,
+				clusterIPs: make(map[string]string),
+				rrCount:    0,
 			}
 		}
 
 		for _, info := range serviceImport.Status.Clusters {
-			remoteService.clusterInfo[info.Cluster] = info.IPs[0]
+			remoteService.clusterIPs[info.Cluster] = info.IPs[0]
 		}
 
-		remoteService.ipList = make([]string, 0)
-		for _, v := range remoteService.clusterInfo {
-			remoteService.ipList = append(remoteService.ipList, v)
-		}
+		remoteService.buildClusterInfoQueue()
 
 		m.svcMap[key] = remoteService
 	}
@@ -88,16 +113,13 @@ func (m *Map) Remove(serviceImport *lighthousev2a1.ServiceImport) {
 		}
 
 		for _, info := range serviceImport.Status.Clusters {
-			delete(remoteService.clusterInfo, info.Cluster)
+			delete(remoteService.clusterIPs, info.Cluster)
 		}
 
-		if len(remoteService.clusterInfo) == 0 {
+		if len(remoteService.clusterIPs) == 0 {
 			delete(m.svcMap, key)
 		} else {
-			remoteService.ipList = make([]string, 0)
-			for _, v := range remoteService.clusterInfo {
-				remoteService.ipList = append(remoteService.ipList, v)
-			}
+			remoteService.buildClusterInfoQueue()
 		}
 	}
 }
