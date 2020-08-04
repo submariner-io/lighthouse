@@ -19,7 +19,8 @@ const (
 	service1   = "service1"
 	namespace1 = "namespace1"
 	namespace2 = "namespace2"
-	serviceIP  = "100.96.156.175"
+	serviceIP  = "100.96.156.101"
+	serviceIP2 = "100.96.156.102"
 	clusterID  = "clusterID"
 	clusterID2 = "clusterID2"
 )
@@ -28,6 +29,7 @@ var _ = Describe("Lighthouse DNS plugin Handler", func() {
 	Context("Fallthrough not configured", testWithoutFallback)
 	Context("Fallthrough configured", testWithFallback)
 	Context("Cluster connectivity status", testClusterStatus)
+	Context("Headless services", testHeadlessService)
 })
 
 type FailingResponseWriter struct {
@@ -84,7 +86,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(newServiceImport(namespace2, service1, serviceIP, clusterID))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -251,13 +253,29 @@ func testClusterStatus() {
 			serviceImports: setupServiceImportMap(),
 			clusterStatus:  mockCs,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, serviceIP, clusterID2))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
 	When("service is in two clusters and both are connected", func() {
 		It("should succeed and write an A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("service is in two connected clusters and one has no IP", func() {
+		JustBeforeEach(func() {
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.SuperclusterIP))
+		})
+		It("should succeed and write an A record response with the available IP", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
@@ -290,11 +308,12 @@ func testClusterStatus() {
 			mockCs.clusterStatusMap[clusterID] = false
 			mockCs.clusterStatusMap[clusterID2] = false
 		})
-		It("should return RcodeServerFailure", func() {
+		It("should return empty response (NODATA)", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
-				Qtype: dns.TypeA,
-				Rcode: dns.RcodeServerFailure,
+				Qname:  service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype:  dns.TypeA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
 			})
 		})
 	})
@@ -305,11 +324,98 @@ func testClusterStatus() {
 			delete(mockCs.clusterStatusMap, clusterID2)
 			lh.serviceImports = setupServiceImportMap()
 		})
-		It("should return RcodeServerFailure", func() {
+		It("should return empty response (NODATA)", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname:  service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype:  dns.TypeA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
+			})
+		})
+	})
+}
+
+func testHeadlessService() {
+	var (
+		rec    *dnstest.Recorder
+		lh     *Lighthouse
+		mockCs *MockClusterStatus
+	)
+
+	BeforeEach(func() {
+		mockCs = NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
+		lh = &Lighthouse{
+			Zones:          []string{"cluster.local."},
+			serviceImports: serviceimport.NewMap(),
+			clusterStatus:  mockCs,
+		}
+
+		rec = dnstest.NewRecorder(&test.ResponseWriter{})
+	})
+
+	When("headless service has no IPs", func() {
+		JustBeforeEach(func() {
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.Headless))
+		})
+		It("should succeed and return empty response (NODATA)", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname:  service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype:  dns.TypeA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
+			})
+		})
+	})
+
+	When("headless service has one IP", func() {
+		JustBeforeEach(func() {
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.Headless))
+		})
+		It("should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
 				Qtype: dns.TypeA,
-				Rcode: dns.RcodeServerFailure,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("headless service has two IPs", func() {
+		JustBeforeEach(func() {
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP, serviceIP2}, lighthousev2a1.Headless))
+		})
+		It("should succeed and write two A records as response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP2),
+				},
+			})
+		})
+	})
+
+	When("headless service is present in two clusters", func() {
+		JustBeforeEach(func() {
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP2}, lighthousev2a1.Headless))
+			mockCs.clusterStatusMap[clusterID2] = true
+		})
+		It("should succeed and write all IPs as A records in response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP2),
+				},
 			})
 		})
 	})
@@ -330,12 +436,13 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
-	siMap.Put(newServiceImport(namespace1, service1, serviceIP, clusterID))
+	siMap.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.SuperclusterIP))
 
 	return siMap
 }
 
-func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
+func newServiceImport(namespace, name, clusterID string, serviceIPs []string,
+	siType lighthousev2a1.ServiceImportType) *lighthousev2a1.ServiceImport {
 	return &lighthousev2a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -345,11 +452,14 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 				"origin-namespace": namespace,
 			},
 		},
+		Spec: lighthousev2a1.ServiceImportSpec{
+			Type: siType,
+		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{
 				{
 					Cluster: clusterID,
-					IPs:     []string{serviceIP},
+					IPs:     serviceIPs,
 				},
 			},
 		},

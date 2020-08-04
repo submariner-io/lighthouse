@@ -10,10 +10,12 @@ import (
 type Controller struct {
 	clusterID           string
 	globalnetEnabled    bool
+	namespace           string
 	kubeClientSet       kubernetes.Interface
 	lighthouseClient    lighthouseClientset.Interface
 	serviceExportSyncer *broker.Syncer
 	serviceSyncer       syncer.Interface
+	endpointSyncer      syncer.Interface
 }
 
 type AgentSpecification struct {

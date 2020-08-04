@@ -15,16 +15,19 @@ type clusterInfo struct {
 
 type serviceInfo struct {
 	key           string
-	clusterIPs    map[string]string
+	clusterIPs    map[string][]string
 	clustersQueue []clusterInfo
 	rrCount       uint64
+	isHeadless    bool
 }
 
 func (si *serviceInfo) buildClusterInfoQueue() {
 	si.clustersQueue = make([]clusterInfo, 0)
 	for k, v := range si.clusterIPs {
-		c := clusterInfo{name: k, ip: v, weight: 0}
-		si.clustersQueue = append(si.clustersQueue, c)
+		if len(v) > 0 {
+			c := clusterInfo{name: k, ip: v[0], weight: 0}
+			si.clustersQueue = append(si.clustersQueue, c)
+		}
 	}
 }
 
@@ -33,18 +36,8 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) SelectIP(namespace, name string, checkCluster func(string) bool) (string, bool) {
-	queue, counter := func() ([]clusterInfo, *uint64) {
-		m.RLock()
-		defer m.RUnlock()
-
-		si, ok := m.svcMap[keyFunc(namespace, name)]
-		if !ok {
-			return nil, nil
-		}
-
-		return si.clustersQueue, &si.rrCount
-	}()
+func (m *Map) selectIP(si *serviceInfo, checkCluster func(string) bool) (string, bool) {
+	queue, counter := si.clustersQueue, &si.rrCount
 
 	if queue == nil {
 		return "", false
@@ -66,6 +59,37 @@ func (m *Map) SelectIP(namespace, name string, checkCluster func(string) bool) (
 	return "", true
 }
 
+func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]string, bool) {
+	var svcInfo *serviceInfo
+	var ok bool
+
+	serviceIps := make([]string, 0)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	if svcInfo, ok = m.svcMap[keyFunc(namespace, name)]; !ok {
+		return nil, false
+	}
+
+	if !svcInfo.isHeadless {
+		ip, found := m.selectIP(svcInfo, checkCluster)
+		if ip != "" {
+			serviceIps = append(serviceIps, ip)
+		}
+
+		return serviceIps, found
+	}
+
+	for cluster, ips := range svcInfo.clusterIPs {
+		if checkCluster(cluster) && len(ips) > 0 {
+			serviceIps = append(serviceIps, ips...)
+		}
+	}
+
+	return serviceIps, true
+}
+
 func NewMap() *Map {
 	return &Map{
 		svcMap: make(map[string]*serviceInfo),
@@ -81,19 +105,23 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 		defer m.Unlock()
 
 		remoteService, ok := m.svcMap[key]
+
 		if !ok {
 			remoteService = &serviceInfo{
 				key:        key,
-				clusterIPs: make(map[string]string),
+				clusterIPs: make(map[string][]string),
 				rrCount:    0,
+				isHeadless: serviceImport.Spec.Type == lighthousev2a1.Headless,
 			}
 		}
 
 		for _, info := range serviceImport.Status.Clusters {
-			remoteService.clusterIPs[info.Cluster] = info.IPs[0]
+			remoteService.clusterIPs[info.Cluster] = info.IPs
 		}
 
-		remoteService.buildClusterInfoQueue()
+		if serviceImport.Spec.Type == lighthousev2a1.SuperclusterIP {
+			remoteService.buildClusterInfoQueue()
+		}
 
 		m.svcMap[key] = remoteService
 	}
@@ -118,7 +146,7 @@ func (m *Map) Remove(serviceImport *lighthousev2a1.ServiceImport) {
 
 		if len(remoteService.clusterIPs) == 0 {
 			delete(m.svcMap, key)
-		} else {
+		} else if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()
 		}
 	}

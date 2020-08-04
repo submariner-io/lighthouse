@@ -31,6 +31,7 @@ type Controller struct {
 	stopCh           chan struct{}
 	clusterStatusMap atomic.Value
 	gatewayAvailable bool
+	localCluster     string
 }
 
 func NewController() *Controller {
@@ -137,6 +138,10 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
+	if c.localCluster == "" {
+		c.localCluster, _ = getLocalClusterId(obj)
+	}
+
 	haStatus, connections, ok := getGatewayStatus(obj)
 	if !ok || haStatus != "active" {
 		return
@@ -207,12 +212,34 @@ func getGatewayStatus(obj *unstructured.Unstructured) (haStatus string, connecti
 	return haStatus, connections, true
 }
 
+func getLocalClusterId(obj *unstructured.Unstructured) (clusterId string, found bool) {
+	status, found, err := unstructured.NestedMap(obj.Object, "status")
+	if !found || err != nil {
+		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
+		return "", false
+	}
+
+	localEndpoint, found, err := unstructured.NestedMap(status, "localEndpoint")
+	if !found || err != nil {
+		klog.Errorf("localEndpoint field not found in %#v, err was: %v", status, err)
+		return "", false
+	}
+
+	clusterId, found, err = unstructured.NestedString(localEndpoint, "cluster_id")
+	if !found || err != nil {
+		klog.Errorf("cluster_id field not found in %#v, err was: %v", localEndpoint, err)
+		return "", false
+	}
+
+	return clusterId, true
+}
+
 func (c *Controller) getClusterStatusMap() map[string]bool {
 	return c.clusterStatusMap.Load().(map[string]bool)
 }
 
 func (c *Controller) IsConnected(clusterId string) bool {
-	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterId]
+	return !c.gatewayAvailable || c.localCluster == clusterId || c.getClusterStatusMap()[clusterId]
 }
 
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {

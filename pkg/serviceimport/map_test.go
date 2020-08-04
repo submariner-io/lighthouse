@@ -33,9 +33,12 @@ var _ = Describe("ServiceImport map", func() {
 	}
 
 	selectIP := func(ns, name string) string {
-		ip, found := serviceImportMap.SelectIP(ns, name, checkCluster)
+		ip, found := serviceImportMap.GetIPs(ns, name, checkCluster)
 		Expect(found).To(BeTrue())
-		return ip
+		if len(ip) == 0 {
+			return ""
+		}
+		return ip[0]
 	}
 
 	When("a service is present in one connected cluster", func() {
@@ -141,7 +144,7 @@ var _ = Describe("ServiceImport map", func() {
 
 	When("a service does not exist", func() {
 		It("should return not found", func() {
-			_, found := serviceImportMap.SelectIP(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
 			Expect(found).To(BeFalse())
 		})
 	})
@@ -163,7 +166,7 @@ var _ = Describe("ServiceImport map", func() {
 			Expect(selectIP(namespace1, service1)).To(Equal(serviceIP1))
 
 			serviceImportMap.Remove(si)
-			_, found := serviceImportMap.SelectIP(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
 			Expect(found).To(BeFalse())
 
 			// Should be a no-op
