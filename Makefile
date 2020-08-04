@@ -1,5 +1,3 @@
-coredns ?= 1.5.2
-
 ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
