@@ -107,7 +107,7 @@ func (in *ServiceExportCondition) DeepCopy() *ServiceExportCondition {
 func (in *ServiceExportList) DeepCopyInto(out *ServiceExportList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ServiceExport, len(*in))
@@ -191,7 +191,7 @@ func (in *ServiceImport) DeepCopyObject() runtime.Object {
 func (in *ServiceImportList) DeepCopyInto(out *ServiceImportList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ServiceImport, len(*in))
