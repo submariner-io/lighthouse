@@ -83,6 +83,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 			lh.Zones = make([]string, len(c.ServerBlockKeys))
 			copy(lh.Zones, c.ServerBlockKeys)
 		}
+
 		for i, str := range lh.Zones {
 			lh.Zones[i] = plugin.Host(str).Normalize()
 		}

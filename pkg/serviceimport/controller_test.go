@@ -149,6 +149,7 @@ func validateIpList(first, second *lighthousev2a1.ServiceImport, ipList []string
 	ips := []string{firstClusterInfo.IPs[0], secondClusterInfo.IPs[0]}
 	sort.Strings(ips)
 	sort.Strings(ipList)
+
 	return reflect.DeepEqual(ipList, ips)
 }
 
