@@ -16,6 +16,7 @@ type Controller struct {
 	serviceExportSyncer *broker.Syncer
 	serviceSyncer       syncer.Interface
 	endpointSyncer      syncer.Interface
+	siController        *ServiceImportController
 }
 
 type AgentSpecification struct {

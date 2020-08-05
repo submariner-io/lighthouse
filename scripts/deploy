@@ -18,8 +18,8 @@ function update_coredns_configmap() {
         sed -i -e "/Corefile:/r /tmp/coredns-cm-${CLUSTER_IP}.yaml" /tmp/coremap-${cluster}.yaml
         kubectl -n kube-system replace -f /tmp/coremap-${cluster}.yaml
         kubectl -n kube-system describe cm coredns
-    else 
-        run_subm_clusters install_service_import
+    else
+        kubectl apply -f scripts/resources/cluster-role.yaml
     fi 
 }
 
