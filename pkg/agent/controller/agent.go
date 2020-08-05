@@ -63,7 +63,12 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 		return nil, fmt.Errorf("error creating dynamic client: %v", err)
 	}
 
-	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, lighthouseClient, nil,
+	siController, err := NewController(spec, kubeClientSet, lighthouseClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, lighthouseClient, siController, nil,
 		func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncer(*config)
 		})
@@ -71,8 +76,8 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 
 // Constructor that takes additional detail. This is intended for unit tests.
 func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, restMapper meta.RESTMapper, localClient dynamic.Interface,
-	kubeClientSet kubernetes.Interface, lighthouseClient lighthouseClientset.Interface, scheme *runtime.Scheme,
-	newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
+	kubeClientSet kubernetes.Interface, lighthouseClient lighthouseClientset.Interface, sicontroller *ServiceImportController,
+	scheme *runtime.Scheme, newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
@@ -118,6 +123,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	agentController.endpointSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Endpoint events",
 		SourceClient:        localClient,
@@ -134,6 +140,9 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 	if err != nil {
 		return nil, err
 	}
+=======
+	agentController.siController = sicontroller
+>>>>>>> 4115acb... Create EnpointSlices
 
 	return agentController, nil
 }
@@ -155,7 +164,11 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
+<<<<<<< HEAD
 	if err := a.endpointSyncer.Start(stopCh); err != nil {
+=======
+	if err := a.siController.Start(stopCh); err != nil {
+>>>>>>> 4115acb... Create EnpointSlices
 		return err
 	}
 
@@ -219,8 +232,20 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		return nil, true
 	}
 
+	var importType lighthousev2a1.ServiceImportType
+
+	if svc.Spec.ClusterIP == "None" {
+		importType = lighthousev2a1.Headless
+	} else {
+		importType = lighthousev2a1.SuperclusterIP
+	}
+
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
+<<<<<<< HEAD
 		Type: svcType,
+=======
+		Type: importType,
+>>>>>>> 4115acb... Create EnpointSlices
 	}
 
 	ips, err := a.getIPsForService(svc, svcType)
@@ -273,7 +298,7 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*lighthousev2a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[originName], serviceImport.GetAnnotations()[originNamespace],
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[OriginName], serviceImport.GetAnnotations()[OriginNamespace],
 		lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
 		"", "Service was successfully synced to the broker")
 }
@@ -427,8 +452,8 @@ func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace),
 			Annotations: map[string]string{
-				originName:      svcExport.Name,
-				originNamespace: svcExport.Namespace,
+				OriginName:      svcExport.Name,
+				OriginNamespace: svcExport.Namespace,
 			},
 			Labels: map[string]string{
 				labelSourceName:      svcExport.Name,
