@@ -10,8 +10,8 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
-	github.com/submariner-io/admiral v0.6.0-pre1
-	github.com/submariner-io/shipyard v0.5.0
+	github.com/submariner-io/admiral v0.6.0-pre2
+	github.com/submariner-io/shipyard v0.5.1-0.20200727153411-5c0d49acd978
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v11.0.0+incompatible
