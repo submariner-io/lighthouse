@@ -36,13 +36,7 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) selectIP(si *serviceInfo, checkCluster func(string) bool) (string, bool) {
-	queue, counter := si.clustersQueue, &si.rrCount
-
-	if queue == nil {
-		return "", false
-	}
-
+func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(string) bool) string {
 	queueLength := len(queue)
 	for i := 0; i < queueLength; i++ {
 		c := atomic.LoadUint64(counter)
@@ -52,36 +46,41 @@ func (m *Map) selectIP(si *serviceInfo, checkCluster func(string) bool) (string,
 		atomic.AddUint64(counter, 1)
 
 		if checkCluster(info.name) {
-			return info.ip, true
+			return info.ip
 		}
 	}
 
-	return "", true
+	return ""
 }
 
 func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]string, bool) {
-	var svcInfo *serviceInfo
-	var ok bool
-
 	serviceIps := make([]string, 0)
+	clusterIPs, queue, counter, isHeadless := func() (map[string][]string, []clusterInfo, *uint64, bool) {
+		m.RLock()
+		defer m.RUnlock()
 
-	m.RLock()
-	defer m.RUnlock()
+		si, ok := m.svcMap[keyFunc(namespace, name)]
+		if !ok {
+			return nil, nil, nil, false
+		}
 
-	if svcInfo, ok = m.svcMap[keyFunc(namespace, name)]; !ok {
+		return si.clusterIPs, si.clustersQueue, &si.rrCount, si.isHeadless
+	}()
+
+	if clusterIPs == nil {
 		return nil, false
 	}
 
-	if !svcInfo.isHeadless {
-		ip, found := m.selectIP(svcInfo, checkCluster)
+	if !isHeadless {
+		ip := m.selectIP(queue, counter, checkCluster)
 		if ip != "" {
 			serviceIps = append(serviceIps, ip)
 		}
 
-		return serviceIps, found
+		return serviceIps, true
 	}
 
-	for cluster, ips := range svcInfo.clusterIPs {
+	for cluster, ips := range clusterIPs {
 		if checkCluster(cluster) && len(ips) > 0 {
 			serviceIps = append(serviceIps, ips...)
 		}

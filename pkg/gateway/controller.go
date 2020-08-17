@@ -31,7 +31,6 @@ type Controller struct {
 	stopCh           chan struct{}
 	clusterStatusMap atomic.Value
 	gatewayAvailable bool
-	localCluster     string
 }
 
 func NewController() *Controller {
@@ -138,12 +137,8 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
-	if c.localCluster == "" {
-		c.localCluster, _ = getLocalClusterId(obj)
-	}
-
-	haStatus, connections, ok := getGatewayStatus(obj)
-	if !ok || haStatus != "active" {
+	connections, ok := getGatewayStatus(obj)
+	if !ok {
 		return
 	}
 	var newMap map[string]bool
@@ -160,7 +155,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 
 		clusterId, found, err := unstructured.NestedString(connectionMap, "endpoint", "cluster_id")
 		if !found || err != nil {
-			klog.Errorf("clusterId field not found in %#v", connectionMap)
+			klog.Errorf("cluster_id field not found in %#v", connectionMap)
 			return
 		}
 
@@ -190,48 +185,44 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 	}
 }
 
-func getGatewayStatus(obj *unstructured.Unstructured) (haStatus string, connections []interface{}, gwStatus bool) {
+func getGatewayStatus(obj *unstructured.Unstructured) (connections []interface{}, gwStatus bool) {
 	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
 		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
-		return "", nil, false
+		return nil, false
 	}
 
-	haStatus, found, err = unstructured.NestedString(status, "haStatus")
+	localClusterId, found, err := unstructured.NestedString(status, "localEndpoint", "cluster_id")
+
+	if !found || err != nil {
+		klog.Errorf("localEndpoint->cluster_id not found in %#v, err was: %v", status, err)
+	} else {
+		connections = append(connections, map[string]interface{}{
+			"status": "connected",
+			"endpoint": map[string]interface{}{
+				"cluster_id": localClusterId,
+			},
+		})
+	}
+
+	haStatus, found, err := unstructured.NestedString(status, "haStatus")
+
 	if !found || err != nil {
 		klog.Errorf("haStatus field not found in %#v, err was: %v", status, err)
-		return "", nil, false
+		return connections, true
 	}
 
-	connections, found, err = unstructured.NestedSlice(status, "connections")
-	if !found || err != nil {
-		klog.Errorf("connections field not found in %#v, err was: %v", status, err)
-		return haStatus, nil, false
+	if haStatus == "active" {
+		rconns, found, err := unstructured.NestedSlice(status, "connections")
+		if !found || err != nil {
+			klog.Errorf("connections field not found in %#v, err was: %v", status, err)
+			return connections, false
+		}
+
+		connections = append(connections, rconns...)
 	}
 
-	return haStatus, connections, true
-}
-
-func getLocalClusterId(obj *unstructured.Unstructured) (clusterId string, found bool) {
-	status, found, err := unstructured.NestedMap(obj.Object, "status")
-	if !found || err != nil {
-		klog.Errorf("status field not found in %#v, err was: %v", obj, err)
-		return "", false
-	}
-
-	localEndpoint, found, err := unstructured.NestedMap(status, "localEndpoint")
-	if !found || err != nil {
-		klog.Errorf("localEndpoint field not found in %#v, err was: %v", status, err)
-		return "", false
-	}
-
-	clusterId, found, err = unstructured.NestedString(localEndpoint, "cluster_id")
-	if !found || err != nil {
-		klog.Errorf("cluster_id field not found in %#v, err was: %v", localEndpoint, err)
-		return "", false
-	}
-
-	return clusterId, true
+	return connections, true
 }
 
 func (c *Controller) getClusterStatusMap() map[string]bool {
@@ -239,7 +230,7 @@ func (c *Controller) getClusterStatusMap() map[string]bool {
 }
 
 func (c *Controller) IsConnected(clusterId string) bool {
-	return !c.gatewayAvailable || c.localCluster == clusterId || c.getClusterStatusMap()[clusterId]
+	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterId]
 }
 
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
