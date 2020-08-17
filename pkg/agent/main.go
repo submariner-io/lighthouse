@@ -53,13 +53,21 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 	lightHouseAgent, err := controller.New(&agentSpec, cfg)
-
 	if err != nil {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
 
+	esController, err := controller.NewServiceImportController(&agentSpec, cfg)
+	if err != nil {
+		klog.Fatalf("Failed to create endpointSlice controller: %v", err)
+	}
+
 	if err := lightHouseAgent.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
+	}
+
+	if err := esController.Start(stopCh); err != nil {
+		klog.Fatalf("Failed to start endpointSlice controller: %v", err)
 	}
 
 	<-stopCh
