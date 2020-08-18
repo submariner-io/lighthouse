@@ -54,7 +54,6 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(s
 }
 
 func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]string, bool) {
-	serviceIps := make([]string, 0)
 	clusterIPs, queue, counter, isHeadless := func() (map[string][]string, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
@@ -74,19 +73,21 @@ func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]
 	if !isHeadless {
 		ip := m.selectIP(queue, counter, checkCluster)
 		if ip != "" {
-			serviceIps = append(serviceIps, ip)
+			return []string{ip}, true
 		}
 
-		return serviceIps, true
+		return []string{}, true
 	}
+
+	serviceIPs := make([]string, 0)
 
 	for cluster, ips := range clusterIPs {
-		if checkCluster(cluster) && len(ips) > 0 {
-			serviceIps = append(serviceIps, ips...)
+		if checkCluster(cluster) {
+			serviceIPs = append(serviceIPs, ips...)
 		}
 	}
 
-	return serviceIps, true
+	return serviceIPs, true
 }
 
 func NewMap() *Map {
@@ -118,7 +119,7 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 			remoteService.clusterIPs[info.Cluster] = info.IPs
 		}
 
-		if serviceImport.Spec.Type == lighthousev2a1.SuperclusterIP {
+		if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()
 		}
 
