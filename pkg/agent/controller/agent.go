@@ -11,9 +11,11 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
@@ -26,8 +28,13 @@ import (
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 	serviceUnavailable     = "ServiceUnavailable"
+	invalidServiceType     = "UnsupportedServiceType"
+	clusterIP              = "cluster-ip"
 	originName             = "origin-name"
 	originNamespace        = "origin-namespace"
+	labelSourceName        = "lighthouse.submariner.io/sourceName"
+	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
+	labelSourceCluster     = "lighthouse.submariner.io/sourceCluster"
 )
 
 var MaxExportStatusConditions = 10
@@ -67,17 +74,19 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 	newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
+		namespace:        spec.Namespace,
 		globalnetEnabled: spec.GlobalnetEnabled,
 		kubeClientSet:    kubeClientSet,
 		lighthouseClient: lighthouseClient,
 	}
 
 	svcExportResourceConfig := broker.ResourceConfig{
-		LocalSourceNamespace:  metav1.NamespaceAll,
-		LocalResourceType:     &lighthousev2a1.ServiceExport{},
-		LocalTransform:        agentController.serviceExportToRemoteServiceImport,
-		LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
-		BrokerResourceType:    &lighthousev2a1.ServiceImport{},
+		LocalSourceNamespace:      metav1.NamespaceAll,
+		LocalResourceType:         &lighthousev2a1.ServiceExport{},
+		LocalTransform:            agentController.serviceExportToRemoteServiceImport,
+		LocalOnSuccessfulSync:     agentController.onSuccessfulServiceImportSync,
+		BrokerResourceType:        &lighthousev2a1.ServiceImport{},
+		BrokerResourcesEquivalent: agentController.serviceImportEquivalent,
 	}
 
 	syncerConf.Scheme = scheme
@@ -108,6 +117,23 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
+	agentController.endpointSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:                "Endpoint events",
+		SourceClient:        localClient,
+		SourceNamespace:     metav1.NamespaceAll,
+		Direction:           syncer.LocalToRemote,
+		RestMapper:          restMapper,
+		Federator:           agentController.serviceExportSyncer.GetBrokerFederator(),
+		ResourceType:        &corev1.Endpoints{},
+		Transform:           agentController.endpointToRemoteServiceImport,
+		ResourcesEquivalent: agentController.endpointEquivalent,
+		Scheme:              scheme,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return agentController, nil
 }
 
@@ -128,12 +154,20 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	if err := a.endpointSyncer.Start(stopCh); err != nil {
+		return err
+	}
+
 	klog.Info("Lighthouse agent syncer started")
 
 	return nil
 }
 
 func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	if op == syncer.Update {
+		return nil, false
+	}
+
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
 	serviceImport := a.newServiceImport(svcExport)
 
@@ -156,6 +190,24 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		return nil, true
 	}
 
+	svcType, ok := getServiceImportType(svc)
+
+	if !ok {
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse, invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
+		klog.Errorf("Service type %q not supported", svc.Spec.Type)
+
+		return nil, false
+	}
+
+	if a.globalnetEnabled && svcType == lighthousev2a1.Headless {
+		klog.Infof("Headless Services not supported with globalnet yet")
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionFalse, invalidServiceType, "Headless Services not supported with Globalnet IP")
+
+		return nil, false
+	}
+
 	if a.globalnetEnabled && getGlobalIpFromService(svc) == "" {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
@@ -167,18 +219,48 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
-		Type: lighthousev2a1.SuperclusterIP,
+		Type: svcType,
 	}
+
+	ips := a.getIPsForService(svc, svcType)
+
+	if ips == nil {
+		// Failed to get ips for some reason, requeue
+		return nil, true
+	}
+
 	serviceImport.Status = lighthousev2a1.ServiceImportStatus{
 		Clusters: []lighthousev2a1.ClusterStatus{
-			a.newClusterStatus(svc, a.clusterID),
+			{
+				Cluster: a.clusterID,
+				IPs:     ips,
+			},
 		},
+	}
+
+	if svcType == lighthousev2a1.SuperclusterIP {
+		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
+		cleared out when here's no backing Endpoint pods.
+		*/
+		serviceImport.Annotations[clusterIP] = serviceImport.Status.Clusters[0].IPs[0]
 	}
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 		corev1.ConditionTrue, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
 
 	return serviceImport, false
+}
+
+func getServiceImportType(service *corev1.Service) (lighthousev2a1.ServiceImportType, bool) {
+	if service.Spec.Type != "" && service.Spec.Type != corev1.ServiceTypeClusterIP {
+		return "", false
+	}
+
+	if service.Spec.ClusterIP == corev1.ClusterIPNone {
+		return lighthousev2a1.Headless, true
+	}
+
+	return lighthousev2a1.SuperclusterIP, true
 }
 
 func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
@@ -215,6 +297,65 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	// Update the status and requeue
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 		corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
+
+	return serviceImport, false
+}
+
+func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	ep := obj.(*corev1.Endpoints)
+	svcExport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(ep.Namespace).Get(ep.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		// Service Export not created yet
+		return nil, false
+	} else if err != nil {
+		// some other error. Log and requeue
+		klog.Errorf("Unable to get ServiceExport for %#v: %v", ep, err)
+		return nil, true
+	}
+
+	serviceImport, err := a.getServiceImport(svcExport)
+
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			klog.Errorf("Unable to get ServiceImport for %#v: %v", ep, err)
+		}
+
+		// Requeue
+		return nil, true
+	}
+
+	if serviceImport.Spec.Type == lighthousev2a1.Headless && a.globalnetEnabled {
+		return nil, false
+	}
+
+	ipList := getIPsFromEndpoint(ep)
+
+	if serviceImport.Spec.Type == lighthousev2a1.SuperclusterIP && len(ipList) > 0 {
+		/*
+			When there's no healthy pods, the IPs in the Endpoint will become empty and
+			thus we also clear the ServiceImport IPs to avoid clients sending a request
+			to a cluster which has no active pods to handle the request.
+
+			Once at least one backing Endpoint pod becomes healthy, we need to re-establish
+			the ServiceImport IPs from the previously cached clusterIP annotation.
+		*/
+		ipList = []string{serviceImport.Annotations[clusterIP]}
+	}
+
+	oldStatus := serviceImport.Status.DeepCopy()
+
+	serviceImport.Status = lighthousev2a1.ServiceImportStatus{
+		Clusters: []lighthousev2a1.ClusterStatus{
+			{
+				Cluster: a.clusterID,
+				IPs:     ipList,
+			},
+		},
+	}
+	if reflect.DeepEqual(oldStatus, serviceImport.Status) {
+		klog.V(log.DEBUG).Infof("Old and new cluster status are same")
+		return nil, false
+	}
 
 	return serviceImport, false
 }
@@ -263,33 +404,88 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 	}
 }
 
+func (a *Controller) serviceImportEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+	return syncer.DefaultResourcesEquivalent(obj1, obj2) &&
+		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "status"), util.GetNestedField(obj2, "status"))
+}
+
+func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "subsets"),
+		util.GetNestedField(obj2, "subsets"))
+}
+
 func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {
 	return c1.Type == c2.Type && c1.Status == c2.Status && reflect.DeepEqual(c1.Reason, c2.Reason) &&
 		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
-func (a *Controller) newClusterStatus(service *corev1.Service, clusterID string) lighthousev2a1.ClusterStatus {
-	mcsIp := getGlobalIpFromService(service)
-	if mcsIp == "" {
-		mcsIp = service.Spec.ClusterIP
-	}
-
-	return lighthousev2a1.ClusterStatus{
-		Cluster: clusterID,
-		IPs:     []string{mcsIp},
-	}
-}
-
 func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *lighthousev2a1.ServiceImport {
 	return &lighthousev2a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: svcExport.Name + "-" + svcExport.Namespace + "-" + a.clusterID,
+			Name: a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace),
 			Annotations: map[string]string{
 				originName:      svcExport.Name,
 				originNamespace: svcExport.Namespace,
 			},
+			Labels: map[string]string{
+				labelSourceName:      svcExport.Name,
+				labelSourceNamespace: svcExport.Namespace,
+				labelSourceCluster:   a.clusterID,
+			},
 		},
 	}
+}
+
+func (a *Controller) getServiceImport(svcExport *lighthousev2a1.ServiceExport) (*lighthousev2a1.ServiceImport, error) {
+	siName := a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace)
+	serviceImport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceImports(a.namespace).Get(siName, metav1.GetOptions{})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return serviceImport, nil
+}
+
+func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) []string {
+	if siType == lighthousev2a1.SuperclusterIP {
+		mcsIp := getGlobalIpFromService(service)
+		if mcsIp == "" {
+			mcsIp = service.Spec.ClusterIP
+		}
+
+		return []string{mcsIp}
+	}
+
+	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			klog.Errorf("Error obtaining Endpoint for Service  (%s/%s): %v", service.Namespace, service.Name, err)
+			return nil
+		}
+
+		return make([]string, 0)
+	}
+
+	return getIPsFromEndpoint(endpoint)
+}
+
+func (a *Controller) getObjectNameWithClusterId(name, namespace string) string {
+	return name + "-" + namespace + "-" + a.clusterID
+}
+
+func getIPsFromEndpoint(endpoint *corev1.Endpoints) []string {
+	ipList := make([]string, 0)
+
+	for _, eps := range endpoint.Subsets {
+		for _, addr := range eps.Addresses {
+			ipList = append(ipList, addr.IP)
+		}
+	}
+
+	klog.V(log.DEBUG).Infof("IPList %v for endpoint (%s/%s)", ipList, endpoint.Namespace, endpoint.Name)
+
+	return ipList
 }
 
 func getGlobalIpFromService(service *corev1.Service) string {

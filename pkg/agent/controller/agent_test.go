@@ -202,7 +202,8 @@ func newTestDiver() *testDriver {
 			},
 		}
 
-		t.restMapper = test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{}, &corev1.Service{})
+		t.restMapper = test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{},
+			&corev1.Service{}, &corev1.Endpoints{})
 
 		t.localDynClient = fake.NewDynamicClient()
 		t.brokerDynClient = fake.NewDynamicClient()
@@ -278,7 +279,7 @@ func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
 }
 
 func (t *testDriver) awaitServiceImport(client dynamic.ResourceInterface, serviceIP string) {
-	obj := test.WaitForResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID)
+	obj := test.AwaitResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID)
 
 	serviceImport := &lighthousev2a1.ServiceImport{}
 	Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
@@ -294,7 +295,7 @@ func (t *testDriver) awaitServiceImport(client dynamic.ResourceInterface, servic
 }
 
 func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
-	test.WaitForNoResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID)
+	test.AwaitNoResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID)
 }
 
 func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthousev2a1.ServiceExportCondition) {

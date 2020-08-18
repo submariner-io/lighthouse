@@ -15,7 +15,6 @@ import (
 
 var _ = Describe("ServiceImport controller", func() {
 	Describe("ServiceImport lifecycle notifications", testLifecycleNotifications)
-
 })
 
 func testLifecycleNotifications() {
@@ -87,7 +86,7 @@ func testLifecycleNotifications() {
 		Expect(deleteService(serviceImport)).To(Succeed())
 
 		Eventually(func() bool {
-			_, ok := controller.serviceImports.SelectIP(serviceImport.Namespace, serviceImport.Name, mockCs.IsConnected)
+			_, ok := controller.serviceImports.GetIPs(serviceImport.Namespace, serviceImport.Name, mockCs.IsConnected)
 			return ok
 		}).Should(BeFalse())
 	}
@@ -126,12 +125,12 @@ func testLifecycleNotifications() {
 }
 
 func verifyCachedServiceImport(controller *Controller, expected *lighthousev2a1.ServiceImport, m *MockClusterStatus) {
-	Eventually(func() string {
+	Eventually(func() []string {
 		name := expected.Annotations["origin-name"]
 		namespace := expected.Annotations["origin-namespace"]
-		selectedIp, _ := controller.serviceImports.SelectIP(namespace, name, m.IsConnected)
+		selectedIp, _ := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
 		return selectedIp
-	}).Should(Equal(expected.Status.Clusters[0].IPs[0]))
+	}).Should(Equal(expected.Status.Clusters[0].IPs))
 }
 
 func verifyUpdatedCachedServiceImport(controller *Controller, first, second *lighthousev2a1.ServiceImport, m *MockClusterStatus) {
@@ -139,10 +138,10 @@ func verifyUpdatedCachedServiceImport(controller *Controller, first, second *lig
 	Eventually(func() bool {
 		name := first.Annotations["origin-name"]
 		namespace := first.Annotations["origin-namespace"]
-		selectedIp1, ok1 := controller.serviceImports.SelectIP(namespace, name, m.IsConnected)
-		selectedIp2, ok2 := controller.serviceImports.SelectIP(namespace, name, m.IsConnected)
+		selectedIp1, ok1 := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
+		selectedIp2, ok2 := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
 		if ok1 && ok2 {
-			return validateIpList(first, second, []string{selectedIp1, selectedIp2})
+			return validateIpList(first, second, []string{selectedIp1[0], selectedIp2[0]})
 		}
 		return false
 	}).Should(BeTrue())
@@ -179,6 +178,9 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 				"origin-name":      name,
 				"origin-namespace": namespace,
 			},
+		},
+		Spec: lighthousev2a1.ServiceImportSpec{
+			Type: lighthousev2a1.SuperclusterIP,
 		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{

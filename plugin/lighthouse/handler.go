@@ -49,33 +49,37 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	svcName := query[0]
 	namespace := query[1]
 
-	serviceIp, found := lh.serviceImports.SelectIP(namespace, svcName, lh.clusterStatus.IsConnected)
+	serviceIps, found := lh.serviceImports.GetIPs(namespace, svcName, lh.clusterStatus.IsConnected)
 	if !found {
 		// We couldn't find record for this service name
 		log.Debugf("No record found for service %q", qname)
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "IP not found")
-	}
-
-	if serviceIp == "" {
-		log.Debugf("Couldn't find a connected cluster for %q", qname)
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeServerFailure, "No connection to service clusters")
+		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "service not found")
 	}
 
 	if state.QType() == dns.TypeAAAA {
 		log.Debugf("Returning empty response for TypeAAAA query")
-		return lh.emptyIpv6Response(state)
+		return lh.emptyResponse(state)
 	}
 
-	rr := new(dns.A)
-	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}
-	rr.A = net.ParseIP(serviceIp).To4()
+	if len(serviceIps) == 0 {
+		log.Debugf("Couldn't find a connected cluster for %q", qname)
+		return lh.emptyResponse(state)
+	}
+
+	records := make([]dns.RR, 0)
+
+	for _, ip := range serviceIps {
+		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}, A: net.ParseIP(ip).To4()}
+		log.Debugf("rr is %v", record)
+		records = append(records, record)
+	}
 
 	a := new(dns.Msg)
 	a.SetReply(r)
 	a.Authoritative = true
-	a.Answer = []dns.RR{rr}
-
+	a.Answer = append(a.Answer, records...)
 	log.Debugf("Responding to query with '%s'", a.Answer)
+
 	wErr := w.WriteMsg(a)
 	if wErr != nil {
 		// Error writing reply msg
@@ -86,11 +90,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	return dns.RcodeSuccess, nil
 }
 
-func (lh *Lighthouse) emptyIpv6Response(state request.Request) (int, error) {
-	rr := new(dns.AAAA)
-	rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeAAAA, Class: state.QClass()}
-	rr.AAAA = net.IPv6unspecified
-
+func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
 	a := new(dns.Msg)
 	a.SetReply(state.Req)
 	a.Authoritative = true
