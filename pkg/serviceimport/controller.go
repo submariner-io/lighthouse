@@ -20,17 +20,17 @@ type Controller struct {
 	serviceInformer cache.SharedIndexInformer
 	queue           workqueue.RateLimitingInterface
 	stopCh          chan struct{}
-	serviceImports  *Map
+	store           Store
 }
 
-func NewController(remoteServiceMap *Map) *Controller {
+func NewController(serviceImportStore Store) *Controller {
 	return &Controller{
 		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		newClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return lighthouseClientset.NewForConfig(c)
 		},
-		serviceImports: remoteServiceMap,
-		stopCh:         make(chan struct{}),
+		store:  serviceImportStore,
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -117,7 +117,7 @@ func (c *Controller) runWorker() {
 func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}, key string) {
 	klog.V(log.DEBUG).Infof("In serviceImportCreatedOrUpdated for key %q, service: %#v, ", key, obj)
 
-	c.serviceImports.Put(obj.(*lighthousev2a1.ServiceImport))
+	c.store.Put(obj.(*lighthousev2a1.ServiceImport))
 }
 
 func (c *Controller) serviceImportDeleted(obj interface{}, key string) {
@@ -137,5 +137,5 @@ func (c *Controller) serviceImportDeleted(obj interface{}, key string) {
 		}
 	}
 
-	c.serviceImports.Remove(mcs)
+	c.store.Remove(mcs)
 }

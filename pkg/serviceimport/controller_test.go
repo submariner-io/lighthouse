@@ -1,9 +1,6 @@
 package serviceimport
 
 import (
-	"reflect"
-	"sort"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
@@ -31,21 +28,23 @@ func testLifecycleNotifications() {
 		serviceImport *lighthousev2a1.ServiceImport
 		controller    *Controller
 		fakeClientset lighthouseClientset.Interface
-		mockCs        *MockClusterStatus
+		store         *fakeStore
 	)
 
 	BeforeEach(func() {
-		mockCs = NewMockClusterStatus()
-		mockCs.clusterStatusMap[clusterID] = true
-		mockCs.clusterStatusMap[clusterID2] = true
+		store = &fakeStore{
+			put:    make(chan *lighthousev2a1.ServiceImport, 10),
+			remove: make(chan *lighthousev2a1.ServiceImport, 10),
+		}
+
 		serviceImport = newServiceImport(namespace1, service1, serviceIP, clusterID)
-		serviceImportMap := NewMap()
-		controller = NewController(serviceImportMap)
+		controller = NewController(store)
 		fakeClientset = fakeClientSet.NewSimpleClientset()
 
 		controller.newClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return fakeClientset, nil
 		}
+
 		Expect(controller.Start(&rest.Config{})).To(Succeed())
 	})
 
@@ -70,103 +69,53 @@ func testLifecycleNotifications() {
 
 	testOnAdd := func(serviceImport *lighthousev2a1.ServiceImport) {
 		Expect(createService(serviceImport)).To(Succeed())
-
-		verifyCachedServiceImport(controller, serviceImport, mockCs)
+		store.verifyPut(serviceImport)
 	}
 
 	testOnUpdate := func(serviceImport *lighthousev2a1.ServiceImport) {
 		Expect(updateService(serviceImport)).To(Succeed())
-
-		verifyCachedServiceImport(controller, serviceImport, mockCs)
+		store.verifyPut(serviceImport)
 	}
 
 	testOnRemove := func(serviceImport *lighthousev2a1.ServiceImport) {
 		testOnAdd(serviceImport)
 
 		Expect(deleteService(serviceImport)).To(Succeed())
-
-		Eventually(func() bool {
-			_, ok := controller.serviceImports.GetIPs(serviceImport.Namespace, serviceImport.Name, mockCs.IsConnected)
-			return ok
-		}).Should(BeFalse())
+		store.verifyRemove(serviceImport)
 	}
 
 	testOnDoubleAdd := func(first *lighthousev2a1.ServiceImport, second *lighthousev2a1.ServiceImport) {
 		Expect(createService(first)).To(Succeed())
 		Expect(createService(second)).To(Succeed())
 
-		verifyUpdatedCachedServiceImport(controller, first, second, mockCs)
+		store.verifyPut(first)
+		store.verifyPut(second)
 	}
 
 	When("a ServiceImport is added", func() {
-		It("it should be added to the ServiceImport map", func() {
+		It("it should be added to the ServiceImport store", func() {
 			testOnAdd(serviceImport)
 		})
 	})
 
 	When("a ServiceImport is updated", func() {
-		It("it should be updated in the ServiceImport map", func() {
+		It("it should be updated in the ServiceImport store", func() {
 			testOnAdd(serviceImport)
 			testOnUpdate(newServiceImport(namespace1, service1, serviceIP2, clusterID))
 		})
 	})
 
-	When("same ServiceImport is added in another cluster", func() {
-		It("it should be added to existing ServiceImport map", func() {
+	When("the same ServiceImport is added in another cluster", func() {
+		It("both should be added to the ServiceImport store", func() {
 			testOnDoubleAdd(serviceImport, newServiceImport(namespace1, service1, serviceIP2, clusterID2))
 		})
 	})
 
 	When("a ServiceImport is deleted", func() {
-		It("it should be removed to the ServiceImport map", func() {
+		It("it should be removed from the ServiceImport store", func() {
 			testOnRemove(serviceImport)
 		})
 	})
-}
-
-func verifyCachedServiceImport(controller *Controller, expected *lighthousev2a1.ServiceImport, m *MockClusterStatus) {
-	Eventually(func() []string {
-		name := expected.Annotations["origin-name"]
-		namespace := expected.Annotations["origin-namespace"]
-		selectedIp, _ := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
-		return selectedIp
-	}).Should(Equal(expected.Status.Clusters[0].IPs))
-}
-
-func verifyUpdatedCachedServiceImport(controller *Controller, first, second *lighthousev2a1.ServiceImport, m *MockClusterStatus) {
-	// We can't just compare first and second coz map iteration order is not fixed
-	Eventually(func() bool {
-		name := first.Annotations["origin-name"]
-		namespace := first.Annotations["origin-namespace"]
-		selectedIp1, ok1 := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
-		selectedIp2, ok2 := controller.serviceImports.GetIPs(namespace, name, m.IsConnected)
-		if ok1 && ok2 {
-			return validateIpList(first, second, []string{selectedIp1[0], selectedIp2[0]})
-		}
-		return false
-	}).Should(BeTrue())
-}
-
-func validateIpList(first, second *lighthousev2a1.ServiceImport, ipList []string) bool {
-	firstClusterInfo := first.Status.Clusters[0]
-	secondClusterInfo := second.Status.Clusters[0]
-	ips := []string{firstClusterInfo.IPs[0], secondClusterInfo.IPs[0]}
-	sort.Strings(ips)
-	sort.Strings(ipList)
-
-	return reflect.DeepEqual(ipList, ips)
-}
-
-type MockClusterStatus struct {
-	clusterStatusMap map[string]bool
-}
-
-func NewMockClusterStatus() *MockClusterStatus {
-	return &MockClusterStatus{clusterStatusMap: make(map[string]bool)}
-}
-
-func (m *MockClusterStatus) IsConnected(clusterId string) bool {
-	return m.clusterStatusMap[clusterId]
 }
 
 func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
@@ -191,4 +140,25 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 			},
 		},
 	}
+}
+
+type fakeStore struct {
+	put    chan *lighthousev2a1.ServiceImport
+	remove chan *lighthousev2a1.ServiceImport
+}
+
+func (f *fakeStore) Put(si *lighthousev2a1.ServiceImport) {
+	f.put <- si
+}
+
+func (f *fakeStore) Remove(si *lighthousev2a1.ServiceImport) {
+	f.remove <- si
+}
+
+func (f *fakeStore) verifyPut(expected *lighthousev2a1.ServiceImport) {
+	Eventually(f.put, 5).Should(Receive(Equal(expected)), "Put was not called")
+}
+
+func (f *fakeStore) verifyRemove(expected *lighthousev2a1.ServiceImport) {
+	Eventually(f.remove, 5).Should(Receive(Equal(expected)), "Remove was not called")
 }
