@@ -12,6 +12,7 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -85,10 +86,18 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		BrokerResourcesEquivalent: agentController.serviceImportEquivalent,
 	}
 
+	endpointSliceSyncer := broker.ResourceConfig{
+		LocalSourceNamespace:      metav1.NamespaceAll,
+		LocalResourceType:         &discovery.EndpointSlice{},
+		BrokerResourceType:        &discovery.EndpointSlice{},
+		BrokerResourcesEquivalent: agentController.endpointSliceEquivalent,
+	}
+
 	syncerConf.Scheme = scheme
 	syncerConf.LocalNamespace = spec.Namespace
 	syncerConf.ResourceConfigs = []broker.ResourceConfig{
 		svcExportResourceConfig,
+		endpointSliceSyncer,
 	}
 
 	var err error
@@ -411,6 +420,12 @@ func (a *Controller) serviceImportEquivalent(obj1, obj2 *unstructured.Unstructur
 func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
 	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "subsets"),
 		util.GetNestedField(obj2, "subsets"))
+}
+
+func (a *Controller) endpointSliceEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "endpoints"), util.GetNestedField(obj2, "endpoints")) &&
+		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "ports"), util.GetNestedField(obj2, "ports")) &&
+		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "addresstype"), util.GetNestedField(obj2, "addresstype"))
 }
 
 func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {

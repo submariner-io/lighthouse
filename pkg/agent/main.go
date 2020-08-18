@@ -62,12 +62,22 @@ func main() {
 		klog.Fatalf("Failed to create serviceimport controller: %v", err)
 	}
 
+	esController, err := controller.NewEndpointSliceController(&agentSpec, cfg)
+
+	if err != nil {
+		klog.Fatalf("Failed to create endpointSlice controller: %v", err)
+	}
+
 	if err := lightHouseAgent.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
 	}
 
 	if err := siController.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start serviceimport controller: %v", err)
+	}
+
+	if err := esController.Start(stopCh); err != nil {
+		klog.Fatalf("Failed to start endpointSlice controller: %v", err)
 	}
 
 	<-stopCh
