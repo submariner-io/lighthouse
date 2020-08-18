@@ -13,7 +13,7 @@ require (
 	github.com/submariner-io/admiral v0.6.0-pre4
 	github.com/submariner-io/shipyard v0.5.1-0.20200727153411-5c0d49acd978
 	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
+	k8s.io/apimachinery v0.18.8
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/controller-runtime v0.3.0
