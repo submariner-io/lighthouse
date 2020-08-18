@@ -18,6 +18,7 @@ import (
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeLighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -422,7 +423,7 @@ func newTestDiver() *testDriver {
 		}
 
 		t.restMapper = test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{},
-			&corev1.Service{}, &corev1.Endpoints{})
+			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{})
 
 		t.localDynClient = fake.NewDynamicClient()
 		t.brokerDynClient = fake.NewDynamicClient()
