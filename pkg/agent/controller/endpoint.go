@@ -20,7 +20,7 @@ import (
 )
 
 func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid types.UID, serviceImportName,
-	serviceImportNameSpace, clusterId string) (*EndpointController, error) {
+	serviceImportNameSpace, clusterId string) *EndpointController {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	endpointController := &EndpointController{
 		endPointqueue:                queue,
@@ -32,10 +32,10 @@ func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid 
 		stopCh:                       make(chan struct{}),
 	}
 
-	return endpointController, nil
+	return endpointController
 }
 
-func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Stringer) error {
+func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Stringer) {
 	e.store, e.endpointInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -93,8 +93,6 @@ func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Str
 
 	go e.endpointInformer.Run(e.stopCh)
 	go e.runEndpointWorker(e.endpointInformer, e.endPointqueue)
-
-	return nil
 }
 
 func (e *EndpointController) Stop() {

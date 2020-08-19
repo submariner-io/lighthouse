@@ -126,26 +126,34 @@ func (c *ServiceImportController) runServiceImportWorker() {
 				return
 			}
 
-			c.queue.Forget(key)
-
 			if exists {
-				c.serviceImportCreatedOrUpdated(obj, key)
+				err = c.serviceImportCreatedOrUpdated(obj, key)
 			} else {
-				c.serviceImportDeleted(key)
+				err = c.serviceImportDeleted(key)
+			}
+
+			if err != nil {
+				if !exists {
+					c.serviceImportDeletedMap.Store(key, obj)
+				}
+
+				c.queue.AddRateLimited(key)
+			} else {
+				c.queue.Forget(key)
 			}
 		}()
 	}
 }
 
-func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{}, key string) {
+func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{}, key string) error {
 	if _, found := c.endpointControllers.Load(key); found {
 		klog.V(log.DEBUG).Infof("The endpoint controller is already running fof %q", key)
-		return
+		return nil
 	}
 
 	serviceImportCreated := obj.(*lighthousev2a1.ServiceImport)
 	if serviceImportCreated.Spec.Type != lighthousev2a1.Headless {
-		return
+		return nil
 	}
 
 	annotations := serviceImportCreated.ObjectMeta.Annotations
@@ -156,43 +164,34 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	service, err := c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return
+			return nil
 		}
 
-		c.queue.AddRateLimited(key)
 		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, err)
 
-		return
+		return err
 	}
 
 	if service.Spec.Selector == nil {
 		klog.Errorf("The service %s/%s without a Selector is not supported", serviceNameSpace, serviceName)
-		return
+		return nil
 	}
 
 	labelSelector := labels.Set(service.Spec.Selector).AsSelector()
-	endpointController, err := NewEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
+	endpointController := NewEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
 		serviceImportCreated.ObjectMeta.Name, serviceNameSpace, c.clusterID)
 
-	if err != nil {
-		klog.Errorf("Error creating Endpoint controller for service %s/%s: %v", serviceNameSpace, serviceName, err)
-		return
-	}
-
-	err = endpointController.Start(endpointController.stopCh, labelSelector)
-	if err != nil {
-		klog.Errorf("Error starting Endpoint controller for service %s/%s: %v", serviceNameSpace, serviceName, err)
-		return
-	}
-
+	endpointController.Start(endpointController.stopCh, labelSelector)
 	c.endpointControllers.Store(key, endpointController)
+
+	return nil
 }
 
-func (c *ServiceImportController) serviceImportDeleted(key string) {
+func (c *ServiceImportController) serviceImportDeleted(key string) error {
 	obj, found := c.serviceImportDeletedMap.Load(key)
 	if !found {
 		klog.Warningf("No endpoint controller found  for %q", key)
-		return
+		return nil
 	}
 
 	c.serviceImportDeletedMap.Delete(key)
@@ -209,9 +208,8 @@ func (c *ServiceImportController) serviceImportDeleted(key string) {
 	err := c.kubeClientSet.DiscoveryV1beta1().EndpointSlices(si.Namespace).
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil && !errors.IsNotFound(err) {
-		c.serviceImportDeletedMap.Store(key, si)
-		c.queue.AddRateLimited(key)
-
-		return
+		return err
 	}
+
+	return nil
 }
