@@ -172,7 +172,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 
 	labelSelector := labels.Set(service.Spec.Selector).AsSelector()
 	endpointController, err := NewEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
-		serviceImportCreated.ObjectMeta.Name, c.clusterID)
+		serviceImportCreated.ObjectMeta.Name, serviceNameSpace, c.clusterID)
 
 	if err != nil {
 		klog.Errorf("Error creating Endpoint controller for service %s/%s: %v", serviceNameSpace, serviceName, err)
@@ -198,14 +198,14 @@ func (c *ServiceImportController) serviceImportDeleted(key string) {
 	c.serviceImportDeletedMap.Delete(key)
 
 	si := obj.(lighthousev2a1.ServiceImport)
-	matchLabels := si.ObjectMeta.Labels
-	labelSelector := labels.Set(map[string]string{"app": matchLabels["app"]}).AsSelector()
+
 	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*EndpointController)
 		endpointController.Stop()
 		c.endpointControllers.Delete(key)
 	}
 
+	labelSelector := labels.Set(map[string]string{labelSourceName: si.Name}).AsSelector()
 	err := c.kubeClientSet.DiscoveryV1beta1().EndpointSlices(si.Namespace).
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil && !errors.IsNotFound(err) {

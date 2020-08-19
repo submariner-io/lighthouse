@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -21,15 +20,16 @@ import (
 )
 
 func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid types.UID, serviceImportName,
-	clusterId string) (*EndpointController, error) {
+	serviceImportNameSpace, clusterId string) (*EndpointController, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	endpointController := &EndpointController{
-		endPointqueue:     queue,
-		serviceImportUID:  serviceImportuid,
-		serviceImportName: serviceImportName,
-		kubeClientSet:     kubeClientSet,
-		clusterID:         clusterId,
-		stopCh:            make(chan struct{}),
+		endPointqueue:                queue,
+		serviceImportUID:             serviceImportuid,
+		serviceImportName:            serviceImportName,
+		serviceImportSourceNameSpace: serviceImportNameSpace,
+		kubeClientSet:                kubeClientSet,
+		clusterID:                    clusterId,
+		stopCh:                       make(chan struct{}),
 	}
 
 	return endpointController, nil
@@ -184,10 +184,9 @@ func (e *EndpointController) endPointDeleted(key string) error {
 	e.endpointDeletedMap.Delete(key)
 
 	endPoints := obj.(corev1.Endpoints)
-	matchLabels := endPoints.ObjectMeta.Labels
-	labelSelector := labels.Set(map[string]string{"app": matchLabels["app"]}).AsSelector()
+	endpointSliceName := endPoints.Name + "-" + e.clusterID
 	err := e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).
-		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
+		Delete(endpointSliceName, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Errorf("Deleting EndpointSlice for endPoints %v from NameSpace %s failed due to %v", endPoints, endPoints.Namespace, err)
 		return err
@@ -200,9 +199,13 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	endpointSlice := &discovery.EndpointSlice{}
 	controllerFlag := false
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
-	endpointLabels := endpoints.ObjectMeta.Labels
-	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name,
-		"app": endpointLabels["app"]}
+	endpointSlice.Labels = map[string]string{
+		discovery.LabelServiceName: endpoints.Name,
+		labelSourceNamespace:       e.serviceImportSourceNameSpace,
+		labelSourceCluster:         e.clusterID,
+		labelSourceName:            e.serviceImportName,
+		labelManagedBy:             labelValueManagedBy,
+	}
 	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
 		APIVersion:         "lighthouse.submariner.io.v2alpha1",
 		Kind:               "ServiceImport",
