@@ -29,18 +29,18 @@ type AgentSpecification struct {
 	GlobalnetEnabled bool `split_words:"true"`
 }
 
-// The ServiceImportController listens for a service import created in the submariner-operator namespace
+// The ServiceImportController listens for ServiceImport resources created in the target namespace
 // and creates an EndpointController in response. The EndpointController will use the app label as filter
 // to listen only for the endpoints event related to ServiceImport created
 type ServiceImportController struct {
-	kubeClientSet             kubernetes.Interface
-	lighthouseClient          lighthouseClientset.Interface
-	serviceInformer           cache.SharedIndexInformer
-	queue                     workqueue.RateLimitingInterface
-	endpointControllerCreated sync.Map
-	endpointControllerDeleted sync.Map
-	clusterID                 string
-	lighthouseNamespace       string
+	kubeClientSet           kubernetes.Interface
+	lighthouseClient        lighthouseClientset.Interface
+	serviceInformer         cache.SharedIndexInformer
+	queue                   workqueue.RateLimitingInterface
+	endpointControllers     sync.Map
+	serviceImportDeletedMap sync.Map
+	clusterID               string
+	namespace               string
 }
 
 // Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
@@ -48,7 +48,8 @@ type ServiceImportController struct {
 // to ServiceImport. The app label from the endpoint will be added to endpoint slice as well.
 type EndpointController struct {
 	kubeClientSet      kubernetes.Interface
-	endpointInformer   cache.SharedIndexInformer
+	endpointInformer   cache.Controller
+	store              cache.Store
 	endPointqueue      workqueue.RateLimitingInterface
 	serviceImportUID   types.UID
 	clusterID          string
