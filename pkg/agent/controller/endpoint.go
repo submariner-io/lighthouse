@@ -36,7 +36,7 @@ func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid 
 }
 
 func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Stringer) error {
-	e.endpointInformer = cache.NewSharedIndexInformer(
+	e.store, e.endpointInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labelSelector.String()
@@ -49,49 +49,47 @@ func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Str
 		},
 		&corev1.Endpoints{},
 		0,
-		cache.Indexers{},
-	)
-
-	e.endpointInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.Infof("Endpoint %q added", key)
-			if err == nil {
-				e.endPointqueue.Add(key)
-			}
-		},
-		UpdateFunc: func(obj interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.Infof("Endpoint %q updated", key)
-			if err == nil {
-				e.endPointqueue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.Infof("Endpoint %q deleted", key)
-			if err == nil {
-				var endPoints *corev1.Endpoints
-				var ok bool
-				if endPoints, ok = obj.(*corev1.Endpoints); !ok {
-					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						klog.Errorf("Failed to get deleted endPoints object for key %s, serviceImport %v", key, endPoints)
-						return
-					}
-
-					endPoints, ok = tombstone.Obj.(*corev1.Endpoints)
-
-					if !ok {
-						klog.Errorf("Failed to convert deleted tombstone object %v  to endPoints", tombstone.Obj)
-						return
-					}
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				klog.Infof("Endpoint %q added", key)
+				if err == nil {
+					e.endPointqueue.Add(key)
 				}
-				e.endpointDeletedMap.Store(endPoints, key)
-				e.endPointqueue.Add(key)
-			}
+			},
+			UpdateFunc: func(obj interface{}, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				klog.Infof("Endpoint %q updated", key)
+				if err == nil {
+					e.endPointqueue.Add(key)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				klog.Infof("Endpoint %q deleted", key)
+				if err == nil {
+					var endPoints *corev1.Endpoints
+					var ok bool
+					if endPoints, ok = obj.(*corev1.Endpoints); !ok {
+						tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+						if !ok {
+							klog.Errorf("Failed to get deleted endPoints object for key %s, serviceImport %v", key, endPoints)
+							return
+						}
+
+						endPoints, ok = tombstone.Obj.(*corev1.Endpoints)
+
+						if !ok {
+							klog.Errorf("Failed to convert deleted tombstone object %v  to endPoints", tombstone.Obj)
+							return
+						}
+					}
+					e.endpointDeletedMap.Store(endPoints, key)
+					e.endPointqueue.Add(key)
+				}
+			},
 		},
-	})
+	)
 
 	go e.endpointInformer.Run(e.stopCh)
 	go e.runEndpointWorker(e.endpointInformer, e.endPointqueue)
@@ -99,7 +97,12 @@ func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Str
 	return nil
 }
 
-func (e *EndpointController) runEndpointWorker(informer cache.SharedIndexInformer, queue workqueue.RateLimitingInterface) {
+func (e *EndpointController) Stop() {
+	e.endPointqueue.ShutDown()
+	close(e.stopCh)
+}
+
+func (e *EndpointController) runEndpointWorker(informer cache.Controller, queue workqueue.RateLimitingInterface) {
 	for {
 		keyObj, shutdown := queue.Get()
 		if shutdown {
@@ -111,10 +114,10 @@ func (e *EndpointController) runEndpointWorker(informer cache.SharedIndexInforme
 
 		func() {
 			defer queue.Done(key)
-			obj, exists, err := informer.GetIndexer().GetByKey(key)
+			obj, exists, err := e.store.GetByKey(key)
 
 			if err != nil {
-				klog.Errorf("Error retrieving the object with store is  %v from the cache: %v", informer.GetIndexer().ListKeys(), err)
+				klog.Errorf("Error retrieving the object with key  %s from the cache: %v", key, err)
 				// requeue the item to work on later
 				queue.AddRateLimited(key)
 
@@ -124,11 +127,15 @@ func (e *EndpointController) runEndpointWorker(informer cache.SharedIndexInforme
 			if exists {
 				err = e.endPointCreatedOrUpdated(obj, key)
 			} else {
-				e.endPointDeleted(key)
+				err = e.endPointDeleted(key)
 			}
 
 			if err != nil {
+				if !exists {
+					e.endpointDeletedMap.Store(key, obj)
+				}
 
+				queue.AddRateLimited(key)
 			} else {
 				queue.Forget(key)
 			}
@@ -138,22 +145,21 @@ func (e *EndpointController) runEndpointWorker(informer cache.SharedIndexInforme
 
 func (e *EndpointController) endPointCreatedOrUpdated(obj interface{}, key string) error {
 	endPoints := obj.(*corev1.Endpoints)
-	endpointSliceName := endPoints.Name + "-" + e.clusterID
 	newEndPointSlice := e.endpointSliceFromEndpoints(endPoints)
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		currentEndpointSice, err := e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).
-			Get(endpointSliceName, metav1.GetOptions{})
+			Get(newEndPointSlice.Name, metav1.GetOptions{})
 
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		if currentEndpointSice != nil && currentEndpointSice.ObjectMeta.Name != "" {
-			if equality.Semantic.DeepEqual(currentEndpointSice, newEndPointSlice) {
+		if errors.IsNotFound(err) {
+			_, err = e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).Create(newEndPointSlice)
+		} else {
+			if endpointSliceEquivalent(currentEndpointSice, newEndPointSlice) {
 				return nil
 			}
 			_, err = e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).Update(newEndPointSlice)
-		} else {
-			_, err = e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).Create(newEndPointSlice)
 		}
 		if err != nil {
 			return err
@@ -161,18 +167,18 @@ func (e *EndpointController) endPointCreatedOrUpdated(obj interface{}, key strin
 		return nil
 	})
 	if retryErr != nil {
-		klog.Errorf("Creating EndpointSlice %s from NameSpace %s failed after retry %v", endpointSliceName, endPoints.Namespace,
+		klog.Errorf("Creating EndpointSlice %s from NameSpace %s failed after retry %v", newEndPointSlice.Name, endPoints.Namespace,
 			retryErr)
 	}
 
 	return retryErr
 }
 
-func (e *EndpointController) endPointDeleted(key string) {
+func (e *EndpointController) endPointDeleted(key string) error {
 	obj, found := e.endpointDeletedMap.Load(key)
 	if !found {
 		klog.Errorf("deleting endpointSlice for key %s failed since object not found", key)
-		return
+		return nil
 	}
 
 	e.endpointDeletedMap.Delete(key)
@@ -184,11 +190,10 @@ func (e *EndpointController) endPointDeleted(key string) {
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Errorf("Deleting EndpointSlice for endPoints %v from NameSpace %s failed due to %v", endPoints, endPoints.Namespace, err)
-		e.endpointDeletedMap.Store(key, endPoints)
-		e.endPointqueue.AddRateLimited(key)
-
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
@@ -270,4 +275,10 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 	}
 
 	return true
+}
+
+func endpointSliceEquivalent(obj1, obj2 *discovery.EndpointSlice) bool {
+	return equality.Semantic.DeepEqual(obj1.Endpoints, obj2.Endpoints) &&
+		equality.Semantic.DeepEqual(obj1.Ports, obj2.Ports) &&
+		equality.Semantic.DeepEqual(obj1.AddressType, obj2.AddressType)
 }

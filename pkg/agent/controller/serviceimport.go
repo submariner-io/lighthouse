@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 
+	"github.com/submariner-io/admiral/pkg/log"
+
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
@@ -13,7 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
@@ -30,11 +31,11 @@ func NewServiceImportController(spec *AgentSpecification, cfg *rest.Config) (*Se
 	}
 
 	serviceImportController := ServiceImportController{
-		queue:               workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		kubeClientSet:       kubeClientSet,
-		lighthouseClient:    lighthouseClient,
-		clusterID:           spec.ClusterID,
-		lighthouseNamespace: spec.Namespace,
+		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		kubeClientSet:    kubeClientSet,
+		lighthouseClient: lighthouseClient,
+		clusterID:        spec.ClusterID,
+		namespace:        spec.Namespace,
 	}
 
 	return &serviceImportController, nil
@@ -42,7 +43,7 @@ func NewServiceImportController(spec *AgentSpecification, cfg *rest.Config) (*Se
 
 func (c *ServiceImportController) Start(stopCh <-chan struct{}) error {
 	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(c.lighthouseClient, 0,
-		externalversions.WithNamespace(c.lighthouseNamespace))
+		externalversions.WithNamespace(c.namespace))
 	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
 
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -84,7 +85,7 @@ func (c *ServiceImportController) Start(stopCh <-chan struct{}) error {
 				if si.Spec.Type != lighthousev2a1.Headless {
 					return
 				}
-				c.endpointControllerDeleted.Store(si, key)
+				c.serviceImportDeletedMap.Store(key, si)
 				c.queue.AddRateLimited(key)
 			}
 		},
@@ -137,8 +138,8 @@ func (c *ServiceImportController) runServiceImportWorker() {
 }
 
 func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{}, key string) {
-	if _, found := c.endpointControllerCreated.Load(key); found {
-		klog.V(2).Infof("The endpointController is already running for  key %q", key)
+	if _, found := c.endpointControllers.Load(key); found {
+		klog.V(log.DEBUG).Infof("The endpoint controller is already running fof %q", key)
 		return
 	}
 
@@ -151,28 +152,21 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	serviceNameSpace := annotations[originNamespace]
 	serviceName := annotations[originName]
 	var service *corev1.Service
-	var isFound bool
 
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		service, err = c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				isFound = false
-			}
-			return err
+	service, err := c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return
 		}
-		isFound = true
-		return nil
-	})
 
-	if retryErr != nil || !isFound {
-		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, retryErr)
+		c.queue.AddRateLimited(key)
+		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, err)
+
 		return
 	}
 
 	if service.Spec.Selector == nil {
-		klog.Errorf("The service %q in the namespace %q without selector is not supported", serviceName, serviceNameSpace)
+		klog.Errorf("The service %s/%s without a Selector is not supported", serviceNameSpace, serviceName)
 		return
 	}
 
@@ -181,44 +175,43 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 		serviceImportCreated.ObjectMeta.Name, c.clusterID)
 
 	if err != nil {
-		klog.Errorf("Creating endpoint controller for service %q in the namespace %q failed", serviceName, serviceNameSpace)
+		klog.Errorf("Error creating Endpoint controller for service %s/%s: %v", serviceNameSpace, serviceName, err)
 		return
 	}
 
 	err = endpointController.Start(endpointController.stopCh, labelSelector)
 	if err != nil {
-		klog.Errorf("Starting endpoint controller for service %q in the namespace %q failed", serviceName, serviceNameSpace)
+		klog.Errorf("Error starting Endpoint controller for service %s/%s: %v", serviceNameSpace, serviceName, err)
 		return
 	}
 
-	c.endpointControllerCreated.Store(key, endpointController)
+	c.endpointControllers.Store(key, endpointController)
 }
 
 func (c *ServiceImportController) serviceImportDeleted(key string) {
-	obj, found := c.endpointControllerDeleted.Load(key)
+	obj, found := c.serviceImportDeletedMap.Load(key)
 	if !found {
-		klog.Errorf("deleting endpointSlice for key %s failed since object not found", key)
+		klog.Warningf("No endpoint controller found  for %q", key)
 		return
 	}
 
-	c.endpointControllerDeleted.Delete(key)
+	c.serviceImportDeletedMap.Delete(key)
 
 	si := obj.(lighthousev2a1.ServiceImport)
 	matchLabels := si.ObjectMeta.Labels
 	labelSelector := labels.Set(map[string]string{"app": matchLabels["app"]}).AsSelector()
+	if obj, found := c.endpointControllers.Load(key); found {
+		endpointController := obj.(*EndpointController)
+		endpointController.Stop()
+		c.endpointControllers.Delete(key)
+	}
+
 	err := c.kubeClientSet.DiscoveryV1beta1().EndpointSlices(si.Namespace).
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil && !errors.IsNotFound(err) {
-		c.endpointControllerDeleted.Store(key, si)
+		c.serviceImportDeletedMap.Store(key, si)
 		c.queue.AddRateLimited(key)
 
 		return
-	}
-
-	if obj, found := c.endpointControllerCreated.Load(key); found {
-		endpointController := obj.(*EndpointController)
-		endpointController.endPointqueue.ShutDown()
-		close(endpointController.stopCh)
-		c.endpointControllerCreated.Delete(key)
 	}
 }

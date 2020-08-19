@@ -59,7 +59,7 @@ func main() {
 
 	esController, err := controller.NewServiceImportController(&agentSpec, cfg)
 	if err != nil {
-		klog.Fatalf("Failed to create endpointSlice controller: %v", err)
+		klog.Fatalf("Failed to create ServiceImport controller: %v", err)
 	}
 
 	if err := lightHouseAgent.Start(stopCh); err != nil {
