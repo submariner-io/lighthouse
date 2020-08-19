@@ -16,7 +16,7 @@ import (
 
 type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
-	newClientset    func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
+	NewClientset    func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
 	serviceInformer cache.SharedIndexInformer
 	queue           workqueue.RateLimitingInterface
 	stopCh          chan struct{}
@@ -26,7 +26,7 @@ type Controller struct {
 func NewController(serviceImportStore Store) *Controller {
 	return &Controller{
 		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		newClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
+		NewClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return lighthouseClientset.NewForConfig(c)
 		},
 		store:  serviceImportStore,
@@ -37,7 +37,7 @@ func NewController(serviceImportStore Store) *Controller {
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	klog.Infof("Starting ServiceImport Controller")
 
-	clientSet, err := c.newClientset(kubeConfig)
+	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
 		return fmt.Errorf("Error creating client set: %v", err)
 	}
