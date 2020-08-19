@@ -30,9 +30,6 @@ const (
 	serviceUnavailable     = "ServiceUnavailable"
 	invalidServiceType     = "UnsupportedServiceType"
 	clusterIP              = "cluster-ip"
-	labelSourceName        = "lighthouse.submariner.io/sourceName"
-	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
-	labelSourceCluster     = "lighthouse.submariner.io/sourceCluster"
 )
 
 var MaxExportStatusConditions = 10

@@ -47,18 +47,24 @@ type ServiceImportController struct {
 // It will create an endpoint slice corresponding to an endpoint object and set the owner references
 // to ServiceImport. The app label from the endpoint will be added to endpoint slice as well.
 type EndpointController struct {
-	kubeClientSet      kubernetes.Interface
-	endpointInformer   cache.Controller
-	store              cache.Store
-	endPointqueue      workqueue.RateLimitingInterface
-	serviceImportUID   types.UID
-	clusterID          string
-	serviceImportName  string
-	endpointDeletedMap sync.Map
-	stopCh             chan struct{}
+	kubeClientSet                kubernetes.Interface
+	endpointInformer             cache.Controller
+	store                        cache.Store
+	endPointqueue                workqueue.RateLimitingInterface
+	serviceImportUID             types.UID
+	clusterID                    string
+	serviceImportName            string
+	serviceImportSourceNameSpace string
+	endpointDeletedMap           sync.Map
+	stopCh                       chan struct{}
 }
 
 const (
-	originName      = "origin-name"
-	originNamespace = "origin-namespace"
+	originName           = "origin-name"
+	originNamespace      = "origin-namespace"
+	labelSourceName      = "lighthouse.submariner.io/sourceName"
+	labelSourceNamespace = "lighthouse.submariner.io/sourceNamespace"
+	labelSourceCluster   = "lighthouse.submariner.io/sourceCluster"
+	labelManagedBy       = "endpointslice.kubernetes.io/managed-by"
+	labelValueManagedBy  = "lighthouse-agent.submariner.io"
 )
