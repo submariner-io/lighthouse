@@ -1,4 +1,4 @@
-package serviceimport
+package serviceimport_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -6,6 +6,7 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
@@ -26,7 +27,7 @@ func testLifecycleNotifications() {
 
 	var (
 		serviceImport *lighthousev2a1.ServiceImport
-		controller    *Controller
+		controller    *serviceimport.Controller
 		fakeClientset lighthouseClientset.Interface
 		store         *fakeStore
 	)
@@ -38,10 +39,10 @@ func testLifecycleNotifications() {
 		}
 
 		serviceImport = newServiceImport(namespace1, service1, serviceIP, clusterID)
-		controller = NewController(store)
+		controller = serviceimport.NewController(store)
 		fakeClientset = fakeClientSet.NewSimpleClientset()
 
-		controller.newClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
+		controller.NewClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return fakeClientset, nil
 		}
 

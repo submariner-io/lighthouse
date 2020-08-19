@@ -1,4 +1,4 @@
-package serviceimport
+package serviceimport_test
 
 import (
 	"sort"
@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
 var _ = Describe("ServiceImport Map", func() {
@@ -23,12 +24,12 @@ var _ = Describe("ServiceImport Map", func() {
 
 	var (
 		clusterStatusMap map[string]bool
-		serviceImportMap *Map
+		serviceImportMap *serviceimport.Map
 	)
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
-		serviceImportMap = NewMap()
+		serviceImportMap = serviceimport.NewMap()
 	})
 
 	checkCluster := func(id string) bool {
