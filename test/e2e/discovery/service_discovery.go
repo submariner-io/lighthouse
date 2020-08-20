@@ -41,6 +41,11 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
+	When("there are no active pods for a service", func() {
+		It("should not resolve the service", func() {
+			RunServicesPodAvailabilityTest(f)
+		})
+	})
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
@@ -155,6 +160,37 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
+}
+
+func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
+	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
+		nginxServiceClusterB = svc
+		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
+	}
+
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
+	f.SetNginxReplicaSet(framework.ClusterB, 0)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
+	f.SetNginxReplicaSet(framework.ClusterB, 2)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
 }
 
 func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
