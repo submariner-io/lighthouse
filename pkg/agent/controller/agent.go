@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -12,7 +13,7 @@ import (
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -176,7 +177,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 
 	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
@@ -222,10 +223,12 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		Type: svcType,
 	}
 
-	ips := a.getIPsForService(svc, svcType)
-
-	if ips == nil {
+	ips, err := a.getIPsForService(svc, svcType)
+	if err != nil {
 		// Failed to get ips for some reason, requeue
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionUnknown, "ServiceRetrievalFailed", err.Error())
+
 		return nil, true
 	}
 
@@ -283,7 +286,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 
 	svc := obj.(*corev1.Service)
 	svcExport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// Service Export not created yet
 		return nil, false
 	} else if err != nil {
@@ -304,7 +307,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	ep := obj.(*corev1.Endpoints)
 	svcExport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(ep.Namespace).Get(ep.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// Service Export not created yet
 		return nil, false
 	} else if err != nil {
@@ -316,7 +319,7 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 	serviceImport, err := a.getServiceImport(svcExport)
 
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Unable to get ServiceImport for %#v: %v", ep, err)
 		}
 
@@ -364,7 +367,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(namespace).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			klog.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
 		} else if err != nil {
@@ -447,27 +450,27 @@ func (a *Controller) getServiceImport(svcExport *lighthousev2a1.ServiceExport) (
 	return serviceImport, nil
 }
 
-func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) []string {
+func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) ([]string, error) {
 	if siType == lighthousev2a1.ClusterSetIP {
 		mcsIp := getGlobalIpFromService(service)
 		if mcsIp == "" {
 			mcsIp = service.Spec.ClusterIP
 		}
 
-		return []string{mcsIp}
+		return []string{mcsIp}, nil
 	}
 
 	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
 	if err != nil {
-		if !errors.IsNotFound(err) {
-			klog.Errorf("Error obtaining Endpoint for Service  (%s/%s): %v", service.Namespace, service.Name, err)
-			return nil
+		if !apierrors.IsNotFound(err) {
+			klog.Errorf("Error retrieving Endpoints for Service (%s/%s): %v", service.Namespace, service.Name, err)
+			return nil, errors.WithMessage(err, "Error retrieving the Endpoints for the Service")
 		}
 
-		return make([]string, 0)
+		return make([]string, 0), nil
 	}
 
-	return getIPsFromEndpoint(endpoint)
+	return getIPsFromEndpoint(endpoint), nil
 }
 
 func (a *Controller) getObjectNameWithClusterId(name, namespace string) string {
