@@ -187,7 +187,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		// some other error. Log and requeue
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
-		klog.Errorf("Unable to get service for %#v: %v", svc, err)
+		klog.Errorf("Error retrieving Service (%s/%s): %v", svcExport.Namespace, svcExport.Name, err)
 		return nil, true
 	}
 
@@ -291,7 +291,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 		return nil, false
 	} else if err != nil {
 		// some other error. Log and requeue
-		klog.Errorf("Unable to get ServiceExport for %#v: %v", svc, err)
+		klog.Errorf("Error retrieving ServiceExport for Service (%s/%s): %v", svc.Namespace, svc.Name, err)
 		return nil, true
 	}
 
@@ -312,7 +312,7 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 		return nil, false
 	} else if err != nil {
 		// some other error. Log and requeue
-		klog.Errorf("Unable to get ServiceExport for %#v: %v", ep, err)
+		klog.Errorf("Error retrieving ServiceExport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
 		return nil, true
 	}
 
@@ -320,7 +320,7 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			klog.Errorf("Unable to get ServiceImport for %#v: %v", ep, err)
+			klog.Errorf("Error retrieving ServiceImport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
 		}
 
 		// Requeue
@@ -355,7 +355,8 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 			},
 		},
 	}
-	if reflect.DeepEqual(oldStatus, serviceImport.Status) {
+
+	if reflect.DeepEqual(oldStatus, &serviceImport.Status) {
 		klog.V(log.DEBUG).Infof("Old and new cluster status are same")
 		return nil, false
 	}
