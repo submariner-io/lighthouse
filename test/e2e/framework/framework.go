@@ -7,8 +7,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
@@ -17,6 +21,9 @@ import (
 
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	labelSourceName        = "lighthouse.submariner.io/sourceName"
+	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
+	anyCount               = -1
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -153,6 +160,27 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 	})
 }
 
+func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex, name, namespace string, count int) {
+	labelMap := map[string]string{
+		labelSourceName:      name,
+		labelSourceNamespace: namespace,
+	}
+	siListOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(labelMap).String(),
+	}
+	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
+	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
+		return si.List(siListOptions)
+	}, func(result interface{}) (bool, string, error) {
+		siList := result.(*lighthousev2a1.ServiceImportList)
+		if len(siList.Items) != count {
+			return false, fmt.Sprintf("ServiceImport count was %v instead of %v", len(siList.Items), count), nil
+		}
+
+		return true, "", nil
+	})
+}
+
 func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, namespace string) string {
 	if framework.TestContext.GlobalnetEnabled {
 		svc := framework.KubeClients[cluster].CoreV1().Services(namespace)
@@ -171,4 +199,78 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, names
 	}
 
 	return ""
+}
+
+func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
+	var port int32 = 80
+
+	nginxService := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "nginx-headless",
+			Labels: map[string]string{
+				"app": "nginx-headless",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Type:      "ClusterIP",
+			ClusterIP: v1.ClusterIPNone,
+			Ports: []v1.ServicePort{
+				{
+					Port:     port,
+					Protocol: v1.ProtocolTCP,
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: 8080,
+					},
+				},
+			},
+			Selector: map[string]string{
+				"app": "nginx-demo",
+			},
+		},
+	}
+
+	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)
+	service := framework.AwaitUntil("create service", func() (interface{}, error) {
+		return sc.Create(&nginxService)
+	}, framework.NoopCheckResult).(*v1.Service)
+
+	return service
+}
+
+func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string, count int) (ipList []string) {
+	ep := framework.KubeClients[targetCluster].CoreV1().Endpoints(namespace)
+	By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
+	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
+		return ep.Get(name, metav1.GetOptions{})
+	}, func(result interface{}) (bool, string, error) {
+		ipList = make([]string, 0)
+		endpoint := result.(*v1.Endpoints)
+		for _, eps := range endpoint.Subsets {
+			for _, addr := range eps.Addresses {
+				ipList = append(ipList, addr.IP)
+			}
+		}
+		if count != anyCount && len(ipList) != count {
+			return false, fmt.Sprintf("endpoints have %q IPs when expected %q", len(ipList), count), nil
+		}
+		return true, "", nil
+	})
+
+	return ipList
+}
+
+func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string) (ipList []string) {
+	return f.AwaitEndpointIPs(targetCluster, name, namespace, anyCount)
+}
+
+func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
+	By(fmt.Sprintf("Setting Nginx deployment replicas to %v", count))
+	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
+	deployments := framework.KubeClients[cluster].AppsV1().Deployments(f.Namespace)
+	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
+		return deployments.Patch("nginx-demo", types.MergePatchType, []byte(patch))
+	}, framework.NoopCheckResult).(*appsv1.Deployment)
+
+	return result
 }
