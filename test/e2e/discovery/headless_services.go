@@ -16,19 +16,19 @@ var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", 
 	if !framework.TestContext.GlobalnetEnabled {
 
 		When("a pod tries to resolve a headless service in a remote cluster", func() {
-			It("should be able to discover the remote pod ips successfully", func() {
+			It("should resolve the backing pod IPs from the remote cluster", func() {
 				RunHeadlessDiscoveryTest(f)
 			})
 		})
 
 		When("a pod tries to resolve a headless service which is exported locally and in a remote cluster", func() {
-			It("should resolve the pod ips from both the services", func() {
+			It("should resolve the backing pod IPs from both clusters", func() {
 				RunHeadlessDiscoveryLocalAndRemoteTest(f)
 			})
 		})
 
-		When("number of active pods backing a service changes", func() {
-			It("should only resolve ips from active pods", func() {
+		When("the number of active pods backing a service changes", func() {
+			It("should only resolve the IPs from the active pods", func() {
 				RunHeadlessPodsAvailabilityTest(f)
 			})
 		})
@@ -150,7 +150,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 	}
 
 	By(fmt.Sprintf("Executing %q to verify IPs %v for service %q %q discoverable", strings.Join(cmd, " "), ipList, service.Name, op))
-	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
 		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,

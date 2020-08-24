@@ -252,7 +252,7 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 			}
 		}
 		if count != anyCount && len(ipList) != count {
-			return false, fmt.Sprintf("endpoints have %q IPs when expected %q", len(ipList), count), nil
+			return false, fmt.Sprintf("endpoints have %d IPs when expected %d", len(ipList), count), nil
 		}
 		return true, "", nil
 	})
