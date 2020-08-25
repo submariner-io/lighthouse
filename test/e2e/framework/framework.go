@@ -127,12 +127,12 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*lighthousev2a1.ServiceImportList)
-		for _, si := range siList.Items {
+		for i, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				if si.Status.Clusters[0].IPs[0] != serviceIP {
 					return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s", si.Status.Clusters[0].IPs[0], serviceIP), nil
 				}
-				retServiceImport = &si
+				retServiceImport = &siList.Items[i]
 				return true, "", nil
 			}
 		}
