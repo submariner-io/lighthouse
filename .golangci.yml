@@ -19,7 +19,7 @@ linters:
     - depguard
     - dupl
     - errcheck
-    #- exportloopref
+    - exportloopref
     #- funlen
     #- gochecknoglobals
     #- gochecknoinits
@@ -28,7 +28,7 @@ linters:
     - gofmt
     - goimports
     #- golint
-    #- gosec
+    - gosec
     - gosimple
     - govet
     - ineffassign
