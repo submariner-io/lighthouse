@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
@@ -45,11 +44,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
 	}
 
-	query := strings.Split(qname, ".")
-	svcName := query[0]
-	namespace := query[1]
-
-	serviceIps, found := lh.serviceImports.GetIPs(namespace, svcName, lh.clusterStatus.IsConnected)
+	serviceIps, found := lh.serviceImports.GetIPs(pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
 	if !found {
 		// We couldn't find record for this service name
 		log.Debugf("No record found for service %q", qname)
