@@ -7,6 +7,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const bareResult = "...."
+
 var _ = Describe("[parse] Test parse DNS request", func() {
 	Context("When request is valid", testParseValid)
 	Context("When request is invalid", testParseInvalid)
@@ -18,9 +20,31 @@ func testParseValid() {
 		expected string // output from r.String()
 	}
 
-	When("SRV request", func() {
+	When("SVC request", func() {
 		It("Should give no error", func() {
-			tc := parseTest{"_http._tcp.webs.mynamespace.svc.inter.webs.tests.", "http.tcp..webs.mynamespace.svc"}
+			tc := parseTest{"webs.mynamespace.svc.inter.webs.tests.", "..webs.mynamespace.svc"}
+			m := new(dns.Msg)
+			m.SetQuestion(tc.query, dns.TypeA)
+			state := request.Request{Zone: zone, Req: m}
+			r, e := parseRequest(state)
+			Expect(e).NotTo(HaveOccurred())
+			Expect(r.String()).Should(Equal(tc.expected))
+		})
+	})
+	When("An SVC request of hostname", func() {
+		It("Should give no error", func() {
+			tc := parseTest{"host1.cluster1.webs.mynamespace.svc.inter.webs.tests.", "host1.cluster1.webs.mynamespace.svc"}
+			m := new(dns.Msg)
+			m.SetQuestion(tc.query, dns.TypeA)
+			state := request.Request{Zone: zone, Req: m}
+			r, e := parseRequest(state)
+			Expect(e).NotTo(HaveOccurred())
+			Expect(r.String()).Should(Equal(tc.expected))
+		})
+	})
+	When("An SVC request of cluster", func() {
+		It("Should give no error", func() {
+			tc := parseTest{"cluster1.webs.mynamespace.svc.inter.webs.tests.", ".cluster1.webs.mynamespace.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
 			state := request.Request{Zone: zone, Req: m}
@@ -31,18 +55,7 @@ func testParseValid() {
 	})
 	When("Wildcard request", func() {
 		It("Should give no error", func() {
-			tc := parseTest{"*.any.*.any.svc.inter.webs.tests.", "*.any..*.any.svc"}
-			m := new(dns.Msg)
-			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
-			r, e := parseRequest(state)
-			Expect(e).NotTo(HaveOccurred())
-			Expect(r.String()).Should(Equal(tc.expected))
-		})
-	})
-	When("A request of endpoint", func() {
-		It("Should give no error", func() {
-			tc := parseTest{"1-2-3-4.webs.mynamespace.svc.inter.webs.tests.", "*.*.1-2-3-4.webs.mynamespace.svc"}
+			tc := parseTest{"*.any.*.any.svc.inter.webs.tests.", "*.any.*.any.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
 			state := request.Request{Zone: zone, Req: m}
@@ -53,7 +66,7 @@ func testParseValid() {
 	})
 	When("Bare zone", func() {
 		It("Should give no error", func() {
-			tc := parseTest{"inter.webs.tests.", "....."}
+			tc := parseTest{"inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
 			state := request.Request{Zone: zone, Req: m}
@@ -64,7 +77,7 @@ func testParseValid() {
 	})
 	When("Bare svc type", func() {
 		It("Should give no error", func() {
-			tc := parseTest{"svc.inter.webs.tests.", "....."}
+			tc := parseTest{"svc.inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
 			state := request.Request{Zone: zone, Req: m}
@@ -75,7 +88,7 @@ func testParseValid() {
 	})
 	When("Bare pod type", func() {
 		It("Should give no error", func() {
-			tc := parseTest{"pod.inter.webs.tests.", "....."}
+			tc := parseTest{"pod.inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
 			state := request.Request{Zone: zone, Req: m}
