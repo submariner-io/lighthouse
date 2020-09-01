@@ -192,8 +192,7 @@ var _ = Describe("Globalnet enabled", func() {
 				corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
-			_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Update(t.service)
-			Expect(err).To(Succeed())
+			test.UpdateResource(t.dynamicServiceClient(), t.service)
 
 			t.awaitServiceExported(globalIP, 1)
 		})
@@ -284,19 +283,6 @@ var _ = Describe("Service export failures", func() {
 		t.createServiceExport()
 	})
 
-	When("Service retrieval initially fails", func() {
-		BeforeEach(func() {
-			t.cluster1.servicesReactor.SetFailOnGet(errors.New("fake Get error"))
-		})
-
-		It("should update the ServiceExport status and eventually sync a ServiceImport", func() {
-			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
-				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
-			t.cluster1.servicesReactor.SetResetOnFailure(true)
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 1)
-		})
-	})
-
 	When("Endpoints retrieval initially fails", func() {
 		BeforeEach(func() {
 			t.service.Spec.ClusterIP = corev1.ClusterIPNone
@@ -308,34 +294,6 @@ var _ = Describe("Service export failures", func() {
 				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
 			t.cluster1.endpointsReactor.SetResetOnFailure(true)
 			t.awaitHeadlessServiceImport(t.endpointIPs()...)
-		})
-	})
-
-	When("an exported Service is deleted and ServiceExport retrieval initially fails", func() {
-		It("should eventually delete the ServiceImport", func() {
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
-
-			t.cluster1.serviceExportReactor.SetFailOnGet(errors.New("fake Get error"))
-			t.cluster1.serviceExportReactor.SetResetOnFailure(true)
-			t.deleteService()
-			t.awaitNoServiceImport(t.cluster1.localServiceImportClient)
-		})
-	})
-
-	When("Endpoints is updated and ServiceExport retrieval initially fails", func() {
-		BeforeEach(func() {
-			t.service.Spec.ClusterIP = corev1.ClusterIPNone
-		})
-
-		It("should eventually update the ServiceImport", func() {
-			t.awaitHeadlessServiceImport(t.endpointIPs()...)
-
-			t.cluster1.serviceExportReactor.SetFailOnGet(errors.New("fake Get error"))
-			t.cluster1.serviceExportReactor.SetResetOnFailure(true)
-			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
-			t.updateEndpoints()
-
-			t.awaitUpdatedServiceImport(t.endpointIPs()...)
 		})
 	})
 
