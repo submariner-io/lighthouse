@@ -60,7 +60,6 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipList := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
@@ -97,7 +96,6 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
@@ -131,7 +129,6 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipList := f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 3)
