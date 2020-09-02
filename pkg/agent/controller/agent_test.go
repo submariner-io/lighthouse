@@ -1,9 +1,11 @@
 package controller_test
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -25,8 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	fakeKubeCLient "k8s.io/client-go/kubernetes/fake"
+	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/testing"
 )
 
 const clusterID = "east"
@@ -257,6 +260,100 @@ var _ = Describe("Headless service syncing", func() {
 	})
 })
 
+var _ = Describe("Service export failures", func() {
+	t := newTestDiver()
+
+	JustBeforeEach(func() {
+		t.createService()
+		t.createEndpoints()
+		t.createServiceExport()
+	})
+
+	When("Service retrieval initially fails", func() {
+		BeforeEach(func() {
+			t.servicesReactor.SetFailOnGet(errors.New("fake Get error"))
+		})
+
+		It("should update the ServiceExport status and eventually sync a ServiceImport", func() {
+			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
+			t.servicesReactor.SetResetOnFailure(true)
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 1)
+		})
+	})
+
+	When("Endpoints retrieval initially fails", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+			t.endpointsReactor.SetFailOnGet(errors.New("fake Get error"))
+		})
+
+		It("should update the ServiceExport status and eventually sync a ServiceImport", func() {
+			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
+				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
+			t.endpointsReactor.SetResetOnFailure(true)
+			t.awaitServiceImport(t.localServiceImportClient, lighthousev2a1.Headless, t.endpointIPs()...)
+		})
+	})
+
+	When("an exported Service is deleted and ServiceExport retrieval initially fails", func() {
+		It("should eventually delete the ServiceImport", func() {
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+
+			t.serviceExportReactor.SetFailOnGet(errors.New("fake Get error"))
+			t.serviceExportReactor.SetResetOnFailure(true)
+			t.deleteService()
+			t.awaitNoServiceImport(t.localServiceImportClient)
+		})
+	})
+
+	When("Endpoints is updated and ServiceExport retrieval initially fails", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		It("should eventually update the ServiceImport", func() {
+			t.awaitServiceImport(t.localServiceImportClient, lighthousev2a1.Headless, t.endpointIPs()...)
+
+			t.serviceExportReactor.SetFailOnGet(errors.New("fake Get error"))
+			t.serviceExportReactor.SetResetOnFailure(true)
+			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
+			t.updateEndpoints()
+
+			t.awaitUpdatedServiceImport(t.localServiceImportClient, t.endpointIPs()...)
+		})
+	})
+
+	When("Endpoints is updated and ServiceImport retrieval initially fails", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		It("should eventually update the ServiceImport", func() {
+			t.awaitServiceImport(t.localServiceImportClient, lighthousev2a1.Headless, t.endpointIPs()...)
+
+			t.serviceImportReactor.SetFailOnGet(errors.New("fake Get error"))
+			t.serviceImportReactor.SetResetOnFailure(true)
+			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
+			t.updateEndpoints()
+
+			t.awaitUpdatedServiceImport(t.localServiceImportClient, t.endpointIPs()...)
+		})
+	})
+
+	When("a conflict initially occurs when updating the ServiceExport status", func() {
+		BeforeEach(func() {
+			t.serviceExportReactor.SetFailOnUpdate(apierrors.NewConflict(schema.GroupResource{}, t.serviceExport.Name,
+				errors.New("fake conflict")))
+			t.serviceExportReactor.SetResetOnFailure(true)
+		})
+
+		It("should eventually update the ServiceExport status", func() {
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+		})
+	})
+})
+
 type testDriver struct {
 	agentController           *controller.Controller
 	agentSpec                 *controller.AgentSpecification
@@ -273,6 +370,10 @@ type testDriver struct {
 	stopCh                    chan struct{}
 	now                       time.Time
 	restMapper                meta.RESTMapper
+	endpointsReactor          *FailingReactor
+	servicesReactor           *FailingReactor
+	serviceExportReactor      *FailingReactor
+	serviceImportReactor      *FailingReactor
 }
 
 func newTestDiver() *testDriver {
@@ -336,13 +437,19 @@ func newTestDiver() *testDriver {
 
 		t.brokerServiceImportClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
 			&lighthousev2a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
+
+		fakeCS := fakeKubeClient.NewSimpleClientset()
+		t.endpointsReactor = NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
+		t.servicesReactor = NewFailingReactorForResource(&fakeCS.Fake, "services")
+		t.localServiceClient = fakeCS
+
+		fakeLH := fakeLighthouseClientset.NewSimpleClientset()
+		t.serviceExportReactor = NewFailingReactorForResource(&fakeLH.Fake, "serviceexports")
+		t.serviceImportReactor = NewFailingReactorForResource(&fakeLH.Fake, "serviceimports")
+		t.lighthouseClient = fakeLH
 	})
 
 	JustBeforeEach(func() {
-		t.localServiceClient = fakeKubeCLient.NewSimpleClientset()
-
-		t.lighthouseClient = fakeLighthouseClientset.NewSimpleClientset(t.serviceExport)
-
 		syncerConfig := &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
 		}
@@ -395,6 +502,9 @@ func (t *testDriver) dynamicEndpointsClient() dynamic.ResourceInterface {
 }
 
 func (t *testDriver) createServiceExport() {
+	_, err := t.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.serviceExport.Namespace).Create(t.serviceExport)
+	Expect(err).To(Succeed())
+
 	test.CreateResource(t.localServiceExportClient, t.serviceExport)
 }
 
@@ -457,6 +567,9 @@ func (t *testDriver) awaitUpdatedServiceImport(client dynamic.ResourceInterface,
 	}
 
 	Expect(err).To(Succeed())
+
+	_, err = t.lighthouseClient.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Update(serviceImport)
+	Expect(err).To(Succeed())
 }
 
 func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
@@ -464,7 +577,7 @@ func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
 }
 
 func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthousev2a1.ServiceExportCondition) {
-	var found []lighthousev2a1.ServiceExportCondition
+	var found *lighthousev2a1.ServiceExport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		se, err := t.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.service.Namespace).Get(t.service.Name, metav1.GetOptions{})
@@ -476,7 +589,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 			return false, err
 		}
 
-		found = se.Status.Conditions
+		found = se
 
 		if (atIndex + len(expCond)) != len(se.Status.Conditions) {
 			return false, nil
@@ -503,7 +616,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 			Fail("ServiceExport not found")
 		}
 
-		Fail(format.Message(found, fmt.Sprintf("to contain at index %d", atIndex), expCond))
+		Fail(format.Message(found.Status.Conditions, fmt.Sprintf("to contain at index %d", atIndex), expCond))
 	} else {
 		Expect(err).To(Succeed())
 	}
@@ -569,4 +682,143 @@ func newServiceExportCondition(cType lighthousev2a1.ServiceExportConditionType,
 		Status: status,
 		Reason: &reason,
 	}
+}
+
+type FailingReactor struct {
+	sync.Mutex
+	failOnCreate   error
+	failOnUpdate   error
+	failOnDelete   error
+	failOnGet      error
+	failOnList     error
+	resetOnFailure bool
+}
+
+func NewFailingReactorForResource(f *testing.Fake, resource string) *FailingReactor {
+	r := &FailingReactor{}
+	chain := []testing.Reactor{&testing.SimpleReactor{Verb: "*", Resource: resource, Reaction: r.react}}
+	f.ReactionChain = append(chain, f.ReactionChain...)
+
+	return r
+}
+
+func (f *FailingReactor) react(action testing.Action) (bool, runtime.Object, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	switch action.GetVerb() {
+	case "get":
+		return f.get()
+	case "create":
+		return f.create()
+	case "update":
+		return f.update()
+	case "delete":
+		return f.delete()
+	case "list":
+		return f.list()
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) get() (bool, runtime.Object, error) {
+	err := f.failOnGet
+	if err != nil {
+		if f.resetOnFailure {
+			f.failOnGet = nil
+		}
+
+		return true, nil, err
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) create() (bool, runtime.Object, error) {
+	err := f.failOnCreate
+	if err != nil {
+		if f.resetOnFailure {
+			f.failOnCreate = nil
+		}
+
+		return true, nil, err
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) update() (bool, runtime.Object, error) {
+	err := f.failOnUpdate
+	if err != nil {
+		if f.resetOnFailure {
+			f.failOnUpdate = nil
+		}
+
+		return true, nil, err
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) delete() (bool, runtime.Object, error) {
+	err := f.failOnDelete
+	if err != nil {
+		if f.resetOnFailure {
+			f.failOnDelete = nil
+		}
+
+		return true, nil, err
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) list() (bool, runtime.Object, error) {
+	err := f.failOnList
+	if err != nil {
+		if f.resetOnFailure {
+			f.failOnList = nil
+		}
+
+		return true, nil, err
+	}
+
+	return false, nil, nil
+}
+
+func (f *FailingReactor) SetResetOnFailure(v bool) {
+	f.Lock()
+	defer f.Unlock()
+	f.resetOnFailure = v
+}
+
+func (f *FailingReactor) SetFailOnCreate(err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.failOnCreate = err
+}
+
+func (f *FailingReactor) SetFailOnUpdate(err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.failOnUpdate = err
+}
+
+func (f *FailingReactor) SetFailOnDelete(err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.failOnDelete = err
+}
+
+func (f *FailingReactor) SetFailOnGet(err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.failOnGet = err
+}
+
+func (f *FailingReactor) SetFailOnList(err error) {
+	f.Lock()
+	defer f.Unlock()
+	f.failOnList = err
 }
