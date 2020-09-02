@@ -1,4 +1,4 @@
-package serviceimport
+package serviceimport_test
 
 import (
 	"testing"
