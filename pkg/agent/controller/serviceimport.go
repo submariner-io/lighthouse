@@ -1,48 +1,33 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/submariner-io/admiral/pkg/log"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
-func NewServiceImportController(spec *AgentSpecification, cfg *rest.Config) (*ServiceImportController, error) {
-	kubeClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
-	}
-
-	lighthouseClient, err := lighthouseClientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error building lighthouseClient %s", err.Error())
-	}
-
-	serviceImportController := ServiceImportController{
+func newServiceImportController(spec *AgentSpecification, kubeClientSet kubernetes.Interface,
+	lighthouseClient lighthouseClientset.Interface) *ServiceImportController {
+	return &ServiceImportController{
 		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		kubeClientSet:    kubeClientSet,
 		lighthouseClient: lighthouseClient,
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
 	}
-
-	return &serviceImportController, nil
 }
 
-func (c *ServiceImportController) Start(stopCh <-chan struct{}) error {
+func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(c.lighthouseClient, 0,
 		externalversions.WithNamespace(c.namespace))
 	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
@@ -174,10 +159,10 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	}
 
 	labelSelector := labels.Set(service.Spec.Selector).AsSelector()
-	endpointController := NewEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
+	endpointController := newEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
 		serviceImportCreated.ObjectMeta.Name, serviceNameSpace, c.clusterID)
 
-	endpointController.Start(endpointController.stopCh, labelSelector)
+	endpointController.start(endpointController.stopCh, labelSelector)
 	c.endpointControllers.Store(key, endpointController)
 
 	return nil

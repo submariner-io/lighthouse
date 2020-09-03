@@ -57,17 +57,8 @@ func main() {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
 
-	siController, err := controller.NewServiceImportController(&agentSpec, cfg)
-	if err != nil {
-		klog.Fatalf("Failed to create serviceimport controller: %v", err)
-	}
-
 	if err := lightHouseAgent.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
-	}
-
-	if err := siController.Start(stopCh); err != nil {
-		klog.Fatalf("Failed to start serviceimport controller: %v", err)
 	}
 
 	<-stopCh

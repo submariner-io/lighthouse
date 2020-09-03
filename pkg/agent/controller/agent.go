@@ -154,10 +154,11 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		ResourcesEquivalent: agentController.endpointEquivalent,
 		Scheme:              scheme,
 	})
-
 	if err != nil {
 		return nil, err
 	}
+
+	agentController.serviceImportController = newServiceImportController(spec, kubeClientSet, lighthouseClient)
 
 	return agentController, nil
 }
@@ -187,7 +188,11 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	klog.Info("Lighthouse agent syncer started")
+	if err := a.serviceImportController.start(stopCh); err != nil {
+		return err
+	}
+
+	klog.Info("Agent controller started")
 
 	return nil
 }
