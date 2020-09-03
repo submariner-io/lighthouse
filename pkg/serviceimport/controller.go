@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
@@ -18,14 +17,12 @@ type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
 	NewClientset    func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
 	serviceInformer cache.SharedIndexInformer
-	queue           workqueue.RateLimitingInterface
 	stopCh          chan struct{}
 	store           Store
 }
 
 func NewController(serviceImportStore Store) *Controller {
 	return &Controller{
-		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		NewClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
 			return lighthouseClientset.NewForConfig(c)
 		},
@@ -47,95 +44,48 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.V(log.DEBUG).Infof("ServiceImport %q added", key)
-			if err == nil {
-				c.queue.Add(key)
-			}
+		AddFunc: c.serviceImportCreatedOrUpdated,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.serviceImportCreatedOrUpdated(newObj)
 		},
-		UpdateFunc: func(obj interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(log.DEBUG).Infof("ServiceImport %q updated", key)
-			if err == nil {
-				c.queue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.V(log.DEBUG).Infof("ServiceImport %q deleted", key)
-			if err == nil {
-				c.serviceImportDeleted(obj, key)
-			}
-		},
+		DeleteFunc: c.serviceImportDeleted,
 	})
 
 	go c.serviceInformer.Run(c.stopCh)
-	go c.runWorker()
 
 	return nil
 }
 
 func (c *Controller) Stop() {
 	close(c.stopCh)
-	c.queue.ShutDown()
 
 	klog.Infof("ServiceImport Controller stopped")
 }
 
-func (c *Controller) runWorker() {
-	for {
-		keyObj, shutdown := c.queue.Get()
-		if shutdown {
-			klog.Infof("Lighthouse watcher for ServiceImports stopped")
-			return
-		}
-
-		key := keyObj.(string)
-
-		func() {
-			defer c.queue.Done(key)
-			obj, exists, err := c.serviceInformer.GetIndexer().GetByKey(key)
-
-			if err != nil {
-				klog.Errorf("Error retrieving service with key %q from the cache: %v", key, err)
-				// requeue the item to work on later
-				c.queue.AddRateLimited(key)
-
-				return
-			}
-
-			if exists {
-				c.serviceImportCreatedOrUpdated(obj, key)
-			}
-
-			c.queue.Forget(key)
-		}()
-	}
-}
-
-func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}, key string) {
-	klog.V(log.DEBUG).Infof("In serviceImportCreatedOrUpdated for key %q, service: %#v, ", key, obj)
+func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}) {
+	klog.V(log.DEBUG).Infof("In serviceImportCreatedOrUpdated for: %#v, ", obj)
 
 	c.store.Put(obj.(*lighthousev2a1.ServiceImport))
 }
 
-func (c *Controller) serviceImportDeleted(obj interface{}, key string) {
-	var mcs *lighthousev2a1.ServiceImport
+func (c *Controller) serviceImportDeleted(obj interface{}) {
+	klog.V(log.DEBUG).Infof("In serviceImportDeleted for: %#v, ", obj)
+
+	var si *lighthousev2a1.ServiceImport
 	var ok bool
-	if mcs, ok = obj.(*lighthousev2a1.ServiceImport); !ok {
+	if si, ok = obj.(*lighthousev2a1.ServiceImport); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			klog.Errorf("Failed to get deleted serviceimport object for %s", key)
+			klog.Errorf("Could not convert object %#v to DeletedFinalStateUnknown", obj)
 			return
 		}
 
-		mcs, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
+		si, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
 		if !ok {
-			klog.Errorf("Failed to convert deleted tombstone object %v  to serviceimport", tombstone.Obj)
+			klog.Errorf("Could not convert object tombstone %#v to Unstructured", tombstone.Obj)
 			return
 		}
 	}
 
-	c.store.Remove(mcs)
+	c.store.Remove(si)
 }
