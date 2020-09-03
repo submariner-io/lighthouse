@@ -86,18 +86,10 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		BrokerResourcesEquivalent: agentController.serviceImportEquivalent,
 	}
 
-	endpointSliceSyncer := broker.ResourceConfig{
-		LocalSourceNamespace:      metav1.NamespaceAll,
-		LocalResourceType:         &discovery.EndpointSlice{},
-		BrokerResourceType:        &discovery.EndpointSlice{},
-		BrokerResourcesEquivalent: agentController.endpointSliceEquivalent,
-	}
-
 	syncerConf.Scheme = scheme
 	syncerConf.LocalNamespace = spec.Namespace
 	syncerConf.ResourceConfigs = []broker.ResourceConfig{
 		svcExportResourceConfig,
-		endpointSliceSyncer,
 	}
 
 	var err error
@@ -117,7 +109,27 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		Transform:       agentController.serviceToRemoteServiceImport,
 		Scheme:          scheme,
 	})
+	if err != nil {
+		return nil, err
+	}
 
+	agentController.endpointSliceSyncer, err = newSyncer(&broker.SyncerConfig{
+		LocalRestConfig:  syncerConf.LocalRestConfig,
+		LocalNamespace:   metav1.NamespaceAll,
+		LocalClusterID:   spec.ClusterID,
+		BrokerRestConfig: syncerConf.BrokerRestConfig,
+		BrokerNamespace:  syncerConf.BrokerNamespace,
+		Scheme:           syncerConf.Scheme,
+		ResourceConfigs: []broker.ResourceConfig{
+			{
+				LocalSourceNamespace:      metav1.NamespaceAll,
+				LocalResourceType:         &discovery.EndpointSlice{},
+				BrokerResourceType:        &discovery.EndpointSlice{},
+				BrokerResourcesEquivalent: agentController.endpointSliceEquivalent,
+				BrokerTransform:           agentController.remoteEndpointSliceToLocal,
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +172,10 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	}
 
 	if err := a.endpointSyncer.Start(stopCh); err != nil {
+		return err
+	}
+
+	if err := a.endpointSliceSyncer.Start(stopCh); err != nil {
 		return err
 	}
 
@@ -511,4 +527,27 @@ func getGlobalIpFromService(service *corev1.Service) string {
 	}
 
 	return ""
+}
+
+func (e *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	endPointSlice := obj.(*discovery.EndpointSlice)
+	labels := endPointSlice.GetObjectMeta().GetLabels()
+
+	newEndPointSlice := newEndPointSlice(endPointSlice, labels[labelSourceNamespace])
+
+	return newEndPointSlice, false
+}
+
+func newEndPointSlice(endpointSlice *discovery.EndpointSlice, namespace string) *discovery.EndpointSlice {
+	return &discovery.EndpointSlice{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      endpointSlice.Name,
+			Namespace: namespace,
+			Labels:    endpointSlice.GetLabels(),
+		},
+		AddressType: endpointSlice.AddressType,
+		Endpoints:   endpointSlice.Endpoints,
+		Ports:       endpointSlice.Ports,
+	}
 }
