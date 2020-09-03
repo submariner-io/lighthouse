@@ -125,7 +125,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 				LocalSourceNamespace:      metav1.NamespaceAll,
 				LocalResourceType:         &discovery.EndpointSlice{},
 				BrokerResourceType:        &discovery.EndpointSlice{},
-				BrokerResourcesEquivalent: agentController.endpointSliceEquivalent,
+				BrokerResourcesEquivalent: agentController.endpointSlicesEquivalent,
 				BrokerTransform:           agentController.remoteEndpointSliceToLocal,
 			},
 		},
@@ -438,7 +438,7 @@ func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) b
 		util.GetNestedField(obj2, "subsets"))
 }
 
-func (a *Controller) endpointSliceEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+func (a *Controller) endpointSlicesEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
 	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "endpoints"), util.GetNestedField(obj2, "endpoints")) &&
 		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "ports"), util.GetNestedField(obj2, "ports")) &&
 		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "addresstype"), util.GetNestedField(obj2, "addresstype"))
