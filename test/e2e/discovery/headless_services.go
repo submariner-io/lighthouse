@@ -13,26 +13,35 @@ import (
 var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("discovery")
 
-	if !framework.TestContext.GlobalnetEnabled {
-
-		When("a pod tries to resolve a headless service in a remote cluster", func() {
-			It("should resolve the backing pod IPs from the remote cluster", func() {
+	When("a pod tries to resolve a headless service in a remote cluster", func() {
+		It("should resolve the backing pod IPs from the remote cluster", func() {
+			if !framework.TestContext.GlobalnetEnabled {
 				RunHeadlessDiscoveryTest(f)
-			})
+			} else {
+				framework.Skipf("Globalnet is enabled, skipping the test...")
+			}
 		})
+	})
 
-		When("a pod tries to resolve a headless service which is exported locally and in a remote cluster", func() {
-			It("should resolve the backing pod IPs from both clusters", func() {
+	When("a pod tries to resolve a headless service which is exported locally and in a remote cluster", func() {
+		It("should resolve the backing pod IPs from both clusters", func() {
+			if !framework.TestContext.GlobalnetEnabled {
 				RunHeadlessDiscoveryLocalAndRemoteTest(f)
-			})
+			} else {
+				framework.Skipf("Globalnet is enabled, skipping the test...")
+			}
 		})
+	})
 
-		When("the number of active pods backing a service changes", func() {
-			It("should only resolve the IPs from the active pods", func() {
+	When("the number of active pods backing a service changes", func() {
+		It("should only resolve the IPs from the active pods", func() {
+			if !framework.TestContext.GlobalnetEnabled {
 				RunHeadlessPodsAvailabilityTest(f)
-			})
+			} else {
+				framework.Skipf("Globalnet is enabled, skipping the test...")
+			}
 		})
-	}
+	})
 })
 
 func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
@@ -51,7 +60,6 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipList := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
@@ -88,7 +96,6 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
@@ -122,7 +129,6 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	f.NewNetShootDeployment(framework.ClusterA)
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipList := f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 3)
