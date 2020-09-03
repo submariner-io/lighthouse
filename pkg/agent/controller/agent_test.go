@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -29,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/testing"
 )
 
 const clusterID = "east"
@@ -370,10 +368,10 @@ type testDriver struct {
 	stopCh                    chan struct{}
 	now                       time.Time
 	restMapper                meta.RESTMapper
-	endpointsReactor          *FailingReactor
-	servicesReactor           *FailingReactor
-	serviceExportReactor      *FailingReactor
-	serviceImportReactor      *FailingReactor
+	endpointsReactor          *fake.FailingReactor
+	servicesReactor           *fake.FailingReactor
+	serviceExportReactor      *fake.FailingReactor
+	serviceImportReactor      *fake.FailingReactor
 }
 
 func newTestDiver() *testDriver {
@@ -439,13 +437,13 @@ func newTestDiver() *testDriver {
 			&lighthousev2a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
 		fakeCS := fakeKubeClient.NewSimpleClientset()
-		t.endpointsReactor = NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
-		t.servicesReactor = NewFailingReactorForResource(&fakeCS.Fake, "services")
+		t.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
+		t.servicesReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "services")
 		t.localServiceClient = fakeCS
 
 		fakeLH := fakeLighthouseClientset.NewSimpleClientset()
-		t.serviceExportReactor = NewFailingReactorForResource(&fakeLH.Fake, "serviceexports")
-		t.serviceImportReactor = NewFailingReactorForResource(&fakeLH.Fake, "serviceimports")
+		t.serviceExportReactor = fake.NewFailingReactorForResource(&fakeLH.Fake, "serviceexports")
+		t.serviceImportReactor = fake.NewFailingReactorForResource(&fakeLH.Fake, "serviceimports")
 		t.lighthouseClient = fakeLH
 	})
 
@@ -682,143 +680,4 @@ func newServiceExportCondition(cType lighthousev2a1.ServiceExportConditionType,
 		Status: status,
 		Reason: &reason,
 	}
-}
-
-type FailingReactor struct {
-	sync.Mutex
-	failOnCreate   error
-	failOnUpdate   error
-	failOnDelete   error
-	failOnGet      error
-	failOnList     error
-	resetOnFailure bool
-}
-
-func NewFailingReactorForResource(f *testing.Fake, resource string) *FailingReactor {
-	r := &FailingReactor{}
-	chain := []testing.Reactor{&testing.SimpleReactor{Verb: "*", Resource: resource, Reaction: r.react}}
-	f.ReactionChain = append(chain, f.ReactionChain...)
-
-	return r
-}
-
-func (f *FailingReactor) react(action testing.Action) (bool, runtime.Object, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	switch action.GetVerb() {
-	case "get":
-		return f.get()
-	case "create":
-		return f.create()
-	case "update":
-		return f.update()
-	case "delete":
-		return f.delete()
-	case "list":
-		return f.list()
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) get() (bool, runtime.Object, error) {
-	err := f.failOnGet
-	if err != nil {
-		if f.resetOnFailure {
-			f.failOnGet = nil
-		}
-
-		return true, nil, err
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) create() (bool, runtime.Object, error) {
-	err := f.failOnCreate
-	if err != nil {
-		if f.resetOnFailure {
-			f.failOnCreate = nil
-		}
-
-		return true, nil, err
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) update() (bool, runtime.Object, error) {
-	err := f.failOnUpdate
-	if err != nil {
-		if f.resetOnFailure {
-			f.failOnUpdate = nil
-		}
-
-		return true, nil, err
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) delete() (bool, runtime.Object, error) {
-	err := f.failOnDelete
-	if err != nil {
-		if f.resetOnFailure {
-			f.failOnDelete = nil
-		}
-
-		return true, nil, err
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) list() (bool, runtime.Object, error) {
-	err := f.failOnList
-	if err != nil {
-		if f.resetOnFailure {
-			f.failOnList = nil
-		}
-
-		return true, nil, err
-	}
-
-	return false, nil, nil
-}
-
-func (f *FailingReactor) SetResetOnFailure(v bool) {
-	f.Lock()
-	defer f.Unlock()
-	f.resetOnFailure = v
-}
-
-func (f *FailingReactor) SetFailOnCreate(err error) {
-	f.Lock()
-	defer f.Unlock()
-	f.failOnCreate = err
-}
-
-func (f *FailingReactor) SetFailOnUpdate(err error) {
-	f.Lock()
-	defer f.Unlock()
-	f.failOnUpdate = err
-}
-
-func (f *FailingReactor) SetFailOnDelete(err error) {
-	f.Lock()
-	defer f.Unlock()
-	f.failOnDelete = err
-}
-
-func (f *FailingReactor) SetFailOnGet(err error) {
-	f.Lock()
-	defer f.Unlock()
-	f.failOnGet = err
-}
-
-func (f *FailingReactor) SetFailOnList(err error) {
-	f.Lock()
-	defer f.Unlock()
-	f.failOnList = err
 }
