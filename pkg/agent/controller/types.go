@@ -19,6 +19,7 @@ type Controller struct {
 	kubeClientSet       kubernetes.Interface
 	lighthouseClient    lighthouseClientset.Interface
 	serviceExportSyncer *broker.Syncer
+	endpointSliceSyncer *broker.Syncer
 	serviceSyncer       syncer.Interface
 	endpointSyncer      syncer.Interface
 }
@@ -57,16 +58,6 @@ type EndpointController struct {
 	serviceImportSourceNameSpace string
 	endpointDeletedMap           sync.Map
 	stopCh                       chan struct{}
-}
-
-type EndpointSliceController struct {
-	kubeClientSet           kubernetes.Interface
-	endpointSliceInformer   cache.SharedIndexInformer
-	endPointSlicequeue      workqueue.RateLimitingInterface
-	clusterID               string
-	endpointSliceDeletedMap sync.Map
-	namespace               string
-	stopCh                  chan struct{}
 }
 
 const (
