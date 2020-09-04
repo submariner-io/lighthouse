@@ -198,11 +198,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	controllerFlag := false
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		discovery.LabelServiceName: endpoints.Name,
-		labelSourceNamespace:       e.serviceImportSourceNameSpace,
-		labelSourceCluster:         e.clusterID,
-		labelSourceName:            e.serviceImportName,
-		labelManagedBy:             labelValueManagedBy,
+		labelServiceImportName:   e.serviceImportName,
+		discovery.LabelManagedBy: labelValueManagedBy,
+		labelSourceNamespace:     e.serviceImportSourceNameSpace,
+		labelSourceCluster:       e.clusterID,
 	}
 	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
 		APIVersion:         "lighthouse.submariner.io.v2alpha1",
@@ -261,6 +260,7 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		TargetRef:  address.TargetRef,
 		Topology:   topology,
+		Hostname:   &address.Hostname,
 	}
 }
 

@@ -61,11 +61,11 @@ type EndpointController struct {
 }
 
 const (
-	originName           = "origin-name"
-	originNamespace      = "origin-namespace"
-	labelSourceName      = "lighthouse.submariner.io/sourceName"
-	labelSourceNamespace = "lighthouse.submariner.io/sourceNamespace"
-	labelSourceCluster   = "lighthouse.submariner.io/sourceCluster"
-	labelManagedBy       = "endpointslice.kubernetes.io/managed-by"
-	labelValueManagedBy  = "lighthouse-agent.submariner.io"
+	originName             = "origin-name"
+	originNamespace        = "origin-namespace"
+	labelSourceName        = "lighthouse.submariner.io/sourceName"
+	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
+	labelSourceCluster     = "lighthouse.submariner.io/sourceCluster"
+	labelServiceImportName = "multicluster.kubernetes.io/service-name"
+	labelValueManagedBy    = "lighthouse-agent.submariner.io"
 )
