@@ -6,6 +6,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
@@ -27,6 +28,7 @@ type Lighthouse struct {
 	Fall           fall.F
 	Zones          []string
 	serviceImports *serviceimport.Map
+	endpointSlices *endpointslice.Map
 	clusterStatus  ClusterStatus
 }
 

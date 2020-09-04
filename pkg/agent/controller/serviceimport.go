@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
@@ -49,22 +50,21 @@ func (c *ServiceImportController) Start(stopCh <-chan struct{}) error {
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.V(2).Infof("ServiceImport %q added", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q added", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		UpdateFunc: func(obj interface{}, new interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(new)
-			// TODO Change level
-			klog.Infof("ServiceImport %q updated", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q updated", key)
 			if err == nil {
 				c.queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.Infof("ServiceImport %q deleted", key)
+			klog.V(log.DEBUG).Infof("ServiceImport %q deleted", key)
 			if err == nil {
 				var si *lighthousev2a1.ServiceImport
 				var ok bool
@@ -157,8 +157,8 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	}
 
 	annotations := serviceImportCreated.ObjectMeta.Annotations
-	serviceNameSpace := annotations[originNamespace]
-	serviceName := annotations[originName]
+	serviceNameSpace := annotations[lhconstants.OriginNamespace]
+	serviceName := annotations[lhconstants.OriginName]
 	var service *corev1.Service
 
 	service, err := c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
@@ -204,7 +204,7 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 		c.endpointControllers.Delete(key)
 	}
 
-	labelSelector := labels.Set(map[string]string{labelSourceName: si.Name}).AsSelector()
+	labelSelector := labels.Set(map[string]string{lhconstants.LabelSourceName: si.Name}).AsSelector()
 	err := c.kubeClientSet.DiscoveryV1beta1().EndpointSlices(si.Namespace).
 		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil && !errors.IsNotFound(err) {
