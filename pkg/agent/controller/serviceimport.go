@@ -196,7 +196,7 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 
 	c.serviceImportDeletedMap.Delete(key)
 
-	si := obj.(lighthousev2a1.ServiceImport)
+	si := obj.(*lighthousev2a1.ServiceImport)
 
 	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*EndpointController)
