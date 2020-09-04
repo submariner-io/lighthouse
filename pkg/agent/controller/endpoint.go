@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 
+	"github.com/submariner-io/admiral/pkg/log"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -52,21 +54,21 @@ func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Str
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
-				klog.Infof("Endpoint %q added", key)
+				klog.V(log.DEBUG).Infof("Endpoint %q added", key)
 				if err == nil {
 					e.endPointqueue.Add(key)
 				}
 			},
 			UpdateFunc: func(obj interface{}, new interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(new)
-				klog.Infof("Endpoint %q updated", key)
+				klog.V(log.DEBUG).Infof("Endpoint %q updated", key)
 				if err == nil {
 					e.endPointqueue.Add(key)
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				klog.Infof("Endpoint %q deleted", key)
+				klog.V(log.DEBUG).Infof("Endpoint %q deleted", key)
 				if err == nil {
 					var endPoints *corev1.Endpoints
 					var ok bool
@@ -198,10 +200,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	controllerFlag := false
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		labelServiceImportName:   e.serviceImportName,
-		discovery.LabelManagedBy: labelValueManagedBy,
-		labelSourceNamespace:     e.serviceImportSourceNameSpace,
-		labelSourceCluster:       e.clusterID,
+		lhconstants.LabelServiceImportName: e.serviceImportName,
+		discovery.LabelManagedBy:           lhconstants.LabelValueManagedBy,
+		lhconstants.LabelSourceNamespace:   e.serviceImportSourceNameSpace,
+		lhconstants.LabelSourceCluster:     e.clusterID,
 	}
 	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
 		APIVersion:         "lighthouse.submariner.io.v2alpha1",
@@ -258,7 +260,6 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 	return discovery.Endpoint{
 		Addresses:  []string{address.IP},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
-		TargetRef:  address.TargetRef,
 		Topology:   topology,
 		Hostname:   &address.Hostname,
 	}

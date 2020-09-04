@@ -11,6 +11,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -122,12 +123,18 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		Scheme:           syncerConf.Scheme,
 		ResourceConfigs: []broker.ResourceConfig{
 			{
-				LocalSourceNamespace:      metav1.NamespaceAll,
-				LocalResourceType:         &discovery.EndpointSlice{},
-				LocalResourcesEquivalent:  agentController.endpointSlicesEquivalent,
-				BrokerResourceType:        &discovery.EndpointSlice{},
-				BrokerResourcesEquivalent: agentController.endpointSlicesEquivalent,
-				BrokerTransform:           agentController.remoteEndpointSliceToLocal,
+
+				LocalSourceNamespace: metav1.NamespaceAll,
+				LocalResourceType:    &discovery.EndpointSlice{},
+				LocalTransform:       agentController.validateEndpointSliceLocal,
+				LocalResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
+					return false
+				},
+				BrokerResourceType: &discovery.EndpointSlice{},
+				BrokerResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
+					return false
+				},
+				BrokerTransform: agentController.remoteEndpointSliceToLocal,
 			},
 		},
 	})
@@ -294,7 +301,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*lighthousev2a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[originName], serviceImport.GetAnnotations()[originNamespace],
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
+		serviceImport.GetAnnotations()[lhconstants.OriginNamespace],
 		lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
 		"", "Service was successfully synced to the broker")
 }
@@ -439,12 +447,6 @@ func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) b
 		util.GetNestedField(obj2, "subsets"))
 }
 
-func (a *Controller) endpointSlicesEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
-	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "endpoints"), util.GetNestedField(obj2, "endpoints")) &&
-		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "ports"), util.GetNestedField(obj2, "ports")) &&
-		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "addresstype"), util.GetNestedField(obj2, "addresstype"))
-}
-
 func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {
 	return c1.Type == c2.Type && c1.Status == c2.Status && reflect.DeepEqual(c1.Reason, c2.Reason) &&
 		reflect.DeepEqual(c1.Message, c2.Message)
@@ -455,13 +457,13 @@ func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace),
 			Annotations: map[string]string{
-				originName:      svcExport.Name,
-				originNamespace: svcExport.Namespace,
+				lhconstants.OriginName:      svcExport.Name,
+				lhconstants.OriginNamespace: svcExport.Namespace,
 			},
 			Labels: map[string]string{
-				labelSourceName:      svcExport.Name,
-				labelSourceNamespace: svcExport.Namespace,
-				labelSourceCluster:   a.clusterID,
+				lhconstants.LabelSourceName:      svcExport.Name,
+				lhconstants.LabelSourceNamespace: svcExport.Namespace,
+				lhconstants.LabelSourceCluster:   a.clusterID,
 			},
 		},
 	}
@@ -530,7 +532,7 @@ func getGlobalIpFromService(service *corev1.Service) string {
 	return ""
 }
 
-func (e *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
@@ -538,11 +540,22 @@ func (e *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Op
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      endpointSlice.Name,
-			Namespace: labels[labelSourceNamespace],
+			Namespace: labels[lhconstants.LabelSourceNamespace],
 			Labels:    labels,
 		},
 		AddressType: endpointSlice.AddressType,
 		Endpoints:   endpointSlice.Endpoints,
 		Ports:       endpointSlice.Ports,
 	}, false
+}
+
+func (a *Controller) validateEndpointSliceLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	labels := endpointSlice.GetObjectMeta().GetLabels()
+
+	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
+		return nil, false
+	}
+
+	return obj, false
 }
