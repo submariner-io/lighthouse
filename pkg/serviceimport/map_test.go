@@ -37,7 +37,7 @@ var _ = Describe("ServiceImport Map", func() {
 	}
 
 	getIPs := func(ns, name string) []string {
-		ips, found := serviceImportMap.GetIPs(ns, name, checkCluster)
+		ips, found := serviceImportMap.GetIPs(ns, name, "", checkCluster)
 		Expect(found).To(BeTrue())
 		return ips
 	}
@@ -163,7 +163,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service does not exist", func() {
 		It("should return not found", func() {
-			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, "", checkCluster)
 			Expect(found).To(BeFalse())
 		})
 	})
@@ -185,7 +185,7 @@ var _ = Describe("ServiceImport Map", func() {
 			Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 
 			serviceImportMap.Remove(si)
-			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, "", checkCluster)
 			Expect(found).To(BeFalse())
 
 			// Should be a no-op
