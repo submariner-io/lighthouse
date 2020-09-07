@@ -9,14 +9,15 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 )
 
 const (
@@ -24,6 +25,8 @@ const (
 	labelSourceName        = "lighthouse.submariner.io/sourceName"
 	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
 	anyCount               = -1
+	statefulServiceName    = "nginx-ss"
+	statefulSetName        = "web"
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -201,14 +204,14 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, names
 	return ""
 }
 
-func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
+func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster framework.ClusterIndex) *v1.Service {
 	var port int32 = 80
 
 	nginxService := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "nginx-headless",
+			Name: name,
 			Labels: map[string]string{
-				"app": "nginx-headless",
+				"app": app,
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -216,16 +219,11 @@ func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.
 			ClusterIP: v1.ClusterIPNone,
 			Ports: []v1.ServicePort{
 				{
-					Port:     port,
-					Protocol: v1.ProtocolTCP,
-					TargetPort: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: 8080,
-					},
+					Port: port,
 				},
 			},
 			Selector: map[string]string{
-				"app": "nginx-demo",
+				"app": app,
 			},
 		},
 	}
@@ -236,6 +234,10 @@ func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.
 	}, framework.NoopCheckResult).(*v1.Service)
 
 	return service
+}
+
+func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
+	return f.NewNginxHeadlessServiceWithParams("nginx-headless", "nginx-demo", cluster)
 }
 
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string, count int) (ipList []string) {
@@ -271,6 +273,106 @@ func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uin
 	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
 		return deployments.Patch("nginx-demo", types.MergePatchType, []byte(patch))
 	}, framework.NoopCheckResult).(*appsv1.Deployment)
+
+	return result
+}
+
+func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.StatefulSet {
+	var replicaCount int32 = 1
+	var port int32 = 8080
+
+	nginxStatefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: statefulSetName,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": statefulServiceName,
+				},
+			},
+			ServiceName: statefulServiceName,
+			Replicas:    &replicaCount,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": statefulServiceName,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            statefulServiceName,
+							Image:           "nginxinc/nginx-unprivileged:stable-alpine",
+							ImagePullPolicy: v1.PullAlways,
+							Ports: []v1.ContainerPort{
+								{
+									ContainerPort: port,
+									Name:          "web",
+								},
+							},
+							Command: []string{},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+		},
+	}
+
+	create(f, cluster, nginxStatefulSet)
+
+	return nginxStatefulSet
+}
+
+func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.StatefulSet) *v1.PodList {
+	count := statefulSet.Spec.Replicas
+	pc := framework.KubeClients[cluster].AppsV1().StatefulSets(f.Namespace)
+	appName := statefulSet.Spec.Template.ObjectMeta.Labels["app"]
+
+	_ = framework.AwaitUntil("create statefulSet", func() (interface{}, error) {
+		return pc.Create(statefulSet)
+	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
+
+	return f.AwaitPodsByAppLabel(cluster, appName, f.Namespace, int(*count))
+}
+
+func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
+	sliceCount, epCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
+	ep := framework.KubeClients[targetCluster].DiscoveryV1beta1().EndpointSlices(namespace)
+	labelMap := map[string]string{
+		v1beta1.LabelManagedBy: lhconstants.LabelValueManagedBy,
+	}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(labelMap).String(),
+	}
+
+	By(fmt.Sprintf("Retrieving EndpointSlices for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
+	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
+		return ep.List(listOptions)
+	}, func(result interface{}) (bool, string, error) {
+		endpointSliceList = result.(*v1beta1.EndpointSliceList)
+		if sliceCount != anyCount && len(endpointSliceList.Items) != sliceCount {
+			return false, fmt.Sprintf("%d endpointslices found when expected %d", len(endpointSliceList.Items), sliceCount), nil
+		}
+		endpointSlice := &endpointSliceList.Items[0]
+
+		if epCount != anyCount && len(endpointSlice.Endpoints) != epCount {
+			return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", len(endpointSlice.Endpoints), epCount), nil
+		}
+		return true, "", nil
+	})
+
+	return endpointSliceList
+}
+
+func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, count uint32) *appsv1.StatefulSet {
+	By(fmt.Sprintf("Setting Nginx statefulset replicas to %v", count))
+	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
+	ss := framework.KubeClients[cluster].AppsV1().StatefulSets(f.Namespace)
+	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
+		return ss.Patch(statefulSetName, types.MergePatchType, []byte(patch))
+	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
 
 	return result
 }
