@@ -160,6 +160,9 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	}
 
 	Expect(verifyCount).To(Equal(2))
+
+	f.DeleteServiceExport(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
 }
 
 func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
@@ -210,6 +213,9 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 				nginxServiceClusterB.Name, checkedDomains, *endpoint.Hostname == "web-0")
 		}
 	}
+
+	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
 }
 
 func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
