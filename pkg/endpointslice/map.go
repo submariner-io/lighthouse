@@ -51,7 +51,9 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	}
 
 	for _, endpoint := range es.Endpoints {
-		epInfo.hostIPs[*endpoint.Hostname] = endpoint.Addresses
+		if endpoint.Hostname != nil {
+			epInfo.hostIPs[*endpoint.Hostname] = endpoint.Addresses
+		}
 	}
 
 	m.epMap[key] = epInfo

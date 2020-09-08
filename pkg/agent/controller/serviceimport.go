@@ -133,10 +133,6 @@ func (c *ServiceImportController) runServiceImportWorker() {
 			}
 
 			if err != nil {
-				if !exists {
-					c.serviceImportDeletedMap.Store(key, obj)
-				}
-
 				c.queue.AddRateLimited(key)
 			} else {
 				c.queue.Forget(key)
@@ -194,8 +190,6 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 		return nil
 	}
 
-	c.serviceImportDeletedMap.Delete(key)
-
 	si := obj.(*lighthousev2a1.ServiceImport)
 
 	if obj, found := c.endpointControllers.Load(key); found {
@@ -210,6 +204,8 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
+	c.serviceImportDeletedMap.Delete(key)
 
 	return nil
 }

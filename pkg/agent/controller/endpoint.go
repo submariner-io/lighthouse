@@ -93,6 +93,8 @@ func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Str
 		},
 	)
 
+	klog.V(log.DEBUG).Infof("Starting Endpoint watcher for %q started", e.serviceImportName)
+
 	go e.endpointInformer.Run(e.stopCh)
 	go e.runEndpointWorker(e.endpointInformer, e.endPointqueue)
 }
@@ -106,7 +108,7 @@ func (e *EndpointController) runEndpointWorker(informer cache.Controller, queue 
 	for {
 		keyObj, shutdown := queue.Get()
 		if shutdown {
-			klog.Infof("Lighthouse watcher for ServiceImports stopped")
+			klog.V(log.DEBUG).Infof("Endpoints watcher for %q stopped", e.serviceImportName)
 			return
 		}
 
@@ -131,10 +133,6 @@ func (e *EndpointController) runEndpointWorker(informer cache.Controller, queue 
 			}
 
 			if err != nil {
-				if !exists {
-					e.endpointDeletedMap.Store(key, obj)
-				}
-
 				queue.AddRateLimited(key)
 			} else {
 				queue.Forget(key)
@@ -181,8 +179,6 @@ func (e *EndpointController) endPointDeleted(key string) error {
 		return nil
 	}
 
-	e.endpointDeletedMap.Delete(key)
-
 	endPoints := obj.(corev1.Endpoints)
 	endpointSliceName := endPoints.Name + "-" + e.clusterID
 	err := e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).
@@ -191,6 +187,8 @@ func (e *EndpointController) endPointDeleted(key string) error {
 		klog.Errorf("Deleting EndpointSlice for endPoints %v from NameSpace %s failed due to %v", endPoints, endPoints.Namespace, err)
 		return err
 	}
+
+	e.endpointDeletedMap.Delete(key)
 
 	return nil
 }
@@ -257,12 +255,17 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		topology["kubernetes.io/hostname"] = *address.NodeName
 	}
 
-	return discovery.Endpoint{
+	endpoint := discovery.Endpoint{
 		Addresses:  []string{address.IP},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		Topology:   topology,
-		Hostname:   &address.Hostname,
 	}
+
+	if address.Hostname != "" {
+		endpoint.Hostname = &address.Hostname
+	}
+
+	return endpoint
 }
 
 func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
