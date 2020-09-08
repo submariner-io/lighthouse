@@ -124,6 +124,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 			{
 				LocalSourceNamespace:      metav1.NamespaceAll,
 				LocalResourceType:         &discovery.EndpointSlice{},
+				LocalResourcesEquivalent:  agentController.endpointSlicesEquivalent,
 				BrokerResourceType:        &discovery.EndpointSlice{},
 				BrokerResourcesEquivalent: agentController.endpointSlicesEquivalent,
 				BrokerTransform:           agentController.remoteEndpointSliceToLocal,
