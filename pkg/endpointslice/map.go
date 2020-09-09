@@ -20,6 +20,9 @@ type Map struct {
 func (m *Map) GetIPs(hostname, cluster, namespace, name string) ([]string, bool) {
 	key := keyFunc(namespace, name, cluster)
 
+	m.RLock()
+	defer m.RUnlock()
+
 	result, ok := m.epMap[key]
 	if !ok {
 		return nil, false
@@ -42,13 +45,13 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		return
 	}
 
-	m.Lock()
-	defer m.Unlock()
-
 	epInfo := &endpointInfo{
 		key:     key,
 		hostIPs: make(map[string][]string),
 	}
+
+	m.Lock()
+	defer m.Unlock()
 
 	for _, endpoint := range es.Endpoints {
 		if endpoint.Hostname != nil {

@@ -126,7 +126,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 
 				LocalSourceNamespace: metav1.NamespaceAll,
 				LocalResourceType:    &discovery.EndpointSlice{},
-				LocalTransform:       agentController.validateEndpointSliceLocal,
+				LocalTransform:       agentController.filterLocalEndpointSlices,
 				LocalResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
 					return false
 				},
@@ -549,7 +549,7 @@ func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Op
 	}, false
 }
 
-func (a *Controller) validateEndpointSliceLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
