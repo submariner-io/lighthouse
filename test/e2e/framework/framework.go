@@ -267,7 +267,7 @@ func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, name, n
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
-	By(fmt.Sprintf("Setting Nginx deployment replicas to %v", count))
+	By(fmt.Sprintf("Setting Nginx deployment replicas to %v in cluster %q", count, framework.TestContext.ClusterIDs[cluster]))
 	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
 	deployments := framework.KubeClients[cluster].AppsV1().Deployments(f.Namespace)
 	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
