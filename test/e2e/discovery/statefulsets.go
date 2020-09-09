@@ -51,7 +51,7 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
@@ -69,30 +69,12 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyCount := 0
+	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 1, true)
 
-	for _, endpointSlice := range endpointSlices.Items {
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
-
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, true)
-			verifyCount++
-		}
-	}
-
-	Expect(verifyCount).To(Equal(1))
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
 
-	for _, endpointSlice := range endpointSlices.Items {
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
-
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, false)
-		}
-	}
+	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 1, false)
 }
 
 func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
@@ -130,24 +112,12 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 1)
 
-	verifyCount := 0
-
-	for _, endpointSlice := range endpointSlices.Items {
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
-
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, true)
-			verifyCount++
-		}
-	}
-
-	Expect(verifyCount).To(Equal(2))
+	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 2, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1)
 
-	verifyCount = 0
+	verifyCount := 0
 
 	for _, endpointSlice := range endpointSlices.Items {
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
@@ -159,7 +129,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		}
 	}
 
-	Expect(verifyCount).To(Equal(2))
+	Expect(verifyCount).To(Equal(2), "Mismatch in count of IPs to be validated with dig")
 
 	f.DeleteServiceExport(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
@@ -189,19 +159,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 3)
 
-	verifyCount := 0
-
-	for _, endpointSlice := range endpointSlices.Items {
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
-
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, true)
-			verifyCount++
-		}
-	}
-
-	Expect(verifyCount).To(Equal(3))
+	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 3, true)
 
 	f.SetNginxStatefulSetReplicas(framework.ClusterB, 1)
 
@@ -216,6 +174,23 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
+}
+
+func verifyEndpointSlices(f *framework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
+	endpointSlices *v1beta1.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
+	count := 0
+
+	for _, endpointSlice := range endpointSlices.Items {
+		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
+
+		for _, endpoint := range endpointSlice.Endpoints {
+			verifyEndpointsWithDig(f, targetCluster, netshootPodList, endpoint, sourceCluster,
+				svcName, checkedDomains, shouldContain)
+			count++
+		}
+	}
+
+	Expect(count).To(Equal(verifyCount), "Mismatch in count of IPs to be validated with dig")
 }
 
 func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
