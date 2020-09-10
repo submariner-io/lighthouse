@@ -21,7 +21,7 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid types.UID, serviceImportName,
+func newEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid types.UID, serviceImportName,
 	serviceImportNameSpace, clusterId string) *EndpointController {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	endpointController := &EndpointController{
@@ -37,7 +37,7 @@ func NewEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid 
 	return endpointController
 }
 
-func (e *EndpointController) Start(stopCh <-chan struct{}, labelSelector fmt.Stringer) {
+func (e *EndpointController) start(stopCh <-chan struct{}, labelSelector fmt.Stringer) {
 	e.store, e.endpointInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
