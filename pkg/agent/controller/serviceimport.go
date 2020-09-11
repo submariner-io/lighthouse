@@ -133,7 +133,8 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	}
 
 	serviceImportCreated := obj.(*lighthousev2a1.ServiceImport)
-	if serviceImportCreated.Spec.Type != lighthousev2a1.Headless {
+	if serviceImportCreated.Spec.Type != lighthousev2a1.Headless ||
+		serviceImportCreated.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
 		return nil
 	}
 
@@ -176,6 +177,10 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 	}
 
 	si := obj.(*lighthousev2a1.ServiceImport)
+
+	if si.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+		return nil
+	}
 
 	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*EndpointController)
