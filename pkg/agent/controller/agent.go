@@ -539,19 +539,9 @@ func getGlobalIpFromService(service *corev1.Service) string {
 
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	labels := endpointSlice.GetObjectMeta().GetLabels()
+	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
 
-	return &discovery.EndpointSlice{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      endpointSlice.Name,
-			Namespace: labels[lhconstants.LabelSourceNamespace],
-			Labels:    labels,
-		},
-		AddressType: endpointSlice.AddressType,
-		Endpoints:   endpointSlice.Endpoints,
-		Ports:       endpointSlice.Ports,
-	}, false
+	return endpointSlice, false
 }
 
 func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {

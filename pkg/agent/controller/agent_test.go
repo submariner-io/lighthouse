@@ -17,6 +17,7 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeLighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,14 +26,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 )
 
 const clusterID1 = "east"
 const clusterID2 = "west"
+
+var nodeName = "my-node"
+var hostName = "my-host"
+var ready = true
+var notReady = false
 
 var _ = Describe("ServiceImport syncing", func() {
 	t := newTestDiver()
@@ -184,7 +192,7 @@ var _ = Describe("Globalnet enabled", func() {
 				corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
-			_, err := t.cluster1.localServiceClient.CoreV1().Services(t.service.Namespace).Update(t.service)
+			_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Update(t.service)
 			Expect(err).To(Succeed())
 
 			t.awaitServiceExported(globalIP, 1)
@@ -218,37 +226,51 @@ var _ = Describe("Headless service syncing", func() {
 
 	When("a ServiceExport is created", func() {
 		When("the Endpoints already exists", func() {
-			It("should correctly sync a ServiceImport", func() {
+			It("should correctly sync a ServiceImport and EndpointSlice", func() {
 				t.createEndpoints()
 				t.createServiceExport()
 
-				t.awaitHeadlessServiceExported(t.endpointIPs()...)
+				t.awaitHeadlessServiceImport(t.endpointIPs()...)
+				t.awaitEndpointSlice()
 			})
 		})
 
 		When("the Endpoints doesn't initially exist", func() {
-			It("should eventually sync a correct ServiceImport", func() {
+			It("should eventually sync a correct ServiceImport and EndpointSlice", func() {
 				t.createServiceExport()
-
-				t.awaitHeadlessServiceExported()
+				t.awaitHeadlessServiceImport()
 
 				t.createEndpoints()
-
 				t.awaitUpdatedServiceImport(t.endpointIPs()...)
+				t.awaitEndpointSlice()
 			})
 		})
 	})
 
 	When("the Endpoints for a service are updated", func() {
-		It("should update the ServiceImport", func() {
+		It("should update the ServiceImport and EndpointSlice", func() {
 			t.createEndpoints()
 			t.createServiceExport()
 
-			t.awaitHeadlessServiceExported(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport(t.endpointIPs()...)
+			t.awaitEndpointSlice()
 
 			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
 			t.updateEndpoints()
 			t.awaitUpdatedServiceImport(t.endpointIPs()...)
+			t.awaitUpdatedEndpointSlice(append(t.endpointIPs(), "10.253.6.1"))
+		})
+	})
+
+	When("a ServiceExport is deleted", func() {
+		It("should delete the ServiceImport and EndpointSlice", func() {
+			t.createEndpoints()
+			t.createServiceExport()
+			t.awaitHeadlessServiceImport(t.endpointIPs()...)
+			t.awaitEndpointSlice()
+
+			t.deleteServiceExport()
+			t.awaitHeadlessServiceUnexported()
 		})
 	})
 })
@@ -285,7 +307,7 @@ var _ = Describe("Service export failures", func() {
 			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
 				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
 			t.cluster1.endpointsReactor.SetResetOnFailure(true)
-			t.awaitHeadlessServiceExported(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport(t.endpointIPs()...)
 		})
 	})
 
@@ -306,7 +328,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually update the ServiceImport", func() {
-			t.awaitHeadlessServiceExported(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport(t.endpointIPs()...)
 
 			t.cluster1.serviceExportReactor.SetFailOnGet(errors.New("fake Get error"))
 			t.cluster1.serviceExportReactor.SetResetOnFailure(true)
@@ -323,7 +345,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually update the ServiceImport", func() {
-			t.awaitHeadlessServiceExported(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport(t.endpointIPs()...)
 
 			t.cluster1.serviceImportReactor.SetFailOnGet(errors.New("fake Get error"))
 			t.cluster1.serviceImportReactor.SetResetOnFailure(true)
@@ -352,7 +374,8 @@ type cluster struct {
 	localDynClient           dynamic.Interface
 	localServiceExportClient dynamic.ResourceInterface
 	localServiceImportClient dynamic.ResourceInterface
-	localServiceClient       kubernetes.Interface
+	localEndpointSliceClient dynamic.ResourceInterface
+	localKubeClient          kubernetes.Interface
 	lighthouseClient         lighthouseClientset.Interface
 	endpointsReactor         *fake.FailingReactor
 	servicesReactor          *fake.FailingReactor
@@ -365,6 +388,7 @@ type testDriver struct {
 	cluster2                  cluster
 	brokerDynClient           dynamic.Interface
 	brokerServiceImportClient *fake.DynamicResourceClient
+	brokerEndpointSliceClient *fake.DynamicResourceClient
 	service                   *corev1.Service
 	serviceExport             *lighthousev2a1.ServiceExport
 	endpoints                 *corev1.Endpoints
@@ -402,6 +426,7 @@ func newTestDiver() *testDriver {
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: "10.253.9.1",
+				Selector:  map[string]string{"app": "test"},
 			},
 		}
 
@@ -416,15 +441,30 @@ func newTestDiver() *testDriver {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      t.service.Name,
 				Namespace: t.service.Namespace,
+				Labels:    map[string]string{"app": "test"},
 			},
 			Subsets: []corev1.EndpointSubset{
 				{
 					Addresses: []corev1.EndpointAddress{
 						{
-							IP: "192.168.5.1",
+							IP:       "192.168.5.1",
+							Hostname: hostName,
 						},
 						{
-							IP: "192.168.5.2",
+							IP:       "192.168.5.2",
+							NodeName: &nodeName,
+						},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{
+							IP: "10.253.6.1",
+						},
+					},
+					Ports: []corev1.EndpointPort{
+						{
+							Name:     "port-1",
+							Protocol: corev1.ProtocolTCP,
+							Port:     1234,
 						},
 					},
 				},
@@ -439,8 +479,43 @@ func newTestDiver() *testDriver {
 		t.brokerServiceImportClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
 			&lighthousev2a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
+		t.brokerEndpointSliceClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
+			&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
+
 		t.cluster1.init(t.restMapper)
 		t.cluster2.init(t.restMapper)
+
+		_, endpointSliceInformer := cache.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(options)
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(options)
+				},
+			},
+			&discovery.EndpointSlice{}, 0,
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					defer GinkgoRecover()
+					_, err := t.cluster1.localEndpointSliceClient.Create(test.ToUnstructured(obj.(runtime.Object)),
+						metav1.CreateOptions{})
+					Expect(err).To(Succeed())
+				},
+				UpdateFunc: func(obj interface{}, new interface{}) {
+					defer GinkgoRecover()
+					_, err := t.cluster1.localEndpointSliceClient.Update(test.ToUnstructured(new.(runtime.Object)),
+						metav1.UpdateOptions{})
+					Expect(err).To(Succeed())
+				},
+				DeleteFunc: func(obj interface{}) {
+					defer GinkgoRecover()
+					Expect(t.cluster1.localEndpointSliceClient.Delete(obj.(*discovery.EndpointSlice).Name, nil)).To(Succeed())
+				},
+			},
+		)
+
+		go endpointSliceInformer.Run(t.stopCh)
 	})
 
 	JustBeforeEach(func() {
@@ -450,6 +525,7 @@ func newTestDiver() *testDriver {
 
 		syncerScheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
+		Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
 		Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
 
 		t.cluster1.start(t, syncerConfig, syncerScheme)
@@ -472,10 +548,15 @@ func (c *cluster) init(restMapper meta.RESTMapper) {
 	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
 		&lighthousev2a1.ServiceImport{})).Namespace(test.LocalNamespace)
 
+	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
+		&discovery.EndpointSlice{})).Namespace(test.LocalNamespace)
+
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
 	c.servicesReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "services")
-	c.localServiceClient = fakeCS
+	c.localKubeClient = fakeCS
+
+	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 
 	fakeLH := fakeLighthouseClientset.NewSimpleClientset()
 	c.serviceExportReactor = fake.NewFailingReactorForResource(&fakeLH.Fake, "serviceexports")
@@ -485,7 +566,7 @@ func (c *cluster) init(restMapper meta.RESTMapper) {
 
 func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
 	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient,
-		c.localServiceClient, c.lighthouseClient, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+		c.localKubeClient, c.lighthouseClient, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
 		})
 
@@ -557,6 +638,113 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIPs 
 	Expect(err).To(Succeed())
 }
 
+func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface,
+	endpoints *corev1.Endpoints, service *corev1.Service, namespace string, expectOwnerRef bool) {
+	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
+
+	endpointSlice := &discovery.EndpointSlice{}
+	Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
+
+	siName := service.Name + "-" + service.Namespace + "-" + clusterID1
+
+	Expect(endpointSlice.Namespace).To(Equal(namespace))
+
+	labels := endpointSlice.GetLabels()
+	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelServiceImportName, siName))
+	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
+	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
+	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceCluster, clusterID1))
+
+	if expectOwnerRef {
+		Expect(endpointSlice.OwnerReferences).To(HaveLen(1))
+
+		si, err := serviceImportClient.Get(siName, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+
+		controllerFlag := false
+
+		Expect(endpointSlice.OwnerReferences[0]).To(Equal(metav1.OwnerReference{
+			APIVersion: "lighthouse.submariner.io.v2alpha1",
+			Kind:       "ServiceImport",
+			Name:       siName,
+			UID:        si.GetUID(),
+			Controller: &controllerFlag,
+		}))
+	} else {
+		Expect(endpointSlice.OwnerReferences).To(HaveLen(0))
+	}
+
+	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
+
+	Expect(endpointSlice.Endpoints).To(HaveLen(3))
+	Expect(endpointSlice.Endpoints[0]).To(Equal(discovery.Endpoint{
+		Addresses:  []string{"192.168.5.1"},
+		Conditions: discovery.EndpointConditions{Ready: &ready},
+		Hostname:   &hostName,
+	}))
+	Expect(endpointSlice.Endpoints[1]).To(Equal(discovery.Endpoint{
+		Addresses:  []string{"192.168.5.2"},
+		Conditions: discovery.EndpointConditions{Ready: &ready},
+		Topology:   map[string]string{"kubernetes.io/hostname": nodeName},
+	}))
+	Expect(endpointSlice.Endpoints[2]).To(Equal(discovery.Endpoint{
+		Addresses:  []string{"10.253.6.1"},
+		Conditions: discovery.EndpointConditions{Ready: &notReady},
+	}))
+
+	Expect(endpointSlice.Ports).To(HaveLen(1))
+
+	name := "port-1"
+	protocol := corev1.ProtocolTCP
+	var port int32 = 1234
+
+	Expect(endpointSlice.Ports[0]).To(Equal(discovery.EndpointPort{
+		Name:     &name,
+		Protocol: &protocol,
+		Port:     &port,
+	}))
+}
+
+func (c *cluster) awaitEndpointSlice(endpoints *corev1.Endpoints, service *corev1.Service) {
+	awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service,
+		service.Namespace, c.agentSpec.ClusterID == clusterID1)
+}
+
+func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints, expectedIPs []string) {
+	name := endpoints.Name + "-" + clusterID1
+
+	sort.Strings(expectedIPs)
+
+	var actualIPs []string
+
+	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
+		obj, err := endpointSliceClient.Get(name, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+
+		endpointSlice := &discovery.EndpointSlice{}
+		Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
+
+		actualIPs = nil
+		for _, ep := range endpointSlice.Endpoints {
+			actualIPs = append(actualIPs, ep.Addresses...)
+		}
+
+		sort.Strings(actualIPs)
+
+		return reflect.DeepEqual(actualIPs, expectedIPs), nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		Expect(actualIPs).To(Equal(expectedIPs))
+	}
+
+	Expect(err).To(Succeed())
+}
+
+func (c *cluster) awaitUpdatedEndpointSlice(endpoints *corev1.Endpoints, expectedIPs []string) {
+	awaitUpdatedEndpointSlice(c.localEndpointSliceClient, endpoints, expectedIPs)
+}
+
 func (t *testDriver) awaitBrokerServiceImport(sType lighthousev2a1.ServiceImportType, serviceIPs ...string) {
 	awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIPs...)
 }
@@ -567,22 +755,34 @@ func (t *testDriver) awaitUpdatedServiceImport(serviceIPs ...string) {
 	t.cluster2.awaitUpdatedServiceImport(t.service, serviceIPs...)
 }
 
+func (t *testDriver) awaitEndpointSlice(serviceIPs ...string) {
+	awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace, false)
+	t.cluster1.awaitEndpointSlice(t.endpoints, t.service)
+	t.cluster2.awaitEndpointSlice(t.endpoints, t.service)
+}
+
+func (t *testDriver) awaitUpdatedEndpointSlice(expectedIPs []string) {
+	awaitUpdatedEndpointSlice(t.brokerEndpointSliceClient, t.endpoints, expectedIPs)
+	t.cluster1.awaitUpdatedEndpointSlice(t.endpoints, expectedIPs)
+	t.cluster2.awaitUpdatedEndpointSlice(t.endpoints, expectedIPs)
+}
+
 func (t *testDriver) createService() {
-	_, err := t.cluster1.localServiceClient.CoreV1().Services(t.service.Namespace).Create(t.service)
+	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Create(t.service)
 	Expect(err).To(Succeed())
 
 	test.CreateResource(t.dynamicServiceClient(), t.service)
 }
 
 func (t *testDriver) createEndpoints() {
-	_, err := t.cluster1.localServiceClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(t.endpoints)
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(t.endpoints)
 	Expect(err).To(Succeed())
 
 	test.CreateResource(t.dynamicEndpointsClient(), t.endpoints)
 }
 
 func (t *testDriver) updateEndpoints() {
-	_, err := t.cluster1.localServiceClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(t.endpoints)
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(t.endpoints)
 	Expect(err).To(Succeed())
 
 	test.UpdateResource(t.dynamicEndpointsClient(), t.endpoints)
@@ -606,7 +806,7 @@ func (t *testDriver) deleteServiceExport() {
 func (t *testDriver) deleteService() {
 	Expect(t.dynamicServiceClient().Delete(t.service.Name, nil)).To(Succeed())
 
-	Expect(t.cluster1.localServiceClient.CoreV1().Services(t.service.Namespace).Delete(t.service.Name, nil)).To(Succeed())
+	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(t.service.Name, nil)).To(Succeed())
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
@@ -615,6 +815,10 @@ func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
 
 func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
 	test.AwaitNoResource(client, t.service.Name+"-"+t.service.Namespace+"-"+clusterID1)
+}
+
+func (t *testDriver) awaitNoEndpointSlice(client dynamic.ResourceInterface) {
+	test.AwaitNoResource(client, t.endpoints.Name+"-"+clusterID1)
 }
 
 func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthousev2a1.ServiceExportCondition) {
@@ -704,7 +908,7 @@ func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int
 	return statusIndex + 2
 }
 
-func (t *testDriver) awaitHeadlessServiceExported(serviceIPs ...string) {
+func (t *testDriver) awaitHeadlessServiceImport(serviceIPs ...string) {
 	t.awaitBrokerServiceImport(lighthousev2a1.Headless, serviceIPs...)
 	t.cluster1.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIPs...)
 	t.cluster2.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIPs...)
@@ -714,6 +918,30 @@ func (t *testDriver) awaitServiceUnexported() {
 	t.awaitNoServiceImport(t.brokerServiceImportClient)
 	t.awaitNoServiceImport(t.cluster1.localServiceImportClient)
 	t.awaitNoServiceImport(t.cluster2.localServiceImportClient)
+}
+
+func (t *testDriver) awaitHeadlessServiceUnexported() {
+	t.awaitServiceUnexported()
+
+	Expect(t.cluster1.lighthouseClient.LighthouseV2alpha1().ServiceImports(t.service.Namespace).Delete(
+		t.service.Name+"-"+t.service.Namespace+"-"+clusterID1, nil)).To(Succeed())
+
+	// In a real k8s env, the EndpointSlice would be deleted via k8s GC as it is owned by the ServiceImport.
+	Expect(t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(t.endpoints.Namespace).Delete(
+		t.endpoints.Name+"-"+clusterID1, nil)).To(Succeed())
+
+	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
+	t.awaitNoEndpointSlice(t.brokerEndpointSliceClient)
+	t.awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient)
+
+	// Ensure the service's Endpoints are no longer being watched by updating the Endpoints and verifyjng the
+	// EndpointSlice isn't recreated.
+	t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.10"})
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(t.endpoints)
+	Expect(err).To(Succeed())
+
+	time.Sleep(200 * time.Millisecond)
+	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
 }
 
 func (t *testDriver) awaitServiceUnavailableStatus(atIndex int) {

@@ -83,6 +83,11 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		<-stopCh
 		c.queue.ShutDown()
 
+		c.endpointControllers.Range(func(key, value interface{}) bool {
+			value.(*EndpointController).Stop()
+			return true
+		})
+
 		klog.Infof("ServiceImport Controller stopped")
 	}(stopCh)
 
