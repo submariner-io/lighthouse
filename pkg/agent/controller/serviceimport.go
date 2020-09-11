@@ -159,7 +159,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 		return nil
 	}
 
-	labelSelector := labels.Set(service.Spec.Selector).AsSelector()
+	labelSelector := labels.Set(service.GetLabels()).AsSelector()
 	endpointController := newEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
 		serviceImportCreated.ObjectMeta.Name, serviceNameSpace, c.clusterID)
 
