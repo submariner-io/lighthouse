@@ -173,12 +173,15 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 	obj, found := c.serviceImportDeletedMap.Load(key)
 	if !found {
 		klog.Warningf("No endpoint controller found  for %q", key)
+		c.serviceImportDeletedMap.Delete(key)
+
 		return nil
 	}
 
 	si := obj.(*lighthousev2a1.ServiceImport)
 
 	if si.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+		c.serviceImportDeletedMap.Delete(key)
 		return nil
 	}
 
