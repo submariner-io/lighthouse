@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -64,7 +65,7 @@ spec:
         app: lighthouse-agent
     spec:
       containers:
-      - name: lighthouse-agent
-        image: lighthouse-agent:local
+        - name: lighthouse-agent
+          image: lighthouse-agent:local
       serviceAccount: submariner:lighthouse
       serviceAccountName: submariner-lighthouse
