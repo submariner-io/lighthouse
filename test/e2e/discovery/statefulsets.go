@@ -91,9 +91,6 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName, framework.ClusterB)
 
-	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-
 	// Create StatefulSet on ClusterA
 	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterAName))
 
@@ -102,6 +99,9 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
 	nginxServiceClusterA := f.NewNginxHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName, appName, framework.ClusterA)
+
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
