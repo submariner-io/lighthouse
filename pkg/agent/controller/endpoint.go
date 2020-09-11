@@ -93,7 +93,7 @@ func (e *EndpointController) start(stopCh <-chan struct{}, labelSelector fmt.Str
 		},
 	)
 
-	klog.V(log.DEBUG).Infof("Starting Endpoint watcher for %q started", e.serviceImportName)
+	klog.V(log.DEBUG).Infof("Starting Endpoint watcher for %q", e.serviceImportName)
 
 	go e.endpointInformer.Run(e.stopCh)
 	go e.runEndpointWorker(e.endpointInformer, e.endPointqueue)
