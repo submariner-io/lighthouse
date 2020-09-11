@@ -73,7 +73,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	records := make([]dns.RR, 0)
 
 	for _, ip := range ips {
-		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass()}, A: net.ParseIP(ip).To4()}
+		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(), Ttl: lh.ttl}, A: net.ParseIP(ip).To4()}
 		log.Debugf("rr is %v", record)
 		records = append(records, record)
 	}

@@ -97,6 +97,18 @@ func testCorrectConfig() {
 		})
 	})
 
+	When("ttl arguments is specified", func() {
+		BeforeEach(func() {
+			config = `lighthouse {
+			    ttl 30
+            }`
+		})
+
+		It("should succeed with the ttl field populated correctly", func() {
+			Expect(lh.ttl).Should(Equal(uint32(30)))
+		})
+	})
+
 	It("Should handle missing optional fields", func() {
 		config := `lighthouse`
 		c := caddy.NewTestController("dns", config)
@@ -106,6 +118,7 @@ func testCorrectConfig() {
 		Expect(setupErr).NotTo(HaveOccurred())
 		Expect(lh.Fall).Should(Equal(fall.F{}))
 		Expect(lh.Zones).Should(BeEmpty())
+		Expect(lh.ttl).Should(Equal(defaultTtl))
 	})
 }
 
@@ -132,6 +145,38 @@ func testIncorrectConfig() {
 
 		It("should return an appropriate plugin error", func() {
 			verifyPluginError(setupErr, "dummy")
+		})
+	})
+
+	When("an empty ttl is specified", func() {
+		BeforeEach(func() {
+			config = `lighthouse {
+                ttl
+		    } noplugin`
+
+			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				return &rest.Config{}, nil
+			}
+		})
+
+		It("should return an appropriate plugin error", func() {
+			verifyPluginError(setupErr, "Wrong argument count")
+		})
+	})
+
+	When("an invalid ttl is specified", func() {
+		BeforeEach(func() {
+			config = `lighthouse {
+                ttl -10
+		    } noplugin`
+
+			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				return &rest.Config{}, nil
+			}
+		})
+
+		It("should return an appropriate plugin error", func() {
+			verifyPluginError(setupErr, "ttl must be in range [0, 3600]: -10")
 		})
 	})
 

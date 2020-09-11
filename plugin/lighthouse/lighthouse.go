@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	Svc = "svc"
-	Pod = "pod"
+	Svc        = "svc"
+	Pod        = "pod"
+	defaultTtl = uint32(5)
 )
 
 var (
@@ -27,6 +28,7 @@ type Lighthouse struct {
 	Next           plugin.Handler
 	Fall           fall.F
 	Zones          []string
+	ttl            uint32
 	serviceImports *serviceimport.Map
 	endpointSlices *endpointslice.Map
 	clusterStatus  ClusterStatus
