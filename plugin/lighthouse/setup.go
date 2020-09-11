@@ -3,6 +3,7 @@ package lighthouse
 import (
 	"flag"
 	"fmt"
+	"strconv"
 
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -81,7 +82,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil
 	})
 
-	lh := &Lighthouse{serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap}
+	lh := &Lighthouse{ttl: defaultTtl, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
@@ -100,6 +101,14 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 			switch c.Val() {
 			case "fallthrough":
 				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
+			case "ttl":
+				t, err := parseTtl(c)
+
+				if err != nil {
+					return nil, err
+				}
+
+				lh.ttl = t
 			default:
 				if c.Val() != "}" {
 					return nil, c.Errf("unknown property '%s'", c.Val())
@@ -109,6 +118,25 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	}
 
 	return lh, nil
+}
+
+func parseTtl(c *caddy.Controller) (uint32, error) {
+	// Refer: https://github.com/coredns/coredns/blob/master/plugin/kubernetes/setup.go
+	args := c.RemainingArgs()
+	if len(args) == 0 {
+		return 0, c.ArgErr()
+	}
+
+	t, err := strconv.Atoi(args[0])
+	if err != nil {
+		return 0, err
+	}
+
+	if t < 0 || t > 3600 {
+		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t)
+	}
+
+	return uint32(t), nil
 }
 
 func init() {
