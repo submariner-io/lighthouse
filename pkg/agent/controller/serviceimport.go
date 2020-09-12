@@ -191,13 +191,6 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 		c.endpointControllers.Delete(key)
 	}
 
-	labelSelector := labels.Set(map[string]string{lhconstants.LabelSourceName: si.Name}).AsSelector()
-	err := c.kubeClientSet.DiscoveryV1beta1().EndpointSlices(si.Namespace).
-		DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector.String()})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
 	c.serviceImportDeletedMap.Delete(key)
 
 	return nil
