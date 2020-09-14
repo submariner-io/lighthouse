@@ -9,7 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -164,11 +163,10 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 		return nil
 	}
 
-	labelSelector := labels.Set(service.GetLabels()).AsSelector()
 	endpointController := newEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
-		serviceImportCreated.ObjectMeta.Name, serviceNameSpace, c.clusterID)
+		serviceImportCreated.ObjectMeta.Name, serviceName, serviceNameSpace, c.clusterID)
 
-	endpointController.start(endpointController.stopCh, labelSelector)
+	endpointController.start(endpointController.stopCh)
 	c.endpointControllers.Store(key, endpointController)
 
 	return nil
