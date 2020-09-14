@@ -355,11 +355,15 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 		if sliceCount != anyCount && len(endpointSliceList.Items) != sliceCount {
 			return false, fmt.Sprintf("%d endpointslices found when expected %d", len(endpointSliceList.Items), sliceCount), nil
 		}
-		endpointSlice := &endpointSliceList.Items[0]
 
-		if epCount != anyCount && len(endpointSlice.Endpoints) != epCount {
-			return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", len(endpointSlice.Endpoints), epCount), nil
+		if len(endpointSliceList.Items) > 0 {
+			endpointSlice := &endpointSliceList.Items[0]
+
+			if epCount != anyCount && len(endpointSlice.Endpoints) != epCount {
+				return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", len(endpointSlice.Endpoints), epCount), nil
+			}
 		}
+
 		return true, "", nil
 	})
 
