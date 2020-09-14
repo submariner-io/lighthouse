@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +15,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
@@ -27,7 +27,7 @@ type Controller struct {
 	NewClientset     NewClientsetFunc
 	informer         cache.Controller
 	store            cache.Store
-	queue            workqueue.RateLimitingInterface
+	queue            workqueue.Interface
 	stopCh           chan struct{}
 	clusterStatusMap atomic.Value
 	gatewayAvailable bool
@@ -36,7 +36,7 @@ type Controller struct {
 func NewController() *Controller {
 	controller := &Controller{
 		NewClientset:     getNewClientsetFunc(),
-		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:            workqueue.New("Gateway Controller"),
 		stopCh:           make(chan struct{}),
 		gatewayAvailable: true,
 	}
@@ -75,18 +75,9 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		},
 		WatchFunc: gwClientset.Watch,
 	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(key)
-			}
-		},
-		UpdateFunc: func(obj interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(log.DEBUG).Infof("GatewayStatus %q updated", key)
-			if err == nil {
-				c.queue.Add(key)
-			}
+		AddFunc: c.queue.Enqueue,
+		UpdateFunc: func(old interface{}, new interface{}) {
+			c.queue.Enqueue(new)
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -100,7 +91,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		return fmt.Errorf("failed to wait for informer cache to sync")
 	}
 
-	go c.runWorker()
+	go c.queue.Run(c.stopCh, c.processNextGateway)
 
 	return nil
 }
@@ -111,34 +102,18 @@ func (c *Controller) Stop() {
 	klog.Infof("Gateway status Controller stopped")
 }
 
-func (c *Controller) runWorker() {
-	for {
-		keyObj, shutdown := c.queue.Get()
-		if shutdown {
-			klog.Infof("Lighthouse watcher for Gateways stopped")
-			return
-		}
-
-		key := keyObj.(string)
-
-		func() {
-			defer c.queue.Done(key)
-			obj, exists, err := c.store.GetByKey(key)
-			if err != nil {
-				klog.Errorf("Error retrieving gateway with key %q from the cache: %v", key, err)
-				// requeue the item to work on later
-				c.queue.AddRateLimited(key)
-
-				return
-			}
-
-			if exists {
-				c.gatewayCreatedOrUpdated(obj.(*unstructured.Unstructured))
-			}
-
-			c.queue.Forget(key)
-		}()
+func (c *Controller) processNextGateway(key, name, ns string) (bool, error) {
+	obj, exists, err := c.store.GetByKey(key)
+	if err != nil {
+		// requeue the item to work on later
+		return true, fmt.Errorf("error retrieving Gateway with key %q from the cache: %v", key, err)
 	}
+
+	if exists {
+		c.gatewayCreatedOrUpdated(obj.(*unstructured.Unstructured))
+	}
+
+	return false, nil
 }
 
 func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
