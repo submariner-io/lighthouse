@@ -269,19 +269,19 @@ func testClusterStatus() {
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP}, lighthousev2a1.ClusterSetIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP2}, lighthousev2a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
-	When("service is in two clusters and both are connected", func() {
-		It("should succeed and write an A record response", func() {
+	When("service is in two clusters and specific cluster is requested", func() {
+		It("should succeed and write that cluster's IP as A record response", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+					test.A(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
 				},
 			})
 		})
@@ -289,7 +289,7 @@ func testClusterStatus() {
 
 	When("service is in two connected clusters and one has no IP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.ClusterSetIP))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{}, ""))
 		})
 		It("should succeed and write an A record response with the available IP", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -313,7 +313,7 @@ func testClusterStatus() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
 				},
 			})
 		})
@@ -424,7 +424,7 @@ func testHeadlessService() {
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP2}, lighthousev2a1.Headless))
 			mockCs.clusterStatusMap[clusterID2] = true
 		})
-		When("query for headless service", func() {
+		When("no cluster is requested", func() {
 			It("should succeed and write all IPs as A records in response", func() {
 				executeTestCase(lh, rec, test.Case{
 					Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
@@ -437,8 +437,8 @@ func testHeadlessService() {
 				})
 			})
 		})
-		When("query for headless service in specific cluster", func() {
-			It("should succeed and write one IP as A record in response", func() {
+		When("requested for a specific cluster", func() {
+			It("should succeed and write the cluster's IP as A record in response", func() {
 				executeTestCase(lh, rec, test.Case{
 					Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 					Qtype: dns.TypeA,
