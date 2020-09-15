@@ -13,9 +13,14 @@ import (
 	"k8s.io/klog"
 )
 
+type NewClientsetFunc func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
+
+// Indirection hook for unit tests to supply fake client sets
+var NewClientset NewClientsetFunc
+
 type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
-	NewClientset    func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
+	NewClientset    NewClientsetFunc
 	serviceInformer cache.SharedIndexInformer
 	stopCh          chan struct{}
 	store           Store
@@ -23,11 +28,19 @@ type Controller struct {
 
 func NewController(serviceImportStore Store) *Controller {
 	return &Controller{
-		NewClientset: func(c *rest.Config) (lighthouseClientset.Interface, error) {
-			return lighthouseClientset.NewForConfig(c)
-		},
-		store:  serviceImportStore,
-		stopCh: make(chan struct{}),
+		NewClientset: getNewClientsetFunc(),
+		store:        serviceImportStore,
+		stopCh:       make(chan struct{}),
+	}
+}
+
+func getNewClientsetFunc() NewClientsetFunc {
+	if NewClientset != nil {
+		return NewClientset
+	}
+
+	return func(c *rest.Config) (lighthouseClientset.Interface, error) {
+		return lighthouseClientset.NewForConfig(c)
 	}
 }
 
@@ -52,6 +65,10 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	})
 
 	go c.serviceInformer.Run(c.stopCh)
+
+	if ok := cache.WaitForCacheSync(c.stopCh, c.serviceInformer.HasSynced); !ok {
+		return fmt.Errorf("failed to wait for informer cache to sync")
+	}
 
 	return nil
 }
