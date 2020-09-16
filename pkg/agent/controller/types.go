@@ -13,15 +13,16 @@ import (
 )
 
 type Controller struct {
-	clusterID           string
-	globalnetEnabled    bool
-	namespace           string
-	kubeClientSet       kubernetes.Interface
-	lighthouseClient    lighthouseClientset.Interface
-	serviceExportSyncer *broker.Syncer
-	endpointSliceSyncer *broker.Syncer
-	serviceSyncer       syncer.Interface
-	endpointSyncer      syncer.Interface
+	clusterID               string
+	globalnetEnabled        bool
+	namespace               string
+	kubeClientSet           kubernetes.Interface
+	lighthouseClient        lighthouseClientset.Interface
+	serviceExportSyncer     *broker.Syncer
+	endpointSliceSyncer     *broker.Syncer
+	serviceSyncer           syncer.Interface
+	endpointSyncer          syncer.Interface
+	serviceImportController *ServiceImportController
 }
 
 type AgentSpecification struct {
@@ -55,6 +56,7 @@ type EndpointController struct {
 	serviceImportUID             types.UID
 	clusterID                    string
 	serviceImportName            string
+	serviceName                  string
 	serviceImportSourceNameSpace string
 	endpointDeletedMap           sync.Map
 	stopCh                       chan struct{}

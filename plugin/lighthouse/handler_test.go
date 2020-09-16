@@ -66,6 +66,7 @@ func testWithoutFallback() {
 			Zones:          []string{"cluster.local."},
 			serviceImports: setupServiceImportMap(),
 			clusterStatus:  mockCs,
+			ttl:            defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -78,7 +79,7 @@ func testWithoutFallback() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -92,7 +93,7 @@ func testWithoutFallback() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace2 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace2 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -179,6 +180,7 @@ func testWithFallback() {
 			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
 			serviceImports: setupServiceImportMap(),
 			clusterStatus:  mockCs,
+			ttl:            defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -252,6 +254,7 @@ func testClusterStatus() {
 			Zones:          []string{"cluster.local."},
 			serviceImports: setupServiceImportMap(),
 			clusterStatus:  mockCs,
+			ttl:            defaultTtl,
 		}
 		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP}, lighthousev2a1.ClusterSetIP))
 
@@ -265,7 +268,7 @@ func testClusterStatus() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -281,7 +284,7 @@ func testClusterStatus() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -297,7 +300,7 @@ func testClusterStatus() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -349,6 +352,7 @@ func testHeadlessService() {
 			Zones:          []string{"cluster.local."},
 			serviceImports: serviceimport.NewMap(),
 			clusterStatus:  mockCs,
+			ttl:            defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -378,7 +382,7 @@ func testHeadlessService() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
@@ -394,8 +398,8 @@ func testHeadlessService() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP2),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP2),
 				},
 			})
 		})
@@ -413,8 +417,8 @@ func testHeadlessService() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP),
-					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    0    IN    A    " + serviceIP2),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.cluster.local.    5    IN    A    " + serviceIP2),
 				},
 			})
 		})
