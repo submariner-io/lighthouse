@@ -56,6 +56,7 @@ type EndpointController struct {
 	serviceImportUID             types.UID
 	clusterID                    string
 	serviceImportName            string
+	serviceName                  string
 	serviceImportSourceNameSpace string
 	endpointDeletedMap           sync.Map
 	stopCh                       chan struct{}

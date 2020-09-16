@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -10,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -22,12 +21,13 @@ import (
 )
 
 func newEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid types.UID, serviceImportName,
-	serviceImportNameSpace, clusterId string) *EndpointController {
+	serviceName, serviceImportNameSpace, clusterId string) *EndpointController {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	endpointController := &EndpointController{
 		endPointqueue:                queue,
 		serviceImportUID:             serviceImportuid,
 		serviceImportName:            serviceImportName,
+		serviceName:                  serviceName,
 		serviceImportSourceNameSpace: serviceImportNameSpace,
 		kubeClientSet:                kubeClientSet,
 		clusterID:                    clusterId,
@@ -37,16 +37,17 @@ func newEndpointController(kubeClientSet kubernetes.Interface, serviceImportuid 
 	return endpointController
 }
 
-func (e *EndpointController) start(stopCh <-chan struct{}, labelSelector fmt.Stringer) {
+func (e *EndpointController) start(stopCh <-chan struct{}) {
+	nameSelector := fields.OneTermEqualSelector("metadata.name", e.serviceName)
 	e.store, e.endpointInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.LabelSelector = labelSelector.String()
-				return e.kubeClientSet.CoreV1().Endpoints(metav1.NamespaceAll).List(options)
+				options.FieldSelector = nameSelector.String()
+				return e.kubeClientSet.CoreV1().Endpoints(e.serviceImportSourceNameSpace).List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = labelSelector.String()
-				return e.kubeClientSet.CoreV1().Endpoints(metav1.NamespaceAll).Watch(options)
+				options.FieldSelector = nameSelector.String()
+				return e.kubeClientSet.CoreV1().Endpoints(e.serviceImportSourceNameSpace).Watch(options)
 			},
 		},
 		&corev1.Endpoints{},
@@ -93,7 +94,7 @@ func (e *EndpointController) start(stopCh <-chan struct{}, labelSelector fmt.Str
 		},
 	)
 
-	klog.V(log.DEBUG).Infof("Starting Endpoint watcher for %q started", e.serviceImportName)
+	klog.V(log.DEBUG).Infof("Starting Endpoint watcher for %q", e.serviceImportName)
 
 	go e.endpointInformer.Run(e.stopCh)
 	go e.runEndpointWorker(e.endpointInformer, e.endPointqueue)
@@ -143,6 +144,7 @@ func (e *EndpointController) runEndpointWorker(informer cache.Controller, queue 
 
 func (e *EndpointController) endPointCreatedOrUpdated(obj interface{}, key string) error {
 	endPoints := obj.(*corev1.Endpoints)
+
 	newEndPointSlice := e.endpointSliceFromEndpoints(endPoints)
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		currentEndpointSice, err := e.kubeClientSet.DiscoveryV1beta1().EndpointSlices(endPoints.Namespace).
@@ -202,6 +204,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		discovery.LabelManagedBy:           lhconstants.LabelValueManagedBy,
 		lhconstants.LabelSourceNamespace:   e.serviceImportSourceNameSpace,
 		lhconstants.LabelSourceCluster:     e.clusterID,
+		lhconstants.LabelSourceName:        e.serviceName,
 	}
 	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
 		APIVersion:         "lighthouse.submariner.io.v2alpha1",
