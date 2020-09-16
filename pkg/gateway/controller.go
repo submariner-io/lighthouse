@@ -24,7 +24,7 @@ type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
 var NewClientset NewClientsetFunc
 
 type Controller struct {
-	newClientset     NewClientsetFunc
+	NewClientset     NewClientsetFunc
 	informer         cache.Controller
 	store            cache.Store
 	queue            workqueue.RateLimitingInterface
@@ -35,7 +35,7 @@ type Controller struct {
 
 func NewController() *Controller {
 	controller := &Controller{
-		newClientset:     getNewClientsetFunc(),
+		NewClientset:     getNewClientsetFunc(),
 		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		stopCh:           make(chan struct{}),
 		gatewayAvailable: true,
@@ -95,6 +95,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	})
 
 	go c.informer.Run(c.stopCh)
+
+	if ok := cache.WaitForCacheSync(c.stopCh, c.informer.HasSynced); !ok {
+		return fmt.Errorf("failed to wait for informer cache to sync")
+	}
+
 	go c.runWorker()
 
 	return nil
@@ -156,7 +161,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 		clusterId, found, err := unstructured.NestedString(connectionMap, "endpoint", "cluster_id")
 		if !found || err != nil {
 			klog.Errorf("cluster_id field not found in %#v", connectionMap)
-			return
+			continue
 		}
 
 		if status == "connected" {
@@ -213,8 +218,8 @@ func getGatewayStatus(obj *unstructured.Unstructured) (connections []interface{}
 	}
 
 	if haStatus == "active" {
-		rconns, found, err := unstructured.NestedSlice(status, "connections")
-		if !found || err != nil {
+		rconns, _, err := unstructured.NestedSlice(status, "connections")
+		if err != nil {
 			klog.Errorf("connections field not found in %#v, err was: %v", status, err)
 			return connections, false
 		}
@@ -234,7 +239,7 @@ func (c *Controller) IsConnected(clusterId string) bool {
 }
 
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
-	clientSet, err := c.newClientset(kubeConfig)
+	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client set: %v", err)
 	}
