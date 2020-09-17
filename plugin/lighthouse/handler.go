@@ -53,7 +53,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "host not found")
 		}
 	} else {
-		ips, found = lh.serviceImports.GetIPs(pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
+		ips, found = lh.serviceImports.GetIPs(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected)
 		if !found {
 			// We couldn't find record for this service name
 			log.Debugf("No record found for service %q", qname)

@@ -53,7 +53,7 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(s
 	return ""
 }
 
-func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]string, bool) {
+func (m *Map) GetIPs(namespace, name, cluster string, checkCluster func(string) bool) ([]string, bool) {
 	clusterIPs, queue, counter, isHeadless := func() (map[string][]string, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
@@ -68,6 +68,11 @@ func (m *Map) GetIPs(namespace, name string, checkCluster func(string) bool) ([]
 
 	if clusterIPs == nil {
 		return nil, false
+	}
+
+	if cluster != "" {
+		ips, found := clusterIPs[cluster]
+		return ips, found
 	}
 
 	if !isHeadless {

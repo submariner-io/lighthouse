@@ -36,14 +36,23 @@ var _ = Describe("ServiceImport Map", func() {
 		return clusterStatusMap[id]
 	}
 
-	getIPs := func(ns, name string) []string {
-		ips, found := serviceImportMap.GetIPs(ns, name, checkCluster)
+	getIPs := func(ns, name, cluster string) []string {
+		ips, found := serviceImportMap.GetIPs(ns, name, cluster, checkCluster)
 		Expect(found).To(BeTrue())
 		return ips
 	}
 
 	getIP := func(ns, name string) string {
-		ips := getIPs(ns, name)
+		ips := getIPs(ns, name, "")
+		if len(ips) == 0 {
+			return ""
+		}
+		Expect(ips).To(HaveLen(1))
+		return ips[0]
+	}
+
+	getClusterIP := func(ns, name, cluster string) string {
+		ips := getIPs(ns, name, cluster)
 		if len(ips) == 0 {
 			return ""
 		}
@@ -54,7 +63,7 @@ var _ = Describe("ServiceImport Map", func() {
 	expectIPs := func(ns, name string, expIPs []string) {
 		sort.Strings(expIPs)
 		for i := 0; i < 5; i++ {
-			ips := getIPs(namespace1, service1)
+			ips := getIPs(namespace1, service1, "")
 			sort.Strings(ips)
 			Expect(ips).To(Equal(expIPs))
 		}
@@ -90,28 +99,47 @@ var _ = Describe("ServiceImport Map", func() {
 	})
 
 	When("a service is present in three connected clusters", func() {
-		It("should consistently return the IPs round-robin", func() {
+		JustBeforeEach(func() {
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP3, clusterID3))
+		})
+		When("no specific cluster is requested", func() {
+			It("should consistently return the IPs round-robin", func() {
 
-			firstIP := getIP(namespace1, service1)
-			Expect(firstIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
+				firstIP := getIP(namespace1, service1)
+				Expect(firstIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
 
-			secondIP := getIP(namespace1, service1)
-			Expect(secondIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
-			Expect(secondIP).ToNot(Equal(firstIP))
+				secondIP := getIP(namespace1, service1)
+				Expect(secondIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
+				Expect(secondIP).ToNot(Equal(firstIP))
 
-			thirdIP := getIP(namespace1, service1)
-			Expect(thirdIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
-			Expect(thirdIP).ToNot(Equal(firstIP))
-			Expect(thirdIP).ToNot(Equal(secondIP))
+				thirdIP := getIP(namespace1, service1)
+				Expect(thirdIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
+				Expect(thirdIP).ToNot(Equal(firstIP))
+				Expect(thirdIP).ToNot(Equal(secondIP))
 
-			for i := 0; i < 5; i++ {
-				Expect(getIP(namespace1, service1)).To(Equal(firstIP))
-				Expect(getIP(namespace1, service1)).To(Equal(secondIP))
-				Expect(getIP(namespace1, service1)).To(Equal(thirdIP))
-			}
+				for i := 0; i < 5; i++ {
+					Expect(getIP(namespace1, service1)).To(Equal(firstIP))
+					Expect(getIP(namespace1, service1)).To(Equal(secondIP))
+					Expect(getIP(namespace1, service1)).To(Equal(thirdIP))
+				}
+			})
+		})
+		When("specific cluster is requested", func() {
+			It("should consistently return that cluster's IPs", func() {
+
+				firstIP := getClusterIP(namespace1, service1, clusterID2)
+				Expect(firstIP).To(Equal(serviceIP2))
+				Expect(firstIP).ToNot(Or(Equal(serviceIP1), Equal(serviceIP3)))
+
+				secondIP := getClusterIP(namespace1, service1, clusterID2)
+				Expect(secondIP).To(Equal(firstIP))
+
+				thirdIP := getClusterIP(namespace1, service1, clusterID2)
+				Expect(thirdIP).To(Equal(firstIP))
+
+			})
 		})
 	})
 
@@ -163,7 +191,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service does not exist", func() {
 		It("should return not found", func() {
-			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, "", checkCluster)
 			Expect(found).To(BeFalse())
 		})
 	})
@@ -185,7 +213,7 @@ var _ = Describe("ServiceImport Map", func() {
 			Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 
 			serviceImportMap.Remove(si)
-			_, found := serviceImportMap.GetIPs(namespace1, service1, checkCluster)
+			_, found := serviceImportMap.GetIPs(namespace1, service1, "", checkCluster)
 			Expect(found).To(BeFalse())
 
 			// Should be a no-op
