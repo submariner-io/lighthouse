@@ -1,86 +1,52 @@
 package controller
 
 import (
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/syncer"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	"github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
-func newServiceImportController(spec *AgentSpecification, kubeClientSet kubernetes.Interface,
-	lighthouseClient lighthouseClientset.Interface) *ServiceImportController {
-	return &ServiceImportController{
-		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		kubeClientSet:    kubeClientSet,
-		lighthouseClient: lighthouseClient,
-		clusterID:        spec.ClusterID,
-		namespace:        spec.Namespace,
+func newServiceImportController(spec *AgentSpecification, kubeClientSet kubernetes.Interface, restMapper meta.RESTMapper,
+	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
+	controller := &ServiceImportController{
+		kubeClientSet: kubeClientSet,
+		clusterID:     spec.ClusterID,
 	}
+
+	var err error
+
+	controller.serviceImportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:            "ServiceImport watcher",
+		SourceClient:    localClient,
+		SourceNamespace: spec.Namespace,
+		Direction:       syncer.LocalToRemote,
+		RestMapper:      restMapper,
+		Federator:       federate.NewNoopFederator(),
+		ResourceType:    &lighthousev2a1.ServiceImport{},
+		Transform:       controller.serviceImportToEndpointController,
+		Scheme:          scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return controller, nil
 }
 
 func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
-	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(c.lighthouseClient, 0,
-		externalversions.WithNamespace(c.namespace))
-	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
-
-	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			klog.V(log.DEBUG).Infof("ServiceImport %q added", key)
-			if err == nil {
-				c.queue.Add(key)
-			}
-		},
-		UpdateFunc: func(obj interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			klog.V(log.DEBUG).Infof("ServiceImport %q updated", key)
-			if err == nil {
-				c.queue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			klog.V(log.DEBUG).Infof("ServiceImport %q deleted", key)
-			if err == nil {
-				var si *lighthousev2a1.ServiceImport
-				var ok bool
-				if si, ok = obj.(*lighthousev2a1.ServiceImport); !ok {
-					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						klog.Errorf("Failed to get deleted serviceimport object for key %s, serviceImport %v", key, si)
-						return
-					}
-
-					si, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
-
-					if !ok {
-						klog.Errorf("Failed to convert deleted tombstone object %v  to serviceimport", tombstone.Obj)
-						return
-					}
-				}
-				if si.Spec.Type != lighthousev2a1.Headless {
-					return
-				}
-				c.serviceImportDeletedMap.Store(key, si)
-				c.queue.AddRateLimited(key)
-			}
-		},
-	})
-
-	go c.serviceInformer.Run(stopCh)
-	go c.runServiceImportWorker()
-
-	go func(stopCh <-chan struct{}) {
+	go func() {
 		<-stopCh
-		c.queue.ShutDown()
 
 		c.endpointControllers.Range(func(key, value interface{}) bool {
 			value.(*EndpointController).Stop()
@@ -88,61 +54,27 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		})
 
 		klog.Infof("ServiceImport Controller stopped")
-	}(stopCh)
+	}()
+
+	if err := c.serviceImportSyncer.Start(stopCh); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (c *ServiceImportController) runServiceImportWorker() {
-	for {
-		keyObj, shutdown := c.queue.Get()
-		if shutdown {
-			klog.Infof("Lighthouse watcher for ServiceImports stopped")
-			return
-		}
-
-		key := keyObj.(string)
-
-		func() {
-			defer c.queue.Done(key)
-			obj, exists, err := c.serviceInformer.GetIndexer().GetByKey(key)
-
-			if err != nil {
-				klog.Errorf("Error retrieving the object with store is  %v from the cache: %v", c.serviceInformer.GetIndexer().ListKeys(), err)
-				// requeue the item to work on later
-				c.queue.AddRateLimited(key)
-
-				return
-			}
-
-			if exists {
-				err = c.serviceImportCreatedOrUpdated(obj, key)
-			} else {
-				err = c.serviceImportDeleted(key)
-			}
-
-			if err != nil {
-				c.queue.AddRateLimited(key)
-			} else {
-				c.queue.Forget(key)
-			}
-		}()
-	}
-}
-
-func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{}, key string) error {
+func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *lighthousev2a1.ServiceImport, key string) bool {
 	if _, found := c.endpointControllers.Load(key); found {
-		klog.V(log.DEBUG).Infof("The endpoint controller is already running fof %q", key)
-		return nil
+		klog.V(log.DEBUG).Infof("The endpoint controller is already running for %q", key)
+		return false
 	}
 
-	serviceImportCreated := obj.(*lighthousev2a1.ServiceImport)
-	if serviceImportCreated.Spec.Type != lighthousev2a1.Headless ||
-		serviceImportCreated.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
-		return nil
+	if serviceImport.Spec.Type != lighthousev2a1.Headless ||
+		serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+		return false
 	}
 
-	annotations := serviceImportCreated.ObjectMeta.Annotations
+	annotations := serviceImport.ObjectMeta.Annotations
 	serviceNameSpace := annotations[lhconstants.OriginNamespace]
 	serviceName := annotations[lhconstants.OriginName]
 	var service *corev1.Service
@@ -150,42 +82,31 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(obj interface{},
 	service, err := c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil
+			return false
 		}
 
 		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, err)
 
-		return err
+		return true
 	}
 
 	if service.Spec.Selector == nil {
 		klog.Errorf("The service %s/%s without a Selector is not supported", serviceNameSpace, serviceName)
-		return nil
+		return false
 	}
 
-	endpointController := newEndpointController(c.kubeClientSet, serviceImportCreated.ObjectMeta.UID,
-		serviceImportCreated.ObjectMeta.Name, serviceName, serviceNameSpace, c.clusterID)
+	endpointController := newEndpointController(c.kubeClientSet, serviceImport.ObjectMeta.UID,
+		serviceImport.ObjectMeta.Name, serviceName, serviceNameSpace, c.clusterID)
 
 	endpointController.start(endpointController.stopCh)
 	c.endpointControllers.Store(key, endpointController)
 
-	return nil
+	return false
 }
 
-func (c *ServiceImportController) serviceImportDeleted(key string) error {
-	obj, found := c.serviceImportDeletedMap.Load(key)
-	if !found {
-		klog.Warningf("No endpoint controller found  for %q", key)
-		c.serviceImportDeletedMap.Delete(key)
-
-		return nil
-	}
-
-	si := obj.(*lighthousev2a1.ServiceImport)
-
-	if si.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
-		c.serviceImportDeletedMap.Delete(key)
-		return nil
+func (c *ServiceImportController) serviceImportDeleted(serviceImport *lighthousev2a1.ServiceImport, key string) bool {
+	if serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+		return false
 	}
 
 	if obj, found := c.endpointControllers.Load(key); found {
@@ -194,7 +115,15 @@ func (c *ServiceImportController) serviceImportDeleted(key string) error {
 		c.endpointControllers.Delete(key)
 	}
 
-	c.serviceImportDeletedMap.Delete(key)
+	return false
+}
 
-	return nil
+func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	serviceImport := obj.(*lighthousev2a1.ServiceImport)
+	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
+	if op == syncer.Create || op == syncer.Update {
+		return nil, c.serviceImportCreatedOrUpdated(serviceImport, key)
+	}
+
+	return nil, c.serviceImportDeleted(serviceImport, key)
 }

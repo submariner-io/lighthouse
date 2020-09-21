@@ -35,14 +35,10 @@ type AgentSpecification struct {
 // and creates an EndpointController in response. The EndpointController will use the app label as filter
 // to listen only for the endpoints event related to ServiceImport created
 type ServiceImportController struct {
-	kubeClientSet           kubernetes.Interface
-	lighthouseClient        lighthouseClientset.Interface
-	serviceInformer         cache.SharedIndexInformer
-	queue                   workqueue.RateLimitingInterface
-	endpointControllers     sync.Map
-	serviceImportDeletedMap sync.Map
-	clusterID               string
-	namespace               string
+	kubeClientSet       kubernetes.Interface
+	serviceImportSyncer syncer.Interface
+	endpointControllers sync.Map
+	clusterID           string
 }
 
 // Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
