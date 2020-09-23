@@ -209,20 +209,25 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		return serviceImport, false
 	}
 
-	svc, err := a.kubeClientSet.CoreV1().Services(svcExport.Namespace).Get(svcExport.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
+	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
+	if err != nil {
+		// some other error. Log and requeue
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
+		klog.Errorf("Error retrieving Service (%s/%s): %v", svcExport.Namespace, svcExport.Name, err)
+
+		return nil, true
+	}
+
+	if !found {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 
 		return nil, true
-	} else if err != nil {
-		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
-			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
-		klog.Errorf("Error retrieving Service (%s/%s): %v", svcExport.Namespace, svcExport.Name, err)
-		return nil, true
 	}
+
+	svc := obj.(*corev1.Service)
 
 	svcType, ok := getServiceImportType(svc)
 
@@ -319,15 +324,19 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	}
 
 	svc := obj.(*corev1.Service)
-	svcExport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		// Service Export not created yet
-		return nil, false
-	} else if err != nil {
+	obj, found, err := a.serviceExportSyncer.GetLocalResource(svc.Name, svc.Namespace, &lighthousev2a1.ServiceExport{})
+	if err != nil {
 		// some other error. Log and requeue
 		klog.Errorf("Error retrieving ServiceExport for Service (%s/%s): %v", svc.Namespace, svc.Name, err)
 		return nil, true
 	}
+
+	if !found {
+		// Service Export not created yet
+		return nil, false
+	}
+
+	svcExport := obj.(*lighthousev2a1.ServiceExport)
 
 	serviceImport := a.newServiceImport(svcExport)
 
@@ -340,15 +349,18 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 
 func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	ep := obj.(*corev1.Endpoints)
-	svcExport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(ep.Namespace).Get(ep.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		// Service Export not created yet
-		return nil, false
-	} else if err != nil {
-		// some other error. Log and requeue
+	obj, found, err := a.serviceExportSyncer.GetLocalResource(ep.Name, ep.Namespace, &lighthousev2a1.ServiceExport{})
+	if err != nil {
 		klog.Errorf("Error retrieving ServiceExport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
 		return nil, true
 	}
+
+	if !found {
+		// Service Export not created yet
+		return nil, false
+	}
+
+	svcExport := obj.(*lighthousev2a1.ServiceExport)
 
 	serviceImport, err := a.getServiceImport(svcExport)
 
