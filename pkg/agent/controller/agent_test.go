@@ -43,7 +43,19 @@ var ready = true
 var notReady = false
 
 var _ = Describe("ServiceImport syncing", func() {
-	t := newTestDiver()
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
 
 	When("a ServiceExport is created", func() {
 		When("the Service already exists", func() {
@@ -165,15 +177,23 @@ var _ = Describe("ServiceImport syncing", func() {
 })
 
 var _ = Describe("Globalnet enabled", func() {
-	t := newTestDiver()
-
 	globalIP := "192.168.10.34"
-	t.cluster1.agentSpec.GlobalnetEnabled = true
-	t.cluster2.agentSpec.GlobalnetEnabled = true
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+		t.cluster1.agentSpec.GlobalnetEnabled = true
+		t.cluster2.agentSpec.GlobalnetEnabled = true
+	})
 
 	JustBeforeEach(func() {
+		t.justBeforeEach()
 		t.createService()
 		t.createServiceExport()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
 	})
 
 	When("a local ServiceExport is created and the Service has a global IP", func() {
@@ -213,14 +233,20 @@ var _ = Describe("Globalnet enabled", func() {
 })
 
 var _ = Describe("Headless service syncing", func() {
-	t := newTestDiver()
+	var t *testDriver
 
 	BeforeEach(func() {
+		t = newTestDiver()
 		t.service.Spec.ClusterIP = corev1.ClusterIPNone
 	})
 
 	JustBeforeEach(func() {
+		t.justBeforeEach()
 		t.createService()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
 	})
 
 	When("a ServiceExport is created", func() {
@@ -275,12 +301,21 @@ var _ = Describe("Headless service syncing", func() {
 })
 
 var _ = Describe("Service export failures", func() {
-	t := newTestDiver()
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
 
 	JustBeforeEach(func() {
+		t.justBeforeEach()
 		t.createService()
 		t.createEndpoints()
 		t.createServiceExport()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
 	})
 
 	When("Endpoints retrieval initially fails", func() {
@@ -371,13 +406,7 @@ func newTestDiver() *testDriver {
 				GlobalnetEnabled: false,
 			},
 		},
-	}
-
-	BeforeEach(func() {
-		t.now = time.Now()
-		t.stopCh = make(chan struct{})
-
-		t.service = &corev1.Service{
+		service: &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nginx",
 				Namespace: test.LocalNamespace,
@@ -386,115 +415,115 @@ func newTestDiver() *testDriver {
 				ClusterIP: "10.253.9.1",
 				Selector:  map[string]string{"app": "test"},
 			},
-		}
+		},
+		restMapper: test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{},
+			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}),
+		brokerDynClient: fake.NewDynamicClient(),
+		stopCh:          make(chan struct{}),
+		now:             time.Now(),
+	}
 
-		t.serviceExport = &lighthousev2a1.ServiceExport{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      t.service.Name,
-				Namespace: t.service.Namespace,
-			},
-		}
+	t.serviceExport = &lighthousev2a1.ServiceExport{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      t.service.Name,
+			Namespace: t.service.Namespace,
+		},
+	}
 
-		t.endpoints = &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      t.service.Name,
-				Namespace: t.service.Namespace,
-				Labels:    map[string]string{"app": "test"},
-			},
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{
-						{
-							IP:       "192.168.5.1",
-							Hostname: hostName,
-						},
-						{
-							IP:       "192.168.5.2",
-							NodeName: &nodeName,
-						},
+	t.endpoints = &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      t.service.Name,
+			Namespace: t.service.Namespace,
+			Labels:    map[string]string{"app": "test"},
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "192.168.5.1",
+						Hostname: hostName,
 					},
-					NotReadyAddresses: []corev1.EndpointAddress{
-						{
-							IP: "10.253.6.1",
-						},
-					},
-					Ports: []corev1.EndpointPort{
-						{
-							Name:     "port-1",
-							Protocol: corev1.ProtocolTCP,
-							Port:     1234,
-						},
+					{
+						IP:       "192.168.5.2",
+						NodeName: &nodeName,
 					},
 				},
-			},
-		}
-
-		t.restMapper = test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{},
-			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{})
-
-		t.brokerDynClient = fake.NewDynamicClient()
-
-		t.brokerServiceImportClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
-			&lighthousev2a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
-
-		t.brokerEndpointSliceClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
-			&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
-
-		t.cluster1.init(t.restMapper)
-		t.cluster2.init(t.restMapper)
-
-		_, endpointSliceInformer := cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(options)
+				NotReadyAddresses: []corev1.EndpointAddress{
+					{
+						IP: "10.253.6.1",
+					},
 				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(options)
+				Ports: []corev1.EndpointPort{
+					{
+						Name:     "port-1",
+						Protocol: corev1.ProtocolTCP,
+						Port:     1234,
+					},
 				},
 			},
-			&discovery.EndpointSlice{}, 0,
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					defer GinkgoRecover()
-					_, err := t.cluster1.localEndpointSliceClient.Create(test.ToUnstructured(obj.(runtime.Object)),
-						metav1.CreateOptions{})
-					Expect(err).To(Succeed())
-				},
-				UpdateFunc: func(obj interface{}, new interface{}) {
-					defer GinkgoRecover()
-					_, err := t.cluster1.localEndpointSliceClient.Update(test.ToUnstructured(new.(runtime.Object)),
-						metav1.UpdateOptions{})
-					Expect(err).To(Succeed())
-				},
-				DeleteFunc: func(obj interface{}) {
-					defer GinkgoRecover()
-					Expect(t.cluster1.localEndpointSliceClient.Delete(obj.(*discovery.EndpointSlice).Name, nil)).To(Succeed())
-				},
+		},
+	}
+
+	t.brokerServiceImportClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
+		&lighthousev2a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
+
+	t.brokerEndpointSliceClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
+		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
+
+	t.cluster1.init(t.restMapper)
+	t.cluster2.init(t.restMapper)
+
+	_, endpointSliceInformer := cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(options)
 			},
-		)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(options)
+			},
+		},
+		&discovery.EndpointSlice{}, 0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				defer GinkgoRecover()
+				_, err := t.cluster1.localEndpointSliceClient.Create(test.ToUnstructured(obj.(runtime.Object)),
+					metav1.CreateOptions{})
+				Expect(err).To(Succeed())
+			},
+			UpdateFunc: func(obj interface{}, new interface{}) {
+				defer GinkgoRecover()
+				_, err := t.cluster1.localEndpointSliceClient.Update(test.ToUnstructured(new.(runtime.Object)),
+					metav1.UpdateOptions{})
+				Expect(err).To(Succeed())
+			},
+			DeleteFunc: func(obj interface{}) {
+				defer GinkgoRecover()
+				Expect(t.cluster1.localEndpointSliceClient.Delete(obj.(*discovery.EndpointSlice).Name, nil)).To(Succeed())
+			},
+		},
+	)
 
-		go endpointSliceInformer.Run(t.stopCh)
-	})
-
-	JustBeforeEach(func() {
-		syncerConfig := &broker.SyncerConfig{
-			BrokerNamespace: test.RemoteNamespace,
-		}
-
-		syncerScheme := runtime.NewScheme()
-		Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
-		Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
-		Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
-
-		t.cluster1.start(t, syncerConfig, syncerScheme)
-		t.cluster2.start(t, syncerConfig, syncerScheme)
-	})
-
-	AfterEach(func() {
-		close(t.stopCh)
-	})
+	go endpointSliceInformer.Run(t.stopCh)
 
 	return t
+}
+
+func (t *testDriver) justBeforeEach() {
+	syncerConfig := &broker.SyncerConfig{
+		BrokerNamespace: test.RemoteNamespace,
+	}
+
+	syncerScheme := runtime.NewScheme()
+	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
+	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
+	Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
+
+	t.cluster1.start(t, syncerConfig, syncerScheme)
+	t.cluster2.start(t, syncerConfig, syncerScheme)
+}
+
+func (t *testDriver) afterEach() {
+	close(t.stopCh)
 }
 
 func (c *cluster) init(restMapper meta.RESTMapper) {
