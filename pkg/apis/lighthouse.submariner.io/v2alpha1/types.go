@@ -98,15 +98,16 @@ const (
 // ServiceImportSpec describes an imported service and the information necessary to consume it.
 type ServiceImportSpec struct {
 	// +listType=atomic
-	Ports []ServicePort `json:"ports"`
+	// +optional
+	Ports []ServicePort `json:"ports,omitempty"`
 	// +optional
 	IP string `json:"ip,omitempty"`
 	// +optional
-	Type ServiceImportType `json:"type"`
+	Type ServiceImportType `json:"type,omitempty"`
 	// +optional
-	SessionAffinity corev1.ServiceAffinity `json:"sessionAffinity"`
+	SessionAffinity corev1.ServiceAffinity `json:"sessionAffinity,omitempty"`
 	// +optional
-	SessionAffinityConfig *corev1.SessionAffinityConfig `json:"sessionAffinityConfig"`
+	SessionAffinityConfig *corev1.SessionAffinityConfig `json:"sessionAffinityConfig,omitempty"`
 }
 
 // ServicePort represents the port on which the service is exposed
