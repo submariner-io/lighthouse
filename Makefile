@@ -29,6 +29,8 @@ package/.image.lighthouse-agent: bin/lighthouse-agent
 
 package/.image.lighthouse-coredns: bin/lighthouse-coredns
 
+build: bin/lighthouse-agent bin/lighthouse-coredns
+
 bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
 	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go
 
