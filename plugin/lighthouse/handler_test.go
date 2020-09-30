@@ -11,18 +11,23 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	service1   = "service1"
-	namespace1 = "namespace1"
-	namespace2 = "namespace2"
-	serviceIP  = "100.96.156.101"
-	serviceIP2 = "100.96.156.102"
-	clusterID  = "cluster1"
-	clusterID2 = "cluster2"
+	service1    = "service1"
+	namespace1  = "namespace1"
+	namespace2  = "namespace2"
+	serviceIP   = "100.96.156.101"
+	serviceIP2  = "100.96.156.102"
+	clusterID   = "cluster1"
+	clusterID2  = "cluster2"
+	endpointIP  = "100.96.157.101"
+	endpointIP2 = "100.96.157.102"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
@@ -65,6 +70,7 @@ func testWithoutFallback() {
 		lh = &Lighthouse{
 			Zones:          []string{"clusterset.local."},
 			serviceImports: setupServiceImportMap(),
+			endpointSlices: setupEndpointSliceMap(),
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
@@ -192,6 +198,7 @@ func testWithFallback() {
 			Fall:           fall.F{Zones: []string{"clusterset.local."}},
 			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
 			serviceImports: setupServiceImportMap(),
+			endpointSlices: setupEndpointSliceMap(),
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
@@ -266,6 +273,7 @@ func testClusterStatus() {
 		lh = &Lighthouse{
 			Zones:          []string{"clusterset.local."},
 			serviceImports: setupServiceImportMap(),
+			endpointSlices: setupEndpointSliceMap(),
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
@@ -364,6 +372,7 @@ func testHeadlessService() {
 		lh = &Lighthouse{
 			Zones:          []string{"clusterset.local."},
 			serviceImports: serviceimport.NewMap(),
+			endpointSlices: setupEndpointSliceMap(),
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
@@ -374,6 +383,7 @@ func testHeadlessService() {
 	When("headless service has no IPs", func() {
 		JustBeforeEach(func() {
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.Headless))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{}))
 		})
 		It("should succeed and return empty response (NODATA)", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -387,7 +397,8 @@ func testHeadlessService() {
 
 	When("headless service has one IP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.Headless))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
 		})
 		It("should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -395,7 +406,7 @@ func testHeadlessService() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP),
 				},
 			})
 		})
@@ -403,7 +414,8 @@ func testHeadlessService() {
 
 	When("headless service has two IPs", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP, serviceIP2}, lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.Headless))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP, endpointIP2}))
 		})
 		It("should succeed and write two A records as response", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -411,8 +423,8 @@ func testHeadlessService() {
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
-					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP),
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP2),
 				},
 			})
 		})
@@ -420,8 +432,10 @@ func testHeadlessService() {
 
 	When("headless service is present in two clusters", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{serviceIP}, lighthousev2a1.Headless))
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{serviceIP2}, lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, []string{}, lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, []string{}, lighthousev2a1.Headless))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2}))
 			mockCs.clusterStatusMap[clusterID2] = true
 		})
 		When("no cluster is requested", func() {
@@ -431,8 +445,8 @@ func testHeadlessService() {
 					Qtype: dns.TypeA,
 					Rcode: dns.RcodeSuccess,
 					Answer: []dns.RR{
-						test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
-						test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
+						test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP),
+						test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP2),
 					},
 				})
 			})
@@ -444,7 +458,7 @@ func testHeadlessService() {
 					Qtype: dns.TypeA,
 					Rcode: dns.RcodeSuccess,
 					Answer: []dns.RR{
-						test.A(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+						test.A(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP),
 					},
 				})
 			})
@@ -472,6 +486,13 @@ func setupServiceImportMap() *serviceimport.Map {
 	return siMap
 }
 
+func setupEndpointSliceMap() *endpointslice.Map {
+	esMap := endpointslice.NewMap()
+	esMap.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
+
+	return esMap
+}
+
 func newServiceImport(namespace, name, clusterID string, serviceIPs []string,
 	siType lighthousev2a1.ServiceImportType) *lighthousev2a1.ServiceImport {
 	return &lighthousev2a1.ServiceImport{
@@ -492,6 +513,28 @@ func newServiceImport(namespace, name, clusterID string, serviceIPs []string,
 					Cluster: clusterID,
 					IPs:     serviceIPs,
 				},
+			},
+		},
+	}
+}
+
+func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {
+	return &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				lhconstants.LabelServiceImportName: name,
+				discovery.LabelManagedBy:           lhconstants.LabelValueManagedBy,
+				lhconstants.LabelSourceNamespace:   namespace,
+				lhconstants.LabelSourceCluster:     clusterID,
+				lhconstants.LabelSourceName:        name,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses: endpointIPs,
 			},
 		},
 	}

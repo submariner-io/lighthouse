@@ -1,11 +1,8 @@
 package serviceimport_test
 
 import (
-	"sort"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
@@ -58,15 +55,6 @@ var _ = Describe("ServiceImport Map", func() {
 		}
 		Expect(ips).To(HaveLen(1))
 		return ips[0]
-	}
-
-	expectIPs := func(ns, name string, expIPs []string) {
-		sort.Strings(expIPs)
-		for i := 0; i < 5; i++ {
-			ips := getIPs(namespace1, service1, "")
-			sort.Strings(ips)
-			Expect(ips).To(Equal(expIPs))
-		}
 	}
 
 	When("a service is present in one connected cluster", func() {
@@ -234,52 +222,4 @@ var _ = Describe("ServiceImport Map", func() {
 			}
 		})
 	})
-
-	When("a headless service is present in multiple connected clusters", func() {
-		It("should consistently return all the IPs", func() {
-			serviceImport1 := newHeadlessServiceImport(namespace1, service1, clusterID1, "10.253.1.1", "10.253.1.2")
-			serviceImportMap.Put(serviceImport1)
-			serviceImport2 := newHeadlessServiceImport(namespace1, service1, clusterID2, "10.253.2.1")
-			serviceImportMap.Put(serviceImport2)
-			serviceImportMap.Put(newHeadlessServiceImport(namespace1, service1, clusterID3))
-
-			expectIPs(namespace1, service1, append(serviceImport1.Status.Clusters[0].IPs, serviceImport2.Status.Clusters[0].IPs...))
-		})
-	})
-
-	When("a headless service is present in multiple connected clusters with one disconnected", func() {
-		It("should consistently return all the IPs from the connected clusters", func() {
-			serviceImport1 := newHeadlessServiceImport(namespace1, service1, clusterID1, "10.253.1.1", "10.253.1.2")
-			serviceImportMap.Put(serviceImport1)
-			serviceImport2 := newHeadlessServiceImport(namespace1, service1, clusterID2, "10.253.2.1", "10.253.2.2")
-			serviceImportMap.Put(serviceImport2)
-			serviceImport3 := newHeadlessServiceImport(namespace1, service1, clusterID3, "10.253.3.1", "10.253.3.2")
-			serviceImportMap.Put(serviceImport3)
-
-			clusterStatusMap[clusterID2] = false
-			expectIPs(namespace1, service1, append(serviceImport1.Status.Clusters[0].IPs, serviceImport3.Status.Clusters[0].IPs...))
-		})
-	})
-
-	When("a headless service is present in multiple connected clusters and one is removed", func() {
-		It("should consistently return all the remaining IPs", func() {
-			serviceImport1 := newHeadlessServiceImport(namespace1, service1, clusterID1, "10.253.1.1")
-			serviceImportMap.Put(serviceImport1)
-			serviceImport2 := newHeadlessServiceImport(namespace1, service1, clusterID2, "10.253.2.1", "10.253.2.2", "10.253.2.3")
-			serviceImportMap.Put(serviceImport2)
-
-			expectIPs(namespace1, service1, append(serviceImport1.Status.Clusters[0].IPs, serviceImport2.Status.Clusters[0].IPs...))
-
-			serviceImportMap.Remove(serviceImport2)
-			expectIPs(namespace1, service1, serviceImport1.Status.Clusters[0].IPs)
-		})
-	})
 })
-
-func newHeadlessServiceImport(namespace, name, clusterID string, ips ...string) *lighthousev2a1.ServiceImport {
-	si := newServiceImport(namespace, name, "", clusterID)
-	si.Spec.Type = lighthousev2a1.Headless
-	si.Status.Clusters[0].IPs = ips
-
-	return si
-}
