@@ -6,10 +6,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 )
 
 type Controller struct {
@@ -36,24 +37,22 @@ type AgentSpecification struct {
 // to listen only for the endpoints event related to ServiceImport created
 type ServiceImportController struct {
 	kubeClientSet       kubernetes.Interface
+	localClient         dynamic.Interface
+	restMapper          meta.RESTMapper
 	serviceImportSyncer syncer.Interface
 	endpointControllers sync.Map
 	clusterID           string
+	scheme              *runtime.Scheme
 }
 
 // Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
 // It will create an endpoint slice corresponding to an endpoint object and set the owner references
 // to ServiceImport. The app label from the endpoint will be added to endpoint slice as well.
 type EndpointController struct {
-	kubeClientSet                kubernetes.Interface
-	endpointInformer             cache.Controller
-	store                        cache.Store
-	endPointqueue                workqueue.RateLimitingInterface
 	serviceImportUID             types.UID
 	clusterID                    string
 	serviceImportName            string
 	serviceName                  string
 	serviceImportSourceNameSpace string
-	endpointDeletedMap           sync.Map
 	stopCh                       chan struct{}
 }

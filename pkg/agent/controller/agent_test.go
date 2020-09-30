@@ -26,12 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/cache"
 )
 
 const clusterID1 = "east"
@@ -473,38 +471,6 @@ func newTestDiver() *testDriver {
 	t.cluster1.init(t.restMapper)
 	t.cluster2.init(t.restMapper)
 
-	_, endpointSliceInformer := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(options)
-			},
-		},
-		&discovery.EndpointSlice{}, 0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				defer GinkgoRecover()
-				_, err := t.cluster1.localEndpointSliceClient.Create(test.ToUnstructured(obj.(runtime.Object)),
-					metav1.CreateOptions{})
-				Expect(err).To(Succeed())
-			},
-			UpdateFunc: func(obj interface{}, new interface{}) {
-				defer GinkgoRecover()
-				_, err := t.cluster1.localEndpointSliceClient.Update(test.ToUnstructured(new.(runtime.Object)),
-					metav1.UpdateOptions{})
-				Expect(err).To(Succeed())
-			},
-			DeleteFunc: func(obj interface{}) {
-				defer GinkgoRecover()
-				Expect(t.cluster1.localEndpointSliceClient.Delete(obj.(*discovery.EndpointSlice).Name, nil)).To(Succeed())
-			},
-		},
-	)
-
-	go endpointSliceInformer.Run(t.stopCh)
-
 	return t
 }
 
@@ -914,8 +880,7 @@ func (t *testDriver) awaitHeadlessServiceUnexported() {
 		t.service.Name+"-"+t.service.Namespace+"-"+clusterID1, nil)).To(Succeed())
 
 	// In a real k8s env, the EndpointSlice would be deleted via k8s GC as it is owned by the ServiceImport.
-	Expect(t.cluster1.localKubeClient.DiscoveryV1beta1().EndpointSlices(t.endpoints.Namespace).Delete(
-		t.endpoints.Name+"-"+clusterID1, nil)).To(Succeed())
+	Expect(t.cluster1.localEndpointSliceClient.Delete(t.endpoints.Name+"-"+clusterID1, nil)).To(Succeed())
 
 	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
 	t.awaitNoEndpointSlice(t.brokerEndpointSliceClient)
