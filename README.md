@@ -9,7 +9,7 @@ The lighthouse architecture is explained in detail at [Service Discovery](https:
 
 ## Contribute
 
-We welcome any contributions and please refer [Contribution Guide](https://submariner-io.github.io/contributing/lighthouse/) for more details.
+We welcome any contributions. Please refer to the [Contribution Guide](https://submariner.io/contributing/) for more details.
 
 ## Build and Test
 
