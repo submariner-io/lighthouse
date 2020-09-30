@@ -21,7 +21,10 @@ func newServiceImportController(spec *AgentSpecification, kubeClientSet kubernet
 	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
 		kubeClientSet: kubeClientSet,
+		localClient:   localClient,
+		restMapper:    restMapper,
 		clusterID:     spec.ClusterID,
+		scheme:        scheme,
 	}
 
 	var err error
@@ -49,7 +52,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		<-stopCh
 
 		c.endpointControllers.Range(func(key, value interface{}) bool {
-			value.(*EndpointController).Stop()
+			value.(*EndpointController).stop()
 			return true
 		})
 
@@ -95,10 +98,13 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *l
 		return false
 	}
 
-	endpointController := newEndpointController(c.kubeClientSet, serviceImport.ObjectMeta.UID,
-		serviceImport.ObjectMeta.Name, serviceName, serviceNameSpace, c.clusterID)
+	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
+		serviceImport.ObjectMeta.UID, serviceImport.ObjectMeta.Name, serviceNameSpace, serviceName, c.clusterID)
+	if err != nil {
+		klog.Errorf(err.Error())
+		return true
+	}
 
-	endpointController.start(endpointController.stopCh)
 	c.endpointControllers.Store(key, endpointController)
 
 	return false
@@ -111,7 +117,7 @@ func (c *ServiceImportController) serviceImportDeleted(serviceImport *lighthouse
 
 	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*EndpointController)
-		endpointController.Stop()
+		endpointController.stop()
 		c.endpointControllers.Delete(key)
 	}
 
