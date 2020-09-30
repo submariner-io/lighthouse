@@ -14,11 +14,10 @@ import (
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 	clustersetDomain       = "clusterset.local"
-	superclusterDomain     = "supercluster.local"
 )
 
 // Both domains need to be checked, until the operator is updated to use clusterset
-var checkedDomains = []string{clustersetDomain, superclusterDomain}
+var checkedDomains = []string{clustersetDomain}
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("discovery")
