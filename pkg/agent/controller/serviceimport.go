@@ -7,20 +7,17 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
 
-func newServiceImportController(spec *AgentSpecification, kubeClientSet kubernetes.Interface, restMapper meta.RESTMapper,
+func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
 	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		kubeClientSet: kubeClientSet,
+		serviceSyncer: serviceSyncer,
 		localClient:   localClient,
 		restMapper:    restMapper,
 		clusterID:     spec.ClusterID,
@@ -80,19 +77,19 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *l
 	annotations := serviceImport.ObjectMeta.Annotations
 	serviceNameSpace := annotations[lhconstants.OriginNamespace]
 	serviceName := annotations[lhconstants.OriginName]
-	var service *corev1.Service
 
-	service, err := c.kubeClientSet.CoreV1().Services(serviceNameSpace).Get(serviceName, metav1.GetOptions{})
+	obj, found, err := c.serviceSyncer.GetResource(serviceName, serviceNameSpace)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return false
-		}
-
 		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, err)
 
 		return true
 	}
 
+	if !found {
+		return false
+	}
+
+	service := obj.(*corev1.Service)
 	if service.Spec.Selector == nil {
 		klog.Errorf("The service %s/%s without a Selector is not supported", serviceNameSpace, serviceName)
 		return false
