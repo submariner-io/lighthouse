@@ -15,8 +15,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	fakeLighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -330,28 +328,10 @@ var _ = Describe("Service export failures", func() {
 		})
 	})
 
-	When("Endpoints is updated and ServiceImport retrieval initially fails", func() {
-		BeforeEach(func() {
-			t.service.Spec.ClusterIP = corev1.ClusterIPNone
-		})
-
-		It("should eventually update the ServiceImport", func() {
-			t.awaitHeadlessServiceImport(t.endpointIPs()...)
-
-			t.cluster1.serviceImportReactor.SetFailOnGet(errors.New("fake Get error"))
-			t.cluster1.serviceImportReactor.SetResetOnFailure(true)
-			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
-			t.updateEndpoints()
-
-			t.awaitUpdatedServiceImport(t.endpointIPs()...)
-		})
-	})
-
 	When("a conflict initially occurs when updating the ServiceExport status", func() {
 		BeforeEach(func() {
-			t.cluster1.serviceExportReactor.SetFailOnUpdate(apierrors.NewConflict(schema.GroupResource{}, t.serviceExport.Name,
-				errors.New("fake conflict")))
-			t.cluster1.serviceExportReactor.SetResetOnFailure(true)
+			t.cluster1.localServiceExportClient.FailOnUpdate = apierrors.NewConflict(schema.GroupResource{}, t.serviceExport.Name,
+				errors.New("fake conflict"))
 		})
 
 		It("should eventually update the ServiceExport status", func() {
@@ -363,15 +343,11 @@ var _ = Describe("Service export failures", func() {
 type cluster struct {
 	agentSpec                controller.AgentSpecification
 	localDynClient           dynamic.Interface
-	localServiceExportClient dynamic.ResourceInterface
+	localServiceExportClient *fake.DynamicResourceClient
 	localServiceImportClient dynamic.ResourceInterface
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
-	lighthouseClient         lighthouseClientset.Interface
 	endpointsReactor         *fake.FailingReactor
-	servicesReactor          *fake.FailingReactor
-	serviceExportReactor     *fake.FailingReactor
-	serviceImportReactor     *fake.FailingReactor
 }
 
 type testDriver struct {
@@ -384,11 +360,16 @@ type testDriver struct {
 	serviceExport             *lighthousev2a1.ServiceExport
 	endpoints                 *corev1.Endpoints
 	stopCh                    chan struct{}
-	now                       time.Time
 	restMapper                meta.RESTMapper
+	syncerScheme              *runtime.Scheme
 }
 
 func newTestDiver() *testDriver {
+	syncerScheme := runtime.NewScheme()
+	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
+	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
+	Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
+
 	t := &testDriver{
 		cluster1: cluster{
 			agentSpec: controller.AgentSpecification{
@@ -416,9 +397,9 @@ func newTestDiver() *testDriver {
 		},
 		restMapper: test.GetRESTMapperFor(&lighthousev2a1.ServiceExport{}, &lighthousev2a1.ServiceImport{},
 			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}),
-		brokerDynClient: fake.NewDynamicClient(),
+		brokerDynClient: fake.NewDynamicClient(syncerScheme),
+		syncerScheme:    syncerScheme,
 		stopCh:          make(chan struct{}),
-		now:             time.Now(),
 	}
 
 	t.serviceExport = &lighthousev2a1.ServiceExport{
@@ -468,8 +449,8 @@ func newTestDiver() *testDriver {
 	t.brokerEndpointSliceClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
-	t.cluster1.init(t.restMapper)
-	t.cluster2.init(t.restMapper)
+	t.cluster1.init(t.restMapper, syncerScheme)
+	t.cluster2.init(t.restMapper, syncerScheme)
 
 	return t
 }
@@ -479,24 +460,19 @@ func (t *testDriver) justBeforeEach() {
 		BrokerNamespace: test.RemoteNamespace,
 	}
 
-	syncerScheme := runtime.NewScheme()
-	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
-	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
-	Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
-
-	t.cluster1.start(t, syncerConfig, syncerScheme)
-	t.cluster2.start(t, syncerConfig, syncerScheme)
+	t.cluster1.start(t, syncerConfig, t.syncerScheme)
+	t.cluster2.start(t, syncerConfig, t.syncerScheme)
 }
 
 func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(restMapper meta.RESTMapper) {
-	c.localDynClient = fake.NewDynamicClient()
+func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme) {
+	c.localDynClient = fake.NewDynamicClient(syncerScheme)
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
-		&lighthousev2a1.ServiceExport{})).Namespace(test.LocalNamespace)
+		&lighthousev2a1.ServiceExport{})).Namespace(test.LocalNamespace).(*fake.DynamicResourceClient)
 
 	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
 		&lighthousev2a1.ServiceImport{})).Namespace(test.LocalNamespace)
@@ -506,20 +482,14 @@ func (c *cluster) init(restMapper meta.RESTMapper) {
 
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
-	c.servicesReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "services")
 	c.localKubeClient = fakeCS
 
 	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
-
-	fakeLH := fakeLighthouseClientset.NewSimpleClientset()
-	c.serviceExportReactor = fake.NewFailingReactorForResource(&fakeLH.Fake, "serviceexports")
-	c.serviceImportReactor = fake.NewFailingReactorForResource(&fakeLH.Fake, "serviceimports")
-	c.lighthouseClient = fakeLH
 }
 
 func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
-	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient,
-		c.localKubeClient, c.lighthouseClient, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient, c.localKubeClient,
+		syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
 		})
 
@@ -740,9 +710,6 @@ func (t *testDriver) dynamicEndpointsClient() dynamic.ResourceInterface {
 }
 
 func (t *testDriver) createServiceExport() {
-	_, err := t.cluster1.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.serviceExport.Namespace).Create(t.serviceExport)
-	Expect(err).To(Succeed())
-
 	test.CreateResource(t.cluster1.localServiceExportClient, t.serviceExport)
 }
 
@@ -772,7 +739,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 	var found *lighthousev2a1.ServiceExport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		se, err := t.cluster1.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.service.Namespace).Get(t.service.Name, metav1.GetOptions{})
+		obj, err := t.cluster1.localServiceExportClient.Get(t.service.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -780,6 +747,9 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 
 			return false, err
 		}
+
+		se := &lighthousev2a1.ServiceExport{}
+		Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 		found = se
 
@@ -794,7 +764,6 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 			Expect(actual.Type).To(Equal(exp.Type))
 			Expect(actual.Status).To(Equal(exp.Status))
 			Expect(actual.LastTransitionTime).To(Not(BeNil()))
-			Expect(actual.LastTransitionTime.After(t.now)).To(BeTrue())
 			Expect(actual.Reason).To(Not(BeNil()))
 			Expect(*actual.Reason).To(Equal(*exp.Reason))
 			Expect(actual.Message).To(Not(BeNil()))
@@ -816,8 +785,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*lighthous
 
 func (t *testDriver) awaitNotServiceExportStatus(notCond *lighthousev2a1.ServiceExportCondition) {
 	err := wait.PollImmediate(50*time.Millisecond, 300*time.Millisecond, func() (bool, error) {
-		se, err := t.cluster1.lighthouseClient.LighthouseV2alpha1().ServiceExports(t.service.Namespace).Get(t.service.Name,
-			metav1.GetOptions{})
+		obj, err := t.cluster1.localServiceExportClient.Get(t.service.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
@@ -825,6 +793,9 @@ func (t *testDriver) awaitNotServiceExportStatus(notCond *lighthousev2a1.Service
 		if err != nil {
 			return false, err
 		}
+
+		se := &lighthousev2a1.ServiceExport{}
+		Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 		if len(se.Status.Conditions) == 0 {
 			return false, nil
