@@ -1,6 +1,3 @@
     clusterset.local:53 {
         forward . dnsip
     }
-    supercluster.local:53 {
-        forward . dnsip
-    }
