@@ -130,3 +130,12 @@ func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.
 
 	return nil, c.serviceImportDeleted(serviceImport, key)
 }
+
+func (c *ServiceImportController) getServiceImport(name, namespace string) (*lighthousev2a1.ServiceImport, bool, error) {
+	obj, found, err := c.serviceImportSyncer.GetResource(name, namespace)
+	if obj != nil {
+		return obj.(*lighthousev2a1.ServiceImport), found, err
+	}
+
+	return nil, found, err
+}

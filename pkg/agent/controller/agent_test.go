@@ -549,10 +549,7 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 }
 
 func (c *cluster) awaitServiceImport(service *corev1.Service, sType lighthousev2a1.ServiceImportType, serviceIPs ...string) {
-	serviceImport := awaitServiceImport(c.localServiceImportClient, service, sType, serviceIPs...)
-
-	_, err := c.lighthouseClient.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Create(serviceImport)
-	Expect(err).To(Succeed())
+	awaitServiceImport(c.localServiceImportClient, service, sType, serviceIPs...)
 }
 
 func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service,
@@ -585,10 +582,7 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 }
 
 func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIPs ...string) {
-	serviceImport := awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIPs...)
-
-	_, err := c.lighthouseClient.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Update(serviceImport)
-	Expect(err).To(Succeed())
+	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIPs...)
 }
 
 func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface,
@@ -875,9 +869,6 @@ func (t *testDriver) awaitServiceUnexported() {
 
 func (t *testDriver) awaitHeadlessServiceUnexported() {
 	t.awaitServiceUnexported()
-
-	Expect(t.cluster1.lighthouseClient.LighthouseV2alpha1().ServiceImports(t.service.Namespace).Delete(
-		t.service.Name+"-"+t.service.Namespace+"-"+clusterID1, nil)).To(Succeed())
 
 	// In a real k8s env, the EndpointSlice would be deleted via k8s GC as it is owned by the ServiceImport.
 	Expect(t.cluster1.localEndpointSliceClient.Delete(t.endpoints.Name+"-"+clusterID1, nil)).To(Succeed())

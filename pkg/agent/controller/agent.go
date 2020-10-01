@@ -366,14 +366,16 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 
 	svcExport := obj.(*lighthousev2a1.ServiceExport)
 
-	serviceImport, err := a.getServiceImport(svcExport)
-
+	serviceImport, found, err := a.serviceImportController.getServiceImport(
+		a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace), a.namespace)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Errorf("Error retrieving ServiceImport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
-		}
+		klog.Errorf("Error retrieving ServiceImport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
 
 		// Requeue
+		return nil, true
+	}
+
+	if !found {
 		return nil, true
 	}
 
@@ -488,17 +490,6 @@ func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *
 			},
 		},
 	}
-}
-
-func (a *Controller) getServiceImport(svcExport *lighthousev2a1.ServiceExport) (*lighthousev2a1.ServiceImport, error) {
-	siName := a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace)
-	serviceImport, err := a.lighthouseClient.LighthouseV2alpha1().ServiceImports(a.namespace).Get(siName, metav1.GetOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return serviceImport, nil
 }
 
 func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) ([]string, error) {
