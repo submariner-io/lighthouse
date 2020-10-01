@@ -158,7 +158,8 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
-	agentController.serviceImportController, err = newServiceImportController(spec, kubeClientSet, restMapper, localClient, scheme)
+	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer, restMapper,
+		localClient, scheme)
 	if err != nil {
 		return nil, err
 	}
