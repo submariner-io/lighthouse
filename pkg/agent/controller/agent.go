@@ -10,7 +10,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -23,6 +22,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
@@ -43,11 +43,6 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
 	}
 
-	lighthouseClient, err := lighthouseClientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error building lighthouseClient %s", err.Error())
-	}
-
 	syncerConf := &broker.SyncerConfig{LocalRestConfig: cfg}
 
 	restMapper, err := util.BuildRestMapper(cfg)
@@ -60,7 +55,7 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 		return nil, fmt.Errorf("error creating dynamic client: %v", err)
 	}
 
-	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, lighthouseClient, nil,
+	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, scheme.Scheme,
 		func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncer(*config)
 		})
@@ -68,15 +63,21 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 
 // Constructor that takes additional detail. This is intended for unit tests.
 func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, restMapper meta.RESTMapper, localClient dynamic.Interface,
-	kubeClientSet kubernetes.Interface, lighthouseClient lighthouseClientset.Interface, scheme *runtime.Scheme,
+	kubeClientSet kubernetes.Interface, runtimeScheme *runtime.Scheme,
 	newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
 		globalnetEnabled: spec.GlobalnetEnabled,
 		kubeClientSet:    kubeClientSet,
-		lighthouseClient: lighthouseClient,
 	}
+
+	_, gvr, err := util.ToUnstructuredResource(&lighthousev2a1.ServiceExport{}, restMapper)
+	if err != nil {
+		return nil, err
+	}
+
+	agentController.serviceExportClient = localClient.Resource(*gvr)
 
 	svcExportResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace:      metav1.NamespaceAll,
@@ -87,13 +88,12 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		BrokerResourcesEquivalent: agentController.serviceImportEquivalent,
 	}
 
-	syncerConf.Scheme = scheme
+	syncerConf.Scheme = runtimeScheme
 	syncerConf.LocalNamespace = spec.Namespace
 	syncerConf.ResourceConfigs = []broker.ResourceConfig{
 		svcExportResourceConfig,
 	}
 
-	var err error
 	agentController.serviceExportSyncer, err = newSyncer(syncerConf)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		Federator:       agentController.serviceExportSyncer.GetBrokerFederator(),
 		ResourceType:    &corev1.Service{},
 		Transform:       agentController.serviceToRemoteServiceImport,
-		Scheme:          scheme,
+		Scheme:          runtimeScheme,
 	})
 	if err != nil {
 		return nil, err
@@ -152,14 +152,14 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		ResourceType:        &corev1.Endpoints{},
 		Transform:           agentController.endpointToRemoteServiceImport,
 		ResourcesEquivalent: agentController.endpointEquivalent,
-		Scheme:              scheme,
+		Scheme:              runtimeScheme,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer, restMapper,
-		localClient, scheme)
+		localClient, runtimeScheme)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 func (a *Controller) updateExportedServiceStatus(name, namespace string, condType lighthousev2a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		toUpdate, err := a.lighthouseClient.LighthouseV2alpha1().ServiceExports(namespace).Get(name, metav1.GetOptions{})
+		toUpdate, err := a.getServiceExport(name, namespace)
 		if apierrors.IsNotFound(err) {
 			klog.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
@@ -451,13 +451,33 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, exportCondition)
 		}
 
-		_, err = a.lighthouseClient.LighthouseV2alpha1().ServiceExports(toUpdate.Namespace).Update(toUpdate)
+		raw, err := util.ToUnstructured(toUpdate)
+		if err != nil {
+			return err
+		}
+
+		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).Update(raw, metav1.UpdateOptions{})
 
 		return err
 	})
 	if retryErr != nil {
 		klog.Errorf("Error updating status for ServiceExport (%s/%s): %v", namespace, name, retryErr)
 	}
+}
+
+func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.ServiceExport, error) {
+	obj, err := a.serviceExportClient.Namespace(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	se := &lighthousev2a1.ServiceExport{}
+	err = a.serviceImportController.scheme.Convert(obj, se, nil)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "Error converting %#v to ServiceExport", obj)
+	}
+
+	return se, nil
 }
 
 func (a *Controller) serviceImportEquivalent(obj1, obj2 *unstructured.Unstructured) bool {

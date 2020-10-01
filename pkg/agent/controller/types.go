@@ -5,7 +5,6 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,7 +17,7 @@ type Controller struct {
 	globalnetEnabled        bool
 	namespace               string
 	kubeClientSet           kubernetes.Interface
-	lighthouseClient        lighthouseClientset.Interface
+	serviceExportClient     dynamic.NamespaceableResourceInterface
 	serviceExportSyncer     *broker.Syncer
 	endpointSliceSyncer     *broker.Syncer
 	serviceSyncer           syncer.Interface
