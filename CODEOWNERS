@@ -1,8 +1,8 @@
-* @mangelajo @tpantelis @Oats87
-/.github/workflows/ 	@mkolesnik
-/scripts/ 		@mkolesnik
-Makefile* 		@mkolesnik
-Dockerfile.dapper 	@mkolesnik
-package/ 		@mkolesnik
-go.mod @skitt
-go.sum @skitt
+* 			@mangelajo @tpantelis @Oats87
+/.github/workflows/ 	@mangelajo @tpantelis @Oats87 @mkolesnik
+/scripts/ 		@mangelajo @tpantelis @Oats87 @mkolesnik
+Makefile* 		@mangelajo @tpantelis @Oats87 @mkolesnik
+Dockerfile.dapper 	@mangelajo @tpantelis @Oats87 @mkolesnik
+package/ 		@mangelajo @tpantelis @Oats87 @mkolesnik
+go.mod 			@mangelajo @tpantelis @Oats87 @skitt
+go.sum 			@mangelajo @tpantelis @Oats87 @skitt
