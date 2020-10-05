@@ -6,6 +6,7 @@ import (
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -128,15 +129,18 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 				"origin-name":      name,
 				"origin-namespace": namespace,
 			},
+			Labels: map[string]string{
+				lhconstants.LabelSourceCluster: clusterID,
+			},
 		},
 		Spec: lighthousev2a1.ServiceImportSpec{
 			Type: lighthousev2a1.ClusterSetIP,
+			IP:   serviceIP,
 		},
 		Status: lighthousev2a1.ServiceImportStatus{
 			Clusters: []lighthousev2a1.ClusterStatus{
 				{
 					Cluster: clusterID,
-					IPs:     []string{serviceIP},
 				},
 			},
 		},

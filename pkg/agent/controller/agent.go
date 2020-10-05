@@ -278,16 +278,16 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		Clusters: []lighthousev2a1.ClusterStatus{
 			{
 				Cluster: a.clusterID,
-				IPs:     ips,
 			},
 		},
 	}
 
 	if svcType == lighthousev2a1.ClusterSetIP {
+		serviceImport.Spec.IP = ips[0]
 		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
 		cleared out when here's no backing Endpoint pods.
 		*/
-		serviceImport.Annotations[clusterIP] = serviceImport.Status.Clusters[0].IPs[0]
+		serviceImport.Annotations[clusterIP] = ips[0]
 	}
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
@@ -379,11 +379,12 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 		return nil, true
 	}
 
-	if serviceImport.Spec.Type == lighthousev2a1.Headless && a.globalnetEnabled {
+	if serviceImport.Spec.Type == lighthousev2a1.Headless {
 		return nil, false
 	}
 
 	ipList := getIPsFromEndpoint(ep)
+	var ip string
 
 	if serviceImport.Spec.Type == lighthousev2a1.ClusterSetIP && len(ipList) > 0 {
 		/*
@@ -394,24 +395,18 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 			Once at least one backing Endpoint pod becomes healthy, we need to re-establish
 			the ServiceImport IPs from the previously cached clusterIP annotation.
 		*/
-		ipList = []string{serviceImport.Annotations[clusterIP]}
+		ip = serviceImport.Annotations[clusterIP]
+	} else {
+		ip = ""
 	}
 
-	oldStatus := serviceImport.Status.DeepCopy()
-
-	serviceImport.Status = lighthousev2a1.ServiceImportStatus{
-		Clusters: []lighthousev2a1.ClusterStatus{
-			{
-				Cluster: a.clusterID,
-				IPs:     ipList,
-			},
-		},
-	}
-
-	if reflect.DeepEqual(oldStatus, &serviceImport.Status) {
+	oldClusterIp := serviceImport.Spec.IP
+	if oldClusterIp == ip {
 		klog.V(log.DEBUG).Infof("Old and new cluster status are same")
 		return nil, false
 	}
+
+	serviceImport.Spec.IP = ip
 
 	return serviceImport, false
 }
@@ -482,7 +477,7 @@ func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.S
 
 func (a *Controller) serviceImportEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
 	return syncer.DefaultResourcesEquivalent(obj1, obj2) &&
-		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "status"), util.GetNestedField(obj2, "status"))
+		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "metadata"), util.GetNestedField(obj2, "metadata"))
 }
 
 func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
