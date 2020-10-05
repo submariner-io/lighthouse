@@ -47,9 +47,9 @@ func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster fun
 	case cluster == "":
 		ips := make([]string, 0)
 
-		for k, val := range clusterInfos {
-			if checkCluster != nil && checkCluster(k) {
-				ips = append(ips, val.ipList...)
+		for clusterId, info := range clusterInfos {
+			if checkCluster == nil || checkCluster(clusterId) {
+				ips = append(ips, info.ipList...)
 			}
 		}
 
@@ -70,16 +70,19 @@ func NewMap() *Map {
 func (m *Map) Put(es *discovery.EndpointSlice) {
 	key, ok := getKey(es)
 	if !ok {
-		klog.V(log.DEBUG).Infof("Failed to get labels on %#v", es)
+		klog.Warningf("Failed to get key labels from %#v", es.ObjectMeta)
 		return
 	}
 
 	cluster, ok := es.Labels[constants.LabelSourceCluster]
 
 	if !ok {
-		klog.V(log.DEBUG).Infof("Cluster label missing on %s", es.Name)
+		klog.Warningf("Cluster label missing on %#v", es.ObjectMeta)
 		return
 	}
+
+	m.Lock()
+	defer m.Unlock()
 
 	epInfo, ok := m.epMap[key]
 	if !ok {
@@ -88,9 +91,6 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 			clusterInfo: make(map[string]*clusterInfo),
 		}
 	}
-
-	m.Lock()
-	defer m.Unlock()
 
 	epInfo.clusterInfo[cluster] = &clusterInfo{
 		ipList:  make([]string, 0),
@@ -105,13 +105,14 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		epInfo.clusterInfo[cluster].ipList = append(epInfo.clusterInfo[cluster].ipList, endpoint.Addresses...)
 	}
 
-	klog.V(log.DEBUG).Infof("Adding endpointInfo %#v for %s in %s", epInfo.clusterInfo[cluster], es.Name, cluster)
+	klog.V(log.DEBUG).Infof("Adding clusterInfo %#v for EndpointSlice %q in %q", epInfo.clusterInfo[cluster], es.Name, cluster)
 
 	m.epMap[key] = epInfo
 }
 
 func (m *Map) Remove(es *discovery.EndpointSlice) {
-	if key, ok := getKey(es); ok {
+	key, ok := getKey(es)
+	if ok {
 		cluster, ok := es.Labels[constants.LabelSourceCluster]
 
 		if !ok {
