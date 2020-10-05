@@ -132,8 +132,9 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 		siList := result.(*lighthousev2a1.ServiceImportList)
 		for i, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
-				if si.Status.Clusters[0].IPs[0] != serviceIP {
-					return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s", si.Status.Clusters[0].IPs[0], serviceIP), nil
+				if si.Spec.IP != serviceIP {
+					return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s",
+						si.Spec.IP, serviceIP), nil
 				}
 				retServiceImport = &siList.Items[i]
 				return true, "", nil

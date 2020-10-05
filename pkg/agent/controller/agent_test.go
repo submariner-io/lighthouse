@@ -127,11 +127,11 @@ var _ = Describe("ServiceImport syncing", func() {
 
 			t.endpoints.Subsets[0].Addresses = nil
 			t.updateEndpoints()
-			t.awaitUpdatedServiceImport()
+			t.awaitUpdatedServiceImport("")
 
 			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.10"})
 			t.updateEndpoints()
-			t.awaitUpdatedServiceImport()
+			t.awaitUpdatedServiceImport("")
 		})
 	})
 
@@ -251,7 +251,7 @@ var _ = Describe("Headless service syncing", func() {
 				t.createEndpoints()
 				t.createServiceExport()
 
-				t.awaitHeadlessServiceImport(t.endpointIPs()...)
+				t.awaitHeadlessServiceImport("")
 				t.awaitEndpointSlice()
 			})
 		})
@@ -259,10 +259,10 @@ var _ = Describe("Headless service syncing", func() {
 		When("the Endpoints doesn't initially exist", func() {
 			It("should eventually sync a correct ServiceImport and EndpointSlice", func() {
 				t.createServiceExport()
-				t.awaitHeadlessServiceImport()
+				t.awaitHeadlessServiceImport("")
 
 				t.createEndpoints()
-				t.awaitUpdatedServiceImport(t.endpointIPs()...)
+				t.awaitUpdatedServiceImport("")
 				t.awaitEndpointSlice()
 			})
 		})
@@ -273,12 +273,12 @@ var _ = Describe("Headless service syncing", func() {
 			t.createEndpoints()
 			t.createServiceExport()
 
-			t.awaitHeadlessServiceImport(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport("")
 			t.awaitEndpointSlice()
 
 			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
 			t.updateEndpoints()
-			t.awaitUpdatedServiceImport(t.endpointIPs()...)
+			t.awaitUpdatedServiceImport("")
 			t.awaitUpdatedEndpointSlice(append(t.endpointIPs(), "10.253.6.1"))
 		})
 	})
@@ -287,7 +287,7 @@ var _ = Describe("Headless service syncing", func() {
 		It("should delete the ServiceImport and EndpointSlice", func() {
 			t.createEndpoints()
 			t.createServiceExport()
-			t.awaitHeadlessServiceImport(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport("")
 			t.awaitEndpointSlice()
 
 			t.deleteServiceExport()
@@ -324,7 +324,7 @@ var _ = Describe("Service export failures", func() {
 			t.awaitServiceExportStatus(0, newServiceExportCondition(lighthousev2a1.ServiceExportInitialized,
 				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
 			t.cluster1.endpointsReactor.SetResetOnFailure(true)
-			t.awaitHeadlessServiceImport(t.endpointIPs()...)
+			t.awaitHeadlessServiceImport("")
 		})
 	})
 
@@ -498,7 +498,7 @@ func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncer
 }
 
 func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Service, sType lighthousev2a1.ServiceImportType,
-	serviceIPs ...string) *lighthousev2a1.ServiceImport {
+	serviceIP string) *lighthousev2a1.ServiceImport {
 	obj := test.AwaitResource(client, service.Name+"-"+service.Namespace+"-"+clusterID1)
 
 	serviceImport := &lighthousev2a1.ServiceImport{}
@@ -511,22 +511,22 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 	Expect(serviceImport.Status.Clusters).To(HaveLen(1))
 	Expect(serviceImport.Status.Clusters[0].Cluster).To(Equal(clusterID1))
 
-	sort.Strings(serviceIPs)
-	sort.Strings(serviceImport.Status.Clusters[0].IPs)
-	Expect(serviceImport.Status.Clusters[0].IPs).To(Equal(serviceIPs))
+	Expect(serviceImport.Spec.IP).To(Equal(serviceIP))
+	labels := serviceImport.GetObjectMeta().GetLabels()
+	Expect(labels[lhconstants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
+	Expect(labels[lhconstants.LabelSourceName]).To(Equal(service.GetName()))
+	Expect(labels[lhconstants.LabelSourceCluster]).To(Equal(clusterID1))
 
 	return serviceImport
 }
 
-func (c *cluster) awaitServiceImport(service *corev1.Service, sType lighthousev2a1.ServiceImportType, serviceIPs ...string) {
-	awaitServiceImport(c.localServiceImportClient, service, sType, serviceIPs...)
+func (c *cluster) awaitServiceImport(service *corev1.Service, sType lighthousev2a1.ServiceImportType, serviceIP string) {
+	awaitServiceImport(c.localServiceImportClient, service, sType, serviceIP)
 }
 
 func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service,
-	serviceIPs ...string) *lighthousev2a1.ServiceImport {
+	serviceIP string) *lighthousev2a1.ServiceImport {
 	name := service.Name + "-" + service.Namespace + "-" + clusterID1
-
-	sort.Strings(serviceIPs)
 
 	var serviceImport *lighthousev2a1.ServiceImport
 
@@ -537,13 +537,11 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 		serviceImport = &lighthousev2a1.ServiceImport{}
 		Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
 
-		sort.Strings(serviceImport.Status.Clusters[0].IPs)
-
-		return reflect.DeepEqual(serviceImport.Status.Clusters[0].IPs, serviceIPs), nil
+		return reflect.DeepEqual(serviceImport.Spec.IP, serviceIP), nil
 	})
 
 	if err == wait.ErrWaitTimeout {
-		Expect(serviceImport.Status.Clusters[0].IPs).To(Equal(serviceIPs))
+		Expect(serviceImport.Spec.IP).To(Equal(serviceIP))
 	}
 
 	Expect(err).To(Succeed())
@@ -551,8 +549,8 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 	return serviceImport
 }
 
-func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIPs ...string) {
-	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIPs...)
+func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP string) {
+	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIP)
 }
 
 func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface,
@@ -662,14 +660,14 @@ func (c *cluster) awaitUpdatedEndpointSlice(endpoints *corev1.Endpoints, expecte
 	awaitUpdatedEndpointSlice(c.localEndpointSliceClient, endpoints, expectedIPs)
 }
 
-func (t *testDriver) awaitBrokerServiceImport(sType lighthousev2a1.ServiceImportType, serviceIPs ...string) {
-	awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIPs...)
+func (t *testDriver) awaitBrokerServiceImport(sType lighthousev2a1.ServiceImportType, serviceIP string) {
+	awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIP)
 }
 
-func (t *testDriver) awaitUpdatedServiceImport(serviceIPs ...string) {
-	awaitUpdatedServiceImport(t.brokerServiceImportClient, t.service, serviceIPs...)
-	t.cluster1.awaitUpdatedServiceImport(t.service, serviceIPs...)
-	t.cluster2.awaitUpdatedServiceImport(t.service, serviceIPs...)
+func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
+	awaitUpdatedServiceImport(t.brokerServiceImportClient, t.service, serviceIP)
+	t.cluster1.awaitUpdatedServiceImport(t.service, serviceIP)
+	t.cluster2.awaitUpdatedServiceImport(t.service, serviceIP)
 }
 
 func (t *testDriver) awaitEndpointSlice(serviceIPs ...string) {
@@ -826,10 +824,10 @@ func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int
 	return statusIndex + 2
 }
 
-func (t *testDriver) awaitHeadlessServiceImport(serviceIPs ...string) {
-	t.awaitBrokerServiceImport(lighthousev2a1.Headless, serviceIPs...)
-	t.cluster1.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIPs...)
-	t.cluster2.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIPs...)
+func (t *testDriver) awaitHeadlessServiceImport(serviceIP string) {
+	t.awaitBrokerServiceImport(lighthousev2a1.Headless, serviceIP)
+	t.cluster1.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIP)
+	t.cluster2.awaitServiceImport(t.service, lighthousev2a1.Headless, serviceIP)
 }
 
 func (t *testDriver) awaitServiceUnexported() {

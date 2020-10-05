@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 )
 
 type clusterInfo struct {
@@ -108,9 +109,7 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 			}
 		}
 
-		for _, info := range serviceImport.Status.Clusters {
-			remoteService.clusterIPs[info.Cluster] = info.IPs
-		}
+		remoteService.clusterIPs[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = []string{serviceImport.Spec.IP}
 
 		if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()
