@@ -66,7 +66,7 @@ func (m *Map) GetIPs(namespace, name, cluster string, checkCluster func(string) 
 		return si.clusterIPs, si.clustersQueue, &si.rrCount, si.isHeadless
 	}()
 
-	if clusterIPs == nil {
+	if clusterIPs == nil || isHeadless {
 		return nil, false
 	}
 
@@ -75,24 +75,12 @@ func (m *Map) GetIPs(namespace, name, cluster string, checkCluster func(string) 
 		return ips, found
 	}
 
-	if !isHeadless {
-		ip := m.selectIP(queue, counter, checkCluster)
-		if ip != "" {
-			return []string{ip}, true
-		}
-
-		return []string{}, true
+	ip := m.selectIP(queue, counter, checkCluster)
+	if ip != "" {
+		return []string{ip}, true
 	}
 
-	serviceIPs := make([]string, 0)
-
-	for cluster, ips := range clusterIPs {
-		if checkCluster(cluster) {
-			serviceIPs = append(serviceIPs, ips...)
-		}
-	}
-
-	return serviceIPs, true
+	return []string{}, true
 }
 
 func NewMap() *Map {

@@ -46,23 +46,19 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 	var ips []string
 	var found bool
-	if pReq.hostname != "" && pReq.cluster != "" {
-		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service)
+	ips, found = lh.serviceImports.GetIPs(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected)
+
+	if !found {
+		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
 		if !found {
 			log.Debugf("No record found for %q", qname)
-			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "host not found")
+			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "record not found")
 		}
-	} else {
-		ips, found = lh.serviceImports.GetIPs(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected)
-		if !found {
-			// We couldn't find record for this service name
-			log.Debugf("No record found for service %q", qname)
-			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "service not found")
-		}
-		if len(ips) == 0 {
-			log.Debugf("Couldn't find a connected cluster for %q", qname)
-			return lh.emptyResponse(state)
-		}
+	}
+
+	if len(ips) == 0 {
+		log.Debugf("Couldn't find a connected cluster or valid IPs for %q", qname)
+		return lh.emptyResponse(state)
 	}
 
 	if state.QType() == dns.TypeAAAA {
