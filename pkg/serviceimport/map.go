@@ -24,11 +24,9 @@ type serviceInfo struct {
 
 func (si *serviceInfo) buildClusterInfoQueue() {
 	si.clustersQueue = make([]clusterInfo, 0)
-	for k, v := range si.clusterIPs {
-		if len(v) > 0 {
-			c := clusterInfo{name: k, ip: v, weight: 0}
-			si.clustersQueue = append(si.clustersQueue, c)
-		}
+	for cluster, ip := range si.clusterIPs {
+		c := clusterInfo{name: cluster, ip: ip, weight: 0}
+		si.clustersQueue = append(si.clustersQueue, c)
 	}
 }
 
