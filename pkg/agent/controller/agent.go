@@ -80,12 +80,11 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 	agentController.serviceExportClient = localClient.Resource(*gvr)
 
 	svcExportResourceConfig := broker.ResourceConfig{
-		LocalSourceNamespace:      metav1.NamespaceAll,
-		LocalResourceType:         &lighthousev2a1.ServiceExport{},
-		LocalTransform:            agentController.serviceExportToRemoteServiceImport,
-		LocalOnSuccessfulSync:     agentController.onSuccessfulServiceImportSync,
-		BrokerResourceType:        &lighthousev2a1.ServiceImport{},
-		BrokerResourcesEquivalent: agentController.serviceImportEquivalent,
+		LocalSourceNamespace:  metav1.NamespaceAll,
+		LocalResourceType:     &lighthousev2a1.ServiceExport{},
+		LocalTransform:        agentController.serviceExportToRemoteServiceImport,
+		LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
+		BrokerResourceType:    &lighthousev2a1.ServiceImport{},
 	}
 
 	syncerConf.Scheme = runtimeScheme
@@ -400,8 +399,8 @@ func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer
 		ip = ""
 	}
 
-	oldClusterIp := serviceImport.Spec.IP
-	if oldClusterIp == ip {
+	oldClusterIP := serviceImport.Spec.IP
+	if oldClusterIP == ip {
 		klog.V(log.DEBUG).Infof("Old and new cluster status are same")
 		return nil, false
 	}
@@ -473,11 +472,6 @@ func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.S
 	}
 
 	return se, nil
-}
-
-func (a *Controller) serviceImportEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
-	return syncer.DefaultResourcesEquivalent(obj1, obj2) &&
-		equality.Semantic.DeepEqual(util.GetNestedField(obj1, "metadata"), util.GetNestedField(obj2, "metadata"))
 }
 
 func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) bool {

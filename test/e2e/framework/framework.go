@@ -133,7 +133,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 		for i, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				if si.Spec.IP != serviceIP {
-					return false, fmt.Sprintf("ServiceImportIP %s doesn't match %s",
+					return false, fmt.Sprintf("ServiceImport IP %s doesn't match %s",
 						si.Spec.IP, serviceIP), nil
 				}
 				retServiceImport = &siList.Items[i]

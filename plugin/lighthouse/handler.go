@@ -46,7 +46,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 	var ips []string
 	var found bool
-	ips, found = lh.serviceImports.GetIPs(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected)
+	ip, found := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected)
 
 	if !found {
 		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
@@ -54,6 +54,8 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 			log.Debugf("No record found for %q", qname)
 			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "record not found")
 		}
+	} else if ip != "" {
+		ips = []string{ip}
 	}
 
 	if len(ips) == 0 {
