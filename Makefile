@@ -10,7 +10,6 @@ override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override E2E_ARGS += cluster1 cluster2
 override UNIT_TEST_ARGS += test/e2e
-override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
@@ -40,12 +39,10 @@ bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
 deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
 
-test: unit-test
-
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) images test validate
+.PHONY: $(TARGETS) images
 
 else
 
