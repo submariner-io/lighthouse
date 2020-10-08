@@ -39,12 +39,10 @@ bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
 deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
 
-test: unit-test
-
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) images test
+.PHONY: $(TARGETS) images
 
 else
 
