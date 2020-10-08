@@ -5,15 +5,6 @@ on:
   pull_request:
 
 jobs:
-  code-gen:
-    name: Submariner K8s API Code Generation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@v2
-      - name: Run codegen
-        run: make codegen
-
   dco:
     name: DCO in Commit Message(s)
     runs-on: ubuntu-latest
