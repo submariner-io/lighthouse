@@ -4,8 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 type clusterInfo struct {
@@ -88,7 +88,7 @@ func NewMap() *Map {
 	}
 }
 
-func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
+func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 	if name, ok := serviceImport.Annotations["origin-name"]; ok {
 		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)
@@ -103,11 +103,11 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 				key:        key,
 				clusterIPs: make(map[string]string),
 				rrCount:    0,
-				isHeadless: serviceImport.Spec.Type == lighthousev2a1.Headless,
+				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
 			}
 		}
 
-		remoteService.clusterIPs[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = serviceImport.Spec.IP
+		remoteService.clusterIPs[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = serviceImport.Spec.IPs[0]
 
 		if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()
@@ -117,7 +117,7 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 	}
 }
 
-func (m *Map) Remove(serviceImport *lighthousev2a1.ServiceImport) {
+func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 	if name, ok := serviceImport.Annotations["origin-name"]; ok {
 		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)

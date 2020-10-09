@@ -3,13 +3,13 @@ package serviceimport_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	fakeClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
+	fakeMCSClientSet "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("ServiceImport controller", func() {
@@ -27,23 +27,23 @@ func testLifecycleNotifications() {
 	)
 
 	var (
-		serviceImport *lighthousev2a1.ServiceImport
+		serviceImport *mcsv1a1.ServiceImport
 		controller    *serviceimport.Controller
-		fakeClientset lighthouseClientset.Interface
+		fakeClientset mcsClientset.Interface
 		store         *fakeStore
 	)
 
 	BeforeEach(func() {
 		store = &fakeStore{
-			put:    make(chan *lighthousev2a1.ServiceImport, 10),
-			remove: make(chan *lighthousev2a1.ServiceImport, 10),
+			put:    make(chan *mcsv1a1.ServiceImport, 10),
+			remove: make(chan *mcsv1a1.ServiceImport, 10),
 		}
 
 		serviceImport = newServiceImport(namespace1, service1, serviceIP, clusterID)
 		controller = serviceimport.NewController(store)
-		fakeClientset = fakeClientSet.NewSimpleClientset()
+		fakeClientset = fakeMCSClientSet.NewSimpleClientset()
 
-		controller.NewClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
+		controller.NewClientset = func(c *rest.Config) (mcsClientset.Interface, error) {
 			return fakeClientset, nil
 		}
 
@@ -54,39 +54,39 @@ func testLifecycleNotifications() {
 		controller.Stop()
 	})
 
-	createService := func(serviceImport *lighthousev2a1.ServiceImport) error {
-		_, err := fakeClientset.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Create(serviceImport)
+	createService := func(serviceImport *mcsv1a1.ServiceImport) error {
+		_, err := fakeClientset.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Create(serviceImport)
 		return err
 	}
 
-	updateService := func(serviceImport *lighthousev2a1.ServiceImport) error {
-		_, err := fakeClientset.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Update(serviceImport)
+	updateService := func(serviceImport *mcsv1a1.ServiceImport) error {
+		_, err := fakeClientset.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Update(serviceImport)
 		return err
 	}
 
-	deleteService := func(serviceImport *lighthousev2a1.ServiceImport) error {
-		err := fakeClientset.LighthouseV2alpha1().ServiceImports(serviceImport.Namespace).Delete(serviceImport.Name, &metav1.DeleteOptions{})
+	deleteService := func(serviceImport *mcsv1a1.ServiceImport) error {
+		err := fakeClientset.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Delete(serviceImport.Name, &metav1.DeleteOptions{})
 		return err
 	}
 
-	testOnAdd := func(serviceImport *lighthousev2a1.ServiceImport) {
+	testOnAdd := func(serviceImport *mcsv1a1.ServiceImport) {
 		Expect(createService(serviceImport)).To(Succeed())
 		store.verifyPut(serviceImport)
 	}
 
-	testOnUpdate := func(serviceImport *lighthousev2a1.ServiceImport) {
+	testOnUpdate := func(serviceImport *mcsv1a1.ServiceImport) {
 		Expect(updateService(serviceImport)).To(Succeed())
 		store.verifyPut(serviceImport)
 	}
 
-	testOnRemove := func(serviceImport *lighthousev2a1.ServiceImport) {
+	testOnRemove := func(serviceImport *mcsv1a1.ServiceImport) {
 		testOnAdd(serviceImport)
 
 		Expect(deleteService(serviceImport)).To(Succeed())
 		store.verifyRemove(serviceImport)
 	}
 
-	testOnDoubleAdd := func(first *lighthousev2a1.ServiceImport, second *lighthousev2a1.ServiceImport) {
+	testOnDoubleAdd := func(first *mcsv1a1.ServiceImport, second *mcsv1a1.ServiceImport) {
 		Expect(createService(first)).To(Succeed())
 		Expect(createService(second)).To(Succeed())
 
@@ -120,8 +120,8 @@ func testLifecycleNotifications() {
 	})
 }
 
-func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev2a1.ServiceImport {
-	return &lighthousev2a1.ServiceImport{
+func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.ServiceImport {
+	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name + "-" + namespace + "-" + clusterID,
 			Namespace: namespace,
@@ -133,12 +133,12 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 				lhconstants.LabelSourceCluster: clusterID,
 			},
 		},
-		Spec: lighthousev2a1.ServiceImportSpec{
-			Type: lighthousev2a1.ClusterSetIP,
-			IP:   serviceIP,
+		Spec: mcsv1a1.ServiceImportSpec{
+			Type: mcsv1a1.ClusterSetIP,
+			IPs:  []string{serviceIP},
 		},
-		Status: lighthousev2a1.ServiceImportStatus{
-			Clusters: []lighthousev2a1.ClusterStatus{
+		Status: mcsv1a1.ServiceImportStatus{
+			Clusters: []mcsv1a1.ClusterStatus{
 				{
 					Cluster: clusterID,
 				},
@@ -148,22 +148,22 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *lighthousev
 }
 
 type fakeStore struct {
-	put    chan *lighthousev2a1.ServiceImport
-	remove chan *lighthousev2a1.ServiceImport
+	put    chan *mcsv1a1.ServiceImport
+	remove chan *mcsv1a1.ServiceImport
 }
 
-func (f *fakeStore) Put(si *lighthousev2a1.ServiceImport) {
+func (f *fakeStore) Put(si *mcsv1a1.ServiceImport) {
 	f.put <- si
 }
 
-func (f *fakeStore) Remove(si *lighthousev2a1.ServiceImport) {
+func (f *fakeStore) Remove(si *mcsv1a1.ServiceImport) {
 	f.remove <- si
 }
 
-func (f *fakeStore) verifyPut(expected *lighthousev2a1.ServiceImport) {
+func (f *fakeStore) verifyPut(expected *mcsv1a1.ServiceImport) {
 	Eventually(f.put, 5).Should(Receive(Equal(expected)), "Put was not called")
 }
 
-func (f *fakeStore) verifyRemove(expected *lighthousev2a1.ServiceImport) {
+func (f *fakeStore) verifyRemove(expected *mcsv1a1.ServiceImport) {
 	Eventually(f.remove, 5).Should(Receive(Equal(expected)), "Remove was not called")
 }

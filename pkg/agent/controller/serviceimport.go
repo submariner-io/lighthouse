@@ -4,7 +4,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -12,6 +11,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
@@ -33,7 +33,7 @@ func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.I
 		Direction:       syncer.LocalToRemote,
 		RestMapper:      restMapper,
 		Federator:       federate.NewNoopFederator(),
-		ResourceType:    &lighthousev2a1.ServiceImport{},
+		ResourceType:    &mcsv1a1.ServiceImport{},
 		Transform:       controller.serviceImportToEndpointController,
 		Scheme:          scheme,
 	})
@@ -63,13 +63,13 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *lighthousev2a1.ServiceImport, key string) bool {
+func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *mcsv1a1.ServiceImport, key string) bool {
 	if _, found := c.endpointControllers.Load(key); found {
 		klog.V(log.DEBUG).Infof("The endpoint controller is already running for %q", key)
 		return false
 	}
 
-	if serviceImport.Spec.Type != lighthousev2a1.Headless ||
+	if serviceImport.Spec.Type != mcsv1a1.Headless ||
 		serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
 		return false
 	}
@@ -107,7 +107,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *l
 	return false
 }
 
-func (c *ServiceImportController) serviceImportDeleted(serviceImport *lighthousev2a1.ServiceImport, key string) bool {
+func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.ServiceImport, key string) bool {
 	if serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
 		return false
 	}
@@ -122,7 +122,7 @@ func (c *ServiceImportController) serviceImportDeleted(serviceImport *lighthouse
 }
 
 func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
-	serviceImport := obj.(*lighthousev2a1.ServiceImport)
+	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 	if op == syncer.Create || op == syncer.Update {
 		return nil, c.serviceImportCreatedOrUpdated(serviceImport, key)
@@ -131,10 +131,10 @@ func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.
 	return nil, c.serviceImportDeleted(serviceImport, key)
 }
 
-func (c *ServiceImportController) getServiceImport(name, namespace string) (*lighthousev2a1.ServiceImport, bool, error) {
+func (c *ServiceImportController) getServiceImport(name, namespace string) (*mcsv1a1.ServiceImport, bool, error) {
 	obj, found, err := c.serviceImportSyncer.GetResource(name, namespace)
 	if obj != nil {
-		return obj.(*lighthousev2a1.ServiceImport), found, err
+		return obj.(*mcsv1a1.ServiceImport), found, err
 	}
 
 	return nil, found, err

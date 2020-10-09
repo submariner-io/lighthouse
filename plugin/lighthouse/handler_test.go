@@ -10,12 +10,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const (
@@ -106,7 +106,7 @@ func testWithoutFallback() {
 
 	When("type A DNS query for an existing service with a different namespace", func() {
 		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, serviceIP, lighthousev2a1.ClusterSetIP))
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
@@ -277,7 +277,7 @@ func testClusterStatus() {
 			clusterStatus:  mockCs,
 			ttl:            defaultTtl,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, lighthousev2a1.ClusterSetIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -382,7 +382,7 @@ func testHeadlessService() {
 
 	When("headless service has no IPs", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{}))
 		})
 		It("should succeed and return empty response (NODATA)", func() {
@@ -397,7 +397,7 @@ func testHeadlessService() {
 
 	When("headless service has one IP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
 		})
 		It("should succeed and write an A record response", func() {
@@ -414,7 +414,7 @@ func testHeadlessService() {
 
 	When("headless service has two IPs", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP, endpointIP2}))
 		})
 		It("should succeed and write two A records as response", func() {
@@ -432,8 +432,8 @@ func testHeadlessService() {
 
 	When("headless service is present in two clusters", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", lighthousev2a1.Headless))
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, "", lighthousev2a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, "", mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2}))
 			mockCs.clusterStatusMap[clusterID2] = true
@@ -481,7 +481,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
-	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, lighthousev2a1.ClusterSetIP))
+	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP))
 
 	return siMap
 }
@@ -494,8 +494,8 @@ func setupEndpointSliceMap() *endpointslice.Map {
 }
 
 func newServiceImport(namespace, name, clusterID, serviceIP string,
-	siType lighthousev2a1.ServiceImportType) *lighthousev2a1.ServiceImport {
-	return &lighthousev2a1.ServiceImport{
+	siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
+	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -507,12 +507,12 @@ func newServiceImport(namespace, name, clusterID, serviceIP string,
 				lhconstants.LabelSourceCluster: clusterID,
 			},
 		},
-		Spec: lighthousev2a1.ServiceImportSpec{
+		Spec: mcsv1a1.ServiceImportSpec{
 			Type: siType,
-			IP:   serviceIP,
+			IPs:  []string{serviceIP},
 		},
-		Status: lighthousev2a1.ServiceImportStatus{
-			Clusters: []lighthousev2a1.ClusterStatus{
+		Status: mcsv1a1.ServiceImportStatus{
+			Clusters: []mcsv1a1.ClusterStatus{
 				{
 					Cluster: clusterID,
 				},

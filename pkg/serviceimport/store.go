@@ -1,9 +1,9 @@
 package serviceimport
 
-import lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+import mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
 type Store interface {
-	Put(serviceImport *lighthousev2a1.ServiceImport)
+	Put(serviceImport *mcsv1a1.ServiceImport)
 
-	Remove(serviceImport *lighthousev2a1.ServiceImport)
+	Remove(serviceImport *mcsv1a1.ServiceImport)
 }

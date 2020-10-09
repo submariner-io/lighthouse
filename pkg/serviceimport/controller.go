@@ -4,16 +4,16 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	lighthouseInformers "github.com/submariner-io/lighthouse/pkg/client/informers/externalversions"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
+	mcsInformers "github.com/submariner-io/lighthouse/pkg/mcs/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-type NewClientsetFunc func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error)
+type NewClientsetFunc func(kubeConfig *rest.Config) (mcsClientset.Interface, error)
 
 // Indirection hook for unit tests to supply fake client sets
 var NewClientset NewClientsetFunc
@@ -39,8 +39,8 @@ func getNewClientsetFunc() NewClientsetFunc {
 		return NewClientset
 	}
 
-	return func(c *rest.Config) (lighthouseClientset.Interface, error) {
-		return lighthouseClientset.NewForConfig(c)
+	return func(c *rest.Config) (mcsClientset.Interface, error) {
+		return mcsClientset.NewForConfig(c)
 	}
 }
 
@@ -52,10 +52,10 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		return fmt.Errorf("Error creating client set: %v", err)
 	}
 
-	informerFactory := lighthouseInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,
-		lighthouseInformers.WithNamespace(metav1.NamespaceAll))
+	informerFactory := mcsInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,
+		mcsInformers.WithNamespace(metav1.NamespaceAll))
 
-	c.serviceInformer = informerFactory.Lighthouse().V2alpha1().ServiceImports().Informer()
+	c.serviceInformer = informerFactory.Multicluster().V1alpha1().ServiceImports().Informer()
 	c.serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.serviceImportCreatedOrUpdated,
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -82,22 +82,22 @@ func (c *Controller) Stop() {
 func (c *Controller) serviceImportCreatedOrUpdated(obj interface{}) {
 	klog.V(log.DEBUG).Infof("In serviceImportCreatedOrUpdated for: %#v, ", obj)
 
-	c.store.Put(obj.(*lighthousev2a1.ServiceImport))
+	c.store.Put(obj.(*mcsv1a1.ServiceImport))
 }
 
 func (c *Controller) serviceImportDeleted(obj interface{}) {
 	klog.V(log.DEBUG).Infof("In serviceImportDeleted for: %#v, ", obj)
 
-	var si *lighthousev2a1.ServiceImport
+	var si *mcsv1a1.ServiceImport
 	var ok bool
-	if si, ok = obj.(*lighthousev2a1.ServiceImport); !ok {
+	if si, ok = obj.(*mcsv1a1.ServiceImport); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Could not convert object %#v to DeletedFinalStateUnknown", obj)
 			return
 		}
 
-		si, ok = tombstone.Obj.(*lighthousev2a1.ServiceImport)
+		si, ok = tombstone.Obj.(*mcsv1a1.ServiceImport)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %#v to Unstructured", tombstone.Obj)
 			return
