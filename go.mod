@@ -8,7 +8,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.31
 	github.com/onsi/ginkgo v1.14.2
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.7.0
 	github.com/submariner-io/shipyard v0.7.1
