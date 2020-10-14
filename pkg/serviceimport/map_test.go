@@ -39,54 +39,124 @@ var _ = Describe("ServiceImport Map", func() {
 		return endpointStatusMap[id]
 	}
 
-	getIPs := func(ns, name, cluster string) string {
-		ip, found := serviceImportMap.GetIP(ns, name, cluster, checkCluster, checkEndpoint)
+	expectIPsNotFound := func(ns, service, cluster, localCluster string) {
+		_, found := serviceImportMap.GetIP(ns, service, cluster, localCluster, checkCluster, checkEndpoint)
+		Expect(found).To(BeFalse())
+	}
+
+	getIPExpectFound := func(ns, name, cluster, localCluster string) string {
+		ip, found := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeTrue())
 		return ip
 	}
 
 	getIP := func(ns, name string) string {
-		ip := getIPs(ns, name, "")
-		if ip == "" {
-			return ""
-		}
+		ip := getIPExpectFound(ns, name, "", "")
 		return ip
 	}
 
 	getClusterIP := func(ns, name, cluster string) string {
-		ip := getIPs(ns, name, cluster)
-		if ip == "" {
-			return ""
-		}
+		ip := getIPExpectFound(ns, name, cluster, "")
 		return ip
 	}
 
-	When("a service is present in one connected cluster", func() {
-		It("should consistently return the same IP", func() {
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
+	testRoundRobin := func(ns, service, cluster, localCluster string, serviceIPs []string) {
+		contains := func(slice []string, str string) bool {
+			for _, s := range slice {
+				if s == str {
+					return true
+				}
+			}
 
+			return false
+		}
+
+		ipsCount := len(serviceIPs)
+		rrIPs := make([]string, 0)
+
+		for i := 0; i < ipsCount; i++ {
+			ip := getIPExpectFound(ns, service, cluster, localCluster)
+			rrIPs = append(rrIPs, ip)
+			slice := rrIPs[0:i]
+			Expect(contains(slice, ip)).To(BeFalse())
+			Expect(contains(serviceIPs, ip)).To(BeTrue())
+		}
+
+		for i := 0; i < 5; i++ {
+			for _, ip := range rrIPs {
+				testIp := getIPExpectFound(ns, service, cluster, localCluster)
+				Expect(testIp).To(Equal(ip))
+			}
+		}
+	}
+
+	When("a service is present in only one connected cluster", func() {
+		BeforeEach(func() {
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
+		})
+
+		It("should consistently return the IP of the connected cluster", func() {
 			for i := 0; i < 10; i++ {
 				Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 			}
 		})
+
+		When("any local cluster is specified", func() {
+			It("should consistently return the IP of the connected cluster", func() {
+				for i := 0; i < 10; i++ {
+					Expect(getIPExpectFound(namespace1, service1, "", clusterID1)).To(Equal(serviceIP1))
+					Expect(getIPExpectFound(namespace1, service1, "", clusterID2)).To(Equal(serviceIP1))
+				}
+			})
+		})
+
+		When("an invalid cluster is specified", func() {
+			It("should consistently return not found regardless of local cluster", func() {
+				for i := 0; i < 10; i++ {
+					expectIPsNotFound(namespace1, service1, clusterID2, "")
+					expectIPsNotFound(namespace1, service1, clusterID2, clusterID1)
+					expectIPsNotFound(namespace1, service1, clusterID2, clusterID2)
+				}
+			})
+		})
+
+		When("the connected cluster is specified", func() {
+			It("should consistently return its IP regardless of local cluster", func() {
+				for i := 0; i < 10; i++ {
+					Expect(getIPExpectFound(namespace1, service1, clusterID1, "")).To(Equal(serviceIP1))
+					Expect(getIPExpectFound(namespace1, service1, clusterID1, clusterID1)).To(Equal(serviceIP1))
+					Expect(getIPExpectFound(namespace1, service1, clusterID1, clusterID2)).To(Equal(serviceIP1))
+					Expect(getIPExpectFound(namespace1, service1, clusterID1, clusterID3)).To(Equal(serviceIP1))
+				}
+			})
+		})
 	})
 
 	When("a service is present in two connected clusters", func() {
-		It("should consistently return the IPs round-robin", func() {
+		BeforeEach(func() {
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
+		})
 
-			firstIP := getIP(namespace1, service1)
-			Expect(firstIP).To(Or(Equal(serviceIP1), Equal(serviceIP2)))
+		It("should consistently return the IPs round-robin", func() {
+			testRoundRobin(namespace1, service1, "", "", []string{serviceIP1, serviceIP2})
+		})
 
-			secondIP := getIP(namespace1, service1)
-			Expect(secondIP).To(Or(Equal(serviceIP1), Equal(serviceIP2)))
-			Expect(secondIP).ToNot(Equal(firstIP))
+		When("an existent local cluster is specified", func() {
+			It("should consistently return its IP", func() {
+				for i := 0; i < 10; i++ {
+					Expect(getIPExpectFound(namespace1, service1, "", clusterID1)).To(Equal(serviceIP1))
+					Expect(getIPExpectFound(namespace1, service1, "", clusterID2)).To(Equal(serviceIP2))
+				}
+			})
+		})
 
-			for i := 0; i < 5; i++ {
-				Expect(getIP(namespace1, service1)).To(Equal(firstIP))
-				Expect(getIP(namespace1, service1)).To(Equal(secondIP))
-			}
+		When("a non-existent local cluster is specified", func() {
+			It("should consistently return the IPs round-robin", func() {
+				ips := []string{serviceIP1, serviceIP2}
+				testRoundRobin(namespace1, service1, "", clusterID3, ips)
+				testRoundRobin(namespace1, service1, "", "", ips)
+			})
 		})
 	})
 
@@ -96,31 +166,16 @@ var _ = Describe("ServiceImport Map", func() {
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
 			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP3, clusterID3))
 		})
+
 		When("no specific cluster is requested", func() {
 			It("should consistently return the IPs round-robin", func() {
-
-				firstIP := getIP(namespace1, service1)
-				Expect(firstIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
-
-				secondIP := getIP(namespace1, service1)
-				Expect(secondIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
-				Expect(secondIP).ToNot(Equal(firstIP))
-
-				thirdIP := getIP(namespace1, service1)
-				Expect(thirdIP).To(Or(Equal(serviceIP1), Equal(serviceIP2), Equal(serviceIP3)))
-				Expect(thirdIP).ToNot(Equal(firstIP))
-				Expect(thirdIP).ToNot(Equal(secondIP))
-
-				for i := 0; i < 5; i++ {
-					Expect(getIP(namespace1, service1)).To(Equal(firstIP))
-					Expect(getIP(namespace1, service1)).To(Equal(secondIP))
-					Expect(getIP(namespace1, service1)).To(Equal(thirdIP))
-				}
+				ips := []string{serviceIP1, serviceIP2, serviceIP3}
+				testRoundRobin(namespace1, service1, "", "", ips)
 			})
 		})
+
 		When("specific cluster is requested", func() {
 			It("should consistently return that cluster's IPs", func() {
-
 				firstIP := getClusterIP(namespace1, service1, clusterID2)
 				Expect(firstIP).To(Equal(serviceIP2))
 				Expect(firstIP).ToNot(Or(Equal(serviceIP1), Equal(serviceIP3)))
@@ -130,7 +185,6 @@ var _ = Describe("ServiceImport Map", func() {
 
 				thirdIP := getClusterIP(namespace1, service1, clusterID2)
 				Expect(thirdIP).To(Equal(firstIP))
-
 			})
 		})
 	})
@@ -183,8 +237,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service does not exist", func() {
 		It("should return not found", func() {
-			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster, checkEndpoint)
-			Expect(found).To(BeFalse())
+			expectIPsNotFound(namespace1, service1, "", "")
 		})
 	})
 
@@ -205,8 +258,8 @@ var _ = Describe("ServiceImport Map", func() {
 			Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 
 			serviceImportMap.Remove(si)
-			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster, checkEndpoint)
-			Expect(found).To(BeFalse())
+
+			expectIPsNotFound(namespace1, service1, "", "")
 
 			// Should be a no-op
 			serviceImportMap.Remove(si)

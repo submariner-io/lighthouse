@@ -46,7 +46,10 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 	var ips []string
 	var found bool
-	ip, found := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, lh.clusterStatus.IsConnected,
+
+	localClusterID := lh.clusterStatus.LocalClusterID()
+
+	ip, found := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
 		lh.endpointsStatus.IsHealthy)
 
 	if !found {

@@ -44,14 +44,19 @@ type FailingResponseWriter struct {
 
 type MockClusterStatus struct {
 	clusterStatusMap map[string]bool
+	localClusterID   string
 }
 
 func NewMockClusterStatus() *MockClusterStatus {
-	return &MockClusterStatus{clusterStatusMap: make(map[string]bool)}
+	return &MockClusterStatus{clusterStatusMap: make(map[string]bool), localClusterID: ""}
 }
 
 func (m *MockClusterStatus) IsConnected(clusterId string) bool {
 	return m.clusterStatusMap[clusterId]
+}
+
+func (m *MockClusterStatus) LocalClusterID() string {
+	return m.localClusterID
 }
 
 type MockEndpointStatus struct {
