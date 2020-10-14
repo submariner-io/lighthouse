@@ -36,7 +36,9 @@ type Lighthouse struct {
 }
 
 type ClusterStatus interface {
-	IsConnected(clusterId string) bool
+	IsConnected(clusterID string) bool
+
+	LocalClusterID() string
 }
 
 type EndpointsStatus interface {

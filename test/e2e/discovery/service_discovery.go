@@ -20,6 +20,7 @@ const (
 var checkedDomains = []string{clustersetDomain}
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
+
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
@@ -51,6 +52,7 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 			RunServicesPodAvailabilityMutliClusterTest(f)
 		})
 	})
+
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
@@ -239,13 +241,13 @@ func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
 	}
 
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains, true)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
-
-	f.SetNginxReplicaSet(framework.ClusterB, 0)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains, true)
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 
 	f.SetNginxReplicaSet(framework.ClusterA, 0)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains, false)
+	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, true)
+
+	f.SetNginxReplicaSet(framework.ClusterB, 0)
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains, false)
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 }

@@ -27,6 +27,18 @@ var _ = Describe("Gateway controller", func() {
 	t := newTestDiver()
 
 	When("an active Gateway is created", func() {
+		When("LocalClusterID is called", func() {
+			It("should return the correct local cluster ID", func() {
+				t.localClusterIDValidationTest(localClusterID)
+			})
+		})
+
+		When("LocalClusterID is called after the ID is updated", func() {
+			It("should return the new cluster ID", func() {
+				t.localClusterIDUpdateValidationTest(localClusterID, remoteClusterID1)
+			})
+		})
+
 		When("IsConnected is called for the local cluster ID", func() {
 			It("should return true", func() {
 				t.awaitIsNotConnected(localClusterID)
@@ -80,6 +92,18 @@ var _ = Describe("Gateway controller", func() {
 	When("a passive Gateway is created", func() {
 		BeforeEach(func() {
 			Expect(unstructured.SetNestedField(t.gatewayObj.Object, "passive", "status", "haStatus")).To(Succeed())
+		})
+
+		When("LocalClusterID is called", func() {
+			It("should return the correct local cluster ID", func() {
+				t.localClusterIDValidationTest(localClusterID)
+			})
+		})
+
+		When("LocalClusterID is called after the ID is updated", func() {
+			It("should return the new cluster ID", func() {
+				t.localClusterIDUpdateValidationTest(localClusterID, remoteClusterID1)
+			})
 		})
 
 		When("IsConnected is called for the local cluster ID", func() {
@@ -162,6 +186,28 @@ func (t *testDriver) awaitIsNotConnected(clusterID string) {
 	}, 5).Should(BeFalse())
 }
 
+func (t *testDriver) localClusterIDValidationTest(localClusterID string) {
+	t.createGateway()
+	t.awaitValidLocalClusterID(localClusterID)
+}
+
+func (t *testDriver) localClusterIDUpdateValidationTest(originalLocalClusterID, originalRemoteClusterID string) {
+	// First validate for current state
+	t.createGateway()
+	t.awaitValidLocalClusterID(originalLocalClusterID)
+
+	// Second change remote to be the local and validate for new state
+	t.setGatewayLocalClusterID(originalRemoteClusterID)
+	t.updateGateway()
+	t.awaitValidLocalClusterID(originalRemoteClusterID)
+}
+
+func (t *testDriver) awaitValidLocalClusterID(clusterID string) {
+	Eventually(func() string {
+		return t.controller.LocalClusterID()
+	}, 5).Should(Equal(clusterID))
+}
+
 func (t *testDriver) createGateway() {
 	_, err := t.gatewayClient.Create(t.gatewayObj, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
@@ -170,6 +216,10 @@ func (t *testDriver) createGateway() {
 func (t *testDriver) updateGateway() {
 	_, err := t.gatewayClient.Update(t.gatewayObj, metav1.UpdateOptions{})
 	Expect(err).To(Succeed())
+}
+
+func (t *testDriver) setGatewayLocalClusterID(clusterID string) {
+	Expect(unstructured.SetNestedField(t.gatewayObj.Object, clusterID, "status", "localEndpoint", "cluster_id")).To(Succeed())
 }
 
 func (t *testDriver) addGatewayStatusConnection(clusterID, status string) *unstructured.Unstructured {
@@ -198,7 +248,7 @@ func init() {
 	klog.InitFlags(nil)
 }
 
-func TestGatewayt(t *testing.T) {
+func TestGateway(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Gateway Suite")
 }
