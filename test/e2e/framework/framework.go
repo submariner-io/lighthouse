@@ -47,7 +47,7 @@ func NewFramework(baseName string) *Framework {
 }
 
 func beforeSuite() {
-	By("Creating lighthouse clients")
+	framework.By("Creating lighthouse clients")
 
 	for _, restConfig := range framework.RestConfigs {
 		LighthouseClients = append(LighthouseClients, createLighthouseClient(restConfig))
