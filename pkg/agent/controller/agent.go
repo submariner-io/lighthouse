@@ -13,7 +13,6 @@ import (
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -141,22 +140,6 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
-	agentController.endpointSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:                "Endpoint events",
-		SourceClient:        localClient,
-		SourceNamespace:     metav1.NamespaceAll,
-		Direction:           syncer.LocalToRemote,
-		RestMapper:          restMapper,
-		Federator:           agentController.serviceExportSyncer.GetBrokerFederator(),
-		ResourceType:        &corev1.Endpoints{},
-		Transform:           agentController.endpointToRemoteServiceImport,
-		ResourcesEquivalent: agentController.endpointEquivalent,
-		Scheme:              runtimeScheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer, restMapper,
 		localClient, runtimeScheme)
 	if err != nil {
@@ -180,10 +163,6 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	}
 
 	if err := a.serviceSyncer.Start(stopCh); err != nil {
-		return err
-	}
-
-	if err := a.endpointSyncer.Start(stopCh); err != nil {
 		return err
 	}
 
@@ -350,66 +329,6 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	return serviceImport, false
 }
 
-func (a *Controller) endpointToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
-	ep := obj.(*corev1.Endpoints)
-	obj, found, err := a.serviceExportSyncer.GetLocalResource(ep.Name, ep.Namespace, &lighthousev2a1.ServiceExport{})
-	if err != nil {
-		klog.Errorf("Error retrieving ServiceExport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
-		return nil, true
-	}
-
-	if !found {
-		// Service Export not created yet
-		return nil, false
-	}
-
-	svcExport := obj.(*lighthousev2a1.ServiceExport)
-
-	serviceImport, found, err := a.serviceImportController.getServiceImport(
-		a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace), a.namespace)
-	if err != nil {
-		klog.Errorf("Error retrieving ServiceImport for Endpoints (%s/%s): %v", ep.Namespace, ep.Name, err)
-
-		// Requeue
-		return nil, true
-	}
-
-	if !found {
-		return nil, true
-	}
-
-	if serviceImport.Spec.Type == lighthousev2a1.Headless {
-		return nil, false
-	}
-
-	ipList := getIPsFromEndpoint(ep)
-	var ip string
-
-	if serviceImport.Spec.Type == lighthousev2a1.ClusterSetIP && len(ipList) > 0 {
-		/*
-			When there's no healthy pods, the IPs in the Endpoint will become empty and
-			thus we also clear the ServiceImport IPs to avoid clients sending a request
-			to a cluster which has no active pods to handle the request.
-
-			Once at least one backing Endpoint pod becomes healthy, we need to re-establish
-			the ServiceImport IPs from the previously cached clusterIP annotation.
-		*/
-		ip = serviceImport.Annotations[clusterIP]
-	} else {
-		ip = ""
-	}
-
-	oldClusterIP := serviceImport.Spec.IP
-	if oldClusterIP == ip {
-		klog.V(log.DEBUG).Infof("Old and new cluster status are same")
-		return nil, false
-	}
-
-	serviceImport.Spec.IP = ip
-
-	return serviceImport, false
-}
-
 func (a *Controller) updateExportedServiceStatus(name, namespace string, condType lighthousev2a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -472,11 +391,6 @@ func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.S
 	}
 
 	return se, nil
-}
-
-func (a *Controller) endpointEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
-	return equality.Semantic.DeepEqual(util.GetNestedField(obj1, "subsets"),
-		util.GetNestedField(obj2, "subsets"))
 }
 
 func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {

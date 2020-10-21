@@ -118,23 +118,6 @@ var _ = Describe("ServiceImport syncing", func() {
 		})
 	})
 
-	When("the Service's pod endpoint IPs are lost and then reestablished", func() {
-		It("should clear and restore the ServiceImport's IPs", func() {
-			t.createService()
-			t.createEndpoints()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
-
-			t.endpoints.Subsets[0].Addresses = nil
-			t.updateEndpoints()
-			t.awaitUpdatedServiceImport("")
-
-			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.10"})
-			t.updateEndpoints()
-			t.awaitUpdatedServiceImport("")
-		})
-	})
-
 	When("the ServiceExportCondition list count reaches MaxExportStatusConditions", func() {
 		var oldMaxExportStatusConditions int
 
