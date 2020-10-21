@@ -69,8 +69,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *l
 		return false
 	}
 
-	if serviceImport.Spec.Type != lighthousev2a1.Headless ||
-		serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+	if serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
 		return false
 	}
 
@@ -129,13 +128,4 @@ func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.
 	}
 
 	return nil, c.serviceImportDeleted(serviceImport, key)
-}
-
-func (c *ServiceImportController) getServiceImport(name, namespace string) (*lighthousev2a1.ServiceImport, bool, error) {
-	obj, found, err := c.serviceImportSyncer.GetResource(name, namespace)
-	if obj != nil {
-		return obj.(*lighthousev2a1.ServiceImport), found, err
-	}
-
-	return nil, found, err
 }
