@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 )
 
 type clusterInfo struct {
@@ -15,7 +16,7 @@ type clusterInfo struct {
 
 type serviceInfo struct {
 	key           string
-	clusterIPs    map[string][]string
+	clusterIPs    map[string]string
 	clustersQueue []clusterInfo
 	rrCount       uint64
 	isHeadless    bool
@@ -23,11 +24,9 @@ type serviceInfo struct {
 
 func (si *serviceInfo) buildClusterInfoQueue() {
 	si.clustersQueue = make([]clusterInfo, 0)
-	for k, v := range si.clusterIPs {
-		if len(v) > 0 {
-			c := clusterInfo{name: k, ip: v[0], weight: 0}
-			si.clustersQueue = append(si.clustersQueue, c)
-		}
+	for cluster, ip := range si.clusterIPs {
+		c := clusterInfo{name: cluster, ip: ip, weight: 0}
+		si.clustersQueue = append(si.clustersQueue, c)
 	}
 }
 
@@ -53,8 +52,8 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(s
 	return ""
 }
 
-func (m *Map) GetIPs(namespace, name, cluster string, checkCluster func(string) bool) ([]string, bool) {
-	clusterIPs, queue, counter, isHeadless := func() (map[string][]string, []clusterInfo, *uint64, bool) {
+func (m *Map) GetIP(namespace, name, cluster string, checkCluster func(string) bool) (string, bool) {
+	clusterIPs, queue, counter, isHeadless := func() (map[string]string, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
 
@@ -67,20 +66,20 @@ func (m *Map) GetIPs(namespace, name, cluster string, checkCluster func(string) 
 	}()
 
 	if clusterIPs == nil || isHeadless {
-		return nil, false
+		return "", false
 	}
 
 	if cluster != "" {
-		ips, found := clusterIPs[cluster]
-		return ips, found
+		ip, found := clusterIPs[cluster]
+		return ip, found
 	}
 
 	ip := m.selectIP(queue, counter, checkCluster)
 	if ip != "" {
-		return []string{ip}, true
+		return ip, true
 	}
 
-	return []string{}, true
+	return "", true
 }
 
 func NewMap() *Map {
@@ -102,15 +101,13 @@ func (m *Map) Put(serviceImport *lighthousev2a1.ServiceImport) {
 		if !ok {
 			remoteService = &serviceInfo{
 				key:        key,
-				clusterIPs: make(map[string][]string),
+				clusterIPs: make(map[string]string),
 				rrCount:    0,
 				isHeadless: serviceImport.Spec.Type == lighthousev2a1.Headless,
 			}
 		}
 
-		for _, info := range serviceImport.Status.Clusters {
-			remoteService.clusterIPs[info.Cluster] = info.IPs
-		}
+		remoteService.clusterIPs[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = serviceImport.Spec.IP
 
 		if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()
