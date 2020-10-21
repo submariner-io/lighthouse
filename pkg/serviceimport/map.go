@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
+
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 )
@@ -35,7 +37,8 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(string) bool) string {
+func (m *Map) selectIP(queue []clusterInfo, counter *uint64, key string, checkCluster func(string) bool,
+	checkEndpoint func(string, string) bool) string {
 	queueLength := len(queue)
 	for i := 0; i < queueLength; i++ {
 		c := atomic.LoadUint64(counter)
@@ -44,7 +47,7 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(s
 
 		atomic.AddUint64(counter, 1)
 
-		if checkCluster(info.name) {
+		if checkCluster(info.name) && checkEndpoint(key, info.name) {
 			return info.ip
 		}
 	}
@@ -52,7 +55,8 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, checkCluster func(s
 	return ""
 }
 
-func (m *Map) GetIP(namespace, name, cluster string, checkCluster func(string) bool) (string, bool) {
+func (m *Map) GetIP(namespace, name, cluster string, checkCluster func(string) bool,
+	checkEndpoint func(string, string) bool) (string, bool) {
 	clusterIPs, queue, counter, isHeadless := func() (map[string]string, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
@@ -74,7 +78,7 @@ func (m *Map) GetIP(namespace, name, cluster string, checkCluster func(string) b
 		return ip, found
 	}
 
-	ip := m.selectIP(queue, counter, checkCluster)
+	ip := m.selectIP(queue, counter, endpointslice.KeyFunc(name, namespace), checkCluster, checkEndpoint)
 	if ip != "" {
 		return ip, true
 	}

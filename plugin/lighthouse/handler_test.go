@@ -54,6 +54,18 @@ func (m *MockClusterStatus) IsConnected(clusterId string) bool {
 	return m.clusterStatusMap[clusterId]
 }
 
+type MockEndpointStatus struct {
+	endpointStatusMap map[string]bool
+}
+
+func NewMockEndpointStatus() *MockEndpointStatus {
+	return &MockEndpointStatus{endpointStatusMap: make(map[string]bool)}
+}
+
+func (m *MockEndpointStatus) IsHealthy(key, clusterId string) bool {
+	return m.endpointStatusMap[clusterId]
+}
+
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
@@ -67,12 +79,16 @@ func testWithoutFallback() {
 	BeforeEach(func() {
 		mockCs := NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
+		mockEs := NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
+
 		lh = &Lighthouse{
-			Zones:          []string{"clusterset.local."},
-			serviceImports: setupServiceImportMap(),
-			endpointSlices: setupEndpointSliceMap(),
-			clusterStatus:  mockCs,
-			ttl:            defaultTtl,
+			Zones:           []string{"clusterset.local."},
+			serviceImports:  setupServiceImportMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			ttl:             defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -193,14 +209,17 @@ func testWithFallback() {
 	BeforeEach(func() {
 		mockCs := NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
+		mockEs := NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
 		lh = &Lighthouse{
-			Zones:          []string{"clusterset.local."},
-			Fall:           fall.F{Zones: []string{"clusterset.local."}},
-			Next:           test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
-			serviceImports: setupServiceImportMap(),
-			endpointSlices: setupEndpointSliceMap(),
-			clusterStatus:  mockCs,
-			ttl:            defaultTtl,
+			Zones:           []string{"clusterset.local."},
+			Fall:            fall.F{Zones: []string{"clusterset.local."}},
+			Next:            test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin")),
+			serviceImports:  setupServiceImportMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			ttl:             defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -270,12 +289,16 @@ func testClusterStatus() {
 		mockCs = NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
 		mockCs.clusterStatusMap[clusterID2] = true
+		mockEs := NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
+		mockEs.endpointStatusMap[clusterID2] = true
 		lh = &Lighthouse{
-			Zones:          []string{"clusterset.local."},
-			serviceImports: setupServiceImportMap(),
-			endpointSlices: setupEndpointSliceMap(),
-			clusterStatus:  mockCs,
-			ttl:            defaultTtl,
+			Zones:           []string{"clusterset.local."},
+			serviceImports:  setupServiceImportMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			ttl:             defaultTtl,
 		}
 		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, lighthousev2a1.ClusterSetIP))
 
@@ -364,17 +387,22 @@ func testHeadlessService() {
 		rec    *dnstest.Recorder
 		lh     *Lighthouse
 		mockCs *MockClusterStatus
+		mockEs *MockEndpointStatus
 	)
 
 	BeforeEach(func() {
 		mockCs = NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
+		mockEs = NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
+		mockEs.endpointStatusMap[clusterID2] = true
 		lh = &Lighthouse{
-			Zones:          []string{"clusterset.local."},
-			serviceImports: serviceimport.NewMap(),
-			endpointSlices: setupEndpointSliceMap(),
-			clusterStatus:  mockCs,
-			ttl:            defaultTtl,
+			Zones:           []string{"clusterset.local."},
+			serviceImports:  serviceimport.NewMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			ttl:             defaultTtl,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})

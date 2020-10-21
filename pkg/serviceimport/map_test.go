@@ -20,21 +20,27 @@ var _ = Describe("ServiceImport Map", func() {
 	)
 
 	var (
-		clusterStatusMap map[string]bool
-		serviceImportMap *serviceimport.Map
+		clusterStatusMap  map[string]bool
+		serviceImportMap  *serviceimport.Map
+		endpointStatusMap map[string]bool
 	)
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
 		serviceImportMap = serviceimport.NewMap()
+		endpointStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
 	})
 
 	checkCluster := func(id string) bool {
 		return clusterStatusMap[id]
 	}
 
+	checkEndpoint := func(key, id string) bool {
+		return endpointStatusMap[id]
+	}
+
 	getIPs := func(ns, name, cluster string) string {
-		ip, found := serviceImportMap.GetIP(ns, name, cluster, checkCluster)
+		ip, found := serviceImportMap.GetIP(ns, name, cluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeTrue())
 		return ip
 	}
@@ -177,7 +183,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service does not exist", func() {
 		It("should return not found", func() {
-			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster)
+			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster, checkEndpoint)
 			Expect(found).To(BeFalse())
 		})
 	})
@@ -199,7 +205,7 @@ var _ = Describe("ServiceImport Map", func() {
 			Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 
 			serviceImportMap.Remove(si)
-			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster)
+			_, found := serviceImportMap.GetIP(namespace1, service1, "", checkCluster, checkEndpoint)
 			Expect(found).To(BeFalse())
 
 			// Should be a no-op
