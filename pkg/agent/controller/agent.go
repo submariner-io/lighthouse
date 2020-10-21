@@ -240,7 +240,9 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	}
 
 	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
-		Type: svcType,
+		Ports:                 []lighthousev2a1.ServicePort{},
+		Type:                  svcType,
+		SessionAffinityConfig: new(corev1.SessionAffinityConfig),
 	}
 
 	ips, err := a.getIPsForService(svc, svcType)
