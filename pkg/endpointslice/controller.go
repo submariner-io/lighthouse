@@ -15,21 +15,35 @@ import (
 	"k8s.io/klog"
 )
 
+type NewClientsetFunc func(kubeConfig *rest.Config) (kubernetes.Interface, error)
+
+// Indirection hook for unit tests to supply fake client sets
+var NewClientset NewClientsetFunc
+
 type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
-	NewClientset func(kubeConfig *rest.Config) (kubernetes.Interface, error)
+	NewClientset NewClientsetFunc
 	epsInformer  cache.Controller
 	stopCh       chan struct{}
 	store        Store
+	clietnSet    kubernetes.Interface
 }
 
 func NewController(endpointSliceStore Store) *Controller {
 	return &Controller{
-		NewClientset: func(c *rest.Config) (kubernetes.Interface, error) {
-			return kubernetes.NewForConfig(c)
-		},
-		stopCh: make(chan struct{}),
-		store:  endpointSliceStore,
+		NewClientset: getNewClientsetFunc(),
+		stopCh:       make(chan struct{}),
+		store:        endpointSliceStore,
+	}
+}
+
+func getNewClientsetFunc() NewClientsetFunc {
+	if NewClientset != nil {
+		return NewClientset
+	}
+
+	return func(c *rest.Config) (kubernetes.Interface, error) {
+		return kubernetes.NewForConfig(c)
 	}
 }
 
@@ -41,6 +55,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		return fmt.Errorf("Error creating client set: %v", err)
 	}
 
+	c.clietnSet = clientSet
 	labelMap := map[string]string{
 		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
 	}
@@ -97,4 +112,15 @@ func (c *Controller) Stop() {
 	close(c.stopCh)
 
 	klog.Infof("EndpointSlice Controller stopped")
+}
+
+func (c *Controller) IsHealthy(key, clusterId string) bool {
+	endpointInfo := c.store.Get(key)
+	if endpointInfo != nil {
+		if endpointInfo.clusterInfo != nil {
+			return len(endpointInfo.clusterInfo[clusterId].ipList) > 0
+		}
+	}
+
+	return false
 }

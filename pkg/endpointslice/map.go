@@ -25,7 +25,7 @@ type Map struct {
 }
 
 func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]string, bool) {
-	key := keyFunc(name, namespace)
+	key := KeyFunc(name, namespace)
 
 	clusterInfos := func() map[string]*clusterInfo {
 		m.RLock()
@@ -132,6 +132,14 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 	}
 }
 
+func (m *Map) Get(key string) *endpointInfo {
+	m.RLock()
+	defer m.RUnlock()
+	endpointInfo := m.epMap[key]
+
+	return endpointInfo
+}
+
 func getKey(es *discovery.EndpointSlice) (string, bool) {
 	name, ok := es.Labels[constants.LabelSourceName]
 
@@ -145,9 +153,9 @@ func getKey(es *discovery.EndpointSlice) (string, bool) {
 		return "", false
 	}
 
-	return keyFunc(name, namespace), true
+	return KeyFunc(name, namespace), true
 }
 
-func keyFunc(name, namespace string) string {
+func KeyFunc(name, namespace string) string {
 	return name + "-" + namespace
 }
