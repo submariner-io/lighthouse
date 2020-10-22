@@ -1,19 +1,15 @@
-package endpointslice
+package endpointslice_test
 
 import (
 	"time"
 
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	"k8s.io/api/discovery/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"k8s.io/client-go/kubernetes"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
+	"k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
@@ -34,70 +30,70 @@ const testNS2 = "testNameSpace2"
 var _ = Describe("EndpointSlice controller", func() {
 	t := newEndpointSliceTestDiver()
 
-	When("Endpoints exists in an EndpointSlice ", func() {
-		When("IsHealthy is called for the remote clusters", func() {
-			It("should return the appropriate response", func() {
+	When("a service has a valid endpoint", func() {
+		When("IsHealthy is called for the service with a valid cluster", func() {
+			It("should return true", func() {
 				esName := testName1 + remoteClusterID1
 				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
 				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{endPoint1})
 				t.createEndpointSlice(testNS1, endpointSlice)
-				t.AwaitEndpointSlice(esName, testNS1)
-				t.AwaitEpMap(testService1, testNS1)
-				Expect(t.controller.IsHealthy(KeyFunc(testService1, testNS1), remoteClusterID1)).To(BeTrue())
+				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1, false)
 			})
 		})
 	})
 
-	When("When an EndpointSlice does not exists", func() {
-		When("IsHealthy is called for the remote clusters", func() {
-			It("should return false", func() {
-				Expect(t.controller.IsHealthy(KeyFunc(testService1, testNS1), remoteClusterID1)).To(BeFalse())
-			})
+	When("IsHealthy is called for a non-existent service", func() {
+		It("should return false", func() {
+			Expect(t.controller.IsHealthy(testService1, testNS1, remoteClusterID1)).To(BeFalse())
 		})
 	})
 
-	When("When an EndpointSlice exists without endpoints", func() {
-		When("IsHealthy is called", func() {
-			It("should return false", func() {
-				esName := testName1 + remoteClusterID1
-				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{})
-				t.createEndpointSlice(testNS1, endpointSlice)
-				t.AwaitEndpointSlice(esName, testNS1)
-				t.AwaitEpMap(testService1, testNS1)
-				Expect(t.controller.IsHealthy(KeyFunc(testService1, testNS1), remoteClusterID1)).To(BeFalse())
-			})
+	When("IsHealthy is called for a service with no endpoints", func() {
+		It("should return false", func() {
+			esName := testName1 + remoteClusterID1
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{})
+			t.createEndpointSlice(testNS1, endpointSlice)
+			Consistently(func() bool {
+				return t.controller.IsHealthy(testService1, testNS1, remoteClusterID1)
+			}, 500*time.Millisecond).Should(BeFalse())
 		})
 	})
 
-	When("When multiple EndpointSlice exists with endpoints", func() {
-		When("IsHealthy is called", func() {
+	When("a service exists in multiple clusters with valid endpoints", func() {
+		When("IsHealthy is called for each cluster", func() {
 			It("should return true", func() {
 				esName1 := testName1 + remoteClusterID1
 				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
 				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []v1beta1.Endpoint{endPoint1})
 				t.createEndpointSlice(testNS1, endpointSlice)
-				t.AwaitEndpointSlice(esName1, testNS1)
-				t.AwaitEpMap(testService1, testNS1)
 
 				esName2 := testName2 + remoteClusterID2
 				endPoint2 := t.newEndpoint(cluster2HostNamePod1, cluster2EndPointIP1)
 				endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []v1beta1.Endpoint{endPoint2})
 				t.createEndpointSlice(testNS2, endpointSlice2)
-				t.AwaitEndpointSlice(esName2, testNS2)
-				t.AwaitEpMap(testService2, testNS2)
 
-				Expect(t.controller.IsHealthy(KeyFunc(testService1, testNS1), remoteClusterID1)).To(BeTrue())
-				Expect(t.controller.IsHealthy(KeyFunc(testService2, testNS2), remoteClusterID2)).To(BeTrue())
+				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1, false)
+				t.awaitIsHealthy(testService2, testNS2, remoteClusterID2, false)
 			})
 		})
 	})
 
+	When("IsHealthy is called for a non-existent cluster", func() {
+		It("should return false", func() {
+			esName1 := testName1 + remoteClusterID1
+			endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []v1beta1.Endpoint{endPoint1})
+			t.createEndpointSlice(testNS1, endpointSlice)
+
+			t.awaitIsHealthy(testService1, testNS1, "randomcluster", true)
+		})
+	})
 })
 
 type endpointSliceTestDriver struct {
-	controller *Controller
+	controller *endpointslice.Controller
 	kubeClient kubernetes.Interface
-	epMap      *Map
+	epMap      *endpointslice.Map
 }
 
 func newEndpointSliceTestDiver() *endpointSliceTestDriver {
@@ -105,8 +101,8 @@ func newEndpointSliceTestDiver() *endpointSliceTestDriver {
 
 	BeforeEach(func() {
 		t.kubeClient = fakeKubeClient.NewSimpleClientset()
-		t.epMap = NewMap()
-		t.controller = NewController(t.epMap)
+		t.epMap = endpointslice.NewMap()
+		t.controller = endpointslice.NewController(t.epMap)
 		t.controller.NewClientset = func(c *rest.Config) (kubernetes.Interface, error) {
 			return t.kubeClient, nil
 		}
@@ -151,47 +147,14 @@ func (t *endpointSliceTestDriver) newEndpoint(hostname, ipaddress string) v1beta
 	}
 }
 
-func (t *endpointSliceTestDriver) AwaitEndpointSlice(name, nameSpace string) {
-	var found *v1beta1.EndpointSlice
-
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		var err error
-		found, err = t.kubeClient.DiscoveryV1beta1().EndpointSlices(nameSpace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
-
-			return false, err
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		if found == nil {
-			Fail("EndpointSlice not found")
-		}
+func (t *endpointSliceTestDriver) awaitIsHealthy(name, nameSpace, clusterId string, fail bool) {
+	if fail {
+		Eventually(func() bool {
+			return t.controller.IsHealthy(name, nameSpace, clusterId)
+		}, 5).Should(BeFalse())
 	} else {
-		Expect(err).To(Succeed())
-	}
-}
-
-func (t *endpointSliceTestDriver) AwaitEpMap(name, nameSpace string) {
-	var found *endpointInfo
-
-	err := wait.Poll(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		found = t.epMap.Get(KeyFunc(name, nameSpace))
-		if found == nil {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		if found == nil {
-			Fail("Endpoint not found in Map")
-		}
-	} else {
-		Expect(err).To(Succeed())
+		Eventually(func() bool {
+			return t.controller.IsHealthy(name, nameSpace, clusterId)
+		}, 5).Should(BeTrue())
 	}
 }

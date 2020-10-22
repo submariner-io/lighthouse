@@ -62,7 +62,7 @@ func NewMockEndpointStatus() *MockEndpointStatus {
 	return &MockEndpointStatus{endpointStatusMap: make(map[string]bool)}
 }
 
-func (m *MockEndpointStatus) IsHealthy(key, clusterId string) bool {
+func (m *MockEndpointStatus) IsHealthy(name, namespace, clusterId string) bool {
 	return m.endpointStatusMap[clusterId]
 }
 

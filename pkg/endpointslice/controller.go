@@ -26,7 +26,7 @@ type Controller struct {
 	epsInformer  cache.Controller
 	stopCh       chan struct{}
 	store        Store
-	clietnSet    kubernetes.Interface
+	clientSet    kubernetes.Interface
 }
 
 func NewController(endpointSliceStore Store) *Controller {
@@ -55,7 +55,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		return fmt.Errorf("Error creating client set: %v", err)
 	}
 
-	c.clietnSet = clientSet
+	c.clientSet = clientSet
 	labelMap := map[string]string{
 		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
 	}
@@ -114,12 +114,12 @@ func (c *Controller) Stop() {
 	klog.Infof("EndpointSlice Controller stopped")
 }
 
-func (c *Controller) IsHealthy(key, clusterId string) bool {
+func (c *Controller) IsHealthy(name, namespace, clusterId string) bool {
+	key := keyFunc(name, namespace)
 	endpointInfo := c.store.Get(key)
-	if endpointInfo != nil {
-		if endpointInfo.clusterInfo != nil {
-			return len(endpointInfo.clusterInfo[clusterId].ipList) > 0
-		}
+	if endpointInfo != nil && endpointInfo.clusterInfo != nil &&
+		endpointInfo.clusterInfo[clusterId] != nil {
+		return len(endpointInfo.clusterInfo[clusterId].ipList) > 0
 	}
 
 	return false

@@ -40,7 +40,7 @@ type ClusterStatus interface {
 }
 
 type EndpointsStatus interface {
-	IsHealthy(key, clusterId string) bool
+	IsHealthy(name, namespace, clusterId string) bool
 }
 
 var _ plugin.Handler = &Lighthouse{}
