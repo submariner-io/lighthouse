@@ -33,12 +33,17 @@ type Lighthouse struct {
 	endpointSlices  *endpointslice.Map
 	clusterStatus   ClusterStatus
 	endpointsStatus EndpointsStatus
+	localServices   LocalServices
 }
 
 type ClusterStatus interface {
 	IsConnected(clusterID string) bool
 
 	LocalClusterID() string
+}
+
+type LocalServices interface {
+	GetIp(name, namespace string) (string, bool)
 }
 
 type EndpointsStatus interface {

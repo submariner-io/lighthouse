@@ -44,13 +44,13 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
 	}
 
-	var ips []string
-	var found bool
+	var (
+		ips   []string
+		found bool
+		ip    string
+	)
 
-	localClusterID := lh.clusterStatus.LocalClusterID()
-
-	ip, found := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
-		lh.endpointsStatus.IsHealthy)
+	ip, found = lh.getClusterIpForSvc(pReq)
 
 	if !found {
 		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
@@ -109,6 +109,20 @@ func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
 	}
 
 	return dns.RcodeSuccess, nil
+}
+
+func (lh *Lighthouse) getClusterIpForSvc(pReq recordRequest) (ip string, found bool) {
+	localClusterID := lh.clusterStatus.LocalClusterID()
+
+	ip, found, isLocal := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
+		lh.endpointsStatus.IsHealthy)
+
+	getLocal := isLocal || (pReq.cluster != "" && pReq.cluster == localClusterID)
+	if found && getLocal {
+		ip, found = lh.localServices.GetIp(pReq.service, pReq.namespace)
+	}
+
+	return ip, found
 }
 
 // Name implements the Handler interface.

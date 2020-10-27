@@ -54,7 +54,7 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace str
 }
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
-	checkEndpoint func(string, string, string) bool) (string, bool) {
+	checkEndpoint func(string, string, string) bool) (ip string, found, isLocal bool) {
 	clusterIPs, queue, counter, isHeadless := func() (map[string]string, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
@@ -68,13 +68,13 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	}()
 
 	if clusterIPs == nil || isHeadless {
-		return "", false
+		return "", false, false
 	}
 
 	// If a clusterId is specified, we supply it even if the service is not there
 	if cluster != "" {
-		ip, found := clusterIPs[cluster]
-		return ip, found
+		ip, found = clusterIPs[cluster]
+		return ip, found, false
 	}
 
 	// If we are aware of the local cluster
@@ -83,17 +83,17 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 		ip, found := clusterIPs[localCluster]
 
 		if found && ip != "" && checkEndpoint(name, namespace, localCluster) {
-			return ip, found
+			return ip, found, true
 		}
 	}
 
 	// Fall back to Round-Robin if service is not presented in the local cluster
-	ip := m.selectIP(queue, counter, name, namespace, checkCluster, checkEndpoint)
+	ip = m.selectIP(queue, counter, name, namespace, checkCluster, checkEndpoint)
 	if ip != "" {
-		return ip, true
+		return ip, true, false
 	}
 
-	return "", true
+	return "", true, false
 }
 
 func NewMap() *Map {

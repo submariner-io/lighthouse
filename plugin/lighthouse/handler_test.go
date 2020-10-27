@@ -35,6 +35,7 @@ var _ = Describe("Lighthouse DNS plugin Handler", func() {
 	Context("Fallthrough configured", testWithFallback)
 	Context("Cluster connectivity status", testClusterStatus)
 	Context("Headless services", testHeadlessService)
+	Context("Local services", testLocalService)
 })
 
 type FailingResponseWriter struct {
@@ -55,10 +56,6 @@ func (m *MockClusterStatus) IsConnected(clusterId string) bool {
 	return m.clusterStatusMap[clusterId]
 }
 
-func (m *MockClusterStatus) LocalClusterID() string {
-	return m.localClusterID
-}
-
 type MockEndpointStatus struct {
 	endpointStatusMap map[string]bool
 }
@@ -71,6 +68,26 @@ func (m *MockEndpointStatus) IsHealthy(name, namespace, clusterId string) bool {
 	return m.endpointStatusMap[clusterId]
 }
 
+func (m *MockClusterStatus) LocalClusterID() string {
+	return m.localClusterID
+}
+
+type MockLocalServices struct {
+	LocalServicesMap map[string]string
+}
+
+func NewMockLocalServices() *MockLocalServices {
+	return &MockLocalServices{LocalServicesMap: make(map[string]string)}
+}
+
+func (m *MockLocalServices) GetIp(name, namespace string) (string, bool) {
+	ip, found := m.LocalServicesMap[getKey(name, namespace)]
+	return ip, found
+}
+
+func getKey(name, namespace string) string {
+	return namespace + "/" + name
+}
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
@@ -86,13 +103,14 @@ func testWithoutFallback() {
 		mockCs.clusterStatusMap[clusterID] = true
 		mockEs := NewMockEndpointStatus()
 		mockEs.endpointStatusMap[clusterID] = true
-
+		mockLs := NewMockLocalServices()
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),
 			endpointSlices:  setupEndpointSliceMap(),
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
+			localServices:   mockLs,
 			ttl:             defaultTtl,
 		}
 
@@ -214,8 +232,11 @@ func testWithFallback() {
 	BeforeEach(func() {
 		mockCs := NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
+		mockCs.localClusterID = clusterID
 		mockEs := NewMockEndpointStatus()
 		mockEs.endpointStatusMap[clusterID] = true
+		mockLs := NewMockLocalServices()
+
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			Fall:            fall.F{Zones: []string{"clusterset.local."}},
@@ -224,6 +245,7 @@ func testWithFallback() {
 			endpointSlices:  setupEndpointSliceMap(),
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
+			localServices:   mockLs,
 			ttl:             defaultTtl,
 		}
 
@@ -297,12 +319,14 @@ func testClusterStatus() {
 		mockEs := NewMockEndpointStatus()
 		mockEs.endpointStatusMap[clusterID] = true
 		mockEs.endpointStatusMap[clusterID2] = true
+		mockLs := NewMockLocalServices()
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),
 			endpointSlices:  setupEndpointSliceMap(),
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
+			localServices:   mockLs,
 			ttl:             defaultTtl,
 		}
 		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
@@ -399,15 +423,18 @@ func testHeadlessService() {
 	BeforeEach(func() {
 		mockCs = NewMockClusterStatus()
 		mockCs.clusterStatusMap[clusterID] = true
+		mockCs.localClusterID = clusterID
 		mockEs = NewMockEndpointStatus()
 		mockEs.endpointStatusMap[clusterID] = true
 		mockEs.endpointStatusMap[clusterID2] = true
+		mockLs := NewMockLocalServices()
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  serviceimport.NewMap(),
 			endpointSlices:  setupEndpointSliceMap(),
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
+			localServices:   mockLs,
 			ttl:             defaultTtl,
 		}
 
@@ -495,6 +522,92 @@ func testHeadlessService() {
 						test.A(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + endpointIP),
 					},
 				})
+			})
+		})
+	})
+}
+
+func testLocalService() {
+	var (
+		rec    *dnstest.Recorder
+		lh     *Lighthouse
+		mockCs *MockClusterStatus
+	)
+
+	BeforeEach(func() {
+		mockCs = NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
+		mockCs.clusterStatusMap[clusterID2] = true
+		mockEs := NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
+		mockEs.endpointStatusMap[clusterID2] = true
+		mockLs := NewMockLocalServices()
+		mockCs.localClusterID = clusterID
+		mockLs.LocalServicesMap[getKey(service1, namespace1)] = serviceIP
+		lh = &Lighthouse{
+			Zones:           []string{"clusterset.local."},
+			serviceImports:  setupServiceImportMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			localServices:   mockLs,
+			ttl:             defaultTtl,
+		}
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, lighthousev2a1.ClusterSetIP))
+
+		rec = dnstest.NewRecorder(&test.ResponseWriter{})
+	})
+
+	When("service is in local and remote clusters", func() {
+		It("should succeed and write local cluster's IP as A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+				},
+			})
+			// Execute again to make sure not round robin
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+				},
+			})
+		})
+	})
+
+	When("service is in local and remote clusters, and remote cluster is requested", func() {
+		It("should succeed and write remote cluster's IP as A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
+				},
+			})
+		})
+	})
+
+	When("service is in local and remote clusters, and local has no active endpoints", func() {
+		JustBeforeEach(func() {
+			mockEs := NewMockEndpointStatus()
+			mockEs.endpointStatusMap[clusterID] = false
+			mockEs.endpointStatusMap[clusterID2] = true
+			lh.endpointsStatus = mockEs
+		})
+		It("should succeed and write remote cluster's IP as A record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeA,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
+				},
 			})
 		})
 	})
