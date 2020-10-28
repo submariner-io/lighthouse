@@ -37,7 +37,7 @@ var _ = Describe("EndpointSlice controller", func() {
 				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
 				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{endPoint1})
 				t.createEndpointSlice(testNS1, endpointSlice)
-				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1, false)
+				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
 			})
 		})
 	})
@@ -53,9 +53,7 @@ var _ = Describe("EndpointSlice controller", func() {
 			esName := testName1 + remoteClusterID1
 			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{})
 			t.createEndpointSlice(testNS1, endpointSlice)
-			Consistently(func() bool {
-				return t.controller.IsHealthy(testService1, testNS1, remoteClusterID1)
-			}, 500*time.Millisecond).Should(BeFalse())
+			t.awaitNotIsHealthy(testService1, testNS1, remoteClusterID1)
 		})
 	})
 
@@ -72,8 +70,8 @@ var _ = Describe("EndpointSlice controller", func() {
 				endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []v1beta1.Endpoint{endPoint2})
 				t.createEndpointSlice(testNS2, endpointSlice2)
 
-				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1, false)
-				t.awaitIsHealthy(testService2, testNS2, remoteClusterID2, false)
+				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
+				t.awaitIsHealthy(testService2, testNS2, remoteClusterID2)
 			})
 		})
 	})
@@ -85,7 +83,7 @@ var _ = Describe("EndpointSlice controller", func() {
 			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []v1beta1.Endpoint{endPoint1})
 			t.createEndpointSlice(testNS1, endpointSlice)
 
-			t.awaitIsHealthy(testService1, testNS1, "randomcluster", true)
+			t.awaitNotIsHealthy(testService1, testNS1, "randomcluster")
 		})
 	})
 })
@@ -147,14 +145,14 @@ func (t *endpointSliceTestDriver) newEndpoint(hostname, ipaddress string) v1beta
 	}
 }
 
-func (t *endpointSliceTestDriver) awaitIsHealthy(name, nameSpace, clusterId string, fail bool) {
-	if fail {
-		Eventually(func() bool {
-			return t.controller.IsHealthy(name, nameSpace, clusterId)
-		}, 5).Should(BeFalse())
-	} else {
-		Eventually(func() bool {
-			return t.controller.IsHealthy(name, nameSpace, clusterId)
-		}, 5).Should(BeTrue())
-	}
+func (t *endpointSliceTestDriver) awaitIsHealthy(name, nameSpace, clusterId string) {
+	Eventually(func() bool {
+		return t.controller.IsHealthy(name, nameSpace, clusterId)
+	}, 5).Should(BeTrue())
+}
+
+func (t *endpointSliceTestDriver) awaitNotIsHealthy(name, nameSpace, clusterId string) {
+	Consistently(func() bool {
+		return t.controller.IsHealthy(name, nameSpace, clusterId)
+	}, 500*time.Millisecond).Should(BeFalse())
 }

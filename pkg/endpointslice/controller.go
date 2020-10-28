@@ -117,9 +117,11 @@ func (c *Controller) Stop() {
 func (c *Controller) IsHealthy(name, namespace, clusterId string) bool {
 	key := keyFunc(name, namespace)
 	endpointInfo := c.store.Get(key)
-	if endpointInfo != nil && endpointInfo.clusterInfo != nil &&
-		endpointInfo.clusterInfo[clusterId] != nil {
-		return len(endpointInfo.clusterInfo[clusterId].ipList) > 0
+	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
+		info := endpointInfo.clusterInfo[clusterId]
+		if info != nil {
+			return len(info.ipList) > 0
+		}
 	}
 
 	return false
