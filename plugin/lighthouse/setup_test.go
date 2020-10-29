@@ -12,10 +12,10 @@ import (
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	fakeLighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
+	fakeMCSClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -41,8 +41,8 @@ var _ = Describe("Plugin setup", func() {
 			return fakeClient.NewSimpleDynamicClient(runtime.NewScheme()), nil
 		}
 
-		serviceimport.NewClientset = func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error) {
-			return fakeLighthouseClientset.NewSimpleClientset(), nil
+		serviceimport.NewClientset = func(kubeConfig *rest.Config) (mcsClientset.Interface, error) {
+			return fakeMCSClientset.NewSimpleClientset(), nil
 		}
 
 		endpointslice.NewClientset = func(kubeConfig *rest.Config) (kubernetes.Interface, error) {
