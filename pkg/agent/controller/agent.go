@@ -9,7 +9,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -25,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const (
@@ -71,7 +71,7 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		kubeClientSet:    kubeClientSet,
 	}
 
-	_, gvr, err := util.ToUnstructuredResource(&lighthousev2a1.ServiceExport{}, restMapper)
+	_, gvr, err := util.ToUnstructuredResource(&mcsv1a1.ServiceExport{}, restMapper)
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +80,10 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 
 	svcExportResourceConfig := broker.ResourceConfig{
 		LocalSourceNamespace:  metav1.NamespaceAll,
-		LocalResourceType:     &lighthousev2a1.ServiceExport{},
+		LocalResourceType:     &mcsv1a1.ServiceExport{},
 		LocalTransform:        agentController.serviceExportToRemoteServiceImport,
 		LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
-		BrokerResourceType:    &lighthousev2a1.ServiceImport{},
+		BrokerResourceType:    &mcsv1a1.ServiceImport{},
 	}
 
 	syncerConf.Scheme = runtimeScheme
@@ -184,7 +184,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		return nil, false
 	}
 
-	svcExport := obj.(*lighthousev2a1.ServiceExport)
+	svcExport := obj.(*mcsv1a1.ServiceExport)
 	serviceImport := a.newServiceImport(svcExport)
 
 	if op == syncer.Delete {
@@ -194,7 +194,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
 		klog.Errorf("Error retrieving Service (%s/%s): %v", svcExport.Namespace, svcExport.Name, err)
 
@@ -203,7 +203,7 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 
 	if !found {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 
 		return nil, true
@@ -214,16 +214,16 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	svcType, ok := getServiceImportType(svc)
 
 	if !ok {
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
 		klog.Errorf("Service type %q not supported", svc.Spec.Type)
 
 		return nil, false
 	}
 
-	if a.globalnetEnabled && svcType == lighthousev2a1.Headless {
+	if a.globalnetEnabled && svcType == mcsv1a1.Headless {
 		klog.Infof("Headless Services not supported with globalnet yet")
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, invalidServiceType, "Headless Services not supported with Globalnet IP")
 
 		return nil, false
@@ -233,14 +233,14 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, "ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
 
 		return nil, true
 	}
 
-	serviceImport.Spec = lighthousev2a1.ServiceImportSpec{
-		Ports:                 []lighthousev2a1.ServicePort{},
+	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
+		Ports:                 []mcsv1a1.ServicePort{},
 		Type:                  svcType,
 		SessionAffinityConfig: new(corev1.SessionAffinityConfig),
 	}
@@ -248,44 +248,44 @@ func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op s
 	ips, err := a.getIPsForService(svc, svcType)
 	if err != nil {
 		// Failed to get ips for some reason, requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 			corev1.ConditionUnknown, "ServiceRetrievalFailed", err.Error())
 
 		return nil, true
 	}
 
-	serviceImport.Status = lighthousev2a1.ServiceImportStatus{
-		Clusters: []lighthousev2a1.ClusterStatus{
+	serviceImport.Status = mcsv1a1.ServiceImportStatus{
+		Clusters: []mcsv1a1.ClusterStatus{
 			{
 				Cluster: a.clusterID,
 			},
 		},
 	}
 
-	if svcType == lighthousev2a1.ClusterSetIP {
-		serviceImport.Spec.IP = ips[0]
+	if svcType == mcsv1a1.ClusterSetIP {
+		serviceImport.Spec.IPs = ips
 		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
 		cleared out when here's no backing Endpoint pods.
 		*/
 		serviceImport.Annotations[clusterIP] = ips[0]
 	}
 
-	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 		corev1.ConditionTrue, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
 
 	return serviceImport, false
 }
 
-func getServiceImportType(service *corev1.Service) (lighthousev2a1.ServiceImportType, bool) {
+func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, bool) {
 	if service.Spec.Type != "" && service.Spec.Type != corev1.ServiceTypeClusterIP {
 		return "", false
 	}
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
-		return lighthousev2a1.Headless, true
+		return mcsv1a1.Headless, true
 	}
 
-	return lighthousev2a1.ClusterSetIP, true
+	return mcsv1a1.ClusterSetIP, true
 }
 
 func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
@@ -293,11 +293,11 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 		return
 	}
 
-	serviceImport := synced.(*lighthousev2a1.ServiceImport)
+	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
 	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
 		serviceImport.GetAnnotations()[lhconstants.OriginNamespace],
-		lighthousev2a1.ServiceExportExported, corev1.ConditionTrue,
+		mcsv1a1.ServiceExportValid, corev1.ConditionTrue,
 		"", "Service was successfully synced to the broker")
 }
 
@@ -308,7 +308,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	}
 
 	svc := obj.(*corev1.Service)
-	obj, found, err := a.serviceExportSyncer.GetLocalResource(svc.Name, svc.Namespace, &lighthousev2a1.ServiceExport{})
+	obj, found, err := a.serviceExportSyncer.GetLocalResource(svc.Name, svc.Namespace, &mcsv1a1.ServiceExport{})
 	if err != nil {
 		// some other error. Log and requeue
 		klog.Errorf("Error retrieving ServiceExport for Service (%s/%s): %v", svc.Namespace, svc.Name, err)
@@ -320,18 +320,18 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 		return nil, false
 	}
 
-	svcExport := obj.(*lighthousev2a1.ServiceExport)
+	svcExport := obj.(*mcsv1a1.ServiceExport)
 
 	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, lighthousev2a1.ServiceExportInitialized,
+	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 		corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 
 	return serviceImport, false
 }
 
-func (a *Controller) updateExportedServiceStatus(name, namespace string, condType lighthousev2a1.ServiceExportConditionType,
+func (a *Controller) updateExportedServiceStatus(name, namespace string, condType mcsv1a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.getServiceExport(name, namespace)
@@ -343,7 +343,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 		}
 
 		now := metav1.Now()
-		exportCondition := lighthousev2a1.ServiceExportCondition{
+		exportCondition := mcsv1a1.ServiceExportCondition{
 			Type:               condType,
 			Status:             status,
 			LastTransitionTime: &now,
@@ -380,13 +380,13 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 	}
 }
 
-func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.ServiceExport, error) {
+func (a *Controller) getServiceExport(name, namespace string) (*mcsv1a1.ServiceExport, error) {
 	obj, err := a.serviceExportClient.Namespace(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	se := &lighthousev2a1.ServiceExport{}
+	se := &mcsv1a1.ServiceExport{}
 	err = a.serviceImportController.scheme.Convert(obj, se, nil)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Error converting %#v to ServiceExport", obj)
@@ -395,13 +395,13 @@ func (a *Controller) getServiceExport(name, namespace string) (*lighthousev2a1.S
 	return se, nil
 }
 
-func serviceExportConditionEqual(c1, c2 *lighthousev2a1.ServiceExportCondition) bool {
+func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
 	return c1.Type == c2.Type && c1.Status == c2.Status && reflect.DeepEqual(c1.Reason, c2.Reason) &&
 		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
-func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *lighthousev2a1.ServiceImport {
-	return &lighthousev2a1.ServiceImport{
+func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1.ServiceImport {
+	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace),
 			Annotations: map[string]string{
@@ -417,8 +417,8 @@ func (a *Controller) newServiceImport(svcExport *lighthousev2a1.ServiceExport) *
 	}
 }
 
-func (a *Controller) getIPsForService(service *corev1.Service, siType lighthousev2a1.ServiceImportType) ([]string, error) {
-	if siType == lighthousev2a1.ClusterSetIP {
+func (a *Controller) getIPsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) ([]string, error) {
+	if siType == mcsv1a1.ClusterSetIP {
 		mcsIp := getGlobalIpFromService(service)
 		if mcsIp == "" {
 			mcsIp = service.Spec.ClusterIP

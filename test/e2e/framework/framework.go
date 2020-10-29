@@ -14,10 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 )
 
 const (
@@ -34,7 +34,7 @@ type Framework struct {
 	*framework.Framework
 }
 
-var LighthouseClients []*lighthouseClientset.Clientset
+var MCSClients []*mcsClientset.Clientset
 
 func init() {
 	framework.AddBeforeSuite(beforeSuite)
@@ -50,45 +50,45 @@ func beforeSuite() {
 	framework.By("Creating lighthouse clients")
 
 	for _, restConfig := range framework.RestConfigs {
-		LighthouseClients = append(LighthouseClients, createLighthouseClient(restConfig))
+		MCSClients = append(MCSClients, createLighthouseClient(restConfig))
 	}
 }
 
-func createLighthouseClient(restConfig *rest.Config) *lighthouseClientset.Clientset {
-	clientSet, err := lighthouseClientset.NewForConfig(restConfig)
+func createLighthouseClient(restConfig *rest.Config) *mcsClientset.Clientset {
+	clientSet, err := mcsClientset.NewForConfig(restConfig)
 	Expect(err).To(Not(HaveOccurred()))
 
 	return clientSet
 }
 
-func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *lighthousev2a1.ServiceExport {
-	nginxServiceExport := lighthousev2a1.ServiceExport{
+func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
+	nginxServiceExport := mcsv1a1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	se := LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace)
+	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Creating serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
 		return se.Create(&nginxServiceExport)
-	}, framework.NoopCheckResult).(*lighthousev2a1.ServiceExport)
+	}, framework.NoopCheckResult).(*mcsv1a1.ServiceExport)
 
 	return serviceExport
 }
 
 func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
-	se := LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace)
+	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
 		return se.Get(name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
-		se := result.(*lighthousev2a1.ServiceExport)
+		se := result.(*mcsv1a1.ServiceExport)
 		if len(se.Status.Conditions) == 0 {
 			return false, "No ServiceExportConditions", nil
 		}
 
 		last := se.Status.Conditions[len(se.Status.Conditions)-1]
-		if last.Type != lighthousev2a1.ServiceExportExported {
+		if last.Type != mcsv1a1.ServiceExportValid {
 			return false, fmt.Sprintf("ServiceExportCondition Type is %v", last.Type), nil
 		}
 
@@ -103,7 +103,7 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {
 	By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("delete service export", func() (interface{}, error) {
-		return nil, LighthouseClients[cluster].LighthouseV2alpha1().ServiceExports(namespace).Delete(name, &metav1.DeleteOptions{})
+		return nil, MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace).Delete(name, &metav1.DeleteOptions{})
 	}, framework.NoopCheckResult)
 }
 
@@ -112,7 +112,7 @@ func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace s
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 }
 
-func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, svc *v1.Service) *lighthousev2a1.ServiceImport {
+func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, svc *v1.Service) *mcsv1a1.ServiceImport {
 	var serviceIP string
 
 	if framework.TestContext.GlobalnetEnabled {
@@ -121,20 +121,20 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 		serviceIP = svc.Spec.ClusterIP
 	}
 
-	var retServiceImport *lighthousev2a1.ServiceImport
+	var retServiceImport *mcsv1a1.ServiceImport
 
 	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
-	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
+	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	By(fmt.Sprintf("Retrieving ServiceImport for %s on %q", siNamePrefix, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
 		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*lighthousev2a1.ServiceImportList)
+		siList := result.(*mcsv1a1.ServiceImportList)
 		for i, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
-				if si.Spec.IP != serviceIP {
+				if si.Spec.IPs[0] != serviceIP {
 					return false, fmt.Sprintf("ServiceImport IP %s doesn't match %s",
-						si.Spec.IP, serviceIP), nil
+						si.Spec.IPs[0], serviceIP), nil
 				}
 				retServiceImport = &siList.Items[i]
 				return true, "", nil
@@ -149,11 +149,11 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 
 func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, name, namespace string) {
 	siNamePrefix := name + "-" + namespace
-	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
+	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
 		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*lighthousev2a1.ServiceImportList)
+		siList := result.(*mcsv1a1.ServiceImportList)
 		for _, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				return false, fmt.Sprintf("ServiceImport with name prefix %s still exists", siNamePrefix), nil
@@ -172,11 +172,11 @@ func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex
 	siListOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelMap).String(),
 	}
-	si := LighthouseClients[targetCluster].LighthouseV2alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
+	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
 		return si.List(siListOptions)
 	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*lighthousev2a1.ServiceImportList)
+		siList := result.(*mcsv1a1.ServiceImportList)
 		if len(siList.Items) != count {
 			return false, fmt.Sprintf("ServiceImport count was %v instead of %v", len(siList.Items), count), nil
 		}
