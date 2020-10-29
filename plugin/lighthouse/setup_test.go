@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/caddyserver/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin/pkg/fall"
@@ -12,11 +14,13 @@ import (
 	. "github.com/onsi/gomega"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeLighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
 
@@ -39,6 +43,10 @@ var _ = Describe("Plugin setup", func() {
 
 		serviceimport.NewClientset = func(kubeConfig *rest.Config) (lighthouseClientset.Interface, error) {
 			return fakeLighthouseClientset.NewSimpleClientset(), nil
+		}
+
+		endpointslice.NewClientset = func(kubeConfig *rest.Config) (kubernetes.Interface, error) {
+			return fakeKubeClient.NewSimpleClientset(), nil
 		}
 	})
 

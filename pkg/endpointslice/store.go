@@ -6,4 +6,6 @@ type Store interface {
 	Put(endpointSlice *discovery.EndpointSlice)
 
 	Remove(endpointSlice *discovery.EndpointSlice)
+
+	Get(key string) *endpointInfo
 }

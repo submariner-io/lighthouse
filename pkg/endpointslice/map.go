@@ -132,6 +132,14 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 	}
 }
 
+func (m *Map) Get(key string) *endpointInfo {
+	m.RLock()
+	defer m.RUnlock()
+	endpointInfo := m.epMap[key]
+
+	return endpointInfo
+}
+
 func getKey(es *discovery.EndpointSlice) (string, bool) {
 	name, ok := es.Labels[constants.LabelSourceName]
 

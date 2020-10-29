@@ -21,7 +21,6 @@ type Controller struct {
 	serviceExportSyncer     *broker.Syncer
 	endpointSliceSyncer     *broker.Syncer
 	serviceSyncer           syncer.Interface
-	endpointSyncer          syncer.Interface
 	serviceImportController *ServiceImportController
 }
 

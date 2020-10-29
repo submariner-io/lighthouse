@@ -25,17 +25,22 @@ var (
 var log = clog.NewWithPlugin("lighthouse")
 
 type Lighthouse struct {
-	Next           plugin.Handler
-	Fall           fall.F
-	Zones          []string
-	ttl            uint32
-	serviceImports *serviceimport.Map
-	endpointSlices *endpointslice.Map
-	clusterStatus  ClusterStatus
+	Next            plugin.Handler
+	Fall            fall.F
+	Zones           []string
+	ttl             uint32
+	serviceImports  *serviceimport.Map
+	endpointSlices  *endpointslice.Map
+	clusterStatus   ClusterStatus
+	endpointsStatus EndpointsStatus
 }
 
 type ClusterStatus interface {
 	IsConnected(clusterId string) bool
+}
+
+type EndpointsStatus interface {
+	IsHealthy(name, namespace, clusterId string) bool
 }
 
 var _ plugin.Handler = &Lighthouse{}
