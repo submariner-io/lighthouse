@@ -144,8 +144,18 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		Topology:   topology,
 	}
 
-	if address.Hostname != "" {
+	/*
+		We only need TargetRef.Name as pod address and hostname are only relevant fields.
+		Avoid copying TargetRef coz it it has revision which can change for reasons other
+		than address and hostname, resulting in unnecessary syncs across clusters.
+		Revisit this logic if we need TargetRef for other use cases.
+	*/
+
+	switch {
+	case address.Hostname != "":
 		endpoint.Hostname = &address.Hostname
+	case address.TargetRef != nil:
+		endpoint.Hostname = &address.TargetRef.Name
 	}
 
 	return endpoint
