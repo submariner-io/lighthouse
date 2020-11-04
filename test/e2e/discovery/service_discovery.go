@@ -51,6 +51,12 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 			RunServicesPodAvailabilityMutliClusterTest(f)
 		})
 	})
+
+	When("a pod tries to resolve a service which is exported locally and in a remote cluster", func() {
+		It("should return the desired cluster when specified in the DNS query", func() {
+			RunServiceDiscoverySpecifiedClusterIDMultiClusterTest(f)
+		})
+	})
 })
 
 func RunServiceDiscoveryTest(f *lhframework.Framework) {
@@ -250,6 +256,30 @@ func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, false)
 }
 
+func RunServiceDiscoverySpecifiedClusterIDMultiClusterTest(f *lhframework.Framework) {
+	clusterA, clusterB := buildClustersForMultiClusterTesting(f)
+
+	request := DigRequest{
+		Cluster:             clusterA,
+		Service:             clusterB.Services[0],
+		Domains:             checkedDomains,
+		ClusterDomainPrefix: "",
+	}
+	result := DigResult{ExpectedResolvedIPs: []string{clusterA.Services[0].ClusterIP}}
+	test := DigTest{Request: request, Result: result}
+
+	// Fetch local IP, when no cluster domain prefix is specified
+	verifyServiceIpWithDigParams(f.Framework, test)
+
+	// Fetch relevant clusterIP when cluster domain prefix is specified
+	test.Request.ClusterDomainPrefix = clusterA.Name
+	verifyServiceIpWithDigParams(f.Framework, test)
+
+	test.Request.ClusterDomainPrefix = clusterB.Name
+	test.Result.ExpectedResolvedIPs = []string{clusterB.Services[0].ClusterIP}
+	verifyServiceIpWithDigParams(f.Framework, test)
+}
+
 func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	domains []string, shouldContain bool) {
 	var serviceIP string
@@ -299,6 +329,36 @@ func verifyServiceIpWithDig(f *framework.Framework, cluster framework.ClusterInd
 	})
 }
 
+func verifyServiceIpWithDigParams(f *framework.Framework, test DigTest) {
+	cmd := digCommand(test.Request)
+
+	testingPod := test.Request.Cluster.LocalPodsToRunRequestOn.Items[0]
+
+	By(fmt.Sprintf("Executing %q to verify %v", strings.Join(cmd, " "), test))
+	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace,
+			PodName:       testingPod.Name,
+			ContainerName: testingPod.Spec.Containers[0].Name,
+			CaptureStdout: true,
+			CaptureStderr: true,
+		}, test.Request.Cluster.Index)
+		if err != nil {
+			return nil, err
+		}
+
+		return stdout, nil
+	}, func(result interface{}) (bool, string, error) {
+		ips := test.Result.ExpectedResolvedIPs
+		By(fmt.Sprintf("Validating that dig result %q is in expected results %v", result, ips))
+		if !contains(ips, result.(string)) {
+			return false, fmt.Sprintf("expected execution result %q not to be in %v", result, ips), nil
+		}
+		return true, "", nil
+	})
+}
+
 func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *corev1.PodList) string {
 	/*
 		Kubernetes adds --cluster-domain config to all pods' /etc/resolve.conf exactly as follows:
@@ -323,4 +383,79 @@ func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, ta
 	}
 	// Backup option. Ideally we should never hit this.
 	return "cluster" + strconv.Itoa(int(cluster+1)) + ".local"
+}
+
+func buildClustersForMultiClusterTesting(f *lhframework.Framework) (clusterA, clusterB ClusterParams) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
+	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterBName))
+
+	netshootPodListB := f.NewNetShootDeployment(framework.ClusterB)
+
+	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
+		nginxServiceClusterB = svc
+		f.AwaitServiceImportIP(framework.ClusterB, nginxServiceClusterB)
+	}
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	f.NewNginxDeployment(framework.ClusterA)
+
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterAName))
+
+	nginxServiceClusterA := f.NewNginxService(framework.ClusterA)
+
+	f.AwaitGlobalnetIP(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+
+	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodListA := f.NewNetShootDeployment(framework.ClusterA)
+
+	if svc, err := f.GetService(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace); err == nil {
+		nginxServiceClusterA = svc
+		f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterA)
+	}
+
+	serviceAClusterIP := extractServiceClusterIP(nginxServiceClusterA)
+	serviceAParams := ServiceParams{
+		Name:      nginxServiceClusterA.Name,
+		ClusterIP: serviceAClusterIP,
+		Namespace: nginxServiceClusterA.Namespace,
+	}
+	clusterAParams := ClusterParams{
+		Name:                    clusterAName,
+		Index:                   framework.ClusterA,
+		LocalPodsToRunRequestOn: netshootPodListA,
+		Services:                []ServiceParams{serviceAParams},
+	}
+
+	serviceBClusterIP := extractServiceClusterIP(nginxServiceClusterB)
+	serviceBParams := ServiceParams{
+		Name:      nginxServiceClusterB.Name,
+		ClusterIP: serviceBClusterIP,
+		Namespace: nginxServiceClusterB.Namespace,
+	}
+	clusterBParams := ClusterParams{
+		Name:                    clusterBName,
+		Index:                   framework.ClusterB,
+		LocalPodsToRunRequestOn: netshootPodListB,
+		Services:                []ServiceParams{serviceBParams},
+	}
+
+	return clusterAParams, clusterBParams
 }
