@@ -14,7 +14,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	fakeLHClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
+	fakeMCSClientSet "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -332,6 +336,8 @@ type cluster struct {
 	localServiceImportClient dynamic.ResourceInterface
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
+	mcsClientSet             mcsClientset.Interface
+	lighthouseClient         lighthouseClientset.Interface
 	endpointsReactor         *fake.FailingReactor
 }
 
@@ -469,12 +475,18 @@ func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme)
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
 	c.localKubeClient = fakeCS
 
+	fakeLHClient := fakeLHClientSet.NewSimpleClientset()
+	c.lighthouseClient = fakeLHClient
+
+	fakeMCSClient := fakeMCSClientSet.NewSimpleClientset()
+	c.mcsClientSet = fakeMCSClient
+
 	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 }
 
 func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
 	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient, c.localKubeClient,
-		syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+		c.lighthouseClient, c.mcsClientSet, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
 		})
 

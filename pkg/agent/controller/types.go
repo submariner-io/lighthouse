@@ -3,8 +3,13 @@ package controller
 import (
 	"sync"
 
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,15 +18,17 @@ import (
 )
 
 type Controller struct {
-	clusterID               string
-	globalnetEnabled        bool
-	namespace               string
-	kubeClientSet           kubernetes.Interface
-	serviceExportClient     dynamic.NamespaceableResourceInterface
-	serviceExportSyncer     *broker.Syncer
-	endpointSliceSyncer     *broker.Syncer
-	serviceSyncer           syncer.Interface
-	serviceImportController *ServiceImportController
+	clusterID                  string
+	globalnetEnabled           bool
+	namespace                  string
+	kubeClientSet              kubernetes.Interface
+	serviceExportClient        dynamic.NamespaceableResourceInterface
+	serviceExportSyncer        *broker.Syncer
+	endpointSliceSyncer        *broker.Syncer
+	serviceSyncer              syncer.Interface
+	serviceImportController    *ServiceImportController
+	serviceLHExportController  *LHServiceExportController
+	serviceMCSExportController *MCSServiceExportController
 }
 
 type AgentSpecification struct {
@@ -53,4 +60,19 @@ type EndpointController struct {
 	serviceName                  string
 	serviceImportSourceNameSpace string
 	stopCh                       chan struct{}
+}
+
+type LHServiceExportController struct {
+	mcsClientSet            mcsClientset.Interface
+	lighthouseClient        lighthouseClientset.Interface
+	serviceExportInformer   cache.SharedIndexInformer
+	queue                   workqueue.RateLimitingInterface
+	serviceExportDeletedMap sync.Map
+}
+
+type MCSServiceExportController struct {
+	mcsClientSet          mcsClientset.Interface
+	lighthouseClient      lighthouseClientset.Interface
+	serviceExportInformer cache.SharedIndexInformer
+	queue                 workqueue.RateLimitingInterface
 }
