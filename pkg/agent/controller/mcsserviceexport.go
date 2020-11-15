@@ -1,119 +1,83 @@
 package controller
 
 import (
+	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
-	"github.com/submariner-io/lighthouse/pkg/mcs/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func newMCSServiceExportController(lighthouseClient lighthouseClientset.Interface,
-	mcsClientSet mcsClientset.Interface) (*MCSServiceExportController, error) {
+func newMCSServiceExportController(localClient dynamic.Interface, lighthouseClient lighthouseClientset.Interface,
+	restMapper meta.RESTMapper, scheme *runtime.Scheme) (*MCSServiceExportController, error) {
 	serviceExportController := MCSServiceExportController{
-		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		mcsClientSet:     mcsClientSet,
 		lighthouseClient: lighthouseClient,
 	}
+	mcsServiceExportSyncer, err := syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:            "mcsServiceExport -> lhServiceExport",
+		SourceClient:    localClient,
+		SourceNamespace: metav1.NamespaceAll,
+		Direction:       syncer.LocalToRemote,
+		RestMapper:      restMapper,
+		Federator:       broker.NewFederator(localClient, restMapper, metav1.NamespaceAll, ""),
+		ResourceType:    &mcsv1a1.ServiceExport{},
+		Transform:       serviceExportController.MCStoLHServiceExport,
+		Scheme:          scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	serviceExportController.mcsServiceExportSyncer = mcsServiceExportSyncer
 
 	return &serviceExportController, nil
 }
 
 func (c *MCSServiceExportController) start(stopCh <-chan struct{}) error {
-	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(c.mcsClientSet, 0)
-	c.serviceExportInformer = informerFactory.Multicluster().V1alpha1().ServiceExports().Informer()
-
-	c.serviceExportInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-
-		},
-		UpdateFunc: func(obj interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-		},
-	})
-
-	go c.serviceExportInformer.Run(stopCh)
-	go c.runServiceExportWorker()
-
-	go func(stopCh <-chan struct{}) {
-		<-stopCh
-		c.queue.ShutDown()
-	}(stopCh)
+	if err := c.mcsServiceExportSyncer.Start(stopCh); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (c *MCSServiceExportController) runServiceExportWorker() {
-	for {
-		keyObj, shutdown := c.queue.Get()
-		if shutdown {
-			return
-		}
-
-		key := keyObj.(string)
-
-		func() {
-			defer c.queue.Done(key)
-			obj, exists, err := c.serviceExportInformer.GetIndexer().GetByKey(key)
-
-			if err != nil {
-				klog.Errorf("Error retrieving the object with store is  %v from the cache: %v",
-					c.serviceExportInformer.GetIndexer().ListKeys(), err)
-				// requeue the item to work on later
-				c.queue.AddRateLimited(key)
-
-				return
-			}
-
-			if exists {
-				err = c.serviceExportUpdated(obj, key)
-			}
-
-			if err != nil {
-				c.queue.AddRateLimited(key)
-			} else {
-				c.queue.Forget(key)
-			}
-		}()
+func (c *MCSServiceExportController) MCStoLHServiceExport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	if op != syncer.Update {
+		return nil, false
 	}
-}
 
-func (c *MCSServiceExportController) serviceExportUpdated(obj interface{}, key string) error {
 	serviceExportCreated := obj.(*mcsv1a1.ServiceExport)
 
 	objMeta := serviceExportCreated.GetObjectMeta()
-	currentLHExport, err := c.lighthouseClient.LighthouseV2alpha1().ServiceExports(objMeta.GetNamespace()).
+	_, err := c.lighthouseClient.LighthouseV2alpha1().ServiceExports(objMeta.GetNamespace()).
 		Get(objMeta.GetName(), metav1.GetOptions{})
+
 	if errors.IsNotFound(err) {
-		return nil
+		return nil, false
 	} else if err != nil {
-		return err
+		return nil, true
+	}
+
+	lhServiceExport := &lighthousev2a1.ServiceExport{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      objMeta.GetName(),
+			Namespace: objMeta.GetNamespace(),
+		},
 	}
 
 	lhExportStatus := createServiceExportStatus(serviceExportCreated)
 	if lhExportStatus == nil {
-		return nil
+		return nil, false
 	}
 
-	currentLHExport.Status = *lhExportStatus
+	lhServiceExport.Status = *lhExportStatus
 
-	_, err = c.lighthouseClient.LighthouseV2alpha1().ServiceExports(objMeta.GetNamespace()).Update(currentLHExport)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return lhServiceExport, false
 }
 
 func createServiceExportStatus(export *mcsv1a1.ServiceExport) *lighthousev2a1.ServiceExportStatus {
