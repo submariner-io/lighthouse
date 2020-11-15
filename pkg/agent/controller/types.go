@@ -3,13 +3,9 @@ package controller
 import (
 	"sync"
 
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,16 +59,10 @@ type EndpointController struct {
 }
 
 type LHServiceExportController struct {
-	mcsClientSet            mcsClientset.Interface
-	lighthouseClient        lighthouseClientset.Interface
-	serviceExportInformer   cache.SharedIndexInformer
-	queue                   workqueue.RateLimitingInterface
-	serviceExportDeletedMap sync.Map
+	lhServiceExportSyncer syncer.Interface
 }
 
 type MCSServiceExportController struct {
-	mcsClientSet          mcsClientset.Interface
-	lighthouseClient      lighthouseClientset.Interface
-	serviceExportInformer cache.SharedIndexInformer
-	queue                 workqueue.RateLimitingInterface
+	mcsServiceExportSyncer syncer.Interface
+	lighthouseClient       lighthouseClientset.Interface
 }

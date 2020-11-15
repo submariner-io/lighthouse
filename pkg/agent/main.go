@@ -7,6 +7,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -33,6 +34,11 @@ func main() {
 	klog.Infof("AgentSpec: %v", agentSpec)
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Exitf("Error adding Multicluster v1alpha1 to the scheme: %v", err)
+	}
+
+	err = lighthousev2a1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		klog.Exitf("Error adding lighthouse V2alpha1 to the scheme: %v", err)
 	}

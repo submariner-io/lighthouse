@@ -14,11 +14,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	fakeLHClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
-	fakeMCSClientSet "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -336,7 +335,6 @@ type cluster struct {
 	localServiceImportClient dynamic.ResourceInterface
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
-	mcsClientSet             mcsClientset.Interface
 	lighthouseClient         lighthouseClientset.Interface
 	endpointsReactor         *fake.FailingReactor
 }
@@ -360,6 +358,7 @@ func newTestDiver() *testDriver {
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(mcsv1a1.AddToScheme(syncerScheme)).To(Succeed())
+	Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
 
 	t := &testDriver{
 		cluster1: cluster{
@@ -387,7 +386,7 @@ func newTestDiver() *testDriver {
 			},
 		},
 		restMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{},
-			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}),
+			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}, &lighthousev2a1.ServiceExport{}),
 		brokerDynClient: fake.NewDynamicClient(syncerScheme),
 		syncerScheme:    syncerScheme,
 		stopCh:          make(chan struct{}),
@@ -478,15 +477,12 @@ func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme)
 	fakeLHClient := fakeLHClientSet.NewSimpleClientset()
 	c.lighthouseClient = fakeLHClient
 
-	fakeMCSClient := fakeMCSClientSet.NewSimpleClientset()
-	c.mcsClientSet = fakeMCSClient
-
 	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 }
 
 func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
 	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient, c.localKubeClient,
-		c.lighthouseClient, c.mcsClientSet, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+		c.lighthouseClient, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
 		})
 

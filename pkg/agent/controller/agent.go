@@ -11,7 +11,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -56,17 +55,12 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 		return nil, fmt.Errorf("error creating dynamic client: %v", err)
 	}
 
-	mcsClient, err := mcsClientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
-	}
-
 	lighthouseClient, err := lighthouseClientset.NewForConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("Error building lighthouseClient %s", err.Error())
 	}
 
-	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, lighthouseClient, mcsClient, scheme.Scheme,
+	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, lighthouseClient, scheme.Scheme,
 		func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncer(*config)
 		})
@@ -74,8 +68,8 @@ func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
 
 // Constructor that takes additional detail. This is intended for unit tests.
 func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, restMapper meta.RESTMapper, localClient dynamic.Interface,
-	kubeClientSet kubernetes.Interface, lighthouseClient lighthouseClientset.Interface, mcsClient mcsClientset.Interface,
-	runtimeScheme *runtime.Scheme, newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
+	kubeClientSet kubernetes.Interface, lighthouseClient lighthouseClientset.Interface, runtimeScheme *runtime.Scheme,
+	newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
@@ -158,13 +152,13 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
-	agentController.serviceLHExportController, err = newLHServiceExportController(lighthouseClient, mcsClient)
+	agentController.serviceLHExportController, err = newLHServiceExportController(localClient, restMapper, runtimeScheme)
 
 	if err != nil {
 		return nil, err
 	}
 
-	agentController.serviceMCSExportController, err = newMCSServiceExportController(lighthouseClient, mcsClient)
+	agentController.serviceMCSExportController, err = newMCSServiceExportController(localClient, lighthouseClient, restMapper, runtimeScheme)
 
 	if err != nil {
 		return nil, err
