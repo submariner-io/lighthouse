@@ -54,10 +54,15 @@ func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster fun
 		}
 
 		return ips, true
+	case clusterInfos[cluster] == nil:
+		return nil, false
 	case hostname == "":
 		return clusterInfos[cluster].ipList, true
+	case clusterInfos[cluster].hostIPs == nil:
+		return nil, false
 	default:
-		return clusterInfos[cluster].hostIPs[hostname], true
+		ips, ok := clusterInfos[cluster].hostIPs[hostname]
+		return ips, ok
 	}
 }
 
