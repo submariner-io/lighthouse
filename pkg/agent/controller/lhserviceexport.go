@@ -7,24 +7,29 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 func newLHServiceExportController(localClient dynamic.Interface, restMapper meta.RESTMapper,
 	scheme *runtime.Scheme) (*LHServiceExportController, error) {
-	serviceExportController := LHServiceExportController{}
+	serviceExportController := LHServiceExportController{
+		localClient: localClient,
+	}
 
 	lhServiceExportSyncer, err := syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:            "lhServiceExport -> mcsServiceExport",
-		SourceClient:    localClient,
-		SourceNamespace: metav1.NamespaceAll,
-		Direction:       syncer.LocalToRemote,
-		RestMapper:      restMapper,
-		Federator:       broker.NewFederator(localClient, restMapper, metav1.NamespaceAll, ""),
-		ResourceType:    &lighthousev2a1.ServiceExport{},
-		Transform:       serviceExportController.LHtoMCSServiceExport,
-		Scheme:          scheme,
+		Name:             "lhServiceExport -> mcsServiceExport",
+		SourceClient:     localClient,
+		SourceNamespace:  metav1.NamespaceAll,
+		Direction:        syncer.LocalToRemote,
+		RestMapper:       restMapper,
+		Federator:        broker.NewFederator(localClient, restMapper, metav1.NamespaceAll, ""),
+		ResourceType:     &lighthousev2a1.ServiceExport{},
+		Transform:        serviceExportController.LHtoMCSServiceExport,
+		Scheme:           scheme,
+		OnSuccessfulSync: serviceExportController.deleteLHServiceExport,
 	})
 
 	if err != nil {
@@ -55,4 +60,16 @@ func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, op 
 	}
 
 	return mcsServiceExport, false
+}
+
+func (c *LHServiceExportController) deleteLHServiceExport(obj runtime.Object, op syncer.Operation) {
+	serviceExportCreated := obj.(*lighthousev2a1.ServiceExport)
+	resourceClient := c.localClient.Resource(schema.GroupVersionResource{Group: "lighthouse.submariner.io",
+		Version: "v2alpha1", Resource: "serviceexport"}).Namespace(serviceExportCreated.Namespace)
+	if resourceClient != nil {
+		err := resourceClient.Delete(serviceExportCreated.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			klog.Errorf("Error deleting the ServiceExport %q: %v", serviceExportCreated.Name, err)
+		}
+	}
 }

@@ -3,28 +3,27 @@ package controller
 import (
 	"sync"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 type Controller struct {
-	clusterID                  string
-	globalnetEnabled           bool
-	namespace                  string
-	kubeClientSet              kubernetes.Interface
-	serviceExportClient        dynamic.NamespaceableResourceInterface
-	serviceExportSyncer        *broker.Syncer
-	endpointSliceSyncer        *broker.Syncer
-	serviceSyncer              syncer.Interface
-	serviceImportController    *ServiceImportController
-	serviceLHExportController  *LHServiceExportController
-	serviceMCSExportController *MCSServiceExportController
+	clusterID                 string
+	globalnetEnabled          bool
+	namespace                 string
+	kubeClientSet             kubernetes.Interface
+	serviceExportClient       dynamic.NamespaceableResourceInterface
+	serviceExportSyncer       *broker.Syncer
+	endpointSliceSyncer       *broker.Syncer
+	serviceSyncer             syncer.Interface
+	serviceImportController   *ServiceImportController
+	serviceLHExportController *LHServiceExportController
 }
 
 type AgentSpecification struct {
@@ -60,9 +59,5 @@ type EndpointController struct {
 
 type LHServiceExportController struct {
 	lhServiceExportSyncer syncer.Interface
-}
-
-type MCSServiceExportController struct {
-	mcsServiceExportSyncer syncer.Interface
-	lighthouseClient       lighthouseClientset.Interface
+	localClient           dynamic.Interface
 }
