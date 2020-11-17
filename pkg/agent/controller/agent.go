@@ -158,12 +158,6 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		return nil, err
 	}
 
-	agentController.serviceMCSExportController, err = newMCSServiceExportController(localClient, lighthouseClient, restMapper, runtimeScheme)
-
-	if err != nil {
-		return nil, err
-	}
-
 	return agentController, nil
 }
 
@@ -193,10 +187,6 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	}
 
 	if err := a.serviceLHExportController.start(stopCh); err != nil {
-		return err
-	}
-
-	if err := a.serviceMCSExportController.start(stopCh); err != nil {
 		return err
 	}
 
