@@ -50,6 +50,10 @@ func (c *LHServiceExportController) start(stopCh <-chan struct{}) error {
 }
 
 func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+	if op != syncer.Create {
+		return nil, false
+	}
+
 	serviceExportCreated := obj.(*lighthousev2a1.ServiceExport)
 	objMeta := serviceExportCreated.GetObjectMeta()
 	mcsServiceExport := &mcsv1a1.ServiceExport{
@@ -63,12 +67,12 @@ func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, op 
 }
 
 func (c *LHServiceExportController) deleteLHServiceExport(obj runtime.Object, op syncer.Operation) {
-	serviceExportDeleted := obj.(*lighthousev2a1.ServiceExport)
+	serviceExportDeleted := obj.(*mcsv1a1.ServiceExport)
 	resourceClient := c.localClient.Resource(schema.GroupVersionResource{Group: "lighthouse.submariner.io",
-		Version: "v2alpha1", Resource: "serviceexport"}).Namespace(serviceExportDeleted.Namespace)
-	err := resourceClient.Delete(serviceExportDeleted.Name, &metav1.DeleteOptions{})
+		Version: "v2alpha1", Resource: "serviceexports"}).Namespace(serviceExportDeleted.ObjectMeta.GetNamespace())
+	err := resourceClient.Delete(serviceExportDeleted.ObjectMeta.GetName(), &metav1.DeleteOptions{})
 
 	if err != nil {
-		klog.Errorf("Error deleting the ServiceExport %q: %v", serviceExportDeleted.Name, err)
+		klog.Errorf("Error deleting the ServiceExport %q: %v", serviceExportDeleted.GetObjectMeta().GetName(), err)
 	}
 }
