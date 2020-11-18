@@ -59,7 +59,7 @@ var _ = Describe("ServiceImport syncing", func() {
 	var t *testDriver
 
 	BeforeEach(func() {
-		t = newTestDiver()
+		t = newTestDriver()
 	})
 
 	JustBeforeEach(func() {
@@ -81,7 +81,7 @@ var _ = Describe("ServiceImport syncing", func() {
 	})
 })
 
-func newTestDiver() *testDriver {
+func newTestDriver() *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
