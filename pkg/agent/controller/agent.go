@@ -381,7 +381,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			return err
 		}
 
-		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).Update(raw, metav1.UpdateOptions{})
+		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).UpdateStatus(raw, metav1.UpdateOptions{})
 
 		return err
 	})
