@@ -23,7 +23,7 @@ type Controller struct {
 	endpointSliceSyncer       *broker.Syncer
 	serviceSyncer             syncer.Interface
 	serviceImportController   *ServiceImportController
-	serviceLHExportController *LHServiceExportController
+	lhServiceExportController *LHServiceExportController
 }
 
 type AgentSpecification struct {

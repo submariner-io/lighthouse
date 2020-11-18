@@ -63,13 +63,12 @@ func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, op 
 }
 
 func (c *LHServiceExportController) deleteLHServiceExport(obj runtime.Object, op syncer.Operation) {
-	serviceExportCreated := obj.(*lighthousev2a1.ServiceExport)
+	serviceExportDeleted := obj.(*lighthousev2a1.ServiceExport)
 	resourceClient := c.localClient.Resource(schema.GroupVersionResource{Group: "lighthouse.submariner.io",
-		Version: "v2alpha1", Resource: "serviceexport"}).Namespace(serviceExportCreated.Namespace)
-	if resourceClient != nil {
-		err := resourceClient.Delete(serviceExportCreated.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			klog.Errorf("Error deleting the ServiceExport %q: %v", serviceExportCreated.Name, err)
-		}
+		Version: "v2alpha1", Resource: "serviceexport"}).Namespace(serviceExportDeleted.Namespace)
+	err := resourceClient.Delete(serviceExportDeleted.Name, &metav1.DeleteOptions{})
+
+	if err != nil {
+		klog.Errorf("Error deleting the ServiceExport %q: %v", serviceExportDeleted.Name, err)
 	}
 }

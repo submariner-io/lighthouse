@@ -15,8 +15,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
-	lighthouseClientset "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned"
-	fakeLHClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -335,7 +333,6 @@ type cluster struct {
 	localServiceImportClient dynamic.ResourceInterface
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
-	lighthouseClient         lighthouseClientset.Interface
 	endpointsReactor         *fake.FailingReactor
 }
 
@@ -474,15 +471,12 @@ func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme)
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
 	c.localKubeClient = fakeCS
 
-	fakeLHClient := fakeLHClientSet.NewSimpleClientset()
-	c.lighthouseClient = fakeLHClient
-
 	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 }
 
 func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
 	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient, c.localKubeClient,
-		c.lighthouseClient, syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+		syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
 			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
 		})
 
