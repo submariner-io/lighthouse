@@ -33,6 +33,7 @@ import (
 
 const clusterID1 = "east"
 const clusterID2 = "west"
+const serviceNamespace = "service-ns"
 
 var nodeName = "my-node"
 var hostName = "my-host"
@@ -99,7 +100,7 @@ var _ = Describe("ServiceImport syncing", func() {
 
 	When("the ServiceImport sync initially fails", func() {
 		BeforeEach(func() {
-			t.brokerServiceImportClient.PersistentFailOnCreate.Store("mock create error")
+			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("mock create error")
 		})
 
 		It("should not update the ServiceExport status to Exported until the sync is successful", func() {
@@ -116,7 +117,7 @@ var _ = Describe("ServiceImport syncing", func() {
 				Message: &message,
 			})
 
-			t.brokerServiceImportClient.PersistentFailOnCreate.Store("")
+			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("")
 			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
 		})
 	})
@@ -330,7 +331,7 @@ type cluster struct {
 	agentSpec                controller.AgentSpecification
 	localDynClient           dynamic.Interface
 	localServiceExportClient *fake.DynamicResourceClient
-	localServiceImportClient dynamic.ResourceInterface
+	localServiceImportClient *fake.DynamicResourceClient
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
 	endpointsReactor         *fake.FailingReactor
@@ -375,7 +376,7 @@ func newTestDiver() *testDriver {
 		service: &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nginx",
-				Namespace: test.LocalNamespace,
+				Namespace: serviceNamespace,
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: "10.253.9.1",
@@ -459,13 +460,13 @@ func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme)
 	c.localDynClient = fake.NewDynamicClient(syncerScheme)
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
-		&mcsv1a1.ServiceExport{})).Namespace(test.LocalNamespace).(*fake.DynamicResourceClient)
+		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
 
 	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
-		&mcsv1a1.ServiceImport{})).Namespace(test.LocalNamespace)
+		&mcsv1a1.ServiceImport{})).Namespace(test.LocalNamespace).(*fake.DynamicResourceClient)
 
 	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
-		&discovery.EndpointSlice{})).Namespace(test.LocalNamespace)
+		&discovery.EndpointSlice{})).Namespace(serviceNamespace)
 
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")

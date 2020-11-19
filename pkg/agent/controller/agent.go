@@ -78,21 +78,55 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 
 	agentController.serviceExportClient = localClient.Resource(*gvr)
 
-	svcExportResourceConfig := broker.ResourceConfig{
-		LocalSourceNamespace:  metav1.NamespaceAll,
-		LocalResourceType:     &mcsv1a1.ServiceExport{},
-		LocalTransform:        agentController.serviceExportToRemoteServiceImport,
-		LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
-		BrokerResourceType:    &mcsv1a1.ServiceImport{},
-	}
-
 	syncerConf.Scheme = runtimeScheme
 	syncerConf.LocalNamespace = spec.Namespace
+	syncerConf.LocalClusterID = spec.ClusterID
+
 	syncerConf.ResourceConfigs = []broker.ResourceConfig{
-		svcExportResourceConfig,
+		{
+			LocalSourceNamespace: metav1.NamespaceAll,
+			LocalResourceType:    &mcsv1a1.ServiceImport{},
+			BrokerResourceType:   &mcsv1a1.ServiceImport{},
+		},
+	}
+	agentController.serviceImportSyncer, err = newSyncer(syncerConf)
+	if err != nil {
+		return nil, err
 	}
 
-	agentController.serviceExportSyncer, err = newSyncer(syncerConf)
+	syncerConf.LocalNamespace = metav1.NamespaceAll
+	syncerConf.ResourceConfigs = []broker.ResourceConfig{
+		{
+			LocalSourceNamespace: metav1.NamespaceAll,
+			LocalResourceType:    &discovery.EndpointSlice{},
+			LocalTransform:       agentController.filterLocalEndpointSlices,
+			LocalResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
+				return false
+			},
+			BrokerResourceType: &discovery.EndpointSlice{},
+			BrokerResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
+				return false
+			},
+			BrokerTransform: agentController.remoteEndpointSliceToLocal,
+		},
+	}
+	agentController.endpointSliceSyncer, err = newSyncer(syncerConf)
+	if err != nil {
+		return nil, err
+	}
+
+	agentController.serviceExportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:             "ServiceExport -> ServiceImport",
+		SourceClient:     localClient,
+		SourceNamespace:  metav1.NamespaceAll,
+		Direction:        syncer.RemoteToLocal,
+		RestMapper:       restMapper,
+		Federator:        agentController.serviceImportSyncer.GetLocalFederator(),
+		ResourceType:     &mcsv1a1.ServiceExport{},
+		Transform:        agentController.serviceExportToServiceImport,
+		OnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
+		Scheme:           runtimeScheme,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -101,40 +135,12 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		Name:            "Service deletion",
 		SourceClient:    localClient,
 		SourceNamespace: metav1.NamespaceAll,
-		Direction:       syncer.LocalToRemote,
+		Direction:       syncer.RemoteToLocal,
 		RestMapper:      restMapper,
-		Federator:       agentController.serviceExportSyncer.GetBrokerFederator(),
+		Federator:       agentController.serviceImportSyncer.GetLocalFederator(),
 		ResourceType:    &corev1.Service{},
 		Transform:       agentController.serviceToRemoteServiceImport,
 		Scheme:          runtimeScheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	agentController.endpointSliceSyncer, err = newSyncer(&broker.SyncerConfig{
-		LocalRestConfig:  syncerConf.LocalRestConfig,
-		LocalNamespace:   metav1.NamespaceAll,
-		LocalClusterID:   spec.ClusterID,
-		BrokerRestConfig: syncerConf.BrokerRestConfig,
-		BrokerNamespace:  syncerConf.BrokerNamespace,
-		Scheme:           syncerConf.Scheme,
-		ResourceConfigs: []broker.ResourceConfig{
-			{
-
-				LocalSourceNamespace: metav1.NamespaceAll,
-				LocalResourceType:    &discovery.EndpointSlice{},
-				LocalTransform:       agentController.filterLocalEndpointSlices,
-				LocalResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
-					return false
-				},
-				BrokerResourceType: &discovery.EndpointSlice{},
-				BrokerResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
-					return false
-				},
-				BrokerTransform: agentController.remoteEndpointSliceToLocal,
-			},
-		},
 	})
 	if err != nil {
 		return nil, err
@@ -147,7 +153,6 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 	}
 
 	agentController.lhServiceExportController, err = newLHServiceExportController(localClient, restMapper, runtimeScheme)
-
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +166,6 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	// Start the informer factories to begin populating the informer caches
 	klog.Info("Starting Agent controller")
 
-	// Wait for the caches to be synced before starting workers
-	klog.Info("Starting syncer")
-
 	if err := a.serviceExportSyncer.Start(stopCh); err != nil {
 		return err
 	}
@@ -173,6 +175,10 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	}
 
 	if err := a.endpointSliceSyncer.Start(stopCh); err != nil {
+		return err
+	}
+
+	if err := a.serviceImportSyncer.Start(stopCh); err != nil {
 		return err
 	}
 
@@ -189,7 +195,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
 	if op == syncer.Update {
 		return nil, false
 	}
@@ -318,7 +324,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 	}
 
 	svc := obj.(*corev1.Service)
-	obj, found, err := a.serviceExportSyncer.GetLocalResource(svc.Name, svc.Namespace, &mcsv1a1.ServiceExport{})
+	obj, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
 		klog.Errorf("Error retrieving ServiceExport for Service (%s/%s): %v", svc.Namespace, svc.Name, err)

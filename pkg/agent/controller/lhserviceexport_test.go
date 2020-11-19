@@ -17,7 +17,7 @@ var _ = Describe("ServiceExport migration", func() {
 	BeforeEach(func() {
 		t = newTestDiver()
 		lhServiceExportClient = t.cluster1.localDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
-			&lighthousev2a1.ServiceExport{})).Namespace(test.LocalNamespace)
+			&lighthousev2a1.ServiceExport{})).Namespace(serviceNamespace)
 	})
 
 	JustBeforeEach(func() {
