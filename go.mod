@@ -7,11 +7,15 @@ require (
 	github.com/coredns/coredns v1.6.7
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.35
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
-	github.com/submariner-io/admiral v0.7.0
-	github.com/submariner-io/shipyard v0.7.3-0.20201105165619-4a6063d2b38c
+	github.com/stretchr/testify v1.6.1 // indirect
+	github.com/submariner-io/admiral v0.6.0-pre1
+	github.com/submariner-io/shipyard v0.5.0
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 	k8s.io/api v0.18.4
 	k8s.io/apimachinery v0.18.4
 	k8s.io/client-go v11.0.0+incompatible
