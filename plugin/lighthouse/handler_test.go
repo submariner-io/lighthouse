@@ -323,9 +323,10 @@ func testClusterStatus() {
 		})
 	})
 
-	When("service is in two connected clusters and one has no IP", func() {
+	When("service is in two connected clusters and one is not of type ClusterSetIP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP, ""))
+			lh.serviceImports = setupServiceImportMap()
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, ""))
 		})
 		It("should succeed and write an A record response with the available IP", func() {
 			executeTestCase(lh, rec, test.Case{
