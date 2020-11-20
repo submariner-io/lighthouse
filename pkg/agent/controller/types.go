@@ -19,7 +19,8 @@ type Controller struct {
 	namespace                 string
 	kubeClientSet             kubernetes.Interface
 	serviceExportClient       dynamic.NamespaceableResourceInterface
-	serviceExportSyncer       *broker.Syncer
+	serviceExportSyncer       syncer.Interface
+	serviceImportSyncer       *broker.Syncer
 	endpointSliceSyncer       *broker.Syncer
 	serviceSyncer             syncer.Interface
 	serviceImportController   *ServiceImportController
