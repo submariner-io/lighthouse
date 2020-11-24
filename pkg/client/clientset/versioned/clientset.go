@@ -21,7 +21,6 @@ package versioned
 import (
 	"fmt"
 
-	lighthousev1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v1"
 	lighthousev2alpha1 "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/typed/lighthouse.submariner.io/v2alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -30,7 +29,6 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	LighthouseV1() lighthousev1.LighthouseV1Interface
 	LighthouseV2alpha1() lighthousev2alpha1.LighthouseV2alpha1Interface
 }
 
@@ -38,13 +36,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	lighthouseV1       *lighthousev1.LighthouseV1Client
 	lighthouseV2alpha1 *lighthousev2alpha1.LighthouseV2alpha1Client
-}
-
-// LighthouseV1 retrieves the LighthouseV1Client
-func (c *Clientset) LighthouseV1() lighthousev1.LighthouseV1Interface {
-	return c.lighthouseV1
 }
 
 // LighthouseV2alpha1 retrieves the LighthouseV2alpha1Client
@@ -73,10 +65,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.lighthouseV1, err = lighthousev1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.lighthouseV2alpha1, err = lighthousev2alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -93,7 +81,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.lighthouseV1 = lighthousev1.NewForConfigOrDie(c)
 	cs.lighthouseV2alpha1 = lighthousev2alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -103,7 +90,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.lighthouseV1 = lighthousev1.New(c)
 	cs.lighthouseV2alpha1 = lighthousev2alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

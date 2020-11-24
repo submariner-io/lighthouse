@@ -21,7 +21,6 @@ package externalversions
 import (
 	"fmt"
 
-	v1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v1"
 	v2alpha1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -53,11 +52,7 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=lighthouse.submariner.io, Version=v1
-	case v1.SchemeGroupVersion.WithResource("multiclusterservices"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Lighthouse().V1().MultiClusterServices().Informer()}, nil
-
-		// Group=lighthouse.submariner.io, Version=v2alpha1
+	// Group=lighthouse.submariner.io, Version=v2alpha1
 	case v2alpha1.SchemeGroupVersion.WithResource("serviceexports"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Lighthouse().V2alpha1().ServiceExports().Informer()}, nil
 	case v2alpha1.SchemeGroupVersion.WithResource("serviceimports"):
