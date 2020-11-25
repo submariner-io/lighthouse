@@ -287,7 +287,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.
 	}
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-		corev1.ConditionTrue, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
+		corev1.ConditionFalse, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
 
 	return serviceImport, false
 }

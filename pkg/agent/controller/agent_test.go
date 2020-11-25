@@ -109,7 +109,7 @@ var _ = Describe("ServiceImport syncing", func() {
 
 			message := "AwaitingSync"
 			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionTrue, message))
+				corev1.ConditionFalse, message))
 
 			t.awaitNotServiceExportStatus(&mcsv1a1.ServiceExportCondition{
 				Type:    mcsv1a1.ServiceExportValid,
@@ -819,7 +819,7 @@ func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
 
 	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-		corev1.ConditionTrue, "AwaitingSync"), newServiceExportCondition(mcsv1a1.ServiceExportValid,
+		corev1.ConditionFalse, "AwaitingSync"), newServiceExportCondition(mcsv1a1.ServiceExportValid,
 		corev1.ConditionTrue, ""))
 
 	return statusIndex + 2
