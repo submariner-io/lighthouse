@@ -111,7 +111,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 1)
+	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
 	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 2, true)
 
