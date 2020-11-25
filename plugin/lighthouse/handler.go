@@ -119,7 +119,7 @@ func (lh *Lighthouse) getClusterIpForSvc(pReq recordRequest) (ip string, found b
 
 	getLocal := isLocal || (pReq.cluster != "" && pReq.cluster == localClusterID)
 	if found && getLocal {
-		ip, found = lh.localServices.GetIp(pReq.service, pReq.namespace)
+		ip, found = lh.localServices.GetIP(pReq.service, pReq.namespace)
 	}
 
 	return ip, found

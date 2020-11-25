@@ -80,7 +80,7 @@ func NewMockLocalServices() *MockLocalServices {
 	return &MockLocalServices{LocalServicesMap: make(map[string]string)}
 }
 
-func (m *MockLocalServices) GetIp(name, namespace string) (string, bool) {
+func (m *MockLocalServices) GetIP(name, namespace string) (string, bool) {
 	ip, found := m.LocalServicesMap[getKey(name, namespace)]
 	return ip, found
 }
@@ -553,7 +553,7 @@ func testLocalService() {
 			localServices:   mockLs,
 			ttl:             defaultTtl,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, lighthousev2a1.ClusterSetIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})

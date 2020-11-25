@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,11 +68,12 @@ func (c *Controller) Stop() {
 	klog.Infof("Services Controller stopped")
 }
 
-func (c *Controller) GetIp(name, namespace string) (string, bool) {
+func (c *Controller) GetIP(name, namespace string) (string, bool) {
 	key := namespace + "/" + name
 	obj, exists, err := c.svcStore.GetByKey(key)
 
 	if err != nil {
+		klog.V(log.DEBUG).Infof("Error trying to get service for key %q", key)
 		return "", false
 	}
 

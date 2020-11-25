@@ -43,7 +43,7 @@ type ClusterStatus interface {
 }
 
 type LocalServices interface {
-	GetIp(name, namespace string) (string, bool)
+	GetIP(name, namespace string) (string, bool)
 }
 
 type EndpointsStatus interface {
