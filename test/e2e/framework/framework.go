@@ -130,18 +130,19 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 		return si.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
+		if len(siList.Items) < 1 {
+			return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
+		}
 		for i, si := range siList.Items {
 			if strings.HasPrefix(si.Name, siNamePrefix) {
-				if si.Spec.IPs[0] != serviceIP {
-					return false, fmt.Sprintf("ServiceImport IP %s doesn't match %s",
-						si.Spec.IPs[0], serviceIP), nil
+				if si.Spec.IPs[0] == serviceIP {
+					retServiceImport = &siList.Items[i]
+					return true, "", nil
 				}
-				retServiceImport = &siList.Items[i]
-				return true, "", nil
 			}
 		}
 
-		return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
+		return false, fmt.Sprintf("Failed to find ServiceImport with IP %s", serviceIP), nil
 	})
 
 	return retServiceImport
@@ -357,11 +358,15 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 			return false, fmt.Sprintf("%d endpointslices found when expected %d", len(endpointSliceList.Items), sliceCount), nil
 		}
 
-		if len(endpointSliceList.Items) > 0 {
-			endpointSlice := &endpointSliceList.Items[0]
+		totalEp := 0
 
-			if epCount != anyCount && len(endpointSlice.Endpoints) != epCount {
-				return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", len(endpointSlice.Endpoints), epCount), nil
+		if len(endpointSliceList.Items) > 0 {
+			for _, es := range endpointSliceList.Items {
+				totalEp += len(es.Endpoints)
+			}
+
+			if epCount != anyCount && totalEp != epCount {
+				return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", totalEp, epCount), nil
 			}
 		}
 
