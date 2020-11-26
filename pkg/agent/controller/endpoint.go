@@ -72,7 +72,10 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, op syn
 		}, false
 	}
 
-	return e.endpointSliceFromEndpoints(endPoints), false
+	endpointSlice := e.endpointSliceFromEndpoints(endPoints)
+	klog.Infof("The endpintslice created is %v ", endpointSlice)
+
+	return endpointSlice, false
 }
 
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {

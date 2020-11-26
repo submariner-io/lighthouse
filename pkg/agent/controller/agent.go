@@ -489,6 +489,8 @@ func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Op
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
 
+	klog.Infof("In remoteEndpointSliceToLocal returning %v", endpointSlice)
+
 	return endpointSlice, false
 }
 
@@ -497,8 +499,11 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, op syncer.Ope
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
 	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
+		klog.Infof("Retuning nil since not managed by lighthouse %v", obj)
 		return nil, false
 	}
+
+	klog.Infof("In filterLocalEndpointSlices returning %v", obj)
 
 	return obj, false
 }
