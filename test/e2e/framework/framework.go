@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 )
 
@@ -340,34 +339,32 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 }
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
-	sliceCount, epCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
+	expSliceCount, expEpCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
 	ep := framework.KubeClients[targetCluster].DiscoveryV1beta1().EndpointSlices(namespace)
-	labelMap := map[string]string{
-		v1beta1.LabelManagedBy: lhconstants.LabelValueManagedBy,
-	}
-	listOptions := metav1.ListOptions{
-		LabelSelector: labels.Set(labelMap).String(),
-	}
 
-	By(fmt.Sprintf("Retrieving EndpointSlices for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
+	By(fmt.Sprintf("Retrieving EndpointSlices for %s in ns %s on %q", name, namespace,
+		framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
-		return ep.List(listOptions)
+		return ep.List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		endpointSliceList = result.(*v1beta1.EndpointSliceList)
-		if sliceCount != anyCount && len(endpointSliceList.Items) != sliceCount {
-			return false, fmt.Sprintf("%d endpointslices found when expected %d", len(endpointSliceList.Items), sliceCount), nil
+		sliceCount := 0
+		epCount := 0
+
+		for _, es := range endpointSliceList.Items {
+			framework.Logf("Found EndpointSlice %#v", es)
+			if strings.HasPrefix(es.Name, name) {
+				sliceCount++
+				epCount += len(es.Endpoints)
+			}
 		}
 
-		totalEp := 0
+		if expSliceCount != anyCount && sliceCount != expSliceCount {
+			return false, fmt.Sprintf("%d EndpointSlices found when expected %d", len(endpointSliceList.Items), expSliceCount), nil
+		}
 
-		if len(endpointSliceList.Items) > 0 {
-			for _, es := range endpointSliceList.Items {
-				totalEp += len(es.Endpoints)
-			}
-
-			if epCount != anyCount && totalEp != epCount {
-				return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", totalEp, epCount), nil
-			}
+		if expEpCount != anyCount && epCount != expEpCount {
+			return false, fmt.Sprintf("%d total Endpoints found when expected %d", epCount, expEpCount), nil
 		}
 
 		return true, "", nil

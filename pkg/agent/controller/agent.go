@@ -489,6 +489,8 @@ func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Op
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
 
+	klog.Infof("In remoteEndpointSliceToLocal for OP %d returning %#v", op, endpointSlice)
+
 	return endpointSlice, false
 }
 
@@ -499,6 +501,8 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, op syncer.Ope
 	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
 		return nil, false
 	}
+
+	klog.Infof("In filterLocalEndpointSlices returning %#v", obj)
 
 	return obj, false
 }

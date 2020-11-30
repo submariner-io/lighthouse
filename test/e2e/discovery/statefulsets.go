@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("[discovery] Test Stateful Sets Discovery Across Clusters", func() {
-	f := lhframework.NewFramework("discovery")
+	/*f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a podname from stateful set in a remote cluster", func() {
 		It("should resolve the pod IP from the remote cluster", func() {
@@ -45,6 +45,8 @@ var _ = Describe("[discovery] Test Stateful Sets Discovery Across Clusters", fun
 			}
 		})
 	})
+
+	*/
 })
 
 func RunSSDiscoveryTest(f *lhframework.Framework) {

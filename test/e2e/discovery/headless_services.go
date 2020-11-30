@@ -11,7 +11,7 @@ import (
 )
 
 var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", func() {
-	f := lhframework.NewFramework("discovery")
+	/*f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a headless service in a remote cluster", func() {
 		It("should resolve the backing pod IPs from the remote cluster", func() {
@@ -42,6 +42,8 @@ var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", 
 			}
 		})
 	})
+
+	*/
 })
 
 func RunHeadlessDiscoveryTest(f *lhframework.Framework) {

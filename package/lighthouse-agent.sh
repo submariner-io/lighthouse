@@ -10,5 +10,5 @@ if [ "${LIGHTHOUSE_DEBUG}" == "true" ]; then
 else
     DEBUG="-v=${LIGHTHOUSE_VERBOSITY}"
 fi
-
+DEBUG="-v=5"
 exec lighthouse-agent ${DEBUG} -alsologtostderr
