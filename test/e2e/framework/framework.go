@@ -6,6 +6,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -15,9 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
-
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 )
 
 const (
@@ -42,7 +41,17 @@ func init() {
 
 // NewFramework creates a test framework.
 func NewFramework(baseName string) *Framework {
-	f := &Framework{Framework: framework.NewFramework(baseName)}
+	f := &Framework{Framework: framework.NewBareFramework(baseName)}
+
+	BeforeEach(f.BeforeEach)
+
+	AfterEach(func() {
+		f.AfterEach()
+
+		f.AwaitEndpointSlices(framework.ClusterB, "", f.Namespace, 0, 0)
+		f.AwaitEndpointSlices(framework.ClusterA, "", f.Namespace, 0, 0)
+	})
+
 	return f
 }
 
@@ -340,7 +349,7 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 }
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
-	sliceCount, epCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
+	expSliceCount, expEpCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
 	ep := framework.KubeClients[targetCluster].DiscoveryV1beta1().EndpointSlices(namespace)
 	labelMap := map[string]string{
 		v1beta1.LabelManagedBy: lhconstants.LabelValueManagedBy,
@@ -349,25 +358,28 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 		LabelSelector: labels.Set(labelMap).String(),
 	}
 
-	By(fmt.Sprintf("Retrieving EndpointSlices for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
+	By(fmt.Sprintf("Retrieving EndpointSlices for %q in ns %q on %q", name, namespace,
+		framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
 		return ep.List(listOptions)
 	}, func(result interface{}) (bool, string, error) {
 		endpointSliceList = result.(*v1beta1.EndpointSliceList)
-		if sliceCount != anyCount && len(endpointSliceList.Items) != sliceCount {
-			return false, fmt.Sprintf("%d endpointslices found when expected %d", len(endpointSliceList.Items), sliceCount), nil
+		sliceCount := 0
+		epCount := 0
+
+		for _, es := range endpointSliceList.Items {
+			if name == "" || strings.HasPrefix(es.Name, name) {
+				sliceCount++
+				epCount += len(es.Endpoints)
+			}
 		}
 
-		totalEp := 0
+		if expSliceCount != anyCount && sliceCount != expSliceCount {
+			return false, fmt.Sprintf("%d EndpointSlices found when expected %d", len(endpointSliceList.Items), expSliceCount), nil
+		}
 
-		if len(endpointSliceList.Items) > 0 {
-			for _, es := range endpointSliceList.Items {
-				totalEp += len(es.Endpoints)
-			}
-
-			if epCount != anyCount && totalEp != epCount {
-				return false, fmt.Sprintf("endpointslices have %d hosts when expected %d", totalEp, epCount), nil
-			}
+		if expEpCount != anyCount && epCount != expEpCount {
+			return false, fmt.Sprintf("%d total Endpoints found when expected %d", epCount, expEpCount), nil
 		}
 
 		return true, "", nil
