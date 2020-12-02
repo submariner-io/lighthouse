@@ -10,6 +10,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
+	"github.com/submariner-io/lighthouse/pkg/service"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -76,14 +77,22 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error starting the Gateway controller: %v", err)
 	}
 
+	svcController := service.NewController()
+	err = svcController.Start(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error starting the Service controller: %v", err)
+	}
+
 	c.OnShutdown(func() error {
 		siController.Stop()
+		epController.Stop()
 		gwController.Stop()
+		svcController.Stop()
 		return nil
 	})
 
 	lh := &Lighthouse{ttl: defaultTtl, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
-		endpointsStatus: epController}
+		endpointsStatus: epController, localServices: svcController}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
