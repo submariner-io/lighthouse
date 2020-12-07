@@ -6,12 +6,12 @@ multi-cluster environments. The solution is compatible with any CNI (Container N
 ## Architecture
 
 The Lighthouse architecture is explained in detail at
-[Service Discovery](https://submariner.io/getting_started/architecture/service-discovery/).
+[Service Discovery](https://submariner.io/getting-started/architecture/service-discovery/).
 
 ## Contribute
 
-We welcome any contributions. Please refer to the [Contribution Guide](https://submariner.io/for_developers/) for more details.
+We welcome any contributions. Please refer to the [Development Guide](https://submariner.io/development/) for more details.
 
 ## Build and Test
 
-To build and test your code follow the steps in [Building and Testing](https://submariner.io/for_developers/building_testing/).
+To build and test your code follow the steps in [Building and Testing](https://submariner.io/development/building-testing/).
