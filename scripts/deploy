@@ -21,11 +21,19 @@ function update_coredns_configmap() {
     fi 
 }
 
+### Extract the image_tag if necessary ###
+image_tag=
+for arg; do
+    if [[ "$arg" =~ "--image_tag=" ]]; then
+        image_tag=${arg##*=}
+    fi
+done
+
 ### Main ###
 
 declare_kubeconfig
-import_image quay.io/submariner/lighthouse-agent
-import_image quay.io/submariner/lighthouse-coredns
+import_image quay.io/submariner/lighthouse-agent ${image_tag}
+import_image quay.io/submariner/lighthouse-coredns ${image_tag}
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
 
