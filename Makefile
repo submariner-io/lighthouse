@@ -39,6 +39,19 @@ bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
 deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
 
+# Lighthouse-specific upgrade test:
+# deploy latest, start nginx service, export it, upgrade, check service
+upgrade-e2e: deploy-latest export-nginx deploy check-nginx e2e
+
+# This relies on deploy-latest to get the original subctl
+export-nginx: deploy-latest
+	sed s/nginx-demo/nginx-upgrade/ /opt/shipyard/scripts/resources/nginx-demo.yaml | KUBECONFIG=output/kubeconfigs/kind-config-cluster1 kubectl apply -f -
+	KUBECONFIG=output/kubeconfigs/kind-config-cluster1 ~/.local/bin/subctl export service nginx-upgrade -n default
+
+check-nginx:
+	KUBECONFIG=output/kubeconfigs/kind-config-cluster1 kubectl get serviceexports.multicluster.x-k8s.io -n default nginx-upgrade
+	KUBECONFIG=output/kubeconfigs/kind-config-cluster2 kubectl get serviceimports.multicluster.x-k8s.io -n submariner-operator nginx-upgrade-default-cluster1
+
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
