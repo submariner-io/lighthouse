@@ -7,6 +7,7 @@
 [![Release Images](https://github.com/submariner-io/lighthouse/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/lighthouse/actions?query=workflow%3A%22Release+Images%22)
 [![Upgrade](https://github.com/submariner-io/lighthouse/workflows/Upgrade/badge.svg)](https://github.com/submariner-io/lighthouse/actions?query=workflow%3AUpgrade)
 [![Periodic](https://github.com/submariner-io/lighthouse/workflows/Periodic/badge.svg)](https://github.com/submariner-io/lighthouse/actions?query=workflow%3APeriodic)
+[![Flake Finder](https://github.com/submariner-io/lighthouse/workflows/Flake%20Finder/badge.svg)](https://github.com/submariner-io/lighthouse/actions?query=workflow%3A%22Flake+Finder%22)
 <!-- markdownlint-enable line-length -->
 
 Lighthouse provides DNS discovery to Kubernetes clusters connected by [Submariner](https://github.com/submariner-io/submariner) in
