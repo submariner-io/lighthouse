@@ -58,6 +58,16 @@ var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", 
 			}
 		})
 	})
+
+	When("a pod tries to resolve a headless service in a specific remote cluster", func() {
+		It("should resolve the backing pod IPs from the specified remote cluster", func() {
+			if !framework.TestContext.GlobalnetEnabled {
+				RunHeadlessDiscoveryClusterNameTest(f)
+			} else {
+				framework.Skipf("Globalnet is enabled, skipping the test...")
+			}
+		})
+	})
 })
 
 func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
@@ -80,12 +90,16 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 
 	ipList := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		clusterBName, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
 
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, false)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", false)
 }
 
 func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
@@ -118,13 +132,16 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	ipListA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	ipList := append(ipListB, ipListA...)
 
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 1)
 
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListB, checkedDomains, false)
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListA, checkedDomains, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListB, checkedDomains,
+		"", false)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListA, checkedDomains,
+		"", true)
 }
 
 func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
@@ -148,22 +165,67 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
 	ipList := f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 3)
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
 
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
 	ipList = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, false)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", false)
 
 	f.SetNginxReplicaSet(framework.ClusterB, 2)
 	ipList = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 2)
-	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
+}
+
+func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterAName))
+	f.NewNginxDeployment(framework.ClusterA)
+
+	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
+
+	nginxHeadlessClusterA := f.NewNginxHeadlessService(framework.ClusterA)
+
+	f.NewServiceExport(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+
+	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+
+	nginxHeadlessClusterB := f.NewNginxHeadlessService(framework.ClusterB)
+
+	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	ipListClusterA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+	ipListClusterB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterA, netshootPodList, ipListClusterA, checkedDomains,
+		clusterAName, true)
+	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListClusterB, checkedDomains,
+		clusterBName, true)
 }
 
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
-	ipList, domains []string, shouldContain bool) {
+	ipList, domains []string, clusterName string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
+	var clusterDNSName string
+	if clusterName != "" {
+		clusterDNSName = clusterName + "."
+	}
+
 	for i := range domains {
-		cmd = append(cmd, service.Name+"."+f.Namespace+".svc."+domains[i])
+		cmd = append(cmd, clusterDNSName+service.Name+"."+f.Namespace+".svc."+domains[i])
 	}
 
 	op := "are"
