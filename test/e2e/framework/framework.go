@@ -329,7 +329,7 @@ func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.
 					Containers: []v1.Container{
 						{
 							Name:            statefulServiceName,
-							Image:           "nginxinc/nginx-unprivileged:stable-alpine",
+							Image:           "quay.io/bitnami/nginx:latest",
 							ImagePullPolicy: v1.PullAlways,
 							Ports: []v1.ContainerPort{
 								{
