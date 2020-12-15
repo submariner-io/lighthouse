@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    reviewers:
+      - mangelajo
+      - tpantelis
+    assignees:
+      - mangelajo
+      - tpantelis
+    ignore:
+      - dependency-name: k8s.io/api
+        versions:
+          - "> 0.17.0"
+      - dependency-name: k8s.io/apimachinery
+        versions:
+          - "> 0.17.0"
+      - dependency-name: k8s.io/client-go
+        versions:
+          - "> 0.17.0"
