@@ -76,6 +76,8 @@ func beforeSuite() {
 			}
 		}
 	}
+
+	framework.DetectGlobalnet()
 }
 
 func createLighthouseClient(restConfig *rest.Config) *mcsClientset.Clientset {
