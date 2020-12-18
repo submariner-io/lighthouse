@@ -570,6 +570,8 @@ github.com/submariner-io/admiral v0.8.0-rc1 h1:mCMYMAy5ZpRUMoT1AyVN1o5W/5PTUlcLy
 github.com/submariner-io/admiral v0.8.0-rc1/go.mod h1:3KogOfRhE+4N7u1y3gQp+vQAk0HTjbiYkSJzC7lE1xI=
 github.com/submariner-io/shipyard v0.8.0-rc1 h1:a6pk9wcUnOwYavEMV1dS0UrrlRudbSJYIgbXdqq+rH8=
 github.com/submariner-io/shipyard v0.8.0-rc1/go.mod h1:kPqFCYY2F9vMEzEr6YwYQ1dhwL+uXgezG0aLey5rXD0=
+github.com/submariner-io/shipyard v0.8.0 h1:HKvVDJ4VbEz2CFK5h7fhBCz0z421hoykp7Al7j3kE3Y=
+github.com/submariner-io/shipyard v0.8.0/go.mod h1:kPqFCYY2F9vMEzEr6YwYQ1dhwL+uXgezG0aLey5rXD0=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/timewasted/linode v0.0.0-20160829202747-37e84520dcf7/go.mod h1:imsgLplxEC/etjIhdr3dNzV3JeT27LbVu5pYWm0JCBY=
 github.com/tinylib/msgp v1.1.0 h1:9fQd+ICuRIu/ue4vxJZu6/LzxN0HwMds2nq/0cFvxHU=
