@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
@@ -68,9 +69,14 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
+
 	When("a pod tries to resolve a service in a specific remote cluster by its cluster name", func() {
 		It("should resolve the service on the specified cluster", func() {
 			RunServiceDiscoveryClusterNameTest(f)
+
+	When("a pod tries to resolve a service multiple times", func() {
+		It("should resolve the service from both the clusters in a round robin fashion", func() {
+			RunServiceDiscoveryRoundRobinTest(f)
 		})
 	})
 })
@@ -351,6 +357,69 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 		clusterBName, true)
 }
 
+func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+
+	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
+	f.NewNginxDeployment(framework.ClusterC)
+
+	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
+
+	nginxServiceClusterC := f.Framework.NewNginxService(framework.ClusterC)
+
+	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	if svc, err := f.GetService(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace); err == nil {
+		nginxServiceClusterC = svc
+		f.AwaitServiceImportIP(framework.ClusterC, nginxServiceClusterC)
+		f.AwaitEndpointSlices(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 2)
+	}
+
+	if svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace); err == nil {
+		nginxServiceClusterB = svc
+		f.AwaitServiceImportIP(framework.ClusterB, nginxServiceClusterB)
+		f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
+	}
+
+	var serviceIPList []string
+
+	serviceIPClusterB, ok := nginxServiceClusterB.Annotations[submarinerIpamGlobalIp]
+	if !ok {
+		serviceIPClusterB = nginxServiceClusterB.Spec.ClusterIP
+	}
+
+	serviceIPList = append(serviceIPList, serviceIPClusterB)
+
+	serviceIPClusterC, ok := nginxServiceClusterC.Annotations[submarinerIpamGlobalIp]
+	if !ok {
+		serviceIPClusterC = nginxServiceClusterC.Spec.ClusterIP
+	}
+
+	serviceIPList = append(serviceIPList, serviceIPClusterC)
+
+	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, serviceIPList, netshootPodList, checkedDomains,
+		"", true)
+}
+
 func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, domains []string, clusterName string, shouldContain bool) {
 	var serviceIP string
@@ -362,6 +431,7 @@ func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster fr
 	}
 
 	cmd := []string{"dig", "+short"}
+
 	var clusterDNSName string
 	if clusterName != "" {
 		clusterDNSName = clusterName + "."
@@ -404,6 +474,62 @@ func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster fr
 
 		return true, "", nil
 	})
+}
+
+func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, serviceName string, serviceIPList []string,
+	targetPod *corev1.PodList, domains []string, clusterName string, shouldContain bool) {
+	cmd := []string{"dig", "+short"}
+	var clusterDNSName string
+	if clusterName != "" {
+		clusterDNSName = clusterName + "."
+	}
+
+	for i := range domains {
+		cmd = append(cmd, clusterDNSName+serviceName+"."+f.Namespace+".svc."+domains[i])
+	}
+
+	op := "is"
+	if !shouldContain {
+		op += " not"
+	}
+
+	serviceIPMap := make(map[string]int)
+
+	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIPList, serviceName, op))
+
+	for count := 0; count < 10; count++ {
+		framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+			stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+				Command:       cmd,
+				Namespace:     f.Namespace,
+				PodName:       targetPod.Items[0].Name,
+				ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+				CaptureStdout: true,
+				CaptureStderr: true,
+			}, srcCluster)
+			if err != nil {
+				return nil, err
+			}
+
+			return stdout, nil
+		}, func(result interface{}) (bool, string, error) {
+			var doesContain bool
+			for _, serviceIp := range serviceIPList {
+				doesContain = strings.Contains(result.(string), serviceIp)
+				if doesContain {
+					serviceIPMap[serviceIp]++
+				}
+			}
+			By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+			return true, "", nil
+		})
+	}
+
+	By(fmt.Sprintf("Validating that difference between the service IP %q which was returned %d times and  the service"+
+		" IP %q which was returned %d times is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
+		serviceIPList[1], serviceIPMap[serviceIPList[1]]))
+
+	Expect(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]]%10 < 5).Should(BeTrue())
 }
 
 func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *corev1.PodList) string {
