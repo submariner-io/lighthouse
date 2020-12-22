@@ -46,10 +46,11 @@ func NewFramework(baseName string) *Framework {
 	BeforeEach(f.BeforeEach)
 
 	AfterEach(func() {
+		namespace := f.Namespace
 		f.AfterEach()
 
-		f.AwaitEndpointSlices(framework.ClusterB, "", f.Namespace, 0, 0)
-		f.AwaitEndpointSlices(framework.ClusterA, "", f.Namespace, 0, 0)
+		f.AwaitEndpointSlices(framework.ClusterB, "", namespace, 0, 0)
+		f.AwaitEndpointSlices(framework.ClusterA, "", namespace, 0, 0)
 	})
 
 	return f
