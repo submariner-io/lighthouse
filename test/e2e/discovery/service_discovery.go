@@ -304,7 +304,7 @@ func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster fr
 		return stdout, nil
 	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
-		By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+		By(fmt.Sprintf("Validating that dig result %q %s %q", result, op, serviceIP))
 		if doesContain && !shouldContain {
 			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
