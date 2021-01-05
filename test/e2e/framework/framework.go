@@ -70,21 +70,6 @@ func beforeSuite() {
 		EndpointClients = append(EndpointClients, createEndpointClientSet(restConfig))
 	}
 
-	framework.By("Fetching ClusterIDs")
-
-	for idx, kubeClient := range framework.KubeClients {
-		agentDeployment, err :=
-			kubeClient.AppsV1().Deployments(framework.TestContext.SubmarinerNamespace).Get("submariner-lighthouse-agent", metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		for _, envVar := range agentDeployment.Spec.Template.Spec.Containers[0].Env {
-			if envVar.Name == "SUBMARINER_CLUSTERID" {
-				framework.TestContext.ClusterIDs[idx] = envVar.Value
-				break
-			}
-		}
-	}
-
 	framework.DetectGlobalnet()
 }
 
