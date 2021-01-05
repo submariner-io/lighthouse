@@ -416,8 +416,7 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	serviceIPList = append(serviceIPList, serviceIPClusterC)
 
-	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, serviceIPList, netshootPodList, checkedDomains,
-		"", true)
+	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, serviceIPList, netshootPodList, checkedDomains)
 }
 
 func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster framework.ClusterIndex, service *corev1.Service,
@@ -477,22 +476,14 @@ func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster fr
 }
 
 func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, serviceName string, serviceIPList []string,
-	targetPod *corev1.PodList, domains []string, clusterName string, shouldContain bool) {
+	targetPod *corev1.PodList, domains []string) {
 	cmd := []string{"dig", "+short"}
-	var clusterDNSName string
-	if clusterName != "" {
-		clusterDNSName = clusterName + "."
-	}
 
 	for i := range domains {
-		cmd = append(cmd, clusterDNSName+serviceName+"."+f.Namespace+".svc."+domains[i])
+		cmd = append(cmd, serviceName+"."+f.Namespace+".svc."+domains[i])
 	}
 
 	op := "is"
-	if !shouldContain {
-		op += " not"
-	}
-
 	serviceIPMap := make(map[string]int)
 
 	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIPList, serviceName, op))
