@@ -358,6 +358,11 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 }
 
 func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
+	if len(framework.TestContext.ClusterIDs) < 3 {
+		Skip("Only two clusters are deployed and hence skipping the test")
+		return
+	}
+
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
