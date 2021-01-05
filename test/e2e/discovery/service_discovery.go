@@ -68,7 +68,7 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
-	When("a pod tries to resolve a service in a specific remote cluster with cluster name", func() {
+	When("a pod tries to resolve a service in a specific remote cluster by its cluster name", func() {
 		It("should resolve the service on the specified cluster", func() {
 			RunServiceDiscoveryClusterNameTest(f)
 		})

@@ -59,7 +59,7 @@ var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", 
 		})
 	})
 
-	When("a pod tries to resolve a headless service in a specific remote cluster", func() {
+	When("a pod tries to resolve a headless service in a specific remote cluster by its cluster name", func() {
 		It("should resolve the backing pod IPs from the specified remote cluster", func() {
 			if !framework.TestContext.GlobalnetEnabled {
 				RunHeadlessDiscoveryClusterNameTest(f)
