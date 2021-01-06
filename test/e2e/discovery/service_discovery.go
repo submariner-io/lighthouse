@@ -17,6 +17,7 @@ package discovery
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -69,10 +70,11 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
-
 	When("a pod tries to resolve a service in a specific remote cluster by its cluster name", func() {
 		It("should resolve the service on the specified cluster", func() {
 			RunServiceDiscoveryClusterNameTest(f)
+		})
+	})
 
 	When("a pod tries to resolve a service multiple times", func() {
 		It("should resolve the service from both the clusters in a round robin fashion", func() {
@@ -488,10 +490,11 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 		cmd = append(cmd, serviceName+"."+f.Namespace+".svc."+domains[i])
 	}
 
-	op := "is"
 	serviceIPMap := make(map[string]int)
 
-	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIPList, serviceName, op))
+	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q is discoverable", strings.Join(cmd, " "), serviceIPList, serviceName))
+
+	var retIPs []string
 
 	for count := 0; count < 10; count++ {
 		framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
@@ -509,14 +512,14 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 
 			return stdout, nil
 		}, func(result interface{}) (bool, string, error) {
-			var doesContain bool
-			for _, serviceIp := range serviceIPList {
-				doesContain = strings.Contains(result.(string), serviceIp)
-				if doesContain {
-					serviceIPMap[serviceIp]++
+			for _, serviceIP := range serviceIPList {
+				if strings.Contains(result.(string), serviceIP) {
+					serviceIPMap[serviceIP]++
+					retIPs = append(retIPs, serviceIP)
+					break
 				}
 			}
-			By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+
 			return true, "", nil
 		})
 	}
@@ -525,7 +528,9 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 		" IP %q which was returned %d times is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
 		serviceIPList[1], serviceIPMap[serviceIPList[1]]))
 
-	Expect(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]]%10 < 5).Should(BeTrue())
+	Expect(int(math.Abs(float64(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]]))) < 3).To(BeTrue(),
+		"Service IPs were not returned in proper round-robin fashion: Expected IPs: %v,"+
+			" Returned IPs: %v, IP Counts: %v", serviceIPList, retIPs, serviceIPMap)
 }
 
 func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, targetPod *corev1.PodList) string {
