@@ -492,7 +492,8 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 
 	serviceIPMap := make(map[string]int)
 
-	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q is discoverable", strings.Join(cmd, " "), serviceIPList, serviceName))
+	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q are discoverable in a"+
+		" round-robin fashion", strings.Join(cmd, " "), serviceIPList, serviceName))
 
 	var retIPs []string
 
@@ -524,8 +525,8 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 		})
 	}
 
-	By(fmt.Sprintf("Validating that difference between the service IP %q which was returned %d times and  the service"+
-		" IP %q which was returned %d times is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
+	By(fmt.Sprintf("Service IP %q was returned %d times and Service IP %q was returned %d times - "+
+		"verifying the difference between them is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
 		serviceIPList[1], serviceIPMap[serviceIPList[1]]))
 
 	Expect(int(math.Abs(float64(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]]))) < 3).To(BeTrue(),
