@@ -19,6 +19,11 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/client-go/dynamic"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
@@ -49,6 +54,7 @@ type Framework struct {
 }
 
 var MCSClients []*mcsClientset.Clientset
+var EndpointClients []dynamic.ResourceInterface
 
 func init() {
 	framework.AddBeforeSuite(beforeSuite)
@@ -76,6 +82,7 @@ func beforeSuite() {
 
 	for _, restConfig := range framework.RestConfigs {
 		MCSClients = append(MCSClients, createLighthouseClient(restConfig))
+		EndpointClients = append(EndpointClients, createEndpointClientSet(restConfig))
 	}
 
 	framework.DetectGlobalnet()
@@ -86,6 +93,18 @@ func createLighthouseClient(restConfig *rest.Config) *mcsClientset.Clientset {
 	Expect(err).To(Not(HaveOccurred()))
 
 	return clientSet
+}
+
+func createEndpointClientSet(restConfig *rest.Config) dynamic.ResourceInterface {
+	clientSet, err := dynamic.NewForConfig(restConfig)
+	Expect(err).To(Not(HaveOccurred()))
+
+	gvr, _ := schema.ParseResourceArg("endpoints.v1.submariner.io")
+	endpointsClient := clientSet.Resource(*gvr).Namespace("submariner-operator")
+	_, err = endpointsClient.List(metav1.ListOptions{})
+	Expect(err).To(Not(HaveOccurred()))
+
+	return endpointsClient
 }
 
 func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
@@ -415,4 +434,41 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
 
 	return result
+}
+
+func (f *Framework) GetHealthCheckIpInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
+	unstructuredEndpointList, err := EndpointClients[cluster].List(metav1.ListOptions{})
+
+	Expect(err).ShouldNot(HaveOccurred())
+
+	for _, endpoint := range unstructuredEndpointList.Items {
+		By(fmt.Sprintf("Getting the endpoint %s, for cluster %s", endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]))
+
+		if strings.Contains(endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]) {
+			endpointName = endpoint.GetName()
+			Expect(endpointName).NotTo(BeNil())
+
+			spec, found, err := unstructured.NestedMap(endpoint.Object, "spec")
+
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(found).NotTo(BeFalse())
+			healthCheckIP, found, err = unstructured.NestedString(spec, "healthCheckIP")
+
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(found).NotTo(BeFalse())
+		}
+	}
+
+	return endpointName, healthCheckIP
+}
+
+func (f *Framework) SetHealthCheckIp(cluster framework.ClusterIndex, ip, endpointName string) {
+	By(fmt.Sprintf("Setting Health Check Ip to %v in cluster %q", ip, framework.TestContext.ClusterIDs[cluster]))
+	patch := fmt.Sprintf(`{"spec":{"healthCheckIP":%q}}`, ip)
+
+	framework.AwaitUntil("set healthCheckIP", func() (interface{}, error) {
+		endpoint, err := EndpointClients[cluster].Patch(endpointName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		Expect(err).ShouldNot(HaveOccurred())
+		return endpoint, err
+	}, framework.NoopCheckResult)
 }
