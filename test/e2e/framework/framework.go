@@ -436,11 +436,13 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 	return result
 }
 
-func (f *Framework) GetHealthCheckIpInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
-	unstructuredEndpointList, err := EndpointClients[cluster].List(metav1.ListOptions{})
+func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
+	endpointList := framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
+		unstructuredEndpointList, err := EndpointClients[cluster].List(metav1.ListOptions{})
+		return unstructuredEndpointList, err
+	}, framework.NoopCheckResult)
 
-	Expect(err).ShouldNot(HaveOccurred())
-
+	unstructuredEndpointList := endpointList.(*unstructured.UnstructuredList)
 	for _, endpoint := range unstructuredEndpointList.Items {
 		By(fmt.Sprintf("Getting the endpoint %s, for cluster %s", endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]))
 
@@ -448,11 +450,9 @@ func (f *Framework) GetHealthCheckIpInfo(cluster framework.ClusterIndex) (endpoi
 			endpointName = endpoint.GetName()
 			Expect(endpointName).NotTo(BeNil())
 
-			spec, found, err := unstructured.NestedMap(endpoint.Object, "spec")
-
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(found).NotTo(BeFalse())
-			healthCheckIP, found, err = unstructured.NestedString(spec, "healthCheckIP")
+			var found bool
+			var err error
+			healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
 
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(found).NotTo(BeFalse())
@@ -462,13 +462,12 @@ func (f *Framework) GetHealthCheckIpInfo(cluster framework.ClusterIndex) (endpoi
 	return endpointName, healthCheckIP
 }
 
-func (f *Framework) SetHealthCheckIp(cluster framework.ClusterIndex, ip, endpointName string) {
-	By(fmt.Sprintf("Setting Health Check Ip to %v in cluster %q", ip, framework.TestContext.ClusterIDs[cluster]))
+func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpointName string) {
+	By(fmt.Sprintf("Setting health check IP cluster %q to %v", framework.TestContext.ClusterIDs[cluster], ip))
 	patch := fmt.Sprintf(`{"spec":{"healthCheckIP":%q}}`, ip)
 
 	framework.AwaitUntil("set healthCheckIP", func() (interface{}, error) {
 		endpoint, err := EndpointClients[cluster].Patch(endpointName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
-		Expect(err).ShouldNot(HaveOccurred())
 		return endpoint, err
 	}, framework.NoopCheckResult)
 }

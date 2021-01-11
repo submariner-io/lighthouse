@@ -82,9 +82,18 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 	})
 
-	When("Only one of the clusters with service is healthy", func() {
-		It("should not resolve the service on the unhealthy cluster", func() {
+	When("only one of the clusters with a service is healthy", func() {
+		var healthCheckIP, endpointName string
+		BeforeEach(func() {
+			randomIP := "192.168.1.5"
+			endpointName, healthCheckIP = f.GetHealthCheckIPInfo(framework.ClusterC)
+			f.SetHealthCheckIP(framework.ClusterC, randomIP, endpointName)
+		})
+		It("should not resolve the service", func() {
 			RunServicesClusterAvailabilityMutliClusterTest(f)
+		})
+		AfterEach(func() {
+			f.SetHealthCheckIP(framework.ClusterC, healthCheckIP, endpointName)
 		})
 	})
 })
@@ -480,17 +489,7 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList,
 		checkedDomains, "", true)
 	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList,
-		checkedDomains, "", true)
-
-	randomIP := "192.168.1.5"
-	endpointName, healthCheckIP := f.GetHealthCheckIpInfo(framework.ClusterC)
-	f.SetHealthCheckIp(framework.ClusterC, randomIP, endpointName)
-
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList,
-		checkedDomains, "", true)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList,
 		checkedDomains, "", false)
-	f.SetHealthCheckIp(framework.ClusterC, healthCheckIP, endpointName)
 }
 
 func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster framework.ClusterIndex, service *corev1.Service,
