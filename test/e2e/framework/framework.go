@@ -437,27 +437,30 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 }
 
 func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
-	endpointList := framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
+	framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
 		unstructuredEndpointList, err := EndpointClients[cluster].List(metav1.ListOptions{})
 		return unstructuredEndpointList, err
-	}, framework.NoopCheckResult)
+	}, func(result interface{}) (bool, string, error) {
+		unstructuredEndpointList := result.(*unstructured.UnstructuredList)
+		for _, endpoint := range unstructuredEndpointList.Items {
+			By(fmt.Sprintf("Getting the endpoint %s, for cluster %s", endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]))
 
-	unstructuredEndpointList := endpointList.(*unstructured.UnstructuredList)
-	for _, endpoint := range unstructuredEndpointList.Items {
-		By(fmt.Sprintf("Getting the endpoint %s, for cluster %s", endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]))
+			if strings.Contains(endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]) {
+				endpointName = endpoint.GetName()
 
-		if strings.Contains(endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]) {
-			endpointName = endpoint.GetName()
-			Expect(endpointName).NotTo(BeNil())
+				var found bool
+				var err error
+				healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
 
-			var found bool
-			var err error
-			healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
-
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(found).NotTo(BeFalse())
+				if err != nil {
+					return false, fmt.Sprintf("Error retrieving the HealthcheckIP from spec : %v ", endpoint), nil
+				} else if !found {
+					return false, fmt.Sprintf("HealthcheckIP is not found in the spec : %v ", endpoint), nil
+				}
+			}
 		}
-	}
+		return true, "", nil
+	})
 
 	return endpointName, healthCheckIP
 }

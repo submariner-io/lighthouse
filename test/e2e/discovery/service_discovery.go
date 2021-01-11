@@ -84,14 +84,17 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 
 	When("only one of the clusters with a service is healthy", func() {
 		var healthCheckIP, endpointName string
+
 		BeforeEach(func() {
 			randomIP := "192.168.1.5"
 			endpointName, healthCheckIP = f.GetHealthCheckIPInfo(framework.ClusterC)
 			f.SetHealthCheckIP(framework.ClusterC, randomIP, endpointName)
 		})
+
 		It("should not resolve the service", func() {
 			RunServicesClusterAvailabilityMutliClusterTest(f)
 		})
+
 		AfterEach(func() {
 			f.SetHealthCheckIP(framework.ClusterC, healthCheckIP, endpointName)
 		})
