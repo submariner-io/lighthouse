@@ -8,7 +8,7 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
 CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
-override E2E_ARGS += cluster1 cluster2
+override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
 
 # Process extra flags from the `using=a,b,c` optional flag
