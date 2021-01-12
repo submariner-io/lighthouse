@@ -19,7 +19,11 @@ import (
 	"flag"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
@@ -63,11 +67,31 @@ func main() {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
+	kubeClientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building clientset: %s", err.Error())
+	}
+
+	restMapper, err := util.BuildRestMapper(cfg)
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+
+	localClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("error creating dynamic client: %v", err)
+	}
+
 	klog.Infof("Starting submariner-lighthouse-agent %v", agentSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
-	lightHouseAgent, err := controller.New(&agentSpec, cfg)
+	lightHouseAgent, err := controller.New(&agentSpec, broker.SyncerConfig{
+		LocalRestConfig: cfg,
+		LocalClient:     localClient,
+		RestMapper:      restMapper,
+		Scheme:          scheme.Scheme,
+	}, kubeClientSet)
 	if err != nil {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}

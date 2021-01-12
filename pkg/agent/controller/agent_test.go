@@ -34,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -358,15 +357,13 @@ type cluster struct {
 type testDriver struct {
 	cluster1                  cluster
 	cluster2                  cluster
-	brokerDynClient           dynamic.Interface
 	brokerServiceImportClient *fake.DynamicResourceClient
 	brokerEndpointSliceClient *fake.DynamicResourceClient
 	service                   *corev1.Service
 	serviceExport             *mcsv1a1.ServiceExport
 	endpoints                 *corev1.Endpoints
 	stopCh                    chan struct{}
-	restMapper                meta.RESTMapper
-	syncerScheme              *runtime.Scheme
+	syncerConfig              *broker.SyncerConfig
 }
 
 func newTestDiver() *testDriver {
@@ -401,11 +398,14 @@ func newTestDiver() *testDriver {
 				Selector:  map[string]string{"app": "test"},
 			},
 		},
-		restMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{},
-			&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}, &lighthousev2a1.ServiceExport{}),
-		brokerDynClient: fake.NewDynamicClient(syncerScheme),
-		syncerScheme:    syncerScheme,
-		stopCh:          make(chan struct{}),
+		syncerConfig: &broker.SyncerConfig{
+			BrokerNamespace: test.RemoteNamespace,
+			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{},
+				&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}, &lighthousev2a1.ServiceExport{}),
+			BrokerClient: fake.NewDynamicClient(syncerScheme),
+			Scheme:       syncerScheme,
+		},
+		stopCh: make(chan struct{}),
 	}
 
 	t.serviceExport = &mcsv1a1.ServiceExport{
@@ -449,41 +449,37 @@ func newTestDiver() *testDriver {
 		},
 	}
 
-	t.brokerServiceImportClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
+	t.brokerServiceImportClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&mcsv1a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
-	t.brokerEndpointSliceClient = t.brokerDynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper,
+	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
-	t.cluster1.init(t.restMapper, syncerScheme)
-	t.cluster2.init(t.restMapper, syncerScheme)
+	t.cluster1.init(*t.syncerConfig)
+	t.cluster2.init(*t.syncerConfig)
 
 	return t
 }
 
 func (t *testDriver) justBeforeEach() {
-	syncerConfig := &broker.SyncerConfig{
-		BrokerNamespace: test.RemoteNamespace,
-	}
-
-	t.cluster1.start(t, syncerConfig, t.syncerScheme)
-	t.cluster2.start(t, syncerConfig, t.syncerScheme)
+	t.cluster1.start(t, *t.syncerConfig)
+	t.cluster2.start(t, *t.syncerConfig)
 }
 
 func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme) {
-	c.localDynClient = fake.NewDynamicClient(syncerScheme)
+func (c *cluster) init(syncerConfig broker.SyncerConfig) {
+	c.localDynClient = fake.NewDynamicClient(syncerConfig.Scheme)
 
-	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
+	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
 
-	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
+	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceImport{})).Namespace(test.LocalNamespace).(*fake.DynamicResourceClient)
 
-	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(restMapper,
+	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(serviceNamespace)
 
 	fakeCS := fakeKubeClient.NewSimpleClientset()
@@ -493,11 +489,9 @@ func (c *cluster) init(restMapper meta.RESTMapper, syncerScheme *runtime.Scheme)
 	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 }
 
-func (c *cluster) start(t *testDriver, syncerConfig *broker.SyncerConfig, syncerScheme *runtime.Scheme) {
-	agentController, err := controller.NewWithDetail(&c.agentSpec, syncerConfig, t.restMapper, c.localDynClient, c.localKubeClient,
-		syncerScheme, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
-			return broker.NewSyncerWithDetail(config, c.localDynClient, t.brokerDynClient, t.restMapper)
-		})
+func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
+	syncerConfig.LocalClient = c.localDynClient
+	agentController, err := controller.New(&c.agentSpec, syncerConfig, c.localKubeClient)
 
 	Expect(err).To(Succeed())
 	Expect(agentController.Start(t.stopCh)).To(Succeed())
@@ -832,8 +826,8 @@ func (t *testDriver) awaitNotServiceExportStatus(notCond *mcsv1a1.ServiceExportC
 }
 
 func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int {
-	t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, serviceIP)
 	t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
+	t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, serviceIP)
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
 
 	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(mcsv1a1.ServiceExportValid,

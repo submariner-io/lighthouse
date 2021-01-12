@@ -74,7 +74,7 @@ func (e *EndpointController) stop() {
 	close(e.stopCh)
 }
 
-func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endPoints := obj.(*corev1.Endpoints)
 	endpointSliceName := endPoints.Name + "-" + e.clusterID
 
