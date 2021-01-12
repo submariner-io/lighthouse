@@ -196,15 +196,10 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 }
 
 func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
-	if op == syncer.Update {
-		return nil, false
-	}
-
 	svcExport := obj.(*mcsv1a1.ServiceExport)
-	serviceImport := a.newServiceImport(svcExport)
 
 	if op == syncer.Delete {
-		return serviceImport, false
+		return a.newServiceImport(svcExport), false
 	}
 
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
@@ -223,6 +218,10 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist")
 
 		return nil, true
+	}
+
+	if op == syncer.Update && getLastExportConditionReason(svcExport) != serviceUnavailable {
+		return nil, false
 	}
 
 	svc := obj.(*corev1.Service)
@@ -254,6 +253,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.
 
 		return nil, true
 	}
+
+	serviceImport := a.newServiceImport(svcExport)
 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
@@ -293,6 +294,15 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.
 	return serviceImport, false
 }
 
+func getLastExportConditionReason(svcExport *mcsv1a1.ServiceExport) string {
+	numCond := len(svcExport.Status.Conditions)
+	if numCond > 0 && svcExport.Status.Conditions[numCond-1].Reason != nil {
+		return *svcExport.Status.Conditions[numCond-1].Reason
+	}
+
+	return ""
+}
+
 func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, bool) {
 	if service.Spec.Type != "" && service.Spec.Type != corev1.ServiceTypeClusterIP {
 		return "", false
@@ -306,7 +316,7 @@ func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, b
 }
 
 func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
-	if op != syncer.Create {
+	if op == syncer.Delete {
 		return
 	}
 
@@ -350,6 +360,9 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.
 
 func (a *Controller) updateExportedServiceStatus(name, namespace string, condType mcsv1a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string) {
+	klog.V(log.DEBUG).Infof("updateExportedServiceStatus for (%s/%s) - Type: %q, Status: %q, Reason: %q, Message: %q",
+		namespace, name, condType, status, reason, msg)
+
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.getServiceExport(name, namespace)
 		if apierrors.IsNotFound(err) {
@@ -370,7 +383,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 
 		numCond := len(toUpdate.Status.Conditions)
 		if numCond > 0 && serviceExportConditionEqual(&toUpdate.Status.Conditions[numCond-1], &exportCondition) {
-			klog.V(log.DEBUG).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
+			klog.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 				namespace, name, toUpdate.Status.Conditions[numCond-1])
 			return nil
 		}
