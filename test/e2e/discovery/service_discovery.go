@@ -86,6 +86,11 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		var healthCheckIP, endpointName string
 
 		BeforeEach(func() {
+			if len(framework.TestContext.ClusterIDs) < 3 {
+				Skip("Only two clusters are deployed and hence skipping the test")
+				return
+			}
+
 			randomIP := "192.168.1.5"
 			endpointName, healthCheckIP = f.GetHealthCheckIPInfo(framework.ClusterC)
 			f.SetHealthCheckIP(framework.ClusterC, randomIP, endpointName)
