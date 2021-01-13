@@ -453,9 +453,11 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpoi
 				healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
 
 				if err != nil {
-					return false, fmt.Sprintf("Error retrieving the HealthcheckIP from spec : %v ", endpoint), nil
-				} else if !found {
-					return false, fmt.Sprintf("HealthcheckIP is not found in the spec : %v ", endpoint), nil
+					return false, "", err
+				}
+
+				if !found {
+					return false, fmt.Sprintf("HealthcheckIP not found in %#v ", endpoint), nil
 				}
 			}
 		}
