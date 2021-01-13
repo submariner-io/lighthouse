@@ -101,8 +101,8 @@ var _ = Describe("ServiceImport syncing", func() {
 		})
 	})
 
-	When("an exported Service is deleted while the ServiceExport still exists", func() {
-		It("should delete the ServiceImport", func() {
+	When("an exported Service is deleted and recreated while the ServiceExport still exists", func() {
+		It("should delete and recreate the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
 			nextStatusIndex := t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
@@ -110,6 +110,9 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.deleteService()
 			t.awaitServiceUnexported()
 			t.awaitServiceUnavailableStatus(nextStatusIndex)
+
+			t.createService()
+			t.awaitServiceExported(t.service.Spec.ClusterIP, nextStatusIndex+1)
 		})
 	})
 
