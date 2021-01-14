@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - release-*
 
 jobs:
   e2e:
@@ -49,5 +50,6 @@ jobs:
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          RELEASE_ARGS: lighthouse-agent lighthouse-coredns
-        run: make release
+          IMAGES: lighthouse-agent lighthouse-coredns
+        # Pass RELEASE_ARGS on the call, since GITHUB_REF set in the `env` directive doesn't get properly expanded
+        run: make release RELEASE_ARGS="$IMAGES --tag '${GITHUB_REF##*/}'"
