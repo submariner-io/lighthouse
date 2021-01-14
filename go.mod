@@ -12,12 +12,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.8.1-0.20210113165042-ee5f8e389614
 	github.com/submariner-io/shipyard v0.8.0
-	k8s.io/api v0.18.4
-	k8s.io/apimachinery v0.18.4
+	k8s.io/api v0.19.2
+	k8s.io/apimachinery v0.19.2
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200603063816-c1c6865ac451
-	sigs.k8s.io/controller-runtime v0.6.1
+	k8s.io/utils v0.0.0-20200912215256-4140de9c8800
+	sigs.k8s.io/controller-runtime v0.7.0
 	sigs.k8s.io/mcs-api v0.0.0-20200908023942-d26176718973
 )
 
