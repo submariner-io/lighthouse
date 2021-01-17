@@ -28,15 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -51,34 +47,7 @@ const (
 
 var MaxExportStatusConditions = 10
 
-func New(spec *AgentSpecification, cfg *rest.Config) (*Controller, error) {
-	kubeClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error building clientset: %s", err.Error())
-	}
-
-	syncerConf := &broker.SyncerConfig{LocalRestConfig: cfg}
-
-	restMapper, err := util.BuildRestMapper(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	localClient, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("error creating dynamic client: %v", err)
-	}
-
-	return NewWithDetail(spec, syncerConf, restMapper, localClient, kubeClientSet, scheme.Scheme,
-		func(config *broker.SyncerConfig) (*broker.Syncer, error) {
-			return broker.NewSyncer(*config)
-		})
-}
-
-// Constructor that takes additional detail. This is intended for unit tests.
-func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, restMapper meta.RESTMapper, localClient dynamic.Interface,
-	kubeClientSet kubernetes.Interface, runtimeScheme *runtime.Scheme,
-	newSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)) (*Controller, error) {
+func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
@@ -86,14 +55,13 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 		kubeClientSet:    kubeClientSet,
 	}
 
-	_, gvr, err := util.ToUnstructuredResource(&mcsv1a1.ServiceExport{}, restMapper)
+	_, gvr, err := util.ToUnstructuredResource(&mcsv1a1.ServiceExport{}, syncerConf.RestMapper)
 	if err != nil {
 		return nil, err
 	}
 
-	agentController.serviceExportClient = localClient.Resource(*gvr)
+	agentController.serviceExportClient = syncerConf.LocalClient.Resource(*gvr)
 
-	syncerConf.Scheme = runtimeScheme
 	syncerConf.LocalNamespace = spec.Namespace
 	syncerConf.LocalClusterID = spec.ClusterID
 
@@ -104,7 +72,8 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 			BrokerResourceType:   &mcsv1a1.ServiceImport{},
 		},
 	}
-	agentController.serviceImportSyncer, err = newSyncer(syncerConf)
+
+	agentController.serviceImportSyncer, err = broker.NewSyncer(syncerConf)
 	if err != nil {
 		return nil, err
 	}
@@ -125,22 +94,23 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 			BrokerTransform: agentController.remoteEndpointSliceToLocal,
 		},
 	}
-	agentController.endpointSliceSyncer, err = newSyncer(syncerConf)
+
+	agentController.endpointSliceSyncer, err = broker.NewSyncer(syncerConf)
 	if err != nil {
 		return nil, err
 	}
 
 	agentController.serviceExportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:             "ServiceExport -> ServiceImport",
-		SourceClient:     localClient,
+		SourceClient:     syncerConf.LocalClient,
 		SourceNamespace:  metav1.NamespaceAll,
 		Direction:        syncer.RemoteToLocal,
-		RestMapper:       restMapper,
+		RestMapper:       syncerConf.RestMapper,
 		Federator:        agentController.serviceImportSyncer.GetLocalFederator(),
 		ResourceType:     &mcsv1a1.ServiceExport{},
 		Transform:        agentController.serviceExportToServiceImport,
 		OnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
-		Scheme:           runtimeScheme,
+		Scheme:           syncerConf.Scheme,
 	})
 	if err != nil {
 		return nil, err
@@ -148,26 +118,27 @@ func NewWithDetail(spec *AgentSpecification, syncerConf *broker.SyncerConfig, re
 
 	agentController.serviceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:            "Service deletion",
-		SourceClient:    localClient,
+		SourceClient:    syncerConf.LocalClient,
 		SourceNamespace: metav1.NamespaceAll,
 		Direction:       syncer.RemoteToLocal,
-		RestMapper:      restMapper,
+		RestMapper:      syncerConf.RestMapper,
 		Federator:       agentController.serviceImportSyncer.GetLocalFederator(),
 		ResourceType:    &corev1.Service{},
 		Transform:       agentController.serviceToRemoteServiceImport,
-		Scheme:          runtimeScheme,
+		Scheme:          syncerConf.Scheme,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer, restMapper,
-		localClient, runtimeScheme)
+	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer,
+		syncerConf.RestMapper, syncerConf.LocalClient, syncerConf.Scheme)
 	if err != nil {
 		return nil, err
 	}
 
-	agentController.lhServiceExportController, err = newLHServiceExportController(localClient, restMapper, runtimeScheme)
+	agentController.lhServiceExportController, err = newLHServiceExportController(syncerConf.LocalClient, syncerConf.RestMapper,
+		syncerConf.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +181,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (a *Controller) serviceExportToServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	svcExport := obj.(*mcsv1a1.ServiceExport)
 
 	if op == syncer.Delete {
@@ -342,7 +313,7 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 		"", "Service was successfully synced to the broker")
 }
 
-func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	if op != syncer.Delete {
 		// Ignore create/update
 		return nil, false
@@ -513,14 +484,14 @@ func getGlobalIpFromService(service *corev1.Service) string {
 	return ""
 }
 
-func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
 
 	return endpointSlice, false
 }
 
-func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 

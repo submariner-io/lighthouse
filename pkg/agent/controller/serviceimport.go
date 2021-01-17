@@ -135,7 +135,8 @@ func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.Se
 	return false
 }
 
-func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, numRequeues int,
+	op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 	if op == syncer.Create || op == syncer.Update {

@@ -64,7 +64,7 @@ func (c *LHServiceExportController) start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, op syncer.Operation) (runtime.Object, bool) {
+func (c *LHServiceExportController) LHtoMCSServiceExport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	if op != syncer.Create {
 		return nil, false
 	}
