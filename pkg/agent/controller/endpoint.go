@@ -102,7 +102,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		lhconstants.LabelSourceName:        e.serviceName,
 	}
 	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
-		APIVersion:         "lighthouse.submariner.io.v2alpha1",
+		APIVersion:         "multicluster.x-k8s.io.v1alpha1",
 		Kind:               "ServiceImport",
 		Name:               e.serviceImportName,
 		UID:                e.serviceImportUID,

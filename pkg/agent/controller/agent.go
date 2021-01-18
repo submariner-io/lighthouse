@@ -137,12 +137,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		return nil, err
 	}
 
-	agentController.lhServiceExportController, err = newLHServiceExportController(syncerConf.LocalClient, syncerConf.RestMapper,
-		syncerConf.Scheme)
-	if err != nil {
-		return nil, err
-	}
-
 	return agentController, nil
 }
 
@@ -169,10 +163,6 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	}
 
 	if err := a.serviceImportController.start(stopCh); err != nil {
-		return err
-	}
-
-	if err := a.lhServiceExportController.start(stopCh); err != nil {
 		return err
 	}
 

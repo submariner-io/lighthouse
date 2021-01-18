@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
-	lighthousev2a1 "github.com/submariner-io/lighthouse/pkg/apis/lighthouse.submariner.io/v2alpha1"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -371,7 +370,6 @@ func newTestDiver() *testDriver {
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(mcsv1a1.AddToScheme(syncerScheme)).To(Succeed())
-	Expect(lighthousev2a1.AddToScheme(syncerScheme)).To(Succeed())
 
 	t := &testDriver{
 		cluster1: cluster{
@@ -401,7 +399,7 @@ func newTestDiver() *testDriver {
 		syncerConfig: &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
 			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{},
-				&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}, &lighthousev2a1.ServiceExport{}),
+				&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}),
 			BrokerClient: fake.NewDynamicClient(syncerScheme),
 			Scheme:       syncerScheme,
 		},
@@ -592,7 +590,7 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 		controllerFlag := false
 
 		Expect(endpointSlice.OwnerReferences[0]).To(Equal(metav1.OwnerReference{
-			APIVersion: "lighthouse.submariner.io.v2alpha1",
+			APIVersion: "multicluster.x-k8s.io.v1alpha1",
 			Kind:       "ServiceImport",
 			Name:       siName,
 			UID:        si.GetUID(),
