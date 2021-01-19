@@ -14,6 +14,12 @@ jobs:
       matrix:
         globalnet: ['', 'globalnet']
         deploytool: ['operator', 'helm']
+        ovn: ['', 'ovn']
+        exclude:
+          - ovn: 'ovn'
+            deploytool: 'helm'
+          - ovn: 'ovn'
+            globalnet: 'globalnet'
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
@@ -27,7 +33,7 @@ jobs:
 
       - name: Run E2E deployment and tests
         run: |
-          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }}"
+          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }}  ${{ matrix.ovn }}"
 
       - name: Post mortem
         if: failure()

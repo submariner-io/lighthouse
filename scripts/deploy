@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-source ${SCRIPTS_DIR}/lib/cluster_settings
-source ${DAPPER_SOURCE}/scripts/cluster_settings
+#source ${SCRIPTS_DIR}/lib/cluster_settings
+#source ${DAPPER_SOURCE}/scripts/cluster_settings
 source ${SCRIPTS_DIR}/lib/debug_functions
 source ${SCRIPTS_DIR}/lib/deploy_funcs
 source ${SCRIPTS_DIR}/lib/utils

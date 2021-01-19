@@ -1,11 +1,12 @@
 . "${SCRIPTS_DIR}"/lib/source_only
 
 # We need a minimal setup to verify that lighthouse works
-clusters=('cluster1' 'cluster2')
+clusters=('cluster1' 'cluster2' )
 cluster_nodes['cluster1']="control-plane worker worker"
 cluster_nodes['cluster2']="control-plane worker worker"
 
-cluster_cni=( ['cluster1']="weave" ['cluster2']="weave" )
+unset cluster_nodes['cluster3']
 
-cluster_subm=( ['cluster1']="true" ['cluster2']="true"  )
+cluster_cni=( ['cluster1']="ovn" ['cluster2']="ovn" )
 
+cluster_subm=( ['cluster1']="true" ['cluster2']="true" )
