@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"os"
 	"sync/atomic"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -41,8 +42,13 @@ func NewController() *Controller {
 		stopCh:           make(chan struct{}),
 		gatewayAvailable: true,
 	}
+
 	controller.clusterStatusMap.Store(make(map[string]bool))
-	controller.localClusterID.Store("")
+
+	localClusterId := os.Getenv("SUBMARINER_CLUSTERID")
+
+	klog.Infof("Setting localClusterID from env: %q", localClusterId)
+	controller.localClusterID.Store(localClusterId)
 
 	return controller
 }
