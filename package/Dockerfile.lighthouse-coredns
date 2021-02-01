@@ -5,5 +5,6 @@ RUN apt-get update && apt-get -y install ca-certificates && update-ca-certificat
 COPY bin/lighthouse-coredns /usr/local/bin/
 
 EXPOSE 53 53/udp
+EXPOSE 9153 9153/tcp
 
 ENTRYPOINT ["/usr/local/bin/lighthouse-coredns"]
