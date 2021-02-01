@@ -75,7 +75,7 @@ var directives = []string{
 	"ready",
 	"health",
 	"pprof",
-	"metrics",
+	"prometheus",
 	"errors",
 	"log",
 	"dnstap",
