@@ -238,7 +238,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		SessionAffinityConfig: new(corev1.SessionAffinityConfig),
 	}
 
-	ips, err := a.getIPsForService(svc, svcType)
+	ips, ports, err := a.getIPsAndPortsForService(svc, svcType)
 	if err != nil {
 		// Failed to get ips for some reason, requeue
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
@@ -257,6 +257,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 
 	if svcType == mcsv1a1.ClusterSetIP {
 		serviceImport.Spec.IPs = ips
+		serviceImport.Spec.Ports = ports
 		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
 		cleared out when here's no backing Endpoint pods.
 		*/
@@ -422,27 +423,35 @@ func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1
 	}
 }
 
-func (a *Controller) getIPsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) ([]string, error) {
+func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) (
+	[]string, []mcsv1a1.ServicePort, error) {
+	mcsPort := mcsv1a1.ServicePort{}
+	if len(service.Spec.Ports) > 0 {
+		mcsPort.Name = service.Spec.Ports[0].Name
+		mcsPort.Protocol = service.Spec.Ports[0].Protocol
+		mcsPort.Port = service.Spec.Ports[0].Port
+	}
+
 	if siType == mcsv1a1.ClusterSetIP {
 		mcsIp := getGlobalIpFromService(service)
 		if mcsIp == "" {
 			mcsIp = service.Spec.ClusterIP
 		}
 
-		return []string{mcsIp}, nil
+		return []string{mcsIp}, []mcsv1a1.ServicePort{mcsPort}, nil
 	}
 
 	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Error retrieving Endpoints for Service (%s/%s): %v", service.Namespace, service.Name, err)
-			return nil, errors.WithMessage(err, "Error retrieving the Endpoints for the Service")
+			return nil, nil, errors.WithMessage(err, "Error retrieving the Endpoints for the Service")
 		}
 
-		return make([]string, 0), nil
+		return make([]string, 0), make([]mcsv1a1.ServicePort, 0), nil
 	}
 
-	return getIPsFromEndpoint(endpoint), nil
+	return getIPsFromEndpoint(endpoint), []mcsv1a1.ServicePort{mcsPort}, nil
 }
 
 func (a *Controller) getObjectNameWithClusterId(name, namespace string) string {
