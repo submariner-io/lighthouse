@@ -8,7 +8,7 @@ require (
 	github.com/coredns/coredns v1.8.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.38
-	github.com/onsi/ginkgo v1.14.2
+	github.com/onsi/ginkgo v1.15.0
 	github.com/onsi/gomega v1.10.5
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.8.1-0.20210113165042-ee5f8e389614
