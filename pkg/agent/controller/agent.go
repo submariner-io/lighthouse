@@ -427,14 +427,12 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 	[]string, []mcsv1a1.ServicePort, error) {
 	var mcsPorts []mcsv1a1.ServicePort
 
-	if len(service.Spec.Ports) > 0 {
-		mcsPorts = []mcsv1a1.ServicePort{
-			{
-				Name:     service.Spec.Ports[0].Name,
-				Protocol: service.Spec.Ports[0].Protocol,
-				Port:     service.Spec.Ports[0].Port,
-			},
-		}
+	for _, port := range service.Spec.Ports {
+		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
+			Name:     port.Name,
+			Protocol: port.Protocol,
+			Port:     port.Port,
+		})
 	}
 
 	if siType == mcsv1a1.ClusterSetIP {
