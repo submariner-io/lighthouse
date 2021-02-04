@@ -425,11 +425,16 @@ func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1
 
 func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) (
 	[]string, []mcsv1a1.ServicePort, error) {
-	mcsPort := mcsv1a1.ServicePort{}
+	var mcsPorts []mcsv1a1.ServicePort
+
 	if len(service.Spec.Ports) > 0 {
-		mcsPort.Name = service.Spec.Ports[0].Name
-		mcsPort.Protocol = service.Spec.Ports[0].Protocol
-		mcsPort.Port = service.Spec.Ports[0].Port
+		mcsPorts = []mcsv1a1.ServicePort{
+			{
+				Name:     service.Spec.Ports[0].Name,
+				Protocol: service.Spec.Ports[0].Protocol,
+				Port:     service.Spec.Ports[0].Port,
+			},
+		}
 	}
 
 	if siType == mcsv1a1.ClusterSetIP {
@@ -438,7 +443,7 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 			mcsIp = service.Spec.ClusterIP
 		}
 
-		return []string{mcsIp}, []mcsv1a1.ServicePort{mcsPort}, nil
+		return []string{mcsIp}, mcsPorts, nil
 	}
 
 	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
@@ -448,10 +453,10 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 			return nil, nil, errors.WithMessage(err, "Error retrieving the Endpoints for the Service")
 		}
 
-		return make([]string, 0), make([]mcsv1a1.ServicePort, 0), nil
+		return make([]string, 0), nil, nil
 	}
 
-	return getIPsFromEndpoint(endpoint), []mcsv1a1.ServicePort{mcsPort}, nil
+	return getIPsFromEndpoint(endpoint), mcsPorts, nil
 }
 
 func (a *Controller) getObjectNameWithClusterId(name, namespace string) string {

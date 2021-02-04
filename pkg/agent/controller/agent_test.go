@@ -173,6 +173,24 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
 		})
 	})
+
+	When("a Service has port information", func() {
+		BeforeEach(func() {
+			t.service.Spec.Ports = []corev1.ServicePort{
+				{
+					Name:     "eth0",
+					Protocol: corev1.ProtocolTCP,
+					Port:     123,
+				},
+			}
+		})
+
+		It("should set the appropriate port information in the ServiceImport", func() {
+			t.createService()
+			t.createServiceExport()
+			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+		})
+	})
 })
 
 var _ = Describe("Globalnet enabled", func() {
@@ -513,6 +531,14 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 		Expect(len(serviceImport.Spec.IPs)).To(Equal(0))
 	} else {
 		Expect(serviceImport.Spec.IPs).To(Equal([]string{serviceIP}))
+	}
+
+	Expect(serviceImport.Spec.Ports).To(HaveLen(len(service.Spec.Ports)))
+
+	for i := range service.Spec.Ports {
+		Expect(serviceImport.Spec.Ports[i].Name).To(Equal(service.Spec.Ports[i].Name))
+		Expect(serviceImport.Spec.Ports[i].Protocol).To(Equal(service.Spec.Ports[i].Protocol))
+		Expect(serviceImport.Spec.Ports[i].Port).To(Equal(service.Spec.Ports[i].Port))
 	}
 
 	labels := serviceImport.GetObjectMeta().GetLabels()
