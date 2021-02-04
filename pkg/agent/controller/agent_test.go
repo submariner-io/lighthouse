@@ -182,6 +182,11 @@ var _ = Describe("ServiceImport syncing", func() {
 					Protocol: corev1.ProtocolTCP,
 					Port:     123,
 				},
+				{
+					Name:     "eth1",
+					Protocol: corev1.ProtocolTCP,
+					Port:     1234,
+				},
 			}
 		})
 
