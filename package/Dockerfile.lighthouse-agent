@@ -1,7 +1,7 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM scratch
 
 WORKDIR /var/submariner
 
-COPY bin/lighthouse-agent package/lighthouse-agent.sh /usr/local/bin/
+COPY bin/lighthouse-agent /usr/local/bin/
 
-ENTRYPOINT lighthouse-agent.sh
+ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
