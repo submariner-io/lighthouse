@@ -18,7 +18,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -43,6 +45,17 @@ var (
 func main() {
 	agentSpec := controller.AgentSpecification{}
 
+	// Handle environment variables:
+	// SUBMARINER_VERBOSITY determines the verbosity level (1 by default)
+	// SUBMARINER_DEBUG, if set to true, sets the verbosity level to 3
+	if debug := os.Getenv("SUBMARINER_DEBUG"); debug == "true" {
+		os.Args = append(os.Args, "-v=3")
+	} else if verbosity := os.Getenv("SUBMARINER_VERBOSITY"); verbosity != "" {
+		os.Args = append(os.Args, fmt.Sprintf("-v=%s", verbosity))
+	} else {
+		os.Args = append(os.Args, "-v=1")
+	}
+
 	klog.InitFlags(nil)
 
 	flag.Parse()
@@ -52,6 +65,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
+	klog.Infof("Arguments: %v", os.Args)
 	klog.Infof("AgentSpec: %v", agentSpec)
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
