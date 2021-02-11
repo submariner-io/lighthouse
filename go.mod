@@ -17,8 +17,8 @@ require (
 	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200603063816-c1c6865ac451
-	sigs.k8s.io/controller-runtime v0.6.1
+	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
+	sigs.k8s.io/controller-runtime v0.8.2
 	sigs.k8s.io/mcs-api v0.0.0-20200908023942-d26176718973
 )
 
