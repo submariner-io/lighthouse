@@ -21,3 +21,4 @@ updates:
       - dependency-name: k8s.io/client-go
         versions:
           - "> 0.17.0"
+      - dependency-name: github.com/submariner-io/*
