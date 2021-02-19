@@ -41,7 +41,7 @@ var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
 func init() {
-	caddy.RegisterPlugin("lighthouse", caddy.Plugin{
+	caddy.RegisterPlugin(LightHouse, caddy.Plugin{
 		ServerType: "dns",
 		Action:     setupLighthouse,
 	})
@@ -54,7 +54,7 @@ func setupLighthouse(c *caddy.Controller) error {
 
 	l, err := lighthouseParse(c)
 	if err != nil {
-		return plugin.Error("lighthouse", err)
+		return plugin.Error(LightHouse, err)
 	}
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {

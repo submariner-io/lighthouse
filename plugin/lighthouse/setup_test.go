@@ -85,7 +85,7 @@ func testCorrectConfig() {
 			return &rest.Config{}, nil
 		}
 
-		config = "lighthouse"
+		config = LightHouse
 	})
 
 	JustBeforeEach(func() {
@@ -212,7 +212,7 @@ func testIncorrectConfig() {
 
 	When("building the kubeconfig fails", func() {
 		BeforeEach(func() {
-			config = "lighthouse"
+			config = LightHouse
 
 			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
 				return nil, errors.New("mock")
@@ -232,7 +232,7 @@ func testPluginRegistration() {
 				return &rest.Config{}, nil
 			}
 
-			controller := caddy.NewTestController("dns", "lighthouse")
+			controller := caddy.NewTestController("dns", LightHouse)
 			err := setupLighthouse(controller)
 			Expect(err).To(Succeed())
 

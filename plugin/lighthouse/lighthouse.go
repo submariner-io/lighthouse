@@ -37,7 +37,7 @@ var (
 
 // Define log to be a logger with the plugin name in it. This way we can just use log.Info and
 // friends to log.
-var log = clog.NewWithPlugin("lighthouse")
+var log = clog.NewWithPlugin(LightHouse)
 
 type Lighthouse struct {
 	Next            plugin.Handler

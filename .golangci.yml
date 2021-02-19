@@ -18,12 +18,14 @@ linters:
     - bodyclose
     - deadcode
     - depguard
+    - dogsled
     - dupl
     - errcheck
     - exportloopref
     # - funlen
     # - gochecknoglobals
     # - gochecknoinits
+    - goconst
     - gocritic
     - gocyclo
     - gofmt
@@ -38,6 +40,7 @@ linters:
     - maligned
     - misspell
     - nakedret
+    - prealloc
     - staticcheck
     - structcheck
     # - stylecheck

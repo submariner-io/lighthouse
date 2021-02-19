@@ -26,6 +26,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+const LightHouse = "lighthouse"
+
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
@@ -142,7 +144,7 @@ func (lh *Lighthouse) getClusterIpForSvc(pReq recordRequest) (ip string, found b
 
 // Name implements the Handler interface.
 func (lh *Lighthouse) Name() string {
-	return "lighthouse"
+	return LightHouse
 }
 
 func (lh *Lighthouse) error(str string) error {

@@ -31,6 +31,7 @@ import (
 const (
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
 	clustersetDomain       = "clusterset.local"
+	not                    = " not"
 )
 
 // Both domains need to be checked, until the operator is updated to use clusterset
@@ -538,7 +539,7 @@ func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster fr
 
 	op := "is"
 	if !shouldContain {
-		op += " not"
+		op += not
 	}
 
 	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))

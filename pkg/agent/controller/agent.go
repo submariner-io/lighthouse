@@ -425,7 +425,7 @@ func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1
 
 func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) (
 	[]string, []mcsv1a1.ServicePort, error) {
-	var mcsPorts []mcsv1a1.ServicePort
+	var mcsPorts = make([]mcsv1a1.ServicePort, 0, len(service.Spec.Ports))
 
 	for _, port := range service.Spec.Ports {
 		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
