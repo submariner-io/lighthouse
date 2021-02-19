@@ -28,7 +28,7 @@ import (
 const (
 	Svc        = "svc"
 	Pod        = "pod"
-	defaultTtl = uint32(5)
+	defaultTTL = uint32(5)
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 
 // Define log to be a logger with the plugin name in it. This way we can just use log.Info and
 // friends to log.
-var log = clog.NewWithPlugin(LightHouse)
+var log = clog.NewWithPlugin(PluginName)
 
 type Lighthouse struct {
 	Next            plugin.Handler
@@ -62,7 +62,7 @@ type LocalServices interface {
 }
 
 type EndpointsStatus interface {
-	IsHealthy(name, namespace, clusterId string) bool
+	IsHealthy(name, namespace, clusterID string) bool
 }
 
 var _ plugin.Handler = &Lighthouse{}

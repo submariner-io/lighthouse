@@ -30,7 +30,7 @@ import (
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (mcsClientset.Interface, error)
 
-// Indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets
 var NewClientset NewClientsetFunc
 
 type Controller struct {
@@ -64,7 +64,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("Error creating client set: %v", err)
+		return fmt.Errorf("error creating client set: %v", err)
 	}
 
 	informerFactory := mcsInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,

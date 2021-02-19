@@ -43,7 +43,7 @@ linters:
     - prealloc
     - staticcheck
     - structcheck
-    # - stylecheck
+    - stylecheck
     # - testpackage
     - typecheck
     - unconvert
@@ -64,3 +64,9 @@ issues:
     - linters:
         - wsl
       text: "only one cuddle assignment allowed before if statement"
+
+    # Allow dot imports for tests
+    - linters:
+        - stylecheck
+      path: test/*
+      text: "ST1001: should not use dot imports"

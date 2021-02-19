@@ -85,7 +85,7 @@ func testCorrectConfig() {
 			return &rest.Config{}, nil
 		}
 
-		config = LightHouse
+		config = PluginName
 	})
 
 	JustBeforeEach(func() {
@@ -148,7 +148,7 @@ func testCorrectConfig() {
 		Expect(setupErr).NotTo(HaveOccurred())
 		Expect(lh.Fall).Should(Equal(fall.F{}))
 		Expect(lh.Zones).Should(BeEmpty())
-		Expect(lh.ttl).Should(Equal(defaultTtl))
+		Expect(lh.ttl).Should(Equal(defaultTTL))
 	})
 }
 
@@ -212,7 +212,7 @@ func testIncorrectConfig() {
 
 	When("building the kubeconfig fails", func() {
 		BeforeEach(func() {
-			config = LightHouse
+			config = PluginName
 
 			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
 				return nil, errors.New("mock")
@@ -232,7 +232,7 @@ func testPluginRegistration() {
 				return &rest.Config{}, nil
 			}
 
-			controller := caddy.NewTestController("dns", LightHouse)
+			controller := caddy.NewTestController("dns", PluginName)
 			err := setupLighthouse(controller)
 			Expect(err).To(Succeed())
 

@@ -99,8 +99,8 @@ var _ = Describe("ServiceImport Map", func() {
 
 		for i := 0; i < 5; i++ {
 			for _, ip := range rrIPs {
-				testIp := getIPExpectFound(ns, service, cluster, localCluster)
-				Expect(testIp).To(Equal(ip))
+				testIP := getIPExpectFound(ns, service, cluster, localCluster)
+				Expect(testIP).To(Equal(ip))
 			}
 		}
 	}

@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	submarinerIpamGlobalIP = "submariner.io/globalIp"
 	clustersetDomain       = "clusterset.local"
 	not                    = " not"
 )
@@ -135,7 +135,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -143,7 +143,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 }
 
@@ -175,7 +175,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList,
 		[]string{clusterADomain}, "", true)
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
@@ -188,7 +188,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -196,7 +196,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 }
 
@@ -227,13 +227,13 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 }
 
@@ -264,13 +264,13 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 	f.SetNginxReplicaSet(framework.ClusterB, 2)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 }
 
@@ -324,24 +324,24 @@ func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
 	f.AwaitServiceImportIP(framework.ClusterB, nginxServiceClusterB)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList, checkedDomains,
 		"", true)
 
 	f.SetNginxReplicaSet(framework.ClusterC, 0)
 
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 1)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
 		"", false)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 0)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
 		"", false)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 }
 
@@ -382,7 +382,7 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 	f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterA)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace, 2, 2)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains,
 		clusterAName, true)
 
 	svc, err = f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -392,7 +392,7 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 	f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterB)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		clusterBName, true)
 }
 
@@ -448,14 +448,14 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	var serviceIPList []string
 
-	serviceIPClusterB, ok := nginxServiceClusterB.Annotations[submarinerIpamGlobalIp]
+	serviceIPClusterB, ok := nginxServiceClusterB.Annotations[submarinerIpamGlobalIP]
 	if !ok {
 		serviceIPClusterB = nginxServiceClusterB.Spec.ClusterIP
 	}
 
 	serviceIPList = append(serviceIPList, serviceIPClusterB)
 
-	serviceIPClusterC, ok := nginxServiceClusterC.Annotations[submarinerIpamGlobalIp]
+	serviceIPClusterC, ok := nginxServiceClusterC.Annotations[submarinerIpamGlobalIP]
 	if !ok {
 		serviceIPClusterC = nginxServiceClusterC.Spec.ClusterIP
 	}
@@ -510,18 +510,18 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 	f.AwaitServiceImportIP(framework.ClusterA, nginxServiceClusterC)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 2)
 
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList,
 		checkedDomains, "", true)
-	verifyServiceIpWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList,
+	verifyServiceIPWithDig(f.Framework, framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList,
 		checkedDomains, "", false)
 }
 
-func verifyServiceIpWithDig(f *framework.Framework, srcCluster, targetCluster framework.ClusterIndex, service *corev1.Service,
+func verifyServiceIPWithDig(f *framework.Framework, srcCluster, targetCluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, domains []string, clusterName string, shouldContain bool) {
 	var serviceIP string
 	var ok bool
 
-	serviceIP, ok = service.Annotations[submarinerIpamGlobalIp]
+	serviceIP, ok = service.Annotations[submarinerIpamGlobalIP]
 	if !ok || srcCluster == targetCluster {
 		serviceIP = service.Spec.ClusterIP
 	}

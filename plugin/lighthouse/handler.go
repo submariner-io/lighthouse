@@ -26,7 +26,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-const LightHouse = "lighthouse"
+const PluginName = "lighthouse"
 
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
@@ -67,7 +67,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		ip    string
 	)
 
-	ip, found = lh.getClusterIpForSvc(pReq)
+	ip, found = lh.getClusterIPForSvc(pReq)
 
 	if !found {
 		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
@@ -128,7 +128,7 @@ func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
 	return dns.RcodeSuccess, nil
 }
 
-func (lh *Lighthouse) getClusterIpForSvc(pReq recordRequest) (ip string, found bool) {
+func (lh *Lighthouse) getClusterIPForSvc(pReq recordRequest) (ip string, found bool) {
 	localClusterID := lh.clusterStatus.LocalClusterID()
 
 	ip, found, isLocal := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
@@ -144,7 +144,7 @@ func (lh *Lighthouse) getClusterIpForSvc(pReq recordRequest) (ip string, found b
 
 // Name implements the Handler interface.
 func (lh *Lighthouse) Name() string {
-	return LightHouse
+	return PluginName
 }
 
 func (lh *Lighthouse) error(str string) error {

@@ -62,8 +62,8 @@ func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster fun
 	case cluster == "":
 		ips := make([]string, 0)
 
-		for clusterId, info := range clusterInfos {
-			if checkCluster == nil || checkCluster(clusterId) {
+		for clusterID, info := range clusterInfos {
+			if checkCluster == nil || checkCluster(clusterID) {
 				ips = append(ips, info.ipList...)
 			}
 		}

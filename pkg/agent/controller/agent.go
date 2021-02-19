@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	submarinerIpamGlobalIP = "submariner.io/globalIp"
 	serviceUnavailable     = "ServiceUnavailable"
 	invalidServiceType     = "UnsupportedServiceType"
 	clusterIP              = "cluster-ip"
@@ -220,7 +220,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
-	if a.globalnetEnabled && getGlobalIpFromService(svc) == "" {
+	if a.globalnetEnabled && getGlobalIPFromService(svc) == "" {
 		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
 
 		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
@@ -409,7 +409,7 @@ func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
 func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: a.getObjectNameWithClusterId(svcExport.Name, svcExport.Namespace),
+			Name: a.getObjectNameWithClusterID(svcExport.Name, svcExport.Namespace),
 			Annotations: map[string]string{
 				lhconstants.OriginName:      svcExport.Name,
 				lhconstants.OriginNamespace: svcExport.Namespace,
@@ -436,12 +436,12 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 	}
 
 	if siType == mcsv1a1.ClusterSetIP {
-		mcsIp := getGlobalIpFromService(service)
-		if mcsIp == "" {
-			mcsIp = service.Spec.ClusterIP
+		mcsIP := getGlobalIPFromService(service)
+		if mcsIP == "" {
+			mcsIP = service.Spec.ClusterIP
 		}
 
-		return []string{mcsIp}, mcsPorts, nil
+		return []string{mcsIP}, mcsPorts, nil
 	}
 
 	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
@@ -457,7 +457,7 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 	return getIPsFromEndpoint(endpoint), mcsPorts, nil
 }
 
-func (a *Controller) getObjectNameWithClusterId(name, namespace string) string {
+func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 	return name + "-" + namespace + "-" + a.clusterID
 }
 
@@ -475,11 +475,11 @@ func getIPsFromEndpoint(endpoint *corev1.Endpoints) []string {
 	return ipList
 }
 
-func getGlobalIpFromService(service *corev1.Service) string {
+func getGlobalIPFromService(service *corev1.Service) string {
 	if service != nil {
 		annotations := service.GetAnnotations()
 		if annotations != nil {
-			return annotations[submarinerIpamGlobalIp]
+			return annotations[submarinerIpamGlobalIP]
 		}
 	}
 
