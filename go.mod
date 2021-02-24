@@ -7,7 +7,7 @@ require (
 	github.com/coredns/caddy v1.1.0
 	github.com/coredns/coredns v1.8.1
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/miekg/dns v1.1.38
+	github.com/miekg/dns v1.1.39
 	github.com/onsi/ginkgo v1.15.0
 	github.com/onsi/gomega v1.10.5
 	github.com/pkg/errors v0.9.1
