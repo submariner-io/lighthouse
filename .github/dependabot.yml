@@ -22,3 +22,6 @@ updates:
         versions:
           - "> 0.17.0"
       - dependency-name: github.com/submariner-io/*
+      - dependency-name: sigs.k8s.io/controller-runtime
+        versions:
+          - ">= 0.7.0"
