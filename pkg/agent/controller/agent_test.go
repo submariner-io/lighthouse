@@ -16,8 +16,10 @@ limitations under the License.
 package controller_test
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sort"
 	"time"
@@ -512,7 +514,20 @@ func (c *cluster) init(syncerConfig broker.SyncerConfig) {
 
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	syncerConfig.LocalClient = c.localDynClient
-	agentController, err := controller.New(&c.agentSpec, syncerConfig, c.localKubeClient)
+	bigint, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	Expect(err).To(Succeed())
+
+	serviceImportCounterName := "submariner_service_import" + bigint.String()
+
+	bigint, err = rand.Int(rand.Reader, big.NewInt(1000000))
+	Expect(err).To(Succeed())
+
+	serviceExportCounterName := "submariner_service_export" + bigint.String()
+
+	agentController, err := controller.New(&c.agentSpec, syncerConfig, c.localKubeClient,
+		controller.AgentConfig{
+			ServiceImportCounterName: serviceImportCounterName,
+			ServiceExportCounterName: serviceExportCounterName})
 
 	Expect(err).To(Succeed())
 	Expect(agentController.Start(t.stopCh)).To(Succeed())
