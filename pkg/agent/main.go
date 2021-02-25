@@ -105,7 +105,10 @@ func main() {
 		LocalClient:     localClient,
 		RestMapper:      restMapper,
 		Scheme:          scheme.Scheme,
-	}, kubeClientSet)
+	}, kubeClientSet,
+		controller.AgentConfig{
+			ServiceImportCounterName: "submariner_service_import",
+			ServiceExportCounterName: "submariner_service_export"})
 	if err != nil {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}

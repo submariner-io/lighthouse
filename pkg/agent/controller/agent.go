@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -45,9 +46,15 @@ const (
 	clusterIP              = "cluster-ip"
 )
 
+type AgentConfig struct {
+	ServiceImportCounterName string
+	ServiceExportCounterName string
+}
+
 var MaxExportStatusConditions = 10
 
-func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface) (*Controller, error) {
+func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
+	syncerMetricNames AgentConfig) (*Controller, error) {
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
@@ -70,6 +77,10 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 			LocalSourceNamespace: metav1.NamespaceAll,
 			LocalResourceType:    &mcsv1a1.ServiceImport{},
 			BrokerResourceType:   &mcsv1a1.ServiceImport{},
+			SyncCounterOpts: &prometheus.GaugeOpts{
+				Name: syncerMetricNames.ServiceImportCounterName,
+				Help: "Count of imported services",
+			},
 		},
 	}
 
@@ -111,6 +122,10 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		Transform:        agentController.serviceExportToServiceImport,
 		OnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
 		Scheme:           syncerConf.Scheme,
+		SyncCounterOpts: &prometheus.GaugeOpts{
+			Name: syncerMetricNames.ServiceExportCounterName,
+			Help: "Count of exported services",
+		},
 	})
 	if err != nil {
 		return nil, err
