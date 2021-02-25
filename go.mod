@@ -5,14 +5,14 @@ go 1.13
 require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.0
-	github.com/coredns/coredns v1.8.1
+	github.com/coredns/coredns v1.8.3
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/miekg/dns v1.1.38
+	github.com/miekg/dns v1.1.39
 	github.com/onsi/ginkgo v1.15.0
 	github.com/onsi/gomega v1.10.5
 	github.com/pkg/errors v0.9.1
 	github.com/submariner-io/admiral v0.8.1-0.20210113165042-ee5f8e389614
-	github.com/submariner-io/shipyard v0.8.0
+	github.com/submariner-io/shipyard v0.8.1-0.20210223164031-11c810e2a977
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v11.0.0+incompatible
