@@ -56,6 +56,7 @@ type EndpointController struct {
 	serviceName                  string
 	serviceImportSourceNameSpace string
 	stopCh                       chan struct{}
+	localClient                  dynamic.Interface
 }
 
 type LHServiceExportController struct {

@@ -583,7 +583,7 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 		controllerFlag := false
 
 		Expect(endpointSlice.OwnerReferences[0]).To(Equal(metav1.OwnerReference{
-			APIVersion: "lighthouse.submariner.io.v2alpha1",
+			APIVersion: "multicluster.x-k8s.io.v1alpha1",
 			Kind:       "ServiceImport",
 			Name:       siName,
 			UID:        si.GetUID(),
