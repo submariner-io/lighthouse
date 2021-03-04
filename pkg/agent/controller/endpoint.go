@@ -22,10 +22,13 @@ import (
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -67,11 +70,30 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 		return nil, err
 	}
 
+	controller.localClient = localClient
+
 	return controller, nil
 }
 
 func (e *EndpointController) stop() {
 	close(e.stopCh)
+	e.cleanup()
+}
+
+func (e *EndpointController) cleanup() {
+	resourceClient := e.localClient.Resource(schema.GroupVersionResource{Group: "discovery.k8s.io",
+		Version: "v1beta1", Resource: "endpointslices"}).Namespace(e.serviceImportSourceNameSpace)
+
+	endpointSliceLabels := labels.SelectorFromSet(map[string]string{lhconstants.LabelServiceImportName: e.serviceImportName})
+	listEndpointSliceOptions := metav1.ListOptions{
+		LabelSelector: endpointSliceLabels.String(),
+	}
+
+	err := resourceClient.DeleteCollection(&metav1.DeleteOptions{}, listEndpointSliceOptions)
+
+	if err != nil && !errors.IsNotFound(err) {
+		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
+	}
 }
 
 func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
