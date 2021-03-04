@@ -18,8 +18,10 @@ jobs:
 
       - name: Reclaim free space
         run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
+          # cleanup 30GB+ of tools we don't need for our CI
+          rm -rf /opt/ghc /usr/share/dotnet /usr/share/swift
+          df -h
+          free -h
 
       - name: Run E2E deployment and tests
         run: make e2e
