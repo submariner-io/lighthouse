@@ -118,10 +118,10 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -165,10 +165,10 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -247,10 +247,10 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -291,10 +291,10 @@ func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
@@ -303,8 +303,8 @@ func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
 
 	nginxServiceClusterC := f.Framework.NewNginxService(framework.ClusterC)
 
-	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -356,8 +356,8 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	nginxServiceClusterA := f.Framework.NewNginxService(framework.ClusterA)
 
-	f.AwaitGlobalnetIP(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
@@ -366,10 +366,10 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -413,10 +413,10 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
@@ -425,8 +425,8 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	nginxServiceClusterC := f.Framework.NewNginxService(framework.ClusterC)
 
-	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -475,10 +475,10 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterCName))
 
@@ -498,10 +498,10 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 
 	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
 
-	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
+	f.AwaitGlobalnetIP(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
 	svc, err = f.GetService(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 	Expect(err).NotTo(HaveOccurred())
