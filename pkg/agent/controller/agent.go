@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	submarinerIpamGlobalIP = "submariner.io/globalIp"
+	submarinerIPAMGlobalIP = "submariner.io/globalIp"
 	serviceUnavailable     = "ServiceUnavailable"
 	invalidServiceType     = "UnsupportedServiceType"
 	clusterIP              = "cluster-ip"
@@ -494,7 +494,7 @@ func getGlobalIPFromService(service *corev1.Service) string {
 	if service != nil {
 		annotations := service.GetAnnotations()
 		if annotations != nil {
-			return annotations[submarinerIpamGlobalIP]
+			return annotations[submarinerIPAMGlobalIP]
 		}
 	}
 

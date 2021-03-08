@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	submarinerIpamGlobalIP = "submariner.io/globalIp"
+	submarinerIPAMGlobalIP = "submariner.io/globalIp"
 	clustersetDomain       = "clusterset.local"
 	not                    = " not"
 )
@@ -448,14 +448,14 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	var serviceIPList []string
 
-	serviceIPClusterB, ok := nginxServiceClusterB.Annotations[submarinerIpamGlobalIP]
+	serviceIPClusterB, ok := nginxServiceClusterB.Annotations[submarinerIPAMGlobalIP]
 	if !ok {
 		serviceIPClusterB = nginxServiceClusterB.Spec.ClusterIP
 	}
 
 	serviceIPList = append(serviceIPList, serviceIPClusterB)
 
-	serviceIPClusterC, ok := nginxServiceClusterC.Annotations[submarinerIpamGlobalIP]
+	serviceIPClusterC, ok := nginxServiceClusterC.Annotations[submarinerIPAMGlobalIP]
 	if !ok {
 		serviceIPClusterC = nginxServiceClusterC.Spec.ClusterIP
 	}
@@ -521,7 +521,7 @@ func verifyServiceIPWithDig(f *framework.Framework, srcCluster, targetCluster fr
 	var serviceIP string
 	var ok bool
 
-	serviceIP, ok = service.Annotations[submarinerIpamGlobalIP]
+	serviceIP, ok = service.Annotations[submarinerIPAMGlobalIP]
 	if !ok || srcCluster == targetCluster {
 		serviceIP = service.Spec.ClusterIP
 	}
