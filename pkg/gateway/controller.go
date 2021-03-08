@@ -36,7 +36,7 @@ import (
 
 type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
 
-// Indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets
 var NewClientset NewClientsetFunc
 
 type Controller struct {
@@ -60,10 +60,10 @@ func NewController() *Controller {
 
 	controller.clusterStatusMap.Store(make(map[string]bool))
 
-	localClusterId := os.Getenv("SUBMARINER_CLUSTERID")
+	localClusterID := os.Getenv("SUBMARINER_CLUSTERID")
 
-	klog.Infof("Setting localClusterID from env: %q", localClusterId)
-	controller.localClusterID.Store(localClusterId)
+	klog.Infof("Setting localClusterID from env: %q", localClusterID)
+	controller.localClusterID.Store(localClusterID)
 
 	return controller
 }

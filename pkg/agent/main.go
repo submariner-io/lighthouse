@@ -98,7 +98,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	httpServer := startHttpServer()
+	httpServer := startHTTPServer()
 
 	lightHouseAgent, err := controller.New(&agentSpec, broker.SyncerConfig{
 		LocalRestConfig: cfg,
@@ -132,7 +132,7 @@ func init() {
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
-func startHttpServer() *http.Server {
+func startHTTPServer() *http.Server {
 	srv := &http.Server{Addr: ":8082"}
 
 	http.Handle("/metrics", promhttp.Handler())

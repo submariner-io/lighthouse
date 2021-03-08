@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	submarinerIpamGlobalIp = "submariner.io/globalIp"
+	submarinerIpamGlobalIP = "submariner.io/globalIp"
 	labelSourceName        = "lighthouse.submariner.io/sourceName"
 	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
 	anyCount               = -1
@@ -162,7 +162,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 	var serviceIP string
 
 	if framework.TestContext.GlobalnetEnabled {
-		serviceIP = svc.Annotations[submarinerIpamGlobalIp]
+		serviceIP = svc.Annotations[submarinerIpamGlobalIP]
 	} else {
 		serviceIP = svc.Spec.ClusterIP
 	}
@@ -239,14 +239,14 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, names
 			return svc.Get(name, metav1.GetOptions{})
 		}, func(result interface{}) (bool, string, error) {
 			svc := result.(*v1.Service)
-			globalIp := svc.Annotations[submarinerIpamGlobalIp]
-			if globalIp == "" {
+			globalIP := svc.Annotations[submarinerIpamGlobalIP]
+			if globalIP == "" {
 				return false, "GlobalIP not available", nil
 			}
 			return true, "", nil
 		}).(*v1.Service)
 
-		return svcObj.Annotations[submarinerIpamGlobalIp]
+		return svcObj.Annotations[submarinerIpamGlobalIP]
 	}
 
 	return ""

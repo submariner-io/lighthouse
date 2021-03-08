@@ -67,8 +67,8 @@ func NewMockClusterStatus() *MockClusterStatus {
 	return &MockClusterStatus{clusterStatusMap: make(map[string]bool), localClusterID: ""}
 }
 
-func (m *MockClusterStatus) IsConnected(clusterId string) bool {
-	return m.clusterStatusMap[clusterId]
+func (m *MockClusterStatus) IsConnected(clusterID string) bool {
+	return m.clusterStatusMap[clusterID]
 }
 
 type MockEndpointStatus struct {
@@ -79,8 +79,8 @@ func NewMockEndpointStatus() *MockEndpointStatus {
 	return &MockEndpointStatus{endpointStatusMap: make(map[string]bool)}
 }
 
-func (m *MockEndpointStatus) IsHealthy(name, namespace, clusterId string) bool {
-	return m.endpointStatusMap[clusterId]
+func (m *MockEndpointStatus) IsHealthy(name, namespace, clusterID string) bool {
+	return m.endpointStatusMap[clusterID]
 }
 
 func (m *MockClusterStatus) LocalClusterID() string {
@@ -126,7 +126,7 @@ func testWithoutFallback() {
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
 			localServices:   mockLs,
-			ttl:             defaultTtl,
+			ttl:             defaultTTL,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -261,7 +261,7 @@ func testWithFallback() {
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
 			localServices:   mockLs,
-			ttl:             defaultTtl,
+			ttl:             defaultTTL,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -342,7 +342,7 @@ func testClusterStatus() {
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
 			localServices:   mockLs,
-			ttl:             defaultTtl,
+			ttl:             defaultTTL,
 		}
 		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
 
@@ -450,7 +450,7 @@ func testHeadlessService() {
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
 			localServices:   mockLs,
-			ttl:             defaultTtl,
+			ttl:             defaultTTL,
 		}
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -566,7 +566,7 @@ func testLocalService() {
 			clusterStatus:   mockCs,
 			endpointsStatus: mockEs,
 			localServices:   mockLs,
-			ttl:             defaultTtl,
+			ttl:             defaultTTL,
 		}
 		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
 

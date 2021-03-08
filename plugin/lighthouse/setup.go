@@ -41,7 +41,7 @@ var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
 func init() {
-	caddy.RegisterPlugin("lighthouse", caddy.Plugin{
+	caddy.RegisterPlugin(PluginName, caddy.Plugin{
 		ServerType: "dns",
 		Action:     setupLighthouse,
 	})
@@ -54,7 +54,7 @@ func setupLighthouse(c *caddy.Controller) error {
 
 	l, err := lighthouseParse(c)
 	if err != nil {
-		return plugin.Error("lighthouse", err)
+		return plugin.Error(PluginName, err)
 	}
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
@@ -106,7 +106,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil
 	})
 
-	lh := &Lighthouse{ttl: defaultTtl, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
+	lh := &Lighthouse{ttl: defaultTTL, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
 		endpointsStatus: epController, localServices: svcController}
 
 	// Changed `for` to `if` to satisfy golint:
@@ -127,7 +127,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 			case "fallthrough":
 				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
 			case "ttl":
-				t, err := parseTtl(c)
+				t, err := parseTTL(c)
 
 				if err != nil {
 					return nil, err
@@ -145,7 +145,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	return lh, nil
 }
 
-func parseTtl(c *caddy.Controller) (uint32, error) {
+func parseTTL(c *caddy.Controller) (uint32, error) {
 	// Refer: https://github.com/coredns/coredns/blob/master/plugin/kubernetes/setup.go
 	args := c.RemainingArgs()
 	if len(args) == 0 {
