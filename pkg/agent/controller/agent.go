@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -387,7 +388,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, exportCondition)
 		}
 
-		raw, err := util.ToUnstructured(toUpdate)
+		raw, err := resource.ToUnstructured(toUpdate)
 		if err != nil {
 			return err
 		}

@@ -508,8 +508,6 @@ func (c *cluster) init(syncerConfig broker.SyncerConfig) {
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
 	c.localKubeClient = fakeCS
-
-	fake.AddDeleteCollectionReactor(&fakeCS.Fake, "EndpointSlice")
 }
 
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
@@ -895,9 +893,6 @@ func (t *testDriver) awaitServiceUnexported() {
 
 func (t *testDriver) awaitHeadlessServiceUnexported() {
 	t.awaitServiceUnexported()
-
-	// In a real k8s env, the EndpointSlice would be deleted via k8s GC as it is owned by the ServiceImport.
-	Expect(t.cluster1.localEndpointSliceClient.Delete(t.endpoints.Name+"-"+clusterID1, nil)).To(Succeed())
 
 	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
 	t.awaitNoEndpointSlice(t.brokerEndpointSliceClient)
