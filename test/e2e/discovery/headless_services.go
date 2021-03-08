@@ -230,7 +230,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 
 	op := "are"
 	if !shouldContain {
-		op += " not"
+		op += not
 	}
 
 	By(fmt.Sprintf("Executing %q to verify IPs %v for service %q %q discoverable", strings.Join(cmd, " "), ipList, service.Name, op))

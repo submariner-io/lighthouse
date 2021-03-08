@@ -86,7 +86,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 		return "", false, false
 	}
 
-	// If a clusterId is specified, we supply it even if the service is not there
+	// If a clusterID is specified, we supply it even if the service is not there
 	if cluster != "" {
 		ip, found = clusterIPs[cluster]
 		return ip, found, cluster == localCluster

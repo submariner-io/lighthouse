@@ -222,7 +222,7 @@ func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.Clus
 
 	op := "are"
 	if !shouldContain {
-		op += " not"
+		op += not
 	}
 
 	By(fmt.Sprintf("Executing %q to verify IPs %v for pod %q %q discoverable", strings.Join(cmd, " "), endpoint.Addresses, query, op))

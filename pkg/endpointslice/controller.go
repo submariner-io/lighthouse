@@ -32,7 +32,7 @@ import (
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (kubernetes.Interface, error)
 
-// Indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets
 var NewClientset NewClientsetFunc
 
 type Controller struct {
@@ -67,7 +67,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("Error creating client set: %v", err)
+		return fmt.Errorf("error creating client set: %v", err)
 	}
 
 	c.clientSet = clientSet
@@ -129,11 +129,11 @@ func (c *Controller) Stop() {
 	klog.Infof("EndpointSlice Controller stopped")
 }
 
-func (c *Controller) IsHealthy(name, namespace, clusterId string) bool {
+func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {
 	key := keyFunc(name, namespace)
 	endpointInfo := c.store.Get(key)
 	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
-		info := endpointInfo.clusterInfo[clusterId]
+		info := endpointInfo.clusterInfo[clusterID]
 		if info != nil {
 			return len(info.ipList) > 0
 		}

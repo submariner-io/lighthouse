@@ -160,14 +160,14 @@ func (t *endpointSliceTestDriver) newEndpoint(hostname, ipaddress string) v1beta
 	}
 }
 
-func (t *endpointSliceTestDriver) awaitIsHealthy(name, nameSpace, clusterId string) {
+func (t *endpointSliceTestDriver) awaitIsHealthy(name, nameSpace, clusterID string) {
 	Eventually(func() bool {
-		return t.controller.IsHealthy(name, nameSpace, clusterId)
+		return t.controller.IsHealthy(name, nameSpace, clusterID)
 	}, 5).Should(BeTrue())
 }
 
-func (t *endpointSliceTestDriver) awaitNotIsHealthy(name, nameSpace, clusterId string) {
+func (t *endpointSliceTestDriver) awaitNotIsHealthy(name, nameSpace, clusterID string) {
 	Consistently(func() bool {
-		return t.controller.IsHealthy(name, nameSpace, clusterId)
+		return t.controller.IsHealthy(name, nameSpace, clusterID)
 	}, 500*time.Millisecond).Should(BeFalse())
 }
