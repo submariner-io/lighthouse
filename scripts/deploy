@@ -4,7 +4,6 @@ set -e
 source ${SCRIPTS_DIR}/lib/cluster_settings
 source ${DAPPER_SOURCE}/scripts/cluster_settings
 source ${SCRIPTS_DIR}/lib/debug_functions
-source ${SCRIPTS_DIR}/lib/deploy_funcs
 source ${SCRIPTS_DIR}/lib/utils
 
 ### Functions ###
@@ -20,19 +19,9 @@ function update_coredns_configmap() {
     fi 
 }
 
-### Extract the image_tag if necessary ###
-image_tag=
-for arg; do
-    if [[ "$arg" =~ "--image_tag=" ]]; then
-        image_tag=${arg##*=}
-    fi
-done
-
 ### Main ###
 
 declare_kubeconfig
-import_image quay.io/submariner/lighthouse-agent ${image_tag}
-import_image quay.io/submariner/lighthouse-coredns ${image_tag}
 
 ${SCRIPTS_DIR}/deploy.sh "$@"
 
