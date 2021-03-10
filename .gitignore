@@ -4,6 +4,7 @@
 bin
 dist
 junit.xml
+Makefile.dapper
 output
 package/.image.*
 /vendor

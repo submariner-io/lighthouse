@@ -1,4 +1,5 @@
-FROM quay.io/submariner/shipyard-dapper-base:devel
+ARG BASE_BRANCH
+FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH}
 
 ENV DAPPER_ENV="REPO TAG QUAY_USERNAME QUAY_PASSWORD GITHUB_SHA BUILD_ARGS CLUSTERS_ARGS DEPLOY_ARGS RELEASE_ARGS" \
     DAPPER_SOURCE=/go/src/github.com/submariner-io/lighthouse DAPPER_DOCKER_SOCKET=true
