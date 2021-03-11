@@ -5,6 +5,9 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
+IMAGES := lighthouse-agent lighthouse-coredns
+PRELOAD_IMAGES := submariner-gateway submariner-operator submariner-route-agent $(IMAGES)
+
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
@@ -23,8 +26,6 @@ override DEPLOY_ARGS += --deploytool_broker_args '--service-discovery'
 endif
 
 # Targets to make
-
-images: package/.image.lighthouse-agent package/.image.lighthouse-coredns
 
 # Explicitly depend on the binary, since if it doesn't exist Shipyard won't find it
 package/.image.lighthouse-agent: bin/lighthouse-agent
@@ -58,7 +59,7 @@ check-nginx:
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) images
+.PHONY: $(TARGETS)
 
 else
 
