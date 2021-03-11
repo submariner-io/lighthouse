@@ -22,8 +22,7 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
-          deploytool: ${{ matrix.deploytool }}
-          globalnet: ${{ matrix.globalnet }}
+          using: ${{ matrix.deploytool }} ${{ matrix.globalnet }}
 
       - name: Post mortem
         if: failure()
