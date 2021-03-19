@@ -7,7 +7,6 @@ require (
 	github.com/coredns/caddy v1.1.0
 	github.com/coredns/coredns v1.8.3
 	github.com/go-logr/logr v0.3.0 // indirect
-	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/googleapis/gnostic v0.4.0 // indirect
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -16,7 +15,7 @@ require (
 	github.com/onsi/ginkgo v1.15.1
 	github.com/onsi/gomega v1.11.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/submariner-io/admiral v0.9.0-m1.0.20210303181719-5bb1de3368b5
 	github.com/submariner-io/shipyard v0.9.0-m1
 	go.uber.org/zap v1.15.0 // indirect
