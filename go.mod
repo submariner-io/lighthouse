@@ -17,7 +17,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/submariner-io/admiral v0.9.0-m1.0.20210303181719-5bb1de3368b5
-	github.com/submariner-io/shipyard v0.9.0-m1
+	github.com/submariner-io/shipyard v0.9.0-m2
 	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	google.golang.org/appengine v1.6.6 // indirect
