@@ -15,6 +15,12 @@ jobs:
       matrix:
         globalnet: ['', 'globalnet']
         deploytool: ['operator', 'helm']
+        k8s_version: ['1.17.17']
+        include:
+          # Recentness of K8s versions are limited by kindest/node image releases
+          - k8s_version: 1.18.15
+          - k8s_version: 1.19.7
+          - k8s_version: 1.20.2
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
