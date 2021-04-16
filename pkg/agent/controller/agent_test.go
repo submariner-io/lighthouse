@@ -200,6 +200,138 @@ var _ = Describe("ServiceImport syncing", func() {
 	})
 })
 
+var _ = Describe("Reconciliation", func() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		t.justBeforeEach()
+		t.createService()
+		t.createServiceExport()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
+
+	When("a local headless ServiceImport is stale on startup due to a missed ServiceExport delete event", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		JustBeforeEach(func() {
+			t.createEndpoints()
+		})
+
+		It("should delete the ServiceImport and EndpointSlice on reconciliation", func() {
+			serviceImport := t.cluster1.awaitServiceImport(t.service, mcsv1a1.Headless, "")
+			endpointSlice := t.cluster1.awaitEndpointSlice(t.endpoints, t.service)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
+			test.CreateResource(t.cluster1.localEndpointSliceClient, endpointSlice)
+			t.createService()
+			t.cluster1.start(t, *t.syncerConfig)
+
+			t.awaitServiceUnexported()
+			t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
+		})
+	})
+
+	When("a local ServiceImport is stale on startup due to a missed Service delete event", func() {
+		It("should delete the ServiceImport on reconciliation", func() {
+			serviceImport := t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
+			t.createServiceExport()
+			t.cluster1.start(t, *t.syncerConfig)
+
+			t.awaitServiceUnexported()
+		})
+	})
+
+	When("a synced local ServiceImport is stale in the broker datastore on startup", func() {
+		It("should delete it from the broker datastore on reconciliation", func() {
+			serviceImport := t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.brokerServiceImportClient, serviceImport)
+			t.justBeforeEach()
+
+			t.awaitServiceUnexported()
+		})
+	})
+
+	When("a synced remote ServiceImport is stale in the local datastore on startup", func() {
+		It("should delete it from the local datastore on reconciliation", func() {
+			serviceImport := t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.cluster2.localServiceImportClient, serviceImport)
+			t.cluster2.start(t, *t.syncerConfig)
+
+			t.awaitServiceUnexported()
+		})
+	})
+
+	When("a synced local EndpointSlice is stale in the broker datastore on startup", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		JustBeforeEach(func() {
+			t.createEndpoints()
+		})
+
+		It("should delete it from the broker datastore on reconciliation", func() {
+			endpointSlice := t.awaitBrokerEndpointSlice()
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.brokerEndpointSliceClient, endpointSlice)
+			t.justBeforeEach()
+
+			t.awaitNoEndpointSlice(t.brokerEndpointSliceClient)
+			t.awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient)
+		})
+	})
+
+	When("a synced remote EndpointSlice is stale in the local datastore on startup", func() {
+		BeforeEach(func() {
+			t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		JustBeforeEach(func() {
+			t.createEndpoints()
+		})
+
+		It("should delete it from the local datastore on reconciliation", func() {
+			endpointSlice := t.cluster2.awaitEndpointSlice(t.endpoints, t.service)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			test.CreateResource(t.cluster2.localEndpointSliceClient, endpointSlice)
+			t.cluster2.start(t, *t.syncerConfig)
+
+			t.awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient)
+		})
+	})
+})
+
 var _ = Describe("Globalnet enabled", func() {
 	globalIP := "192.168.10.34"
 	var t *testDriver
@@ -567,8 +699,8 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 	return serviceImport
 }
 
-func (c *cluster) awaitServiceImport(service *corev1.Service, sType mcsv1a1.ServiceImportType, serviceIP string) {
-	awaitServiceImport(c.localServiceImportClient, service, sType, serviceIP)
+func (c *cluster) awaitServiceImport(service *corev1.Service, sType mcsv1a1.ServiceImportType, serviceIP string) *mcsv1a1.ServiceImport {
+	return awaitServiceImport(c.localServiceImportClient, service, sType, serviceIP)
 }
 
 func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service,
@@ -609,7 +741,7 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 }
 
 func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface,
-	endpoints *corev1.Endpoints, service *corev1.Service, namespace string, expectOwnerRef bool) {
+	endpoints *corev1.Endpoints, service *corev1.Service, namespace string, expectOwnerRef bool) *discovery.EndpointSlice {
 	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
 
 	endpointSlice := &discovery.EndpointSlice{}
@@ -673,10 +805,12 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 		Protocol: &protocol,
 		Port:     &port,
 	}))
+
+	return endpointSlice
 }
 
-func (c *cluster) awaitEndpointSlice(endpoints *corev1.Endpoints, service *corev1.Service) {
-	awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service,
+func (c *cluster) awaitEndpointSlice(endpoints *corev1.Endpoints, service *corev1.Service) *discovery.EndpointSlice {
+	return awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service,
 		service.Namespace, c.agentSpec.ClusterID == clusterID1)
 }
 
@@ -715,8 +849,12 @@ func (c *cluster) awaitUpdatedEndpointSlice(endpoints *corev1.Endpoints, expecte
 	awaitUpdatedEndpointSlice(c.localEndpointSliceClient, endpoints, expectedIPs)
 }
 
-func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, serviceIP string) {
-	awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIP)
+func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, serviceIP string) *mcsv1a1.ServiceImport {
+	return awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIP)
+}
+
+func (t *testDriver) awaitBrokerEndpointSlice() *discovery.EndpointSlice {
+	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace, false)
 }
 
 func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
@@ -725,8 +863,8 @@ func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
 	t.cluster2.awaitUpdatedServiceImport(t.service, serviceIP)
 }
 
-func (t *testDriver) awaitEndpointSlice(serviceIPs ...string) {
-	awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace, false)
+func (t *testDriver) awaitEndpointSlice() {
+	t.awaitBrokerEndpointSlice()
 	t.cluster1.awaitEndpointSlice(t.endpoints, t.service)
 	t.cluster2.awaitEndpointSlice(t.endpoints, t.service)
 }
