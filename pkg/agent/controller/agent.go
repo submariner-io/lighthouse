@@ -116,7 +116,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		Name:             "ServiceExport -> ServiceImport",
 		SourceClient:     syncerConf.LocalClient,
 		SourceNamespace:  metav1.NamespaceAll,
-		Direction:        syncer.RemoteToLocal,
 		RestMapper:       syncerConf.RestMapper,
 		Federator:        agentController.serviceImportSyncer.GetLocalFederator(),
 		ResourceType:     &mcsv1a1.ServiceExport{},
@@ -136,7 +135,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		Name:            "Service deletion",
 		SourceClient:    syncerConf.LocalClient,
 		SourceNamespace: metav1.NamespaceAll,
-		Direction:       syncer.RemoteToLocal,
 		RestMapper:      syncerConf.RestMapper,
 		Federator:       agentController.serviceImportSyncer.GetLocalFederator(),
 		ResourceType:    &corev1.Service{},
@@ -182,9 +180,49 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	a.serviceExportSyncer.Reconcile(func() []runtime.Object {
+		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
+			return &mcsv1a1.ServiceExport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      si.GetAnnotations()[lhconstants.OriginName],
+					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+				},
+			}
+		})
+	})
+
+	a.serviceSyncer.Reconcile(func() []runtime.Object {
+		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
+			return &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      si.GetAnnotations()[lhconstants.OriginName],
+					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+				},
+			}
+		})
+	})
+
 	klog.Info("Agent controller started")
 
 	return nil
+}
+
+func (a *Controller) serviceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
+	siList, err := a.serviceImportSyncer.ListLocalResources(&mcsv1a1.ServiceImport{})
+	if err != nil {
+		klog.Errorf("Error listing serviceImports: %v", err)
+		return nil
+	}
+
+	retList := make([]runtime.Object, 0, len(siList))
+
+	for _, obj := range siList {
+		si := obj.(*mcsv1a1.ServiceImport)
+
+		retList = append(retList, transform(si))
+	}
+
+	return retList
 }
 
 func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
