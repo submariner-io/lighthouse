@@ -90,16 +90,16 @@ func (m *MockClusterStatus) LocalClusterID() string {
 }
 
 type MockLocalServices struct {
-	LocalServicesMap map[string]string
+	LocalServicesMap map[string]*serviceimport.DNSRecord
 }
 
 func NewMockLocalServices() *MockLocalServices {
-	return &MockLocalServices{LocalServicesMap: make(map[string]string)}
+	return &MockLocalServices{LocalServicesMap: make(map[string]*serviceimport.DNSRecord)}
 }
 
-func (m *MockLocalServices) GetIP(name, namespace string) (string, bool) {
-	ip, found := m.LocalServicesMap[getKey(name, namespace)]
-	return ip, found
+func (m *MockLocalServices) GetIP(name, namespace string) (*serviceimport.DNSRecord, bool) {
+	record, found := m.LocalServicesMap[getKey(name, namespace)]
+	return record, found
 }
 
 func getKey(name, namespace string) string {
@@ -560,7 +560,7 @@ func testLocalService() {
 		mockEs.endpointStatusMap[clusterID2] = true
 		mockLs := NewMockLocalServices()
 		mockCs.localClusterID = clusterID
-		mockLs.LocalServicesMap[getKey(service1, namespace1)] = serviceIP
+		mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{IP: serviceIP}
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),

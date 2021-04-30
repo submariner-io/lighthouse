@@ -21,6 +21,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 type Controller struct {
@@ -86,24 +89,41 @@ func (c *Controller) Stop() {
 	klog.Infof("Services Controller stopped")
 }
 
-func (c *Controller) GetIP(name, namespace string) (string, bool) {
+func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bool) {
 	key := namespace + "/" + name
 	obj, exists, err := c.svcStore.GetByKey(key)
 
 	if err != nil {
 		klog.V(log.DEBUG).Infof("Error trying to get service for key %q", key)
-		return "", false
+		return nil, false
 	}
 
 	if !exists {
-		return "", false
+		return nil, false
 	}
 
 	svc := obj.(*v1.Service)
 
-	if svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" {
-		return svc.Spec.ClusterIP, true
+	var mcsServicePort []mcsv1a1.ServicePort
+	if len(svc.Spec.Ports) != 0 {
+		mcsServicePort = make([]mcsv1a1.ServicePort, len(svc.Spec.Ports))
 	}
 
-	return "", false
+	for index, ports := range svc.Spec.Ports {
+		mcsServicePort[index] = mcsv1a1.ServicePort{
+			Name:     ports.Name,
+			Protocol: ports.Protocol,
+			Port:     ports.Port,
+		}
+	}
+
+	record := &serviceimport.DNSRecord{
+		IP:   svc.Spec.ClusterIP,
+		Port: mcsServicePort,
+	}
+	if svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" {
+		return record, true
+	}
+
+	return nil, false
 }
