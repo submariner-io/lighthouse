@@ -16,14 +16,7 @@ override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
-
-# Process extra flags from the `using=a,b,c` optional flag
-
-ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --service_discovery --deploytool_submariner_args '--set lighthouse.image.repository=localhost:5000/lighthouse-agent,lighthouse.image.tag=local,lighthouseCoredns.image.repository=localhost:5000/lighthouse-coredns,lighthouseCoredns.image.tag=local'
-else
-override DEPLOY_ARGS += --deploytool_broker_args '--service-discovery'
-endif
+override DEPLOY_ARGS += --service_discovery
 
 # Targets to make
 
