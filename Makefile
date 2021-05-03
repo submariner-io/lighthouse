@@ -20,7 +20,7 @@ override UNIT_TEST_ARGS += test/e2e
 # Process extra flags from the `using=a,b,c` optional flag
 
 ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --deploytool_broker_args '--set submariner.serviceDiscovery=true' --deploytool_submariner_args '--set submariner.serviceDiscovery=true,lighthouse.image.repository=localhost:5000/lighthouse-agent,lighthouse.image.tag=local,lighthouseCoredns.image.repository=localhost:5000/lighthouse-coredns,lighthouseCoredns.image.tag=local,serviceAccounts.lighthouse.create=true'
+override DEPLOY_ARGS += --service_discovery --deploytool_submariner_args '--set lighthouse.image.repository=localhost:5000/lighthouse-agent,lighthouse.image.tag=local,lighthouseCoredns.image.repository=localhost:5000/lighthouse-coredns,lighthouseCoredns.image.tag=local'
 else
 override DEPLOY_ARGS += --deploytool_broker_args '--service-discovery'
 endif
