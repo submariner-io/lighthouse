@@ -13,7 +13,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/miekg/dns v1.1.41
 	github.com/onsi/ginkgo v1.16.2
-	github.com/onsi/gomega v1.11.0
+	github.com/onsi/gomega v1.12.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/submariner-io/admiral v0.9.0-rc0
