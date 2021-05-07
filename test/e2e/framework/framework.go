@@ -16,6 +16,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -27,7 +28,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
 )
 
 const (
@@ -101,7 +102,7 @@ func createEndpointClientSet(restConfig *rest.Config) dynamic.ResourceInterface 
 
 	gvr, _ := schema.ParseResourceArg("endpoints.v1.submariner.io")
 	endpointsClient := clientSet.Resource(*gvr).Namespace("submariner-operator")
-	_, err = endpointsClient.List(metav1.ListOptions{})
+	_, err = endpointsClient.List(context.TODO(), metav1.ListOptions{})
 	Expect(err).To(Not(HaveOccurred()))
 
 	return endpointsClient
@@ -116,7 +117,7 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, names
 	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Creating serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
-		return se.Create(&nginxServiceExport)
+		return se.Create(context.TODO(), &nginxServiceExport, metav1.CreateOptions{})
 	}, framework.NoopCheckResult).(*mcsv1a1.ServiceExport)
 
 	return serviceExport
@@ -126,7 +127,7 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
-		return se.Get(name, metav1.GetOptions{})
+		return se.Get(context.TODO(), name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		se := result.(*mcsv1a1.ServiceExport)
 		if len(se.Status.Conditions) == 0 {
@@ -149,13 +150,14 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {
 	By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil("delete service export", func() (interface{}, error) {
-		return nil, MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace).Delete(name, &metav1.DeleteOptions{})
+		return nil, MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace).Delete(
+			context.TODO(), name, metav1.DeleteOptions{})
 	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace string) (*v1.Service, error) {
 	By(fmt.Sprintf("Retrieving service %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
-	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, svc *v1.Service) *mcsv1a1.ServiceImport {
@@ -173,7 +175,7 @@ func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, s
 	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	By(fmt.Sprintf("Retrieving ServiceImport for %s on %q", siNamePrefix, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(metav1.ListOptions{})
+		return si.List(context.TODO(), metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
 		if len(siList.Items) < 1 {
@@ -198,7 +200,7 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 	siNamePrefix := name + "-" + namespace
 	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(metav1.ListOptions{})
+		return si.List(context.TODO(), metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
 		for _, si := range siList.Items {
@@ -221,7 +223,7 @@ func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex
 	}
 	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(siListOptions)
+		return si.List(context.TODO(), siListOptions)
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
 		if len(siList.Items) != count {
@@ -236,7 +238,7 @@ func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, names
 	if framework.TestContext.GlobalnetEnabled {
 		svc := framework.KubeClients[cluster].CoreV1().Services(namespace)
 		svcObj := framework.AwaitUntil("retrieve service", func() (interface{}, error) {
-			return svc.Get(name, metav1.GetOptions{})
+			return svc.Get(context.TODO(), name, metav1.GetOptions{})
 		}, func(result interface{}) (bool, string, error) {
 			svc := result.(*v1.Service)
 			globalIP := svc.Annotations[submarinerIPAMGlobalIP]
@@ -278,7 +280,7 @@ func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster 
 
 	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)
 	service := framework.AwaitUntil("create service", func() (interface{}, error) {
-		return sc.Create(&nginxService)
+		return sc.Create(context.TODO(), &nginxService, metav1.CreateOptions{})
 	}, framework.NoopCheckResult).(*v1.Service)
 
 	return service
@@ -292,7 +294,7 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	ep := framework.KubeClients[targetCluster].CoreV1().Endpoints(namespace)
 	By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
-		return ep.Get(name, metav1.GetOptions{})
+		return ep.Get(context.TODO(), name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		ipList = make([]string, 0)
 		endpoint := result.(*v1.Endpoints)
@@ -319,7 +321,7 @@ func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uin
 	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
 	deployments := framework.KubeClients[cluster].AppsV1().Deployments(f.Namespace)
 	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
-		return deployments.Patch("nginx-demo", types.MergePatchType, []byte(patch))
+		return deployments.Patch(context.TODO(), "nginx-demo", types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	}, framework.NoopCheckResult).(*appsv1.Deployment)
 
 	return result
@@ -379,7 +381,7 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 	appName := statefulSet.Spec.Template.ObjectMeta.Labels["app"]
 
 	_ = framework.AwaitUntil("create statefulSet", func() (interface{}, error) {
-		return pc.Create(statefulSet)
+		return pc.Create(context.TODO(), statefulSet, metav1.CreateOptions{})
 	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
 
 	return f.AwaitPodsByAppLabel(cluster, appName, f.Namespace, int(*count))
@@ -398,7 +400,7 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 	By(fmt.Sprintf("Retrieving EndpointSlices for %q in ns %q on %q", name, namespace,
 		framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
-		return ep.List(listOptions)
+		return ep.List(context.TODO(), listOptions)
 	}, func(result interface{}) (bool, string, error) {
 		endpointSliceList = result.(*v1beta1.EndpointSliceList)
 		sliceCount := 0
@@ -430,7 +432,7 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
 	ss := framework.KubeClients[cluster].AppsV1().StatefulSets(f.Namespace)
 	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
-		return ss.Patch(statefulSetName, types.MergePatchType, []byte(patch))
+		return ss.Patch(context.TODO(), statefulSetName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
 
 	return result
@@ -438,7 +440,7 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 
 func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
 	framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
-		unstructuredEndpointList, err := EndpointClients[cluster].List(metav1.ListOptions{})
+		unstructuredEndpointList, err := EndpointClients[cluster].List(context.TODO(), metav1.ListOptions{})
 		return unstructuredEndpointList, err
 	}, func(result interface{}) (bool, string, error) {
 		unstructuredEndpointList := result.(*unstructured.UnstructuredList)
@@ -472,7 +474,8 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 	patch := fmt.Sprintf(`{"spec":{"healthCheckIP":%q}}`, ip)
 
 	framework.AwaitUntil("set healthCheckIP", func() (interface{}, error) {
-		endpoint, err := EndpointClients[cluster].Patch(endpointName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		endpoint, err := EndpointClients[cluster].Patch(context.TODO(), endpointName, types.MergePatchType, []byte(patch),
+			metav1.PatchOptions{})
 		return endpoint, err
 	}, framework.NoopCheckResult)
 }

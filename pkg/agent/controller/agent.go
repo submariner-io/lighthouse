@@ -16,6 +16,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -431,7 +432,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			return err
 		}
 
-		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).UpdateStatus(raw, metav1.UpdateOptions{})
+		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).UpdateStatus(context.TODO(), raw, metav1.UpdateOptions{})
 
 		return err
 	})
@@ -441,7 +442,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 }
 
 func (a *Controller) getServiceExport(name, namespace string) (*mcsv1a1.ServiceExport, error) {
-	obj, err := a.serviceExportClient.Namespace(namespace).Get(name, metav1.GetOptions{})
+	obj, err := a.serviceExportClient.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +499,7 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 		return []string{mcsIP}, mcsPorts, nil
 	}
 
-	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Error retrieving Endpoints for Service (%s/%s): %v", service.Namespace, service.Name, err)

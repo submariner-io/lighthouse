@@ -16,6 +16,7 @@ limitations under the License.
 package gateway_test
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -224,12 +225,12 @@ func (t *testDriver) awaitValidLocalClusterID(clusterID string) {
 }
 
 func (t *testDriver) createGateway() {
-	_, err := t.gatewayClient.Create(t.gatewayObj, metav1.CreateOptions{})
+	_, err := t.gatewayClient.Create(context.TODO(), t.gatewayObj, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 }
 
 func (t *testDriver) updateGateway() {
-	_, err := t.gatewayClient.Update(t.gatewayObj, metav1.UpdateOptions{})
+	_, err := t.gatewayClient.Update(context.TODO(), t.gatewayObj, metav1.UpdateOptions{})
 	Expect(err).To(Succeed())
 }
 

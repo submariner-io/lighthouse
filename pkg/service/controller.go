@@ -16,6 +16,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -57,10 +58,10 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	c.svcStore, c.svcInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return clientSet.CoreV1().Services(metav1.NamespaceAll).List(options)
+				return clientSet.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return clientSet.CoreV1().Services(metav1.NamespaceAll).Watch(options)
+				return clientSet.CoreV1().Services(metav1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Service{},

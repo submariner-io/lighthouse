@@ -16,6 +16,8 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -89,7 +91,7 @@ func (e *EndpointController) cleanup() {
 		LabelSelector: endpointSliceLabels.String(),
 	}
 
-	err := resourceClient.DeleteCollection(&metav1.DeleteOptions{}, listEndpointSliceOptions)
+	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listEndpointSliceOptions)
 
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)

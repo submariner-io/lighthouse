@@ -19,13 +19,13 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
-	mcsInformers "github.com/submariner-io/lighthouse/pkg/mcs/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
+	mcsInformers "sigs.k8s.io/mcs-api/pkg/client/informers/externalversions"
 )
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (mcsClientset.Interface, error)

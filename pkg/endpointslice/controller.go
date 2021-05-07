@@ -16,6 +16,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"fmt"
 
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
@@ -80,11 +81,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labelSelector
-				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(options)
+				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labelSelector
-				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(options)
+				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&discovery.EndpointSlice{},

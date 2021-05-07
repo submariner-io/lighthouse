@@ -16,6 +16,7 @@ limitations under the License.
 package endpointslice_test
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -131,7 +132,7 @@ func newEndpointSliceTestDiver() *endpointSliceTestDriver {
 }
 
 func (t *endpointSliceTestDriver) createEndpointSlice(namespace string, endpointSlice *v1beta1.EndpointSlice) {
-	_, err := t.kubeClient.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice)
+	_, err := t.kubeClient.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 }
 
