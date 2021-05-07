@@ -16,15 +16,17 @@ limitations under the License.
 package serviceimport_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
-	fakeMCSClientSet "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
+	fakeMCSClientSet "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned/fake"
 )
 
 var _ = Describe("ServiceImport controller", func() {
@@ -70,17 +72,20 @@ func testLifecycleNotifications() {
 	})
 
 	createService := func(serviceImport *mcsv1a1.ServiceImport) error {
-		_, err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Create(serviceImport)
+		_, err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Create(
+			context.TODO(), serviceImport, metav1.CreateOptions{})
 		return err
 	}
 
 	updateService := func(serviceImport *mcsv1a1.ServiceImport) error {
-		_, err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Update(serviceImport)
+		_, err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Update(
+			context.TODO(), serviceImport, metav1.UpdateOptions{})
 		return err
 	}
 
 	deleteService := func(serviceImport *mcsv1a1.ServiceImport) error {
-		err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Delete(serviceImport.Name, &metav1.DeleteOptions{})
+		err := fakeClientSet.MulticlusterV1alpha1().ServiceImports(serviceImport.Namespace).Delete(
+			context.TODO(), serviceImport.Name, metav1.DeleteOptions{})
 		return err
 	}
 

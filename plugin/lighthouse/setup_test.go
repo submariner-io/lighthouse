@@ -29,14 +29,14 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
-	mcsClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned"
-	fakeMCSClientset "github.com/submariner-io/lighthouse/pkg/mcs/client/clientset/versioned/fake"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
+	fakeMCSClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned/fake"
 )
 
 type fakeHandler struct {

@@ -16,6 +16,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -710,7 +711,7 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 	var serviceImport *mcsv1a1.ServiceImport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Get(name, metav1.GetOptions{})
+		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		serviceImport = &mcsv1a1.ServiceImport{}
@@ -760,7 +761,7 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 	if expectOwnerRef {
 		Expect(endpointSlice.OwnerReferences).To(HaveLen(1))
 
-		si, err := serviceImportClient.Get(siName, metav1.GetOptions{})
+		si, err := serviceImportClient.Get(context.TODO(), siName, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		controllerFlag := false
@@ -822,7 +823,7 @@ func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, en
 	var actualIPs []string
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := endpointSliceClient.Get(name, metav1.GetOptions{})
+		obj, err := endpointSliceClient.Get(context.TODO(), name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		endpointSlice := &discovery.EndpointSlice{}
@@ -876,21 +877,21 @@ func (t *testDriver) awaitUpdatedEndpointSlice(expectedIPs []string) {
 }
 
 func (t *testDriver) createService() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Create(t.service)
+	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Create(context.TODO(), t.service, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	test.CreateResource(t.dynamicServiceClient(), t.service)
 }
 
 func (t *testDriver) createEndpoints() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(t.endpoints)
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(context.TODO(), t.endpoints, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	test.CreateResource(t.dynamicEndpointsClient(), t.endpoints)
 }
 
 func (t *testDriver) updateEndpoints() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(t.endpoints)
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(context.TODO(), t.endpoints, metav1.UpdateOptions{})
 	Expect(err).To(Succeed())
 
 	test.UpdateResource(t.dynamicEndpointsClient(), t.endpoints)
@@ -905,13 +906,14 @@ func (t *testDriver) createServiceExport() {
 }
 
 func (t *testDriver) deleteServiceExport() {
-	Expect(t.cluster1.localServiceExportClient.Delete(t.service.GetName(), nil)).To(Succeed())
+	Expect(t.cluster1.localServiceExportClient.Delete(context.TODO(), t.service.GetName(), metav1.DeleteOptions{})).To(Succeed())
 }
 
 func (t *testDriver) deleteService() {
-	Expect(t.dynamicServiceClient().Delete(t.service.Name, nil)).To(Succeed())
+	Expect(t.dynamicServiceClient().Delete(context.TODO(), t.service.Name, metav1.DeleteOptions{})).To(Succeed())
 
-	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(t.service.Name, nil)).To(Succeed())
+	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(context.TODO(), t.service.Name,
+		metav1.DeleteOptions{})).To(Succeed())
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
@@ -930,7 +932,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 	var found *mcsv1a1.ServiceExport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := t.cluster1.localServiceExportClient.Get(t.service.Name, metav1.GetOptions{})
+		obj, err := t.cluster1.localServiceExportClient.Get(context.TODO(), t.service.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -976,7 +978,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 
 func (t *testDriver) awaitNotServiceExportStatus(notCond *mcsv1a1.ServiceExportCondition) {
 	err := wait.PollImmediate(50*time.Millisecond, 300*time.Millisecond, func() (bool, error) {
-		obj, err := t.cluster1.localServiceExportClient.Get(t.service.Name, metav1.GetOptions{})
+		obj, err := t.cluster1.localServiceExportClient.Get(context.TODO(), t.service.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
@@ -1039,7 +1041,7 @@ func (t *testDriver) awaitHeadlessServiceUnexported() {
 	// Ensure the service's Endpoints are no longer being watched by updating the Endpoints and verifyjng the
 	// EndpointSlice isn't recreated.
 	t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.10"})
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(t.endpoints)
+	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(context.TODO(), t.endpoints, metav1.UpdateOptions{})
 	Expect(err).To(Succeed())
 
 	time.Sleep(200 * time.Millisecond)

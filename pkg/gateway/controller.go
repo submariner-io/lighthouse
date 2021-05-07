@@ -16,6 +16,7 @@ limitations under the License.
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -94,9 +96,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return gwClientset.List(metav1.ListOptions{})
+			return gwClientset.List(context.TODO(), metav1.ListOptions{})
 		},
-		WatchFunc: gwClientset.Watch,
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return gwClientset.Watch(context.TODO(), options)
+		},
 	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: c.queue.Enqueue,
 		UpdateFunc: func(old interface{}, new interface{}) {
@@ -258,7 +262,7 @@ func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.Resou
 
 	gvr, _ := schema.ParseResourceArg("gateways.v1.submariner.io")
 	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
-	_, err = gwClient.List(metav1.ListOptions{})
+	_, err = gwClient.List(context.TODO(), metav1.ListOptions{})
 
 	return gwClient, err
 }
