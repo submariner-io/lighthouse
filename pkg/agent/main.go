@@ -53,7 +53,7 @@ func main() {
 	} else if verbosity := os.Getenv("SUBMARINER_VERBOSITY"); verbosity != "" {
 		os.Args = append(os.Args, fmt.Sprintf("-v=%s", verbosity))
 	} else {
-		os.Args = append(os.Args, "-v=1")
+		os.Args = append(os.Args, "-v=2")
 	}
 
 	klog.InitFlags(nil)
