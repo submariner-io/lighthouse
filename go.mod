@@ -11,7 +11,7 @@ require (
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
-	github.com/miekg/dns v1.1.41
+	github.com/miekg/dns v1.1.42
 	github.com/onsi/ginkgo v1.16.2
 	github.com/onsi/gomega v1.12.0
 	github.com/pkg/errors v0.9.1
