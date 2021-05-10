@@ -229,6 +229,8 @@ func (a *Controller) serviceImportLister(transform func(si *mcsv1a1.ServiceImpor
 func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	svcExport := obj.(*mcsv1a1.ServiceExport)
 
+	klog.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
+
 	if op == syncer.Delete {
 		return a.newServiceImport(svcExport), false
 	}
@@ -321,6 +323,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 		corev1.ConditionFalse, "AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
+
+	klog.V(log.DEBUG).Infof("Returning ServiceImport: %#v", serviceImport)
 
 	return serviceImport, false
 }

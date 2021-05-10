@@ -39,7 +39,7 @@ import (
 
 func startEndpointController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
 	serviceImportUID types.UID, serviceImportName, serviceImportNameSpace, serviceName, clusterID string) (*EndpointController, error) {
-	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %q", serviceName)
+	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
 
 	controller := &EndpointController{
 		clusterID:                    clusterID,
@@ -100,9 +100,12 @@ func (e *EndpointController) cleanup() {
 
 func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endPoints := obj.(*corev1.Endpoints)
+
 	endpointSliceName := endPoints.Name + "-" + e.clusterID
 
 	if op == syncer.Delete {
+		klog.V(log.DEBUG).Infof("Endpoints %s/%s deleted", endPoints.Namespace, endPoints.Name)
+
 		return &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      endpointSliceName,
@@ -111,10 +114,16 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 		}, false
 	}
 
-	return e.endpointSliceFromEndpoints(endPoints), false
+	if op == syncer.Create {
+		klog.V(log.DEBUG).Infof("Endpoints %s/%s created", endPoints.Namespace, endPoints.Name)
+	} else {
+		klog.V(log.TRACE).Infof("Endpoints %s/%s updated", endPoints.Namespace, endPoints.Name)
+	}
+
+	return e.endpointSliceFromEndpoints(endPoints, op), false
 }
 
-func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
+func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
 	controllerFlag := false
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
@@ -153,6 +162,12 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses,
 			endpointSlice.AddressType, false)...)
+	}
+
+	if op == syncer.Create {
+		klog.V(log.DEBUG).Infof("Returning EndpointSlice: %#v", endpointSlice)
+	} else {
+		klog.V(log.TRACE).Infof("Returning EndpointSlice: %#v", endpointSlice)
 	}
 
 	return endpointSlice

@@ -139,6 +139,9 @@ func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.
 	op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
+
+	klog.V(log.DEBUG).Infof("ServiceImport %q %sd", key, op)
+
 	if op == syncer.Create || op == syncer.Update {
 		return nil, c.serviceImportCreatedOrUpdated(serviceImport, key)
 	}
