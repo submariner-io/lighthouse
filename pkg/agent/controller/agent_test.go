@@ -741,8 +741,8 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIP)
 }
 
-func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface,
-	endpoints *corev1.Endpoints, service *corev1.Service, namespace string, expectOwnerRef bool) *discovery.EndpointSlice {
+func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
+	service *corev1.Service, namespace string) *discovery.EndpointSlice {
 	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
 
 	endpointSlice := &discovery.EndpointSlice{}
@@ -757,25 +757,6 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
 	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
 	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceCluster, clusterID1))
-
-	if expectOwnerRef {
-		Expect(endpointSlice.OwnerReferences).To(HaveLen(1))
-
-		si, err := serviceImportClient.Get(context.TODO(), siName, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		controllerFlag := false
-
-		Expect(endpointSlice.OwnerReferences[0]).To(Equal(metav1.OwnerReference{
-			APIVersion: "multicluster.x-k8s.io.v1alpha1",
-			Kind:       "ServiceImport",
-			Name:       siName,
-			UID:        si.GetUID(),
-			Controller: &controllerFlag,
-		}))
-	} else {
-		Expect(endpointSlice.OwnerReferences).To(HaveLen(0))
-	}
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 
@@ -811,8 +792,7 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 }
 
 func (c *cluster) awaitEndpointSlice(endpoints *corev1.Endpoints, service *corev1.Service) *discovery.EndpointSlice {
-	return awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service,
-		service.Namespace, c.agentSpec.ClusterID == clusterID1)
+	return awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service, service.Namespace)
 }
 
 func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints, expectedIPs []string) {
@@ -855,7 +835,7 @@ func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, s
 }
 
 func (t *testDriver) awaitBrokerEndpointSlice() *discovery.EndpointSlice {
-	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace, false)
+	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace)
 }
 
 func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
