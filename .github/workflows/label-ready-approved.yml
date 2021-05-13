@@ -1,0 +1,13 @@
+on: pull_request_review
+name: Label Ready to Test
+jobs:
+  label:
+    name: When Approved
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label when approved
+        uses: abinoda/label-when-approved-action@v1.0.7
+        env:
+          APPROVALS: "2"
+          GITHUB_TOKEN: ${{ secrets.TRIAGE_TOKEN }}
+          ADD_LABEL: "ready-to-test"
