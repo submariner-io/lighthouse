@@ -5,6 +5,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
+BINARIES := bin/lighthouse-agent bin/lighthouse-coredns
 IMAGES := lighthouse-agent lighthouse-coredns
 PRELOAD_IMAGES := submariner-gateway submariner-operator submariner-route-agent $(IMAGES)
 
@@ -25,16 +26,20 @@ package/.image.lighthouse-agent: bin/lighthouse-agent
 
 package/.image.lighthouse-coredns: bin/lighthouse-coredns
 
-build: bin/lighthouse-agent bin/lighthouse-coredns
+build: $(BINARIES)
 
 bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
-	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go
+	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go $(BUILD_ARGS)
 
 bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
-	${SCRIPTS_DIR}/compile.sh $@ pkg/coredns/main.go
+	${SCRIPTS_DIR}/compile.sh $@ pkg/coredns/main.go $(BUILD_ARGS)
 
 deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
+
+licensecheck: BUILD_ARGS=--noupx
+licensecheck: $(BINARIES)
+	lichen -c .lichen.yaml $(BINARIES)
 
 # Lighthouse-specific upgrade test:
 # deploy latest, start nginx service, export it, upgrade, check service
