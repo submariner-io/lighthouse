@@ -83,19 +83,20 @@ func (lh *Lighthouse) createARecords(ips []string, state request.Request) []dns.
 }
 
 func (lh *Lighthouse) createSRVRecords(record *serviceimport.DNSRecord, state request.Request, pReq recordRequest, zone string) []dns.RR {
-	reqPorts := make([]mcsv1a1.ServicePort, 0)
-	records := make([]dns.RR, 0)
-	portReqKey := pReq.port + pReq.protocol
-	if portReqKey == "" {
-		reqPorts = record.Port
-	}
+	var reqPorts []mcsv1a1.ServicePort
 
-	for _, port := range record.Port {
-		portKey := strings.ToLower(port.Name) + strings.ToLower(string(port.Protocol))
-		log.Debugf("The current port Name %q SRV require port Name %q", portKey, portReqKey)
+	if pReq.port == "" {
+		reqPorts = record.Ports
+	} else {
+		log.Debugf("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
+		for _, port := range record.Ports {
+			name := strings.ToLower(port.Name)
+			protocol := strings.ToLower(string(port.Protocol))
 
-		if portKey == portReqKey {
-			reqPorts = append(reqPorts, port)
+			log.Debugf("Checking port %q, protocol %q", name, protocol)
+			if name == pReq.port && protocol == pReq.protocol {
+				reqPorts = append(reqPorts, port)
+			}
 		}
 	}
 
@@ -109,12 +110,14 @@ func (lh *Lighthouse) createSRVRecords(record *serviceimport.DNSRecord, state re
 		target = pReq.cluster + "." + target
 	}
 
-	for _, ports := range reqPorts {
+	records := make([]dns.RR, len(reqPorts))
+
+	for _, port := range reqPorts {
 		record := &dns.SRV{
 			Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.ttl},
 			Priority: 0,
 			Weight:   50,
-			Port:     uint16(ports.Port),
+			Port:     uint16(port.Port),
 			Target:   target,
 		}
 		records = append(records, record)

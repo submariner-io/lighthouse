@@ -104,13 +104,17 @@ func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bo
 
 	svc := obj.(*v1.Service)
 
-	var mcsServicePort []mcsv1a1.ServicePort
+	if svc.Spec.Type != v1.ServiceTypeClusterIP || svc.Spec.ClusterIP == "" {
+		return nil, false
+	}
+
+	var mcsServicePorts []mcsv1a1.ServicePort
 	if len(svc.Spec.Ports) != 0 {
-		mcsServicePort = make([]mcsv1a1.ServicePort, len(svc.Spec.Ports))
+		mcsServicePorts = make([]mcsv1a1.ServicePort, len(svc.Spec.Ports))
 	}
 
 	for index, ports := range svc.Spec.Ports {
-		mcsServicePort[index] = mcsv1a1.ServicePort{
+		mcsServicePorts[index] = mcsv1a1.ServicePort{
 			Name:     ports.Name,
 			Protocol: ports.Protocol,
 			Port:     ports.Port,
@@ -118,12 +122,9 @@ func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bo
 	}
 
 	record := &serviceimport.DNSRecord{
-		IP:   svc.Spec.ClusterIP,
-		Port: mcsServicePort,
-	}
-	if svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" {
-		return record, true
+		IP:    svc.Spec.ClusterIP,
+		Ports: mcsServicePorts,
 	}
 
-	return nil, false
+	return record, true
 }

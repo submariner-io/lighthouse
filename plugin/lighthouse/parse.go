@@ -120,8 +120,6 @@ func parseSegments(segs []string, count int, r recordRequest, state request.Requ
 		case 1: // cluster and hostname
 			r.cluster = segs[count]
 			r.hostname = segs[count-1]
-			r.hostname = segs[count-1]
-
 		default: // too long
 			return r, errInvalidRequest
 		}

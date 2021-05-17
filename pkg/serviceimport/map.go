@@ -26,9 +26,10 @@ import (
 )
 
 type DNSRecord struct {
-	IP   string
-	Port []mcsv1a1.ServicePort
+	IP    string
+	Ports []mcsv1a1.ServicePort
 }
+
 type clusterInfo struct {
 	record *DNSRecord
 	name   string
@@ -76,7 +77,7 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace str
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) (record *DNSRecord, found, isLocal bool) {
-	clusterIPs, queue, counter, isHeadless := func() (map[string]*DNSRecord, []clusterInfo, *uint64, bool) {
+	dnsRecords, queue, counter, isHeadless := func() (map[string]*DNSRecord, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
 
@@ -88,20 +89,20 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 		return si.records, si.clustersQueue, &si.rrCount, si.isHeadless
 	}()
 
-	if clusterIPs == nil || isHeadless {
+	if dnsRecords == nil || isHeadless {
 		return nil, false, false
 	}
 
 	// If a clusterID is specified, we supply it even if the service is not there
 	if cluster != "" {
-		record, found = clusterIPs[cluster]
+		record, found = dnsRecords[cluster]
 		return record, found, cluster == localCluster
 	}
 
 	// If we are aware of the local cluster
 	// And we found some accessible IP, we shall return it
 	if localCluster != "" {
-		record, found := clusterIPs[localCluster]
+		record, found := dnsRecords[localCluster]
 
 		if found && record != nil && checkEndpoint(name, namespace, localCluster) {
 			return record, found, true
@@ -145,8 +146,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
 			record := &DNSRecord{
-				IP:   serviceImport.Spec.IPs[0],
-				Port: serviceImport.Spec.Ports,
+				IP:    serviceImport.Spec.IPs[0],
+				Ports: serviceImport.Spec.Ports,
 			}
 			remoteService.records[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = record
 		}
