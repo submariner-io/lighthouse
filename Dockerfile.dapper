@@ -5,6 +5,8 @@ ENV DAPPER_ENV="REPO MAKEFLAGS TAG QUAY_USERNAME QUAY_PASSWORD GITHUB_SHA BUILD_
     DAPPER_SOURCE=/go/src/github.com/submariner-io/lighthouse DAPPER_DOCKER_SOCKET=true
 ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
 
+RUN GO111MODULE=off go get github.com/uw-labs/lichen
+
 WORKDIR ${DAPPER_SOURCE}
 
 ENTRYPOINT ["/opt/shipyard/scripts/entry"]
