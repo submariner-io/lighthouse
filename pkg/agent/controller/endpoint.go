@@ -125,7 +125,7 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
-	controllerFlag := false
+
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
 		lhconstants.LabelServiceImportName: e.serviceImportName,
@@ -134,14 +134,6 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		lhconstants.LabelSourceCluster:     e.clusterID,
 		lhconstants.LabelSourceName:        e.serviceName,
 	}
-	endpointSlice.OwnerReferences = []metav1.OwnerReference{{
-		APIVersion:         "multicluster.x-k8s.io.v1alpha1",
-		Kind:               "ServiceImport",
-		Name:               e.serviceImportName,
-		UID:                e.serviceImportUID,
-		Controller:         &controllerFlag,
-		BlockOwnerDeletion: nil,
-	}}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4
 
