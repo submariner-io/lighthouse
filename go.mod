@@ -12,7 +12,7 @@ require (
 	github.com/onsi/gomega v1.12.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
-	github.com/submariner-io/admiral v0.9.0-rc0.0.20210506112321-7cecd38836bf
+	github.com/submariner-io/admiral v0.10.0-m1
 	github.com/submariner-io/shipyard v0.10.0-m1
 	go.uber.org/zap v1.15.0 // indirect
 	k8s.io/api v0.21.0
