@@ -20,6 +20,8 @@ package lighthouse
 import (
 	"context"
 
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/test"
@@ -45,6 +47,12 @@ const (
 	clusterID2  = "cluster2"
 	endpointIP  = "100.96.157.101"
 	endpointIP2 = "100.96.157.102"
+	portName1   = "http"
+	portName2   = "dns"
+	protcol1    = v1.ProtocolTCP
+	portNumber1 = int32(8080)
+	protcol2    = v1.ProtocolUDP
+	portNumber2 = int32(53)
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
@@ -53,6 +61,7 @@ var _ = Describe("Lighthouse DNS plugin Handler", func() {
 	Context("Cluster connectivity status", testClusterStatus)
 	Context("Headless services", testHeadlessService)
 	Context("Local services", testLocalService)
+	Context("SRV  records", testSRVMultiplePorts)
 })
 
 type FailingResponseWriter struct {
@@ -134,8 +143,8 @@ func testWithoutFallback() {
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
-	When("type A DNS query for an existing service", func() {
-		It("should succeed and write an A record response", func() {
+	When("DNS query for an existing service", func() {
+		It("of Type A record should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
@@ -145,10 +154,21 @@ func testWithoutFallback() {
 				},
 			})
 		})
+		It("of Type SRV should succeed and write an SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
-	When("type A DNS query for an existing service in specific cluster", func() {
-		It("should succeed and write an A record response", func() {
+	When("DNS query for an existing service in specific cluster", func() {
+		It("of Type A record should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
@@ -158,11 +178,23 @@ func testWithoutFallback() {
 				},
 			})
 		})
+		It("of Type SRV should succeed and write an SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
-	When("type A DNS query for an existing service with a different namespace", func() {
-		It("should succeed and write an A record response", func() {
-			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP))
+	When("DNS query for an existing service with a different namespace", func() {
+		It("of Type A record should succeed and write an A record response", func() {
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, serviceIP, portName1,
+				portNumber1, protcol1, mcsv1a1.ClusterSetIP))
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
@@ -172,43 +204,84 @@ func testWithoutFallback() {
 				},
 			})
 		})
+		It("of Type SRV should succeed and write an SRV record response", func() {
+			lh.serviceImports.Put(newServiceImport(namespace2, service1, clusterID, serviceIP, portName1, portNumber1,
+				protcol1, mcsv1a1.ClusterSetIP))
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace2 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						service1 + "." + namespace2 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
-	When("type A DNS query for a non-existent service", func() {
-		It("should return RcodeNameError", func() {
+	When("DNS query for a non-existent service", func() {
+		It("of Type A record should return RcodeNameError for A record query", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: "unknown." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 			})
 		})
+		It("of Type SRV should return RcodeNameError for SRV record query", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "unknown." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeNameError,
+			})
+		})
 	})
 
-	When("type A DNS query for a non-existent service with a different namespace", func() {
-		It("should return RcodeNameError", func() {
+	When("DNS query for a non-existent service with a different namespace", func() {
+		It("of Type A record should return RcodeNameError for A record query ", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 			})
 		})
+		It("of Type SRV should return RcodeNameError for SRV record query ", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeNameError,
+			})
+		})
 	})
 
-	When("type A DNS query for a pod", func() {
-		It("should return RcodeNameError", func() {
+	When("DNS query for a pod", func() {
+		It("of Type A record should return RcodeNameError for A record query", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace1 + ".pod.clusterset.local.",
 				Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 			})
 		})
+		It("of Type SRV should return RcodeNameError for SRV record query", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".pod.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeNameError,
+			})
+		})
 	})
 
-	When("type A DNS query for a non-existent zone", func() {
-		It("should return RcodeNameError", func() {
+	When("DNS query for a non-existent zone", func() {
+		It("of Type A record should return RcodeNameError for A record query", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: service1 + "." + namespace2 + ".svc.cluster.east.",
 				Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotZone,
+			})
+		})
+		It("of Type SRV should return RcodeNameError for SRV record query", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace2 + ".svc.cluster.east.",
+				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeNotZone,
 			})
 		})
@@ -320,6 +393,47 @@ func testWithFallback() {
 			})
 		})
 	})
+
+	When("type SRV DNS query for a non-matching lighthouse zone and matching fallthrough zone", func() {
+		It("should invoke the next plugin", func() {
+			lh.Fall = fall.F{Zones: []string{"clusterset.local.", "cluster.east."}}
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.east.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeBadCookie,
+			})
+		})
+	})
+
+	When("type SRV DNS query for a non-matching lighthouse zone and non-matching fallthrough zone", func() {
+		It("should not invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.cluster.east.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeNotZone,
+			})
+		})
+	})
+
+	When("type SRV DNS query for a pod", func() {
+		It("should invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".pod.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeBadCookie,
+			})
+		})
+	})
+
+	When("type SRV DNS query for a non-existent service", func() {
+		It("should invoke the next plugin", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "unknown." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeBadCookie,
+			})
+		})
+	})
 }
 
 func testClusterStatus() {
@@ -346,7 +460,8 @@ func testClusterStatus() {
 			localServices:   mockLs,
 			ttl:             defaultTTL,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
+			portNumber2, protcol2, mcsv1a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -362,12 +477,24 @@ func testClusterStatus() {
 				},
 			})
 		})
+		It("should succeed and write that cluster's IP as SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("service is in two connected clusters and one is not of type ClusterSetIP", func() {
 		JustBeforeEach(func() {
 			lh.serviceImports = setupServiceImportMap()
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, ""))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
+				portNumber2, protcol2, ""))
 		})
 		It("should succeed and write an A record response with the available IP", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -376,6 +503,17 @@ func testClusterStatus() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.A(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
+				},
+			})
+		})
+		It("should succeed and write that cluster's IP as SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -395,6 +533,17 @@ func testClusterStatus() {
 				},
 			})
 		})
+		It("should succeed and write an SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("service is present in two clusters and both are disconnected", func() {
@@ -402,10 +551,18 @@ func testClusterStatus() {
 			mockCs.clusterStatusMap[clusterID] = false
 			mockCs.clusterStatusMap[clusterID2] = false
 		})
-		It("should return empty response (NODATA)", func() {
+		It("should return empty response (NODATA) for A record query", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname:  service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype:  dns.TypeA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
+			})
+		})
+		It("should return empty response (NODATA) for SRV record query", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname:  service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype:  dns.TypeSRV,
 				Rcode:  dns.RcodeSuccess,
 				Answer: []dns.RR{},
 			})
@@ -418,10 +575,18 @@ func testClusterStatus() {
 			delete(mockCs.clusterStatusMap, clusterID2)
 			lh.serviceImports = setupServiceImportMap()
 		})
-		It("should return empty response (NODATA)", func() {
+		It("should return empty response (NODATA) for A record query", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname:  service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype:  dns.TypeA,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
+			})
+		})
+		It("should return empty response (NODATA) for SRV record query", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname:  service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype:  dns.TypeSRV,
 				Rcode:  dns.RcodeSuccess,
 				Answer: []dns.RR{},
 			})
@@ -460,7 +625,8 @@ func testHeadlessService() {
 
 	When("headless service has no IPs", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1,
+				portNumber1, protcol1, mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{}))
 		})
 		It("should succeed and return empty response (NODATA)", func() {
@@ -475,7 +641,8 @@ func testHeadlessService() {
 
 	When("headless service has one IP", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1,
+				portNumber1, protcol1, mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
 		})
 		It("should succeed and write an A record response", func() {
@@ -492,7 +659,8 @@ func testHeadlessService() {
 
 	When("headless service has two IPs", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1, portNumber1, protcol1,
+				mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP, endpointIP2}))
 		})
 		It("should succeed and write two A records as response", func() {
@@ -510,8 +678,10 @@ func testHeadlessService() {
 
 	When("headless service is present in two clusters", func() {
 		JustBeforeEach(func() {
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", mcsv1a1.Headless))
-			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, "", mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1,
+				portNumber1, protcol1, mcsv1a1.Headless))
+			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, "", portName1,
+				portNumber1, protcol1, mcsv1a1.Headless))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
 			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2}))
 			mockCs.clusterStatusMap[clusterID2] = true
@@ -560,7 +730,16 @@ func testLocalService() {
 		mockEs.endpointStatusMap[clusterID2] = true
 		mockLs := NewMockLocalServices()
 		mockCs.localClusterID = clusterID
-		mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{IP: serviceIP}
+		mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
+			IP: serviceIP,
+			Ports: []mcsv1a1.ServicePort{
+				{
+					Name:        portName1,
+					Protocol:    protcol1,
+					AppProtocol: nil,
+					Port:        portNumber1,
+				},
+			}}
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),
@@ -570,7 +749,8 @@ func testLocalService() {
 			localServices:   mockLs,
 			ttl:             defaultTTL,
 		}
-		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
+		lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2, portNumber2,
+			protcol2, mcsv1a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -595,6 +775,17 @@ func testLocalService() {
 				},
 			})
 		})
+		It("should succeed and write local cluster's IP as SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("service is in local and remote clusters, and remote cluster is requested", func() {
@@ -605,6 +796,17 @@ func testLocalService() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.A(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
+				},
+			})
+		})
+		It("should succeed and write remote cluster's IP as SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -627,6 +829,112 @@ func testLocalService() {
 				},
 			})
 		})
+		It("should succeed and write remote cluster's IP as SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+	})
+}
+
+func testSRVMultiplePorts() {
+	var (
+		rec    *dnstest.Recorder
+		lh     *Lighthouse
+		mockCs *MockClusterStatus
+	)
+
+	BeforeEach(func() {
+		mockCs = NewMockClusterStatus()
+		mockCs.clusterStatusMap[clusterID] = true
+		mockEs := NewMockEndpointStatus()
+		mockEs.endpointStatusMap[clusterID] = true
+		mockLs := NewMockLocalServices()
+		mockCs.localClusterID = clusterID
+		mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
+			IP: serviceIP,
+			Ports: []mcsv1a1.ServicePort{
+				{
+					Name:        portName1,
+					Protocol:    protcol1,
+					AppProtocol: nil,
+					Port:        portNumber1,
+				},
+				{
+					Name:        portName2,
+					Protocol:    protcol2,
+					AppProtocol: nil,
+					Port:        portNumber2,
+				},
+			}}
+		lh = &Lighthouse{
+			Zones:           []string{"clusterset.local."},
+			serviceImports:  setupServiceImportMap(),
+			endpointSlices:  setupEndpointSliceMap(),
+			clusterStatus:   mockCs,
+			endpointsStatus: mockEs,
+			localServices:   mockLs,
+			ttl:             defaultTTL,
+		}
+
+		rec = dnstest.NewRecorder(&test.ResponseWriter{})
+	})
+
+	When("DNS query of type SRV", func() {
+		It("without portName should return all the ports", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("with  HTTP portname  should return TCP port", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 +
+						".svc.clusterset.local.    5    IN    SRV 0 50 8080 " + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("with  DNS portname  should return UDP port", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: portName2 + "." + string(protcol2) + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(portName2 + "." + string(protcol2) + "." + service1 + "." + namespace1 +
+						".svc.clusterset.local.    5    IN    SRV 0 50 53 " + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("with  cluster name should return all the ports from the cluster", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
+						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
+						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 }
 
@@ -645,7 +953,7 @@ func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 
 func setupServiceImportMap() *serviceimport.Map {
 	siMap := serviceimport.NewMap()
-	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP))
+	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protcol1, mcsv1a1.ClusterSetIP))
 
 	return siMap
 }
@@ -657,8 +965,8 @@ func setupEndpointSliceMap() *endpointslice.Map {
 	return esMap
 }
 
-func newServiceImport(namespace, name, clusterID, serviceIP string,
-	siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
+func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
+	portNumber int32, protocol v1.Protocol, siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -674,6 +982,13 @@ func newServiceImport(namespace, name, clusterID, serviceIP string,
 		Spec: mcsv1a1.ServiceImportSpec{
 			Type: siType,
 			IPs:  []string{serviceIP},
+			Ports: []mcsv1a1.ServicePort{
+				{
+					Name:     portName,
+					Protocol: protocol,
+					Port:     portNumber,
+				},
+			},
 		},
 		Status: mcsv1a1.ServiceImportStatus{
 			Clusters: []mcsv1a1.ClusterStatus{

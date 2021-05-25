@@ -21,15 +21,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"strings"
-
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
 const PluginName = "lighthouse"
@@ -68,62 +64,6 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 
 	return lh.getDNSRecord(zone, state, ctx, w, r, pReq)
-}
-
-func (lh *Lighthouse) createARecords(ips []string, state request.Request) []dns.RR {
-	records := make([]dns.RR, 0)
-
-	for _, ip := range ips {
-		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(), Ttl: lh.ttl}, A: net.ParseIP(ip).To4()}
-		log.Debugf("rr is %v", record)
-		records = append(records, record)
-	}
-
-	return records
-}
-
-func (lh *Lighthouse) createSRVRecords(record *serviceimport.DNSRecord, state request.Request, pReq recordRequest, zone string) []dns.RR {
-	var reqPorts []mcsv1a1.ServicePort
-
-	if pReq.port == "" {
-		reqPorts = record.Ports
-	} else {
-		log.Debugf("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
-		for _, port := range record.Ports {
-			name := strings.ToLower(port.Name)
-			protocol := strings.ToLower(string(port.Protocol))
-
-			log.Debugf("Checking port %q, protocol %q", name, protocol)
-			if name == pReq.port && protocol == pReq.protocol {
-				reqPorts = append(reqPorts, port)
-			}
-		}
-	}
-
-	if len(reqPorts) == 0 {
-		return nil
-	}
-
-	target := pReq.service + "." + pReq.namespace + "." + zone
-
-	if pReq.cluster != "" {
-		target = pReq.cluster + "." + target
-	}
-
-	records := make([]dns.RR, len(reqPorts))
-
-	for _, port := range reqPorts {
-		record := &dns.SRV{
-			Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.ttl},
-			Priority: 0,
-			Weight:   50,
-			Port:     uint16(port.Port),
-			Target:   target,
-		}
-		records = append(records, record)
-	}
-
-	return records
 }
 
 func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx context.Context, w dns.ResponseWriter,
@@ -198,19 +138,6 @@ func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
 	}
 
 	return dns.RcodeSuccess, nil
-}
-
-func (lh *Lighthouse) getClusterIPForSvc(pReq recordRequest) (*serviceimport.DNSRecord, bool) {
-	localClusterID := lh.clusterStatus.LocalClusterID()
-
-	record, found, isLocal := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
-		lh.endpointsStatus.IsHealthy)
-	getLocal := isLocal || (pReq.cluster != "" && pReq.cluster == localClusterID)
-	if found && getLocal {
-		record, found = lh.localServices.GetIP(pReq.service, pReq.namespace)
-	}
-
-	return record, found
 }
 
 // Name implements the Handler interface.
