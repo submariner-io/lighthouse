@@ -95,16 +95,17 @@ func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx conte
 		return lh.emptyResponse(state)
 	}
 
-	records := make([]dns.RR, 0)
+	var records []dns.RR
 
 	if state.QType() == dns.TypeA {
 		records = lh.createARecords(ips, state)
 	} else if state.QType() == dns.TypeSRV {
 		records = lh.createSRVRecords(record, state, pReq, zone)
-		if records == nil {
-			log.Debugf("Couldn't find a connected cluster or valid record for %q", state.QName())
-			return lh.emptyResponse(state)
-		}
+	}
+
+	if len(records) == 0 {
+		log.Debugf("Couldn't find a connected cluster or valid record for %q", state.QName())
+		return lh.emptyResponse(state)
 	}
 
 	log.Debugf("rr is %v", records)

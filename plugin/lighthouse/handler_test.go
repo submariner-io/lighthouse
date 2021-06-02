@@ -19,6 +19,7 @@ package lighthouse
 
 import (
 	"context"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -160,8 +161,8 @@ func testWithoutFallback() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -171,21 +172,22 @@ func testWithoutFallback() {
 		It("of Type A record should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
-				Qtype: dns.TypeA,
 				Rcode: dns.RcodeSuccess,
+				Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP),
 				},
 			})
 		})
+
 		It("of Type SRV should succeed and write an SRV record response", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeSRV,
+				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -212,8 +214,8 @@ func testWithoutFallback() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace2 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						service1 + "." + namespace2 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace2 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + service1 + "." + namespace2 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -469,22 +471,23 @@ func testClusterStatus() {
 	When("service is in two clusters and specific cluster is requested", func() {
 		It("should succeed and write that cluster's IP as A record response", func() {
 			executeTestCase(lh, rec, test.Case{
-				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeA,
+				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.A(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    A    " + serviceIP2),
 				},
 			})
 		})
+
 		It("should succeed and write that cluster's IP as SRV record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber2)) + " " + clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -512,8 +515,8 @@ func testClusterStatus() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -539,8 +542,8 @@ func testClusterStatus() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber2)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -781,8 +784,8 @@ func testLocalService() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -799,14 +802,15 @@ func testLocalService() {
 				},
 			})
 		})
+
 		It("should succeed and write remote cluster's IP as SRV record response", func() {
 			executeTestCase(lh, rec, test.Case{
 				Qname: clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber2)) + " " + clusterID2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -835,8 +839,8 @@ func testLocalService() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber2)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -893,10 +897,10 @@ func testSRVMultiplePorts() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
-					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber2)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -907,7 +911,8 @@ func testSRVMultiplePorts() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 +
-						".svc.clusterset.local.    5    IN    SRV 0 50 8080 " + service1 + "." + namespace1 + ".svc.clusterset.local."),
+						".svc.clusterset.local.    5    IN    SRV 0 50 " + strconv.Itoa(int(portNumber1)) + " " + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -918,7 +923,8 @@ func testSRVMultiplePorts() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV(portName2 + "." + string(protcol2) + "." + service1 + "." + namespace1 +
-						".svc.clusterset.local.    5    IN    SRV 0 50 53 " + service1 + "." + namespace1 + ".svc.clusterset.local."),
+						".svc.clusterset.local.    5    IN    SRV 0 50 " + strconv.Itoa(int(portNumber2)) + " " + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -928,10 +934,10 @@ func testSRVMultiplePorts() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 53 " +
-						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
-					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 8080 " +
-						clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						" " + strconv.Itoa(int(portNumber2)) + " " + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
+						" " + strconv.Itoa(int(portNumber1)) + " " + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
