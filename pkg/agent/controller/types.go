@@ -41,6 +41,7 @@ type Controller struct {
 	endpointSliceSyncer     *broker.Syncer
 	serviceSyncer           syncer.Interface
 	serviceImportController *ServiceImportController
+	ingressIPClient         dynamic.NamespaceableResourceInterface
 }
 
 type AgentSpecification struct {
