@@ -8,28 +8,8 @@ on:
       - release-*
 
 jobs:
-  e2e:
-    name: E2E
-    if: github.repository_owner == 'submariner-io'
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@v2
-
-      - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
-
-      - name: Post mortem
-        if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
-
-      - name: Clean up E2E deployment
-        run: make clean-clusters
-
   release:
     name: Release Images
-    needs: e2e
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -37,15 +17,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build new images
-        env:
-          IMAGES_ARGS: --nocache
-        run: make images
-
-      - name: Release the images
-        env:
-          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
-          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          IMAGES: lighthouse-agent lighthouse-coredns
-        # Pass RELEASE_ARGS on the call, since GITHUB_REF set in the `env` directive doesn't get properly expanded
-        run: make release RELEASE_ARGS="$IMAGES --tag '${GITHUB_REF##*/}'"
+      - name: Build and release new images
+        uses: submariner-io/shipyard/gh-actions/release-images@devel
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
