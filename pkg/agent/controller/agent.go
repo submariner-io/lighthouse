@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -154,6 +155,11 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		return nil, err
 	}
 
+	if agentController.globalnetEnabled {
+		gvr, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
+		agentController.ingressIPClient = syncerConf.LocalClient.Resource(*gvr)
+	}
+
 	return agentController, nil
 }
 
@@ -234,7 +240,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	klog.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
 
 	if op == syncer.Delete {
-		return a.newServiceImport(svcExport), false
+		return a.newServiceImport(svcExport.Name, svcExport.Namespace), false
 	}
 
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
@@ -279,31 +285,38 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
-	if a.globalnetEnabled && getGlobalIPFromService(svc) == "" {
-		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
+	var ips []string
+	var ports []mcsv1a1.ServicePort
+	if a.globalnetEnabled {
+		ip, reason, msg := a.getGlobalIP(svc)
+		if ip == "" {
+			klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
+			// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
+			a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
+				corev1.ConditionFalse, reason, msg)
 
-		// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-			corev1.ConditionFalse, "ServiceGlobalIPUnavailable", "Service doesn't have a global IP yet")
+			return nil, true
+		}
 
-		return nil, true
+		ips = []string{ip}
+		ports = a.getPortsForService(svc)
+	} else {
+		ips, ports, err = a.getIPsAndPortsForService(svc, svcType)
+		if err != nil {
+			// Failed to get ips for some reason, requeue
+			a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
+				corev1.ConditionUnknown, "ServiceRetrievalFailed", err.Error())
+
+			return nil, true
+		}
 	}
 
-	serviceImport := a.newServiceImport(svcExport)
+	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
 		Type:                  svcType,
 		SessionAffinityConfig: new(corev1.SessionAffinityConfig),
-	}
-
-	ips, ports, err := a.getIPsAndPortsForService(svc, svcType)
-	if err != nil {
-		// Failed to get ips for some reason, requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-			corev1.ConditionUnknown, "ServiceRetrievalFailed", err.Error())
-
-		return nil, true
 	}
 
 	serviceImport.Status = mcsv1a1.ServiceImportStatus{
@@ -386,7 +399,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
 
-	serviceImport := a.newServiceImport(svcExport)
+	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 
 	// Update the status and requeue
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
@@ -467,17 +480,17 @@ func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
 		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
-func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1.ServiceImport {
+func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: a.getObjectNameWithClusterID(svcExport.Name, svcExport.Namespace),
+			Name: a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{
-				lhconstants.OriginName:      svcExport.Name,
-				lhconstants.OriginNamespace: svcExport.Namespace,
+				lhconstants.OriginName:      name,
+				lhconstants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LabelSourceName:      svcExport.Name,
-				lhconstants.LabelSourceNamespace: svcExport.Namespace,
+				lhconstants.LabelSourceName:      name,
+				lhconstants.LabelSourceNamespace: namespace,
 				lhconstants.LabelSourceCluster:   a.clusterID,
 			},
 		},
@@ -486,23 +499,10 @@ func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1
 
 func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) (
 	[]string, []mcsv1a1.ServicePort, error) {
-	var mcsPorts = make([]mcsv1a1.ServicePort, 0, len(service.Spec.Ports))
-
-	for _, port := range service.Spec.Ports {
-		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
-			Name:     port.Name,
-			Protocol: port.Protocol,
-			Port:     port.Port,
-		})
-	}
+	mcsPorts := a.getPortsForService(service)
 
 	if siType == mcsv1a1.ClusterSetIP {
-		mcsIP := getGlobalIPFromService(service)
-		if mcsIP == "" {
-			mcsIP = service.Spec.ClusterIP
-		}
-
-		return []string{mcsIP}, mcsPorts, nil
+		return []string{service.Spec.ClusterIP}, mcsPorts, nil
 	}
 
 	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -516,6 +516,20 @@ func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mc
 	}
 
 	return getIPsFromEndpoint(endpoint), mcsPorts, nil
+}
+
+func (a *Controller) getPortsForService(service *corev1.Service) []mcsv1a1.ServicePort {
+	var mcsPorts = make([]mcsv1a1.ServicePort, 0, len(service.Spec.Ports))
+
+	for _, port := range service.Spec.Ports {
+		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
+			Name:     port.Name,
+			Protocol: port.Protocol,
+			Port:     port.Port,
+		})
+	}
+
+	return mcsPorts
 }
 
 func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
@@ -536,7 +550,8 @@ func getIPsFromEndpoint(endpoint *corev1.Endpoints) []string {
 	return ipList
 }
 
-func getGlobalIPFromService(service *corev1.Service) string {
+// TODO: Remove this for v2
+func (a *Controller) getGlobalIPFromService(service *corev1.Service) string {
 	if service != nil {
 		annotations := service.GetAnnotations()
 		if annotations != nil {
@@ -563,4 +578,40 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 	}
 
 	return obj, false
+}
+
+func (a *Controller) getGlobalIP(service *corev1.Service) (ip, reason, msg string) {
+	if a.globalnetEnabled {
+		ip = a.getGlobalIPFromService(service)
+		if ip != "" {
+			return ip, "", ""
+		}
+
+		ingressIP, found, err := a.getIngressIP(service.Name, service.Namespace)
+		if err != nil {
+			return "", "GlobalIngressIPRetrievalFailed", err.Error()
+		}
+
+		if !found {
+			return "", defaultReasonIPUnavailable, defaultMsgIPUnavailable
+		}
+
+		return ingressIP.allocatedIP, "", ""
+	}
+
+	return "", "GlobalnetDisabled", "Globalnet is not enabled"
+}
+
+func (a *Controller) getIngressIP(name, namespace string) (*IngressIP, bool, error) {
+	obj, err := a.ingressIPClient.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	if apierrors.IsNotFound(err) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return parseIngressIP(obj), true, nil
 }

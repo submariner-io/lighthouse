@@ -39,6 +39,7 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,6 +53,7 @@ import (
 const clusterID1 = "east"
 const clusterID2 = "west"
 const serviceNamespace = "service-ns"
+const globalIP = "192.168.10.34"
 
 var nodeName = "my-node"
 var hostName = "my-host"
@@ -336,7 +338,6 @@ var _ = Describe("Reconciliation", func() {
 })
 
 var _ = Describe("Globalnet enabled", func() {
-	globalIP := "192.168.10.34"
 	var t *testDriver
 
 	BeforeEach(func() {
@@ -357,7 +358,7 @@ var _ = Describe("Globalnet enabled", func() {
 
 	When("a local ServiceExport is created and the Service has a global IP", func() {
 		BeforeEach(func() {
-			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
+			t.createGlobalIngressIP()
 		})
 
 		It("should sync a ServiceImport with the global IP of the Service", func() {
@@ -370,6 +371,8 @@ var _ = Describe("Globalnet enabled", func() {
 			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 				corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
+			// t.createGlobalIngressIP()
+			// TODO: Delete SetAnnotations for globalnetv2
 			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
 			test.UpdateResource(t.dynamicServiceClient(), t.service)
 
@@ -508,6 +511,7 @@ type cluster struct {
 	localDynClient           dynamic.Interface
 	localServiceExportClient *fake.DynamicResourceClient
 	localServiceImportClient *fake.DynamicResourceClient
+	localGipClient           *fake.DynamicResourceClient
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
 	endpointsReactor         *fake.FailingReactor
@@ -521,6 +525,7 @@ type testDriver struct {
 	service                   *corev1.Service
 	serviceExport             *mcsv1a1.ServiceExport
 	endpoints                 *corev1.Endpoints
+	ingressIP                 *unstructured.Unstructured
 	stopCh                    chan struct{}
 	syncerConfig              *broker.SyncerConfig
 }
@@ -558,8 +563,8 @@ func newTestDiver() *testDriver {
 		},
 		syncerConfig: &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
-			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{},
-				&corev1.Service{}, &corev1.Endpoints{}, &discovery.EndpointSlice{}),
+			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{}, &corev1.Service{},
+				&corev1.Endpoints{}, &discovery.EndpointSlice{}, controller.GetGlobalIngressIPObj()),
 			BrokerClient: fake.NewDynamicClient(syncerScheme),
 			Scheme:       syncerScheme,
 		},
@@ -607,6 +612,7 @@ func newTestDiver() *testDriver {
 		},
 	}
 
+	t.ingressIP = t.newGlobalIngressIP()
 	t.brokerServiceImportClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&mcsv1a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
@@ -617,6 +623,24 @@ func newTestDiver() *testDriver {
 	t.cluster2.init(*t.syncerConfig)
 
 	return t
+}
+
+func (t *testDriver) newGlobalIngressIP() *unstructured.Unstructured {
+	ingressIP := controller.GetGlobalIngressIPObj()
+	ingressIP.SetName(t.service.Name)
+	ingressIP.SetNamespace(t.service.Namespace)
+	Expect(unstructured.SetNestedField(ingressIP.Object, controller.ClusterIPService, "spec", "target")).To(Succeed())
+	Expect(unstructured.SetNestedField(ingressIP.Object, t.service.Name, "spec", "serviceRef", "name")).To(Succeed())
+	Expect(unstructured.SetNestedField(ingressIP.Object, globalIP, "status", "allocatedIP")).To(Succeed())
+
+	conditions := map[string]interface{}{
+		"status":  "True",
+		"reason":  "Success",
+		"message": "Allocated global IP",
+	}
+	Expect(unstructured.SetNestedMap(ingressIP.Object, conditions, "status", "conditions")).To(Succeed())
+
+	return ingressIP
 }
 
 func (t *testDriver) justBeforeEach() {
@@ -639,6 +663,9 @@ func (c *cluster) init(syncerConfig broker.SyncerConfig) {
 
 	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(serviceNamespace)
+
+	c.localGipClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
+		controller.GetGlobalIngressIPObj())).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
 
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
@@ -896,6 +923,10 @@ func (t *testDriver) deleteService() {
 
 	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(context.TODO(), t.service.Name,
 		metav1.DeleteOptions{})).To(Succeed())
+}
+
+func (t *testDriver) createGlobalIngressIP() {
+	test.CreateResource(t.cluster1.localGipClient, t.ingressIP)
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
