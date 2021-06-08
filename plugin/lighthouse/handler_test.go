@@ -54,6 +54,8 @@ const (
 	portNumber1 = int32(8080)
 	protcol2    = v1.ProtocolUDP
 	portNumber2 = int32(53)
+	hostName1   = "hostName1"
+	hostName2   = "hostName2"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
@@ -630,7 +632,7 @@ func testHeadlessService() {
 		JustBeforeEach(func() {
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1,
 				portNumber1, protcol1, mcsv1a1.Headless))
-			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{}))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{}, []string{}, portNumber1, protcol1))
 		})
 		It("should succeed and return empty response (NODATA)", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -640,13 +642,21 @@ func testHeadlessService() {
 				Answer: []dns.RR{},
 			})
 		})
+		It("should succeed and return empty response (NODATA)", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname:  service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype:  dns.TypeSRV,
+				Rcode:  dns.RcodeSuccess,
+				Answer: []dns.RR{},
+			})
+		})
 	})
-
 	When("headless service has one IP", func() {
 		JustBeforeEach(func() {
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1,
 				portNumber1, protcol1, mcsv1a1.Headless))
-			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{hostName1}, []string{endpointIP},
+				portNumber1, protcol1))
 		})
 		It("should succeed and write an A record response", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -658,13 +668,38 @@ func testHeadlessService() {
 				},
 			})
 		})
+		It("should succeed and write an SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("should succeed and write an SRV record response for query with cluster name", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + clusterID + "." + service1 + "." + namespace1 +
+						".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("headless service has two IPs", func() {
 		JustBeforeEach(func() {
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID, "", portName1, portNumber1, protcol1,
 				mcsv1a1.Headless))
-			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP, endpointIP2}))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{hostName1, hostName2},
+				[]string{endpointIP, endpointIP2},
+				portNumber1, protcol1))
 		})
 		It("should succeed and write two A records as response", func() {
 			executeTestCase(lh, rec, test.Case{
@@ -677,6 +712,34 @@ func testHeadlessService() {
 				},
 			})
 		})
+		It("should succeed and write an SRV record response", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
+						strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("should succeed and write an SRV record response when port and protocol is queried", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
+					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("headless service is present in two clusters", func() {
@@ -685,8 +748,10 @@ func testHeadlessService() {
 				portNumber1, protcol1, mcsv1a1.Headless))
 			lh.serviceImports.Put(newServiceImport(namespace1, service1, clusterID2, "", portName1,
 				portNumber1, protcol1, mcsv1a1.Headless))
-			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
-			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2}))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{hostName1}, []string{endpointIP},
+				portNumber1, protcol1))
+			lh.endpointSlices.Put(newEndpointSlice(namespace1, service1, clusterID2, portName1, []string{hostName2}, []string{endpointIP2},
+				portNumber1, protcol1))
 			mockCs.clusterStatusMap[clusterID2] = true
 		})
 		When("no cluster is requested", func() {
@@ -966,7 +1031,7 @@ func setupServiceImportMap() *serviceimport.Map {
 
 func setupEndpointSliceMap() *endpointslice.Map {
 	esMap := endpointslice.NewMap()
-	esMap.Put(newEndpointSlice(namespace1, service1, clusterID, []string{endpointIP}))
+	esMap.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{hostName1}, []string{endpointIP}, portNumber1, protcol1))
 
 	return esMap
 }
@@ -1006,7 +1071,18 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	}
 }
 
-func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {
+func newEndpointSlice(namespace, name, clusterID, portName string, hostName, endpointIPs []string, portNumber int32,
+	protocol v1.Protocol) *discovery.EndpointSlice {
+	endpoints := make([]discovery.Endpoint, len(endpointIPs))
+
+	for i := range endpointIPs {
+		endpoint := discovery.Endpoint{
+			Addresses: []string{endpointIPs[i]},
+			Hostname:  &hostName[i],
+		}
+		endpoints[i] = endpoint
+	}
+
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1020,9 +1096,12 @@ func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
-		Endpoints: []discovery.Endpoint{
+		Endpoints:   endpoints,
+		Ports: []discovery.EndpointPort{
 			{
-				Addresses: endpointIPs,
+				Name:     &portName,
+				Protocol: &protocol,
+				Port:     &portNumber,
 			},
 		},
 	}

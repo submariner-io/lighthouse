@@ -68,24 +68,27 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 
 func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx context.Context, w dns.ResponseWriter,
 	r *dns.Msg, pReq recordRequest) (int, error) {
+	var isHeadless bool
 	var (
-		ips    []string
-		found  bool
-		record *serviceimport.DNSRecord
+		dnsRecords []serviceimport.DNSRecord
+		found      bool
+		record     *serviceimport.DNSRecord
 	)
 
 	record, found = lh.getClusterIPForSvc(pReq)
 	if !found {
-		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
+		dnsRecords, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
 		if !found {
 			log.Debugf("No record found for %q", state.QName())
 			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "record not found")
 		}
+
+		isHeadless = true
 	} else if record != nil && record.IP != "" {
-		ips = []string{record.IP}
+		dnsRecords = append(dnsRecords, *record)
 	}
 
-	if len(ips) == 0 {
+	if len(dnsRecords) == 0 {
 		log.Debugf("Couldn't find a connected cluster or valid IPs for %q", state.QName())
 		return lh.emptyResponse(state)
 	}
@@ -95,12 +98,12 @@ func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx conte
 		return lh.emptyResponse(state)
 	}
 
-	var records []dns.RR
+	records := make([]dns.RR, 0)
 
 	if state.QType() == dns.TypeA {
-		records = lh.createARecords(ips, state)
+		records = lh.createARecords(dnsRecords, state)
 	} else if state.QType() == dns.TypeSRV {
-		records = lh.createSRVRecords(record, state, pReq, zone)
+		records = lh.createSRVRecords(dnsRecords, state, pReq, zone, isHeadless)
 	}
 
 	if len(records) == 0 {

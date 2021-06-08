@@ -20,6 +20,8 @@ package endpointslice_test
 import (
 	"sort"
 
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
@@ -55,7 +57,7 @@ var _ = Describe("EndpointSlice Map", func() {
 		return clusterStatusMap[id]
 	}
 
-	getIPs := func(hostname, cluster, ns, name string) []string {
+	getIPs := func(hostname, cluster, ns, name string) []serviceimport.DNSRecord {
 		ips, found := endpointSliceMap.GetIPs(hostname, cluster, ns, name, checkCluster)
 		Expect(found).To(BeTrue())
 		return ips
@@ -64,7 +66,11 @@ var _ = Describe("EndpointSlice Map", func() {
 	expectIPs := func(hostname, cluster, ns, name string, expIPs []string) {
 		sort.Strings(expIPs)
 		for i := 0; i < 5; i++ {
-			ips := getIPs(hostname, cluster, namespace1, service1)
+			var ips []string
+			records := getIPs(hostname, cluster, namespace1, service1)
+			for _, record := range records {
+				ips = append(ips, record.IP)
+			}
 			sort.Strings(ips)
 			Expect(ips).To(Equal(expIPs))
 		}
