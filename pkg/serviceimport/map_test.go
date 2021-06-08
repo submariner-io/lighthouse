@@ -62,9 +62,12 @@ var _ = Describe("ServiceImport Map", func() {
 	}
 
 	getIPExpectFound := func(ns, name, cluster, localCluster string) string {
-		ip, found, _ := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
+		dnsRecord, found, _ := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeTrue())
-		return ip
+		if dnsRecord != nil {
+			return dnsRecord.IP
+		}
+		return ""
 	}
 
 	getIP := func(ns, name string) string {

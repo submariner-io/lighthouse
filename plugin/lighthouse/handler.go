@@ -21,11 +21,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
 const PluginName = "lighthouse"
@@ -46,7 +46,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotZone, "No matching zone found")
 	}
 
-	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA {
+	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA && state.QType() != dns.TypeSRV {
 		msg := fmt.Sprintf("Query of type %d is not supported", state.QType())
 		log.Debugf(msg)
 
@@ -63,26 +63,30 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
 	}
 
+	return lh.getDNSRecord(zone, state, ctx, w, r, pReq)
+}
+
+func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx context.Context, w dns.ResponseWriter,
+	r *dns.Msg, pReq recordRequest) (int, error) {
 	var (
-		ips   []string
-		found bool
-		ip    string
+		ips    []string
+		found  bool
+		record *serviceimport.DNSRecord
 	)
 
-	ip, found = lh.getClusterIPForSvc(pReq)
-
+	record, found = lh.getClusterIPForSvc(pReq)
 	if !found {
 		ips, found = lh.endpointSlices.GetIPs(pReq.hostname, pReq.cluster, pReq.namespace, pReq.service, lh.clusterStatus.IsConnected)
 		if !found {
-			log.Debugf("No record found for %q", qname)
+			log.Debugf("No record found for %q", state.QName())
 			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "record not found")
 		}
-	} else if ip != "" {
-		ips = []string{ip}
+	} else if record != nil && record.IP != "" {
+		ips = []string{record.IP}
 	}
 
 	if len(ips) == 0 {
-		log.Debugf("Couldn't find a connected cluster or valid IPs for %q", qname)
+		log.Debugf("Couldn't find a connected cluster or valid IPs for %q", state.QName())
 		return lh.emptyResponse(state)
 	}
 
@@ -91,13 +95,20 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.emptyResponse(state)
 	}
 
-	records := make([]dns.RR, 0)
+	var records []dns.RR
 
-	for _, ip := range ips {
-		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(), Ttl: lh.ttl}, A: net.ParseIP(ip).To4()}
-		log.Debugf("rr is %v", record)
-		records = append(records, record)
+	if state.QType() == dns.TypeA {
+		records = lh.createARecords(ips, state)
+	} else if state.QType() == dns.TypeSRV {
+		records = lh.createSRVRecords(record, state, pReq, zone)
 	}
+
+	if len(records) == 0 {
+		log.Debugf("Couldn't find a connected cluster or valid record for %q", state.QName())
+		return lh.emptyResponse(state)
+	}
+
+	log.Debugf("rr is %v", records)
 
 	a := new(dns.Msg)
 	a.SetReply(r)
@@ -128,20 +139,6 @@ func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
 	}
 
 	return dns.RcodeSuccess, nil
-}
-
-func (lh *Lighthouse) getClusterIPForSvc(pReq recordRequest) (ip string, found bool) {
-	localClusterID := lh.clusterStatus.LocalClusterID()
-
-	ip, found, isLocal := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
-		lh.endpointsStatus.IsHealthy)
-
-	getLocal := isLocal || (pReq.cluster != "" && pReq.cluster == localClusterID)
-	if found && getLocal {
-		ip, found = lh.localServices.GetIP(pReq.service, pReq.namespace)
-	}
-
-	return ip, found
 }
 
 // Name implements the Handler interface.

@@ -25,15 +25,20 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
+type DNSRecord struct {
+	IP    string
+	Ports []mcsv1a1.ServicePort
+}
+
 type clusterInfo struct {
-	ip     string
+	record *DNSRecord
 	name   string
 	weight uint64
 }
 
 type serviceInfo struct {
 	key           string
-	clusterIPs    map[string]string
+	records       map[string]*DNSRecord
 	clustersQueue []clusterInfo
 	rrCount       uint64
 	isHeadless    bool
@@ -41,8 +46,8 @@ type serviceInfo struct {
 
 func (si *serviceInfo) buildClusterInfoQueue() {
 	si.clustersQueue = make([]clusterInfo, 0)
-	for cluster, ip := range si.clusterIPs {
-		c := clusterInfo{name: cluster, ip: ip, weight: 0}
+	for cluster, record := range si.records {
+		c := clusterInfo{name: cluster, record: record, weight: 0}
 		si.clustersQueue = append(si.clustersQueue, c)
 	}
 }
@@ -53,7 +58,7 @@ type Map struct {
 }
 
 func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace string, checkCluster func(string) bool,
-	checkEndpoint func(string, string, string) bool) string {
+	checkEndpoint func(string, string, string) bool) *DNSRecord {
 	queueLength := len(queue)
 	for i := 0; i < queueLength; i++ {
 		c := atomic.LoadUint64(counter)
@@ -63,16 +68,16 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace str
 		atomic.AddUint64(counter, 1)
 
 		if checkCluster(info.name) && checkEndpoint(name, namespace, info.name) {
-			return info.ip
+			return info.record
 		}
 	}
 
-	return ""
+	return nil
 }
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
-	checkEndpoint func(string, string, string) bool) (ip string, found, isLocal bool) {
-	clusterIPs, queue, counter, isHeadless := func() (map[string]string, []clusterInfo, *uint64, bool) {
+	checkEndpoint func(string, string, string) bool) (record *DNSRecord, found, isLocal bool) {
+	dnsRecords, queue, counter, isHeadless := func() (map[string]*DNSRecord, []clusterInfo, *uint64, bool) {
 		m.RLock()
 		defer m.RUnlock()
 
@@ -81,36 +86,37 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 			return nil, nil, nil, false
 		}
 
-		return si.clusterIPs, si.clustersQueue, &si.rrCount, si.isHeadless
+		return si.records, si.clustersQueue, &si.rrCount, si.isHeadless
 	}()
 
-	if clusterIPs == nil || isHeadless {
-		return "", false, false
+	if dnsRecords == nil || isHeadless {
+		return nil, false, false
 	}
 
 	// If a clusterID is specified, we supply it even if the service is not there
 	if cluster != "" {
-		ip, found = clusterIPs[cluster]
-		return ip, found, cluster == localCluster
+		record, found = dnsRecords[cluster]
+		return record, found, cluster == localCluster
 	}
 
 	// If we are aware of the local cluster
 	// And we found some accessible IP, we shall return it
 	if localCluster != "" {
-		ip, found := clusterIPs[localCluster]
+		record, found := dnsRecords[localCluster]
 
-		if found && ip != "" && checkEndpoint(name, namespace, localCluster) {
-			return ip, found, true
+		if found && record != nil && checkEndpoint(name, namespace, localCluster) {
+			return record, found, true
 		}
 	}
 
 	// Fall back to Round-Robin if service is not presented in the local cluster
-	ip = m.selectIP(queue, counter, name, namespace, checkCluster, checkEndpoint)
-	if ip != "" {
-		return ip, true, false
+	record = m.selectIP(queue, counter, name, namespace, checkCluster, checkEndpoint)
+
+	if record != nil {
+		return record, true, false
 	}
 
-	return "", true, false
+	return nil, true, false
 }
 
 func NewMap() *Map {
@@ -132,14 +138,18 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		if !ok {
 			remoteService = &serviceInfo{
 				key:        key,
-				clusterIPs: make(map[string]string),
+				records:    make(map[string]*DNSRecord),
 				rrCount:    0,
 				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
 			}
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			remoteService.clusterIPs[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = serviceImport.Spec.IPs[0]
+			record := &DNSRecord{
+				IP:    serviceImport.Spec.IPs[0],
+				Ports: serviceImport.Spec.Ports,
+			}
+			remoteService.records[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = record
 		}
 
 		if !remoteService.isHeadless {
@@ -164,10 +174,10 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		for _, info := range serviceImport.Status.Clusters {
-			delete(remoteService.clusterIPs, info.Cluster)
+			delete(remoteService.records, info.Cluster)
 		}
 
-		if len(remoteService.clusterIPs) == 0 {
+		if len(remoteService.records) == 0 {
 			delete(m.svcMap, key)
 		} else if !remoteService.isHeadless {
 			remoteService.buildClusterInfoQueue()

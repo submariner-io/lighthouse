@@ -60,7 +60,7 @@ type ClusterStatus interface {
 }
 
 type LocalServices interface {
-	GetIP(name, namespace string) (string, bool)
+	GetIP(name, namespace string) (*serviceimport.DNSRecord, bool)
 }
 
 type EndpointsStatus interface {

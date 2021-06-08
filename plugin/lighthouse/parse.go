@@ -26,6 +26,12 @@ import (
 // NOTE: This is taken from github.com/coredns/plugin/kubernetes/parse.go with changes to support use cases in
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-multicluster/1645-multi-cluster-services-api#dns
 type recordRequest struct {
+	// The named port from the kubernetes DNS spec, this is the service part (think _https) from a well formed
+	// SRV record.
+	port string
+	// The protocol is usually _udp or _tcp (if set), and comes from the protocol part of a well formed
+	// SRV record.
+	protocol string
 	// The hostname referring to individual pod backing a headless multiclusterservice.
 	hostname string
 	// The cluster referring to cluster exporting a multicluster service
@@ -53,7 +59,6 @@ func parseRequest(state request.Request) (r recordRequest, err error) {
 	}
 
 	segs := dns.SplitDomainName(base)
-
 	// for r.name, r.namespace and r.cluster, we need to know if they have been set or not...
 	// For cluster: if empty we should skip the cluster check in k.get(). Hence we cannot set if to "*".
 	// For name: myns.svc.cluster.local != *.myns.svc.cluster.local
@@ -63,8 +68,8 @@ func parseRequest(state request.Request) (r recordRequest, err error) {
 	// pod|svc.namespace.service and then either
 	// * cluster
 	// * hostname.cluster
-
 	last := len(segs) - 1
+
 	if last < 0 {
 		return r, nil
 	}
@@ -90,20 +95,7 @@ func parseRequest(state request.Request) (r recordRequest, err error) {
 		return r, nil
 	}
 
-	// Because of ambiguity we check the labels left: 1: a cluster. 2: hostname and cluster.
-	// Anything else is a query that is too long to answer and can safely be delegated to return an nxdomain.
-	switch last {
-	case 0: // cluster only
-		r.cluster = segs[last]
-	case 1: // cluster and hostname
-		r.cluster = segs[last]
-		r.hostname = segs[last-1]
-
-	default: // too long
-		return r, errInvalidRequest
-	}
-
-	return r, nil
+	return parseSegments(segs, last, r, state)
 }
 
 // String return a string representation of r, it just returns all fields concatenated with dots.
@@ -116,4 +108,37 @@ func (r recordRequest) String() string {
 	s += "." + r.podOrSvc
 
 	return s
+}
+
+func parseSegments(segs []string, count int, r recordRequest, state request.Request) (recordRequest, error) {
+	// Because of ambiguity we check the labels left: 1: a cluster. 2: hostname and cluster.
+	// Anything else is a query that is too long to answer and can safely be delegated to return an nxdomain.
+	if state.QType() == dns.TypeA {
+		switch count {
+		case 0: // cluster only
+			r.cluster = segs[count]
+		case 1: // cluster and hostname
+			r.cluster = segs[count]
+			r.hostname = segs[count-1]
+		default: // too long
+			return r, errInvalidRequest
+		}
+	} else if state.QType() == dns.TypeSRV {
+		switch count {
+		case 0: // cluster only
+			r.cluster = segs[count]
+		case 1: // endpoint only
+			r.protocol = segs[count]
+			r.port = segs[count-1]
+
+		case 2: // service and port
+			r.cluster = segs[count]
+			r.protocol = segs[count-1]
+			r.port = segs[count-2]
+		default: // too long
+			return r, errInvalidRequest
+		}
+	}
+
+	return r, nil
 }
