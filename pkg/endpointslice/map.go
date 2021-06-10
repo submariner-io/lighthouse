@@ -43,7 +43,7 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
+func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
 	key := keyFunc(name, namespace)
 
 	clusterInfos := func() map[string]*clusterInfo {

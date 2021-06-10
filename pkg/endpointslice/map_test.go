@@ -57,8 +57,8 @@ var _ = Describe("EndpointSlice Map", func() {
 		return clusterStatusMap[id]
 	}
 
-	getIPs := func(hostname, cluster, ns, name string) []serviceimport.DNSRecord {
-		ips, found := endpointSliceMap.GetIPs(hostname, cluster, ns, name, checkCluster)
+	getRecords := func(hostname, cluster, ns, name string) []serviceimport.DNSRecord {
+		ips, found := endpointSliceMap.GetDNSRecords(hostname, cluster, ns, name, checkCluster)
 		Expect(found).To(BeTrue())
 		return ips
 	}
@@ -67,7 +67,7 @@ var _ = Describe("EndpointSlice Map", func() {
 		sort.Strings(expIPs)
 		for i := 0; i < 5; i++ {
 			var ips []string
-			records := getIPs(hostname, cluster, namespace1, service1)
+			records := getRecords(hostname, cluster, namespace1, service1)
 			for _, record := range records {
 				ips = append(ips, record.IP)
 			}

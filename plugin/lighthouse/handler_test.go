@@ -740,6 +740,21 @@ func testHeadlessService() {
 				},
 			})
 		})
+		It("should succeed and write an SRV record response when port and protocol is queried with underscore prefix", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV("_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
+					test.SRV("_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
 	})
 
 	When("headless service is present in two clusters", func() {
@@ -1003,6 +1018,18 @@ func testSRVMultiplePorts() {
 						" " + strconv.Itoa(int(portNumber2)) + " " + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 					test.SRV(clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV 0 50 " +
 						" " + strconv.Itoa(int(portNumber1)) + " " + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+				},
+			})
+		})
+		It("with  HTTP portname  should return TCP port with underscore prefix", func() {
+			executeTestCase(lh, rec, test.Case{
+				Qname: "_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local.",
+				Qtype: dns.TypeSRV,
+				Rcode: dns.RcodeSuccess,
+				Answer: []dns.RR{
+					test.SRV("_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 +
+						".svc.clusterset.local.    5    IN    SRV 0 50 " + strconv.Itoa(int(portNumber1)) + " " + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
