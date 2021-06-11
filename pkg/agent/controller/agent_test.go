@@ -356,31 +356,82 @@ var _ = Describe("Globalnet enabled", func() {
 		t.afterEach()
 	})
 
-	When("a local ServiceExport is created and the Service has a global IP", func() {
-		BeforeEach(func() {
-			t.createGlobalIngressIP()
+	When("a ClusterIP Service is exported", func() {
+		Context("and it has a global IP", func() {
+			Context("via a GlobalIngressIP", func() {
+				BeforeEach(func() {
+					t.createGlobalIngressIP()
+				})
+
+				It("should sync a ServiceImport with the global IP", func() {
+					t.awaitServiceExported(globalIP, 0)
+				})
+			})
+
+			// TODO: Remove once we switch to globalnet V2
+			Context("via an annotation", func() {
+				BeforeEach(func() {
+					t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
+				})
+
+				It("should sync a ServiceImport with the global IP", func() {
+					t.awaitServiceExported(globalIP, 0)
+				})
+			})
 		})
 
-		It("should sync a ServiceImport with the global IP of the Service", func() {
-			t.awaitServiceExported(globalIP, 0)
+		Context("and it does not initially have a global IP", func() {
+			Context("due to missing GlobalIngressIP", func() {
+				It("should update the ServiceExport status appropriately and eventually sync a ServiceImport", func() {
+					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+
+					t.createGlobalIngressIP()
+					t.awaitServiceExported(globalIP, 1)
+				})
+			})
+
+			Context("due to no AllocatedIP in the GlobalIngressIP", func() {
+				BeforeEach(func() {
+					setIngressAllocatedIP(t.ingressIP, "")
+					setIngressIPConditions(t.ingressIP)
+					t.createGlobalIngressIP()
+				})
+
+				It("should update the ServiceExport status appropriately and eventually sync a ServiceImport", func() {
+					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+
+					setIngressAllocatedIP(t.ingressIP, globalIP)
+					test.UpdateResource(t.cluster1.localIngressIPClient, t.ingressIP)
+					t.awaitServiceExported(globalIP, 1)
+				})
+			})
+		})
+
+		Context("and the GlobalIngressIP has a status condition and no AllocatedIP", func() {
+			condition := metav1.Condition{
+				Type:    "Allocated",
+				Status:  metav1.ConditionFalse,
+				Reason:  "IPPoolAllocationFailed",
+				Message: "IPPool is exhausted",
+			}
+
+			BeforeEach(func() {
+				setIngressAllocatedIP(t.ingressIP, "")
+				setIngressIPConditions(t.ingressIP, condition)
+				t.createGlobalIngressIP()
+			})
+
+			It("should update the ServiceExport status with the condition details", func() {
+				c := newServiceExportCondition(mcsv1a1.ServiceExportValid, corev1.ConditionFalse, condition.Reason)
+				c.Message = &condition.Message
+				t.awaitServiceExportStatus(0, c)
+			})
 		})
 	})
 
-	When("a local ServiceExport is created and the Service does not initially have a global IP", func() {
-		It("should eventually sync a ServiceImport with the global IP of the Service", func() {
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
-
-			// t.createGlobalIngressIP()
-			// TODO: Delete SetAnnotations for globalnetv2
-			t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
-			test.UpdateResource(t.dynamicServiceClient(), t.service)
-
-			t.awaitServiceExported(globalIP, 1)
-		})
-	})
-
-	When("a ServiceExport is created for a headless Service", func() {
+	When("a headless Service is exported", func() {
 		BeforeEach(func() {
 			t.service.Spec.ClusterIP = corev1.ClusterIPNone
 		})
@@ -511,7 +562,7 @@ type cluster struct {
 	localDynClient           dynamic.Interface
 	localServiceExportClient *fake.DynamicResourceClient
 	localServiceImportClient *fake.DynamicResourceClient
-	localGipClient           *fake.DynamicResourceClient
+	localIngressIPClient     *fake.DynamicResourceClient
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
 	endpointsReactor         *fake.FailingReactor
@@ -631,14 +682,14 @@ func (t *testDriver) newGlobalIngressIP() *unstructured.Unstructured {
 	ingressIP.SetNamespace(t.service.Namespace)
 	Expect(unstructured.SetNestedField(ingressIP.Object, controller.ClusterIPService, "spec", "target")).To(Succeed())
 	Expect(unstructured.SetNestedField(ingressIP.Object, t.service.Name, "spec", "serviceRef", "name")).To(Succeed())
-	Expect(unstructured.SetNestedField(ingressIP.Object, globalIP, "status", "allocatedIP")).To(Succeed())
 
-	conditions := map[string]interface{}{
-		"status":  "True",
-		"reason":  "Success",
-		"message": "Allocated global IP",
-	}
-	Expect(unstructured.SetNestedMap(ingressIP.Object, conditions, "status", "conditions")).To(Succeed())
+	setIngressAllocatedIP(ingressIP, globalIP)
+	setIngressIPConditions(ingressIP, metav1.Condition{
+		Type:    "Allocated",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Success",
+		Message: "Allocated global IP",
+	})
 
 	return ingressIP
 }
@@ -664,7 +715,7 @@ func (c *cluster) init(syncerConfig broker.SyncerConfig) {
 	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(serviceNamespace)
 
-	c.localGipClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
+	c.localIngressIPClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		controller.GetGlobalIngressIPObj())).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
 
 	fakeCS := fakeKubeClient.NewSimpleClientset()
@@ -926,7 +977,7 @@ func (t *testDriver) deleteService() {
 }
 
 func (t *testDriver) createGlobalIngressIP() {
-	test.CreateResource(t.cluster1.localGipClient, t.ingressIP)
+	test.CreateResource(t.cluster1.localIngressIPClient, t.ingressIP)
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
@@ -973,6 +1024,10 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 			Expect(actual.Reason).To(Not(BeNil()))
 			Expect(*actual.Reason).To(Equal(*exp.Reason))
 			Expect(actual.Message).To(Not(BeNil()))
+
+			if exp.Message != nil {
+				Expect(*actual.Message).To(Equal(*exp.Message))
+			}
 		}
 
 		return true, nil
@@ -1082,4 +1137,20 @@ func newServiceExportCondition(cType mcsv1a1.ServiceExportConditionType,
 		Status: status,
 		Reason: &reason,
 	}
+}
+
+func setIngressIPConditions(ingressIP *unstructured.Unstructured, conditions ...metav1.Condition) {
+	var err error
+
+	condObjs := make([]interface{}, len(conditions))
+	for i := range conditions {
+		condObjs[i], err = runtime.DefaultUnstructuredConverter.ToUnstructured(&conditions[i])
+		Expect(err).To(Succeed())
+	}
+
+	Expect(unstructured.SetNestedSlice(ingressIP.Object, condObjs, "status", "conditions")).To(Succeed())
+}
+
+func setIngressAllocatedIP(ingressIP *unstructured.Unstructured, ip string) {
+	Expect(unstructured.SetNestedField(ingressIP.Object, ip, "status", "allocatedIP")).To(Succeed())
 }
