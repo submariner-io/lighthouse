@@ -128,17 +128,26 @@ func parseSegments(segs []string, count int, r recordRequest, state request.Requ
 		case 0: // cluster only
 			r.cluster = segs[count]
 		case 1: // endpoint only
-			r.protocol = segs[count]
-			r.port = segs[count-1]
+			r.protocol = stripUnderscore(segs[count])
+			r.port = stripUnderscore(segs[count-1])
 
 		case 2: // service and port
 			r.cluster = segs[count]
-			r.protocol = segs[count-1]
-			r.port = segs[count-2]
+			r.protocol = stripUnderscore(segs[count-1])
+			r.port = stripUnderscore(segs[count-2])
 		default: // too long
 			return r, errInvalidRequest
 		}
 	}
 
 	return r, nil
+}
+
+// stripUnderscore removes a prefixed underscore from s.
+func stripUnderscore(s string) string {
+	if s[0] != '_' {
+		return s
+	}
+
+	return s[1:]
 }

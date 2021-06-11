@@ -22,8 +22,10 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/klog"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 type endpointInfo struct {
@@ -32,8 +34,8 @@ type endpointInfo struct {
 }
 
 type clusterInfo struct {
-	hostIPs map[string][]string
-	ipList  []string
+	hostRecords map[string][]serviceimport.DNSRecord
+	recordList  []serviceimport.DNSRecord
 }
 
 type Map struct {
@@ -41,7 +43,7 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]string, bool) {
+func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
 	key := keyFunc(name, namespace)
 
 	clusterInfos := func() map[string]*clusterInfo {
@@ -62,24 +64,24 @@ func (m *Map) GetIPs(hostname, cluster, namespace, name string, checkCluster fun
 
 	switch {
 	case cluster == "":
-		ips := make([]string, 0)
+		records := make([]serviceimport.DNSRecord, 0)
 
 		for clusterID, info := range clusterInfos {
 			if checkCluster == nil || checkCluster(clusterID) {
-				ips = append(ips, info.ipList...)
+				records = append(records, info.recordList...)
 			}
 		}
 
-		return ips, true
+		return records, true
 	case clusterInfos[cluster] == nil:
 		return nil, false
 	case hostname == "":
-		return clusterInfos[cluster].ipList, true
-	case clusterInfos[cluster].hostIPs == nil:
+		return clusterInfos[cluster].recordList, true
+	case clusterInfos[cluster].hostRecords == nil:
 		return nil, false
 	default:
-		ips, ok := clusterInfos[cluster].hostIPs[hostname]
-		return ips, ok
+		records, ok := clusterInfos[cluster].hostRecords[hostname]
+		return records, ok
 	}
 }
 
@@ -115,16 +117,43 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	}
 
 	epInfo.clusterInfo[cluster] = &clusterInfo{
-		ipList:  make([]string, 0),
-		hostIPs: make(map[string][]string),
+		recordList:  make([]serviceimport.DNSRecord, 0),
+		hostRecords: make(map[string][]serviceimport.DNSRecord),
+	}
+
+	mcsPorts := make([]mcsv1a1.ServicePort, len(es.Ports))
+
+	for i, port := range es.Ports {
+		mcsPort := mcsv1a1.ServicePort{
+			Name:        *port.Name,
+			Protocol:    *port.Protocol,
+			AppProtocol: port.AppProtocol,
+			Port:        *port.Port,
+		}
+		mcsPorts[i] = mcsPort
 	}
 
 	for _, endpoint := range es.Endpoints {
-		if endpoint.Hostname != nil {
-			epInfo.clusterInfo[cluster].hostIPs[*endpoint.Hostname] = endpoint.Addresses
+		var records []serviceimport.DNSRecord
+
+		for _, address := range endpoint.Addresses {
+			record := serviceimport.DNSRecord{
+				IP:    address,
+				Ports: mcsPorts,
+			}
+
+			if endpoint.Hostname != nil {
+				record.HostName = *endpoint.Hostname
+			}
+
+			records = append(records, record)
 		}
 
-		epInfo.clusterInfo[cluster].ipList = append(epInfo.clusterInfo[cluster].ipList, endpoint.Addresses...)
+		if endpoint.Hostname != nil {
+			epInfo.clusterInfo[cluster].hostRecords[*endpoint.Hostname] = records
+		}
+
+		epInfo.clusterInfo[cluster].recordList = append(epInfo.clusterInfo[cluster].recordList, records...)
 	}
 
 	klog.V(log.DEBUG).Infof("Adding clusterInfo %#v for EndpointSlice %q in %q", epInfo.clusterInfo[cluster], es.Name, cluster)

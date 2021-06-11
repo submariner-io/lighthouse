@@ -138,7 +138,7 @@ func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {
 	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
 		info := endpointInfo.clusterInfo[clusterID]
 		if info != nil {
-			return len(info.ipList) > 0
+			return len(info.recordList) > 0
 		}
 	}
 

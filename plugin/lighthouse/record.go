@@ -27,57 +27,64 @@ import (
 	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (lh *Lighthouse) createARecords(ips []string, state request.Request) []dns.RR {
+func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state request.Request) []dns.RR {
 	records := make([]dns.RR, 0)
 
-	for _, ip := range ips {
-		record := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(), Ttl: lh.ttl}, A: net.ParseIP(ip).To4()}
-		log.Debugf("rr is %v", record)
-		records = append(records, record)
+	for _, record := range dnsrecords {
+		dnsRecord := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(),
+			Ttl: lh.ttl}, A: net.ParseIP(record.IP).To4()}
+		records = append(records, dnsRecord)
 	}
 
 	return records
 }
 
-func (lh *Lighthouse) createSRVRecords(record *serviceimport.DNSRecord, state request.Request, pReq recordRequest, zone string) []dns.RR {
-	var reqPorts []v1alpha1.ServicePort
+func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, state request.Request, pReq recordRequest, zone string,
+	isHeadless bool) []dns.RR {
+	var records []dns.RR
 
-	if pReq.port == "" {
-		reqPorts = record.Ports
-	} else {
-		log.Debugf("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
-		for _, port := range record.Ports {
-			name := strings.ToLower(port.Name)
-			protocol := strings.ToLower(string(port.Protocol))
+	for _, dnsRecord := range dnsrecords {
+		var reqPorts []v1alpha1.ServicePort
 
-			log.Debugf("Checking port %q, protocol %q", name, protocol)
-			if name == pReq.port && protocol == pReq.protocol {
-				reqPorts = append(reqPorts, port)
+		if pReq.port == "" {
+			reqPorts = dnsRecord.Ports
+		} else {
+			log.Debugf("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
+			for _, port := range dnsRecord.Ports {
+				name := strings.ToLower(port.Name)
+				protocol := strings.ToLower(string(port.Protocol))
+
+				log.Debugf("Checking port %q, protocol %q", name, protocol)
+				if name == pReq.port && protocol == pReq.protocol {
+					reqPorts = append(reqPorts, port)
+				}
 			}
 		}
-	}
 
-	if len(reqPorts) == 0 {
-		return nil
-	}
-
-	target := pReq.service + "." + pReq.namespace + ".svc." + zone
-
-	if pReq.cluster != "" {
-		target = pReq.cluster + "." + target
-	}
-
-	records := make([]dns.RR, len(reqPorts))
-
-	for index, port := range reqPorts {
-		record := &dns.SRV{
-			Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.ttl},
-			Priority: 0,
-			Weight:   50,
-			Port:     uint16(port.Port),
-			Target:   target,
+		if len(reqPorts) == 0 {
+			return nil
 		}
-		records[index] = record
+
+		target := pReq.service + "." + pReq.namespace + ".svc." + zone
+
+		if pReq.cluster != "" {
+			target = pReq.cluster + "." + target
+		}
+
+		if isHeadless {
+			target = dnsRecord.HostName + "." + target
+		}
+
+		for _, port := range reqPorts {
+			record := &dns.SRV{
+				Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.ttl},
+				Priority: 0,
+				Weight:   50,
+				Port:     uint16(port.Port),
+				Target:   target,
+			}
+			records = append(records, record)
+		}
 	}
 
 	return records
