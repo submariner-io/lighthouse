@@ -596,7 +596,7 @@ func (a *Controller) getGlobalIP(service *corev1.Service) (ip, reason, msg strin
 			return "", defaultReasonIPUnavailable, defaultMsgIPUnavailable
 		}
 
-		return ingressIP.allocatedIP, "", ""
+		return ingressIP.allocatedIP, ingressIP.unallocatedReason, ingressIP.unallocatedMsg
 	}
 
 	return "", "GlobalnetDisabled", "Globalnet is not enabled"

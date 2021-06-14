@@ -68,8 +68,8 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 	}
 
 	gip.allocatedIP, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
-	conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
 	if gip.allocatedIP == "" {
+		conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
 		if len(conditions) > 0 {
 			latestCondition := conditions[len(conditions)-1].(map[string]interface{})
 			gip.unallocatedMsg = latestCondition["message"].(string)
