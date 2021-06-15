@@ -45,10 +45,9 @@ import (
 )
 
 const (
-	submarinerIPAMGlobalIP = "submariner.io/globalIp"
-	serviceUnavailable     = "ServiceUnavailable"
-	invalidServiceType     = "UnsupportedServiceType"
-	clusterIP              = "cluster-ip"
+	serviceUnavailable = "ServiceUnavailable"
+	invalidServiceType = "UnsupportedServiceType"
+	clusterIP          = "cluster-ip"
 )
 
 type AgentConfig struct {
@@ -550,18 +549,6 @@ func getIPsFromEndpoint(endpoint *corev1.Endpoints) []string {
 	return ipList
 }
 
-// TODO: Remove this for v2
-func (a *Controller) getGlobalIPFromService(service *corev1.Service) string {
-	if service != nil {
-		annotations := service.GetAnnotations()
-		if annotations != nil {
-			return annotations[submarinerIPAMGlobalIP]
-		}
-	}
-
-	return ""
-}
-
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
@@ -582,11 +569,6 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 
 func (a *Controller) getGlobalIP(service *corev1.Service) (ip, reason, msg string) {
 	if a.globalnetEnabled {
-		ip = a.getGlobalIPFromService(service)
-		if ip != "" {
-			return ip, "", ""
-		}
-
 		ingressIP, found, err := a.getIngressIP(service.Name, service.Namespace)
 		if err != nil {
 			return "", "GlobalIngressIPRetrievalFailed", err.Error()
