@@ -43,12 +43,12 @@ import (
 )
 
 const (
-	submarinerIPAMGlobalIP = "submariner.io/globalIp"
-	labelSourceName        = "lighthouse.submariner.io/sourceName"
-	labelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
-	anyCount               = -1
-	statefulServiceName    = "nginx-ss"
-	statefulSetName        = "web"
+	labelSourceName      = "lighthouse.submariner.io/sourceName"
+	labelSourceNamespace = "lighthouse.submariner.io/sourceNamespace"
+	anyCount             = -1
+	statefulServiceName  = "nginx-ss"
+	statefulSetName      = "web"
+	not                  = " not"
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -162,15 +162,14 @@ func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace s
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (f *Framework) AwaitServiceImportIP(targetCluster framework.ClusterIndex, svc *v1.Service) *mcsv1a1.ServiceImport {
-	var serviceIP string
+func (f *Framework) AwaitServiceImportIP(srcCluster, targetCluster framework.ClusterIndex, svc *v1.Service) *mcsv1a1.ServiceImport {
+	serviceIP := f.GetServiceIP(srcCluster, svc, false)
 
-	if framework.TestContext.GlobalnetEnabled {
-		serviceIP = svc.Annotations[submarinerIPAMGlobalIP]
-	} else {
-		serviceIP = svc.Spec.ClusterIP
-	}
+	return f.AwaitServiceImportWithIP(targetCluster, svc, serviceIP)
+}
 
+func (f *Framework) AwaitServiceImportWithIP(targetCluster framework.ClusterIndex, svc *v1.Service,
+	serviceIP string) *mcsv1a1.ServiceImport {
 	var retServiceImport *mcsv1a1.ServiceImport
 
 	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
@@ -234,26 +233,6 @@ func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex
 
 		return true, "", nil
 	})
-}
-
-func (f *Framework) AwaitGlobalnetIP(cluster framework.ClusterIndex, name, namespace string) string {
-	if framework.TestContext.GlobalnetEnabled {
-		svc := framework.KubeClients[cluster].CoreV1().Services(namespace)
-		svcObj := framework.AwaitUntil("retrieve service", func() (interface{}, error) {
-			return svc.Get(context.TODO(), name, metav1.GetOptions{})
-		}, func(result interface{}) (bool, string, error) {
-			svc := result.(*v1.Service)
-			globalIP := svc.Annotations[submarinerIPAMGlobalIP]
-			if globalIP == "" {
-				return false, "GlobalIP not available", nil
-			}
-			return true, "", nil
-		}).(*v1.Service)
-
-		return svcObj.Annotations[submarinerIPAMGlobalIP]
-	}
-
-	return ""
 }
 
 func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster framework.ClusterIndex) *v1.Service {
@@ -480,4 +459,68 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 			metav1.PatchOptions{})
 		return endpoint, err
 	}, framework.NoopCheckResult)
+}
+
+func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
+	domains []string, clusterName string, shouldContain bool) {
+	serviceIP := f.GetServiceIP(targetCluster, service, srcCluster == targetCluster)
+	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
+}
+
+func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
+	domains []string, clusterName, serviceIP string, shouldContain bool) {
+	cmd := []string{"dig", "+short"}
+
+	var clusterDNSName string
+	if clusterName != "" {
+		clusterDNSName = clusterName + "."
+	}
+
+	for i := range domains {
+		cmd = append(cmd, clusterDNSName+service.Name+"."+f.Namespace+".svc."+domains[i])
+	}
+
+	op := "is"
+	if !shouldContain {
+		op += not
+	}
+
+	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
+	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace,
+			PodName:       targetPod.Items[0].Name,
+			ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+			CaptureStdout: true,
+			CaptureStderr: true,
+		}, srcCluster)
+		if err != nil {
+			return nil, err
+		}
+
+		return stdout, nil
+	}, func(result interface{}) (bool, string, error) {
+		doesContain := strings.Contains(result.(string), serviceIP)
+		By(fmt.Sprintf("Validating that dig result %q %s %q", result, op, serviceIP))
+		if doesContain && !shouldContain {
+			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
+		}
+
+		if !doesContain && shouldContain {
+			return false, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
+		}
+
+		return true, "", nil
+	})
+}
+
+func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service, isLocal bool) string {
+	Expect(service.Spec.Type).To(Equal(v1.ServiceTypeClusterIP))
+
+	if !framework.TestContext.GlobalnetEnabled || isLocal {
+		return service.Spec.ClusterIP
+	}
+
+	return f.Framework.AwaitGlobalIngressIP(svcCluster, service.Name, service.Namespace)
 }
