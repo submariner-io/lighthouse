@@ -143,6 +143,11 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
 
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		true, true)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		false, true)
+
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
@@ -150,6 +155,12 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", "", true)
+	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
+		"", false)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		true, false)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		false, false)
 }
 
 func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
@@ -265,12 +276,18 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		true, true)
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		true, false)
 	f.SetNginxReplicaSet(framework.ClusterB, 2)
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
+		true, true)
 }
 
 func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
@@ -379,6 +396,8 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains,
 		clusterAName, true)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains, clusterAName,
+		true, true)
 
 	svc, err = f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(err).NotTo(HaveOccurred())
@@ -389,6 +408,8 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		clusterBName, true)
+	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, clusterBName,
+		true, true)
 }
 
 func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
@@ -499,6 +520,73 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 		checkedDomains, "", true)
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterC, nginxServiceClusterC, netshootPodList,
 		checkedDomains, "", false)
+}
+
+func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
+	domains []string, clusterName string, withPort, shouldContain bool) {
+	ports := service.Spec.Ports
+	for i := range domains {
+		for _, port := range ports {
+			cmd := []string{"dig", "+short", "SRV"}
+
+			clusterDNSName := service.Name + "." + f.Namespace + ".svc." + domains[i]
+
+			if clusterName != "" {
+				clusterDNSName = clusterName + "." + clusterDNSName
+			}
+
+			portName := clusterDNSName
+
+			if withPort {
+				portName = strings.ToLower(port.Name+"."+string(port.Protocol)+".") + portName
+			}
+
+			cmd = append(cmd, portName)
+
+			op := "is"
+			if !shouldContain {
+				op += not
+			}
+
+			By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
+				service.Name, op))
+			framework.AwaitUntil("verify if service Ports is discoverable", func() (interface{}, error) {
+				stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+					Command:       cmd,
+					Namespace:     f.Namespace,
+					PodName:       targetPod.Items[0].Name,
+					ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+					CaptureStdout: true,
+					CaptureStderr: true,
+				}, srcCluster)
+				if err != nil {
+					return nil, err
+				}
+
+				return stdout, nil
+			}, func(result interface{}) (bool, string, error) {
+				var doesContain bool
+				if shouldContain {
+					doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
+						strings.Contains(result.(string), clusterDNSName)
+				} else {
+					doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) ||
+						strings.Contains(result.(string), clusterDNSName)
+				}
+
+				By(fmt.Sprintf("Validating that port in dig result for SRV Record %q %s %d and the domain name %s %q", result,
+					op, port.Port, op, clusterDNSName))
+				if doesContain && !shouldContain {
+					return false, fmt.Sprintf("expected execution result %q not to contain %d", result, port.Port), nil
+				}
+
+				if !doesContain && shouldContain {
+					return false, fmt.Sprintf("expected execution result %q to contain %q", result, port.Port), nil
+				}
+				return true, "", nil
+			})
+		}
+	}
 }
 
 func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, serviceName string, serviceIPList []string,
