@@ -675,7 +675,8 @@ func testHeadlessService() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
-						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + clusterID + "." + service1 + "." +
+						namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -719,9 +720,9 @@ func testHeadlessService() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
-						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+						strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 					test.SRV(service1 + "." + namespace1 + ".svc.clusterset.local.    5    IN    SRV  0 50 " +
-						strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
+						strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + clusterID + "." + service1 + "." + namespace1 + ".svc.clusterset.local."),
 				},
 			})
 		})
@@ -732,10 +733,10 @@ func testHeadlessService() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
-						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + clusterID + "." + service1 + "." +
 						namespace1 + ".svc.clusterset.local."),
 					test.SRV(portName1 + "." + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
-						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + clusterID + "." + service1 + "." +
 						namespace1 + ".svc.clusterset.local."),
 				},
 			})
@@ -747,10 +748,10 @@ func testHeadlessService() {
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
 					test.SRV("_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
-						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + service1 + "." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName1 + "." + clusterID + "." + service1 + "." +
 						namespace1 + ".svc.clusterset.local."),
 					test.SRV("_" + portName1 + "." + "_" + string(protcol1) + "." + service1 + "." + namespace1 + ".svc.clusterset.local." +
-						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + service1 + "." +
+						"    5    IN    SRV  0 50 " + strconv.Itoa(int(portNumber1)) + " " + hostName2 + "." + clusterID + "." + service1 + "." +
 						namespace1 + ".svc.clusterset.local."),
 				},
 			})
@@ -822,7 +823,9 @@ func testLocalService() {
 					AppProtocol: nil,
 					Port:        portNumber1,
 				},
-			}}
+			},
+			ClusterName: clusterID,
+		}
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),
@@ -956,7 +959,9 @@ func testSRVMultiplePorts() {
 					AppProtocol: nil,
 					Port:        portNumber2,
 				},
-			}}
+			},
+			ClusterName: clusterID,
+		}
 		lh = &Lighthouse{
 			Zones:           []string{"clusterset.local."},
 			serviceImports:  setupServiceImportMap(),

@@ -26,9 +26,10 @@ import (
 )
 
 type DNSRecord struct {
-	IP       string
-	Ports    []mcsv1a1.ServicePort
-	HostName string
+	IP          string
+	Ports       []mcsv1a1.ServicePort
+	HostName    string
+	ClusterName string
 }
 
 type clusterInfo struct {
