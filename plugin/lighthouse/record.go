@@ -67,7 +67,9 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, sta
 
 		target := pReq.service + "." + pReq.namespace + ".svc." + zone
 
-		if pReq.cluster != "" {
+		if isHeadless {
+			target = dnsRecord.ClusterName + "." + target
+		} else if pReq.cluster != "" {
 			target = pReq.cluster + "." + target
 		}
 

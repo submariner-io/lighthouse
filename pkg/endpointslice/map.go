@@ -138,8 +138,9 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 
 		for _, address := range endpoint.Addresses {
 			record := serviceimport.DNSRecord{
-				IP:    address,
-				Ports: mcsPorts,
+				IP:          address,
+				Ports:       mcsPorts,
+				ClusterName: cluster,
 			}
 
 			if endpoint.Hostname != nil {
