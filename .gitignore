@@ -14,3 +14,4 @@ package/.image.*
 .shflags
 *.coverprofile
 .shflags
+Dockerfile.*
