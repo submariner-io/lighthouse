@@ -55,17 +55,6 @@ var _ = Describe("Globalnet enabled", func() {
 					t.awaitServiceExported(globalIP, 0)
 				})
 			})
-
-			// TODO: Remove once we switch to globalnet V2
-			Context("via an annotation", func() {
-				BeforeEach(func() {
-					t.service.SetAnnotations(map[string]string{"submariner.io/globalIp": globalIP})
-				})
-
-				It("should sync a ServiceImport with the global IP", func() {
-					t.awaitServiceExported(globalIP, 0)
-				})
-			})
 		})
 
 		Context("and it does not initially have a global IP", func() {
