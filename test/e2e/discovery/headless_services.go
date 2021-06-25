@@ -19,12 +19,18 @@ package discovery
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	httpPortName = "http"
+	opAre        = "are"
 )
 
 var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", func() {
@@ -90,18 +96,25 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	ipList := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	ipList, hostNameList := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", true)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		clusterBName, true)
 
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, true, false, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, false, false, true)
+
 	f.DeleteServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
 
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", false)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, false, false, false)
 }
 
 func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
@@ -130,8 +143,8 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	ipListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
-	ipListA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+	ipListB, hostNameListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	ipListA, hostNameListA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	ipList := append(ipListB, ipListA...)
 
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
@@ -144,6 +157,10 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 		"", false)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListA, checkedDomains,
 		"", true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListB, checkedDomains,
+		clusterBName, true, false, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListA, checkedDomains,
+		clusterBName, true, false, true)
 }
 
 func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
@@ -166,17 +183,17 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	ipList := f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 3)
+	ipList, _ := f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 3)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", true)
 
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
-	ipList = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
+	ipList, _ = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", false)
 
 	f.SetNginxReplicaSet(framework.ClusterB, 2)
-	ipList = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 2)
+	ipList, _ = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 2)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", true)
 }
@@ -209,13 +226,21 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
-	ipListClusterA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
-	ipListClusterB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	ipListClusterA, hostNameListA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+	ipListClusterB, hostNameListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterA, netshootPodList, ipListClusterA, checkedDomains,
 		clusterAName, true)
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListClusterB, checkedDomains,
 		clusterBName, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListA, checkedDomains,
+		clusterBName, true, true, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListB, checkedDomains,
+		clusterBName, true, true, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListA, checkedDomains,
+		clusterBName, false, true, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListB, checkedDomains,
+		clusterBName, false, true, true)
 }
 
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
@@ -230,7 +255,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 		cmd = append(cmd, clusterDNSName+service.Name+"."+f.Namespace+".svc."+domains[i])
 	}
 
-	op := "are"
+	op := opAre
 	if !shouldContain {
 		op += not
 	}
@@ -268,4 +293,82 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 
 		return true, "", nil
 	})
+}
+
+func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
+	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
+	ports := service.Spec.Ports
+	for i := range domains {
+		for _, port := range ports {
+			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
+			op := opAre
+			if !shouldContain {
+				op += not
+			}
+
+			By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
+				strings.Join(cmd, " "), hostNameList, service.Name, op))
+			framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
+				stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+					Command:       cmd,
+					Namespace:     f.Namespace,
+					PodName:       targetPod.Items[0].Name,
+					ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+					CaptureStdout: true,
+					CaptureStderr: true,
+				}, cluster)
+				if err != nil {
+					return nil, err
+				}
+
+				return stdout, nil
+			}, func(result interface{}) (bool, string, error) {
+				By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+				if len(hostNameList) == 0 && result != "" {
+					return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
+				}
+				for _, hostName := range hostNameList {
+					hostDNS := hostName + "." + domainName
+					var doesContain bool
+					if shouldContain {
+						doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
+							strings.Contains(result.(string), hostDNS)
+					} else {
+						doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) ||
+							strings.Contains(result.(string), hostDNS)
+					}
+					if doesContain && !shouldContain {
+						return false, fmt.Sprintf("expected execution result %q not to contain %q", result, hostName), nil
+					}
+
+					if !doesContain && shouldContain {
+						return false, fmt.Sprintf("expected execution result %q to contain %q", result, hostName), nil
+					}
+				}
+
+				return true, "", nil
+			})
+		}
+	}
+}
+
+func createSRVQuery(f *framework.Framework, port corev1.ServicePort, service *corev1.Service,
+	domain string, clusterName string, withPort, withcluster bool) (cmd []string, domainName string) {
+	cmd = []string{"dig", "+short", "SRV"}
+
+	domainName = service.Name + "." + f.Namespace + ".svc." + domain
+	clusterDNSName := domainName
+	if withcluster {
+		clusterDNSName = clusterName + "." + clusterDNSName
+	}
+
+	portDNS := clusterDNSName
+
+	if withPort {
+		portDNS = strings.ToLower(port.Name+"."+string(port.Protocol)+".") + portDNS
+	}
+
+	cmd = append(cmd, portDNS)
+
+	return cmd, domainName
 }
