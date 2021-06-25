@@ -14,6 +14,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.10.0-m2
 	github.com/submariner-io/shipyard v0.10.0-m2.0.20210615173434-f15404d75718
+	github.com/uw-labs/lichen v0.1.4
 	go.uber.org/zap v1.15.0 // indirect
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0

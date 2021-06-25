@@ -38,8 +38,12 @@ deploy: images clusters
 	./scripts/$@ $(DEPLOY_ARGS)
 
 licensecheck: BUILD_ARGS=--noupx
-licensecheck: $(BINARIES)
-	lichen -c .lichen.yaml $(BINARIES)
+licensecheck: $(BINARIES) bin/lichen
+	bin/lichen -c .lichen.yaml $(BINARIES)
+
+bin/lichen: vendor/modules.txt
+	mkdir -p $(@D)
+	go build -o $@ github.com/uw-labs/lichen
 
 # Lighthouse-specific upgrade test:
 # deploy latest, start nginx service, export it, upgrade, check service
