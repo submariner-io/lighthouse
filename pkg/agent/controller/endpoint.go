@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,8 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	}
 
 	controller.localClient = localClient
+	gvr, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
+	controller.ingressIPClient = localClient.Resource(*gvr)
 
 	return controller, nil
 }
@@ -122,10 +125,11 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 		klog.V(log.TRACE).Infof("Endpoints %s/%s updated", endPoints.Namespace, endPoints.Name)
 	}
 
-	return e.endpointSliceFromEndpoints(endPoints, op), false
+	return e.endpointSliceFromEndpoints(endPoints, op)
 }
 
-func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) *discovery.EndpointSlice {
+func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) (
+	*discovery.EndpointSlice, bool) {
 	endpointSlice := &discovery.EndpointSlice{}
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
@@ -153,9 +157,19 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
 
-		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
-		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses,
-			endpointSlice.AddressType, false)...)
+		newEndpoints, retry := e.getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)
+		if retry {
+			return nil, true
+		}
+
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
+		newEndpoints, retry = e.getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)
+		if retry {
+			// TODO: We may not want unready endpoints at all
+			return nil, true
+		}
+
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
 	}
 
 	if op == syncer.Create {
@@ -164,30 +178,42 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		klog.V(log.TRACE).Infof("Returning EndpointSlice: %#v", endpointSlice)
 	}
 
-	return endpointSlice
+	return endpointSlice, false
 }
 
-func getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType, ready bool) []discovery.Endpoint {
+func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType,
+	ready bool) ([]discovery.Endpoint, bool) {
 	endpoints := []discovery.Endpoint{}
 	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
 
 	for _, address := range addresses {
 		if utilnet.IsIPv6String(address.IP) == isIPv6AddressType {
-			endpoints = append(endpoints, endpointFromAddress(address, ready))
+			endpoint, retry := e.endpointFromAddress(address, ready)
+			if retry {
+				return nil, true
+			}
+
+			endpoints = append(endpoints, *endpoint)
 		}
 	}
 
-	return endpoints
+	return endpoints, false
 }
 
-func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.Endpoint {
+func (e *EndpointController) endpointFromAddress(address corev1.EndpointAddress, ready bool) (*discovery.Endpoint, bool) {
 	topology := map[string]string{}
 	if address.NodeName != nil {
 		topology["kubernetes.io/hostname"] = *address.NodeName
 	}
 
-	endpoint := discovery.Endpoint{
-		Addresses:  []string{address.IP},
+	ip := e.getIP(address)
+
+	if ip == "" {
+		return nil, true
+	}
+
+	endpoint := &discovery.Endpoint{
+		Addresses:  []string{ip},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		Topology:   topology,
 	}
@@ -206,7 +232,7 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		endpoint.Hostname = &address.TargetRef.Name
 	}
 
-	return endpoint
+	return endpoint, false
 }
 
 func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
@@ -221,4 +247,25 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 	}
 
 	return true
+}
+
+func (e *EndpointController) getIP(address corev1.EndpointAddress) string {
+	if e.isHeadless && e.globalnetEnabled {
+		var ip string
+
+		name := "pod-" + address.TargetRef.Name
+		// TODO: Replace with a syncer.GetResource() to reduce API calls
+		obj, err := e.ingressIPClient.Namespace(e.serviceImportSourceNameSpace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err == nil {
+			ip, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
+		}
+
+		if ip == "" {
+			klog.Infof("GlobalIP for %s not allocated yet", name)
+		}
+
+		return ip
+	}
+
+	return address.IP
 }
