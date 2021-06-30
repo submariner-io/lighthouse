@@ -54,7 +54,9 @@ import (
 const clusterID1 = "east"
 const clusterID2 = "west"
 const serviceNamespace = "service-ns"
-const globalIP = "192.168.10.34"
+const globalIP1 = "242.254.1.1"
+const globalIP2 = "242.254.1.2"
+const globalIP3 = "242.254.1.3"
 
 var nodeName = "my-node"
 var hostName = "my-host"
@@ -94,9 +96,9 @@ type testDriver struct {
 	service                   *corev1.Service
 	serviceExport             *mcsv1a1.ServiceExport
 	endpoints                 *corev1.Endpoints
-	ingressIP                 *unstructured.Unstructured
 	stopCh                    chan struct{}
 	syncerConfig              *broker.SyncerConfig
+	endpointGlobalIPs         []string
 }
 
 func newTestDiver() *testDriver {
@@ -159,15 +161,24 @@ func newTestDiver() *testDriver {
 					{
 						IP:       "192.168.5.1",
 						Hostname: hostName,
+						TargetRef: &corev1.ObjectReference{
+							Name: "one",
+						},
 					},
 					{
 						IP:       "192.168.5.2",
 						NodeName: &nodeName,
+						TargetRef: &corev1.ObjectReference{
+							Name: "two",
+						},
 					},
 				},
 				NotReadyAddresses: []corev1.EndpointAddress{
 					{
 						IP: "10.253.6.1",
+						TargetRef: &corev1.ObjectReference{
+							Name: "not-ready",
+						},
 					},
 				},
 				Ports: []corev1.EndpointPort{
@@ -181,7 +192,6 @@ func newTestDiver() *testDriver {
 		},
 	}
 
-	t.ingressIP = t.newGlobalIngressIP()
 	t.brokerServiceImportClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&mcsv1a1.ServiceImport{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
@@ -194,14 +204,14 @@ func newTestDiver() *testDriver {
 	return t
 }
 
-func (t *testDriver) newGlobalIngressIP() *unstructured.Unstructured {
+func (t *testDriver) newGlobalIngressIP(name, ip string) *unstructured.Unstructured {
 	ingressIP := controller.GetGlobalIngressIPObj()
-	ingressIP.SetName(t.service.Name)
+	ingressIP.SetName(name)
 	ingressIP.SetNamespace(t.service.Namespace)
 	Expect(unstructured.SetNestedField(ingressIP.Object, controller.ClusterIPService, "spec", "target")).To(Succeed())
 	Expect(unstructured.SetNestedField(ingressIP.Object, t.service.Name, "spec", "serviceRef", "name")).To(Succeed())
 
-	setIngressAllocatedIP(ingressIP, globalIP)
+	setIngressAllocatedIP(ingressIP, ip)
 	setIngressIPConditions(ingressIP, metav1.Condition{
 		Type:    "Allocated",
 		Status:  metav1.ConditionTrue,
@@ -339,8 +349,8 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIP)
 }
 
-func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
-	service *corev1.Service, namespace string) *discovery.EndpointSlice {
+func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
+	service *corev1.Service, namespace string, globalIPs []string) *discovery.EndpointSlice {
 	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
 
 	endpointSlice := &discovery.EndpointSlice{}
@@ -358,19 +368,27 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 
+	addresses := globalIPs
+	if addresses == nil {
+		addresses = []string{endpoints.Subsets[0].Addresses[0].IP, endpoints.Subsets[0].Addresses[1].IP,
+			endpoints.Subsets[0].NotReadyAddresses[0].IP}
+	}
+
 	Expect(endpointSlice.Endpoints).To(HaveLen(3))
 	Expect(endpointSlice.Endpoints[0]).To(Equal(discovery.Endpoint{
-		Addresses:  []string{"192.168.5.1"},
+		Addresses:  []string{addresses[0]},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		Hostname:   &hostName,
 	}))
 	Expect(endpointSlice.Endpoints[1]).To(Equal(discovery.Endpoint{
-		Addresses:  []string{"192.168.5.2"},
+		Addresses:  []string{addresses[1]},
+		Hostname:   &endpoints.Subsets[0].Addresses[1].TargetRef.Name,
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		Topology:   map[string]string{"kubernetes.io/hostname": nodeName},
 	}))
 	Expect(endpointSlice.Endpoints[2]).To(Equal(discovery.Endpoint{
-		Addresses:  []string{"10.253.6.1"},
+		Addresses:  []string{addresses[2]},
+		Hostname:   &endpoints.Subsets[0].NotReadyAddresses[0].TargetRef.Name,
 		Conditions: discovery.EndpointConditions{Ready: &notReady},
 	}))
 
@@ -389,8 +407,8 @@ func awaitEndpointSlice(endpointSliceClient, serviceImportClient dynamic.Resourc
 	return endpointSlice
 }
 
-func (c *cluster) awaitEndpointSlice(endpoints *corev1.Endpoints, service *corev1.Service) *discovery.EndpointSlice {
-	return awaitEndpointSlice(c.localEndpointSliceClient, c.localServiceImportClient, endpoints, service, service.Namespace)
+func (c *cluster) awaitEndpointSlice(t *testDriver) *discovery.EndpointSlice {
+	return awaitEndpointSlice(c.localEndpointSliceClient, t.endpoints, t.service, t.service.Namespace, t.endpointGlobalIPs)
 }
 
 func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints, expectedIPs []string) {
@@ -433,7 +451,7 @@ func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, s
 }
 
 func (t *testDriver) awaitBrokerEndpointSlice() *discovery.EndpointSlice {
-	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.brokerServiceImportClient, t.endpoints, t.service, test.RemoteNamespace)
+	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.endpoints, t.service, test.RemoteNamespace, t.endpointGlobalIPs)
 }
 
 func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
@@ -444,8 +462,8 @@ func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
 
 func (t *testDriver) awaitEndpointSlice() {
 	t.awaitBrokerEndpointSlice()
-	t.cluster1.awaitEndpointSlice(t.endpoints, t.service)
-	t.cluster2.awaitEndpointSlice(t.endpoints, t.service)
+	t.cluster1.awaitEndpointSlice(t)
+	t.cluster2.awaitEndpointSlice(t)
 }
 
 func (t *testDriver) awaitUpdatedEndpointSlice(expectedIPs []string) {
@@ -494,8 +512,15 @@ func (t *testDriver) deleteService() {
 		metav1.DeleteOptions{})).To(Succeed())
 }
 
-func (t *testDriver) createGlobalIngressIP() {
-	test.CreateResource(t.cluster1.localIngressIPClient, t.ingressIP)
+func (t *testDriver) createGlobalIngressIP(ingressIP *unstructured.Unstructured) {
+	test.CreateResource(t.cluster1.localIngressIPClient, ingressIP)
+}
+
+func (t *testDriver) createEndpointIngressIPs() {
+	t.endpointGlobalIPs = []string{globalIP1, globalIP2, globalIP3}
+	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-one", globalIP1))
+	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-two", globalIP2))
+	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-not-ready", globalIP3))
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {

@@ -34,23 +34,30 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	utilnet "k8s.io/utils/net"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 func startEndpointController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
-	serviceImportUID types.UID, serviceImportName, serviceImportNameSpace, serviceName, clusterID string) (*EndpointController, error) {
+	serviceImport *mcsv1a1.ServiceImport, serviceImportNameSpace, serviceName, clusterID string,
+	globalnetEnabled bool) (*EndpointController, error) {
 	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
+
+	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
 
 	controller := &EndpointController{
 		clusterID:                    clusterID,
-		serviceImportUID:             serviceImportUID,
-		serviceImportName:            serviceImportName,
+		serviceImportUID:             serviceImport.UID,
+		serviceImportName:            serviceImport.Name,
 		serviceImportSourceNameSpace: serviceImportNameSpace,
 		serviceName:                  serviceName,
 		stopCh:                       make(chan struct{}),
+		isHeadless:                   serviceImport.Spec.Type == mcsv1a1.Headless,
+		globalnetEnabled:             globalnetEnabled,
+		localClient:                  localClient,
+		ingressIPClient:              localClient.Resource(*globalIngressIPGVR),
 	}
 
 	nameSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
@@ -74,10 +81,6 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	if err := epsSyncer.Start(controller.stopCh); err != nil {
 		return nil, err
 	}
-
-	controller.localClient = localClient
-	gvr, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
-	controller.ingressIPClient = localClient.Resource(*gvr)
 
 	return controller, nil
 }
@@ -129,7 +132,7 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 }
 
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) (
-	*discovery.EndpointSlice, bool) {
+	runtime.Object, bool) {
 	endpointSlice := &discovery.EndpointSlice{}
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
@@ -254,6 +257,7 @@ func (e *EndpointController) getIP(address corev1.EndpointAddress) string {
 		var ip string
 
 		name := "pod-" + address.TargetRef.Name
+
 		// TODO: Replace with a syncer.GetResource() to reduce API calls
 		obj, err := e.ingressIPClient.Namespace(e.serviceImportSourceNameSpace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err == nil {

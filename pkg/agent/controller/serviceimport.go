@@ -113,14 +113,11 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	}
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
-		serviceImport.ObjectMeta.UID, serviceImport.ObjectMeta.Name, serviceNameSpace, serviceName, c.clusterID)
+		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalnetEnabled)
 	if err != nil {
 		klog.Errorf(err.Error())
 		return true
 	}
-
-	endpointController.globalnetEnabled = c.globalnetEnabled
-	endpointController.isHeadless = serviceImport.Spec.Type == mcsv1a1.Headless
 
 	c.endpointControllers.Store(key, endpointController)
 
