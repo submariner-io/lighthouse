@@ -235,7 +235,8 @@ func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex
 	})
 }
 
-func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster framework.ClusterIndex) *v1.Service {
+func (f *Framework) NewNginxHeadlessServiceWithParams(name, app, portName string, protcol v1.Protocol,
+	cluster framework.ClusterIndex) *v1.Service {
 	var port int32 = 80
 
 	nginxService := v1.Service{
@@ -250,7 +251,9 @@ func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster 
 			ClusterIP: v1.ClusterIPNone,
 			Ports: []v1.ServicePort{
 				{
-					Port: port,
+					Port:     port,
+					Name:     portName,
+					Protocol: protcol,
 				},
 			},
 			Selector: map[string]string{
@@ -268,20 +271,23 @@ func (f *Framework) NewNginxHeadlessServiceWithParams(name, app string, cluster 
 }
 
 func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
-	return f.NewNginxHeadlessServiceWithParams("nginx-headless", "nginx-demo", cluster)
+	return f.NewNginxHeadlessServiceWithParams("nginx-headless", "nginx-demo", "http", v1.ProtocolTCP, cluster)
 }
 
-func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string, count int) (ipList []string) {
+func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
+	namespace string, count int) (ipList, hostNameList []string) {
 	ep := framework.KubeClients[targetCluster].CoreV1().Endpoints(namespace)
 	By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
 		return ep.Get(context.TODO(), name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		ipList = make([]string, 0)
+		hostNameList = make([]string, 0)
 		endpoint := result.(*v1.Endpoints)
 		for _, eps := range endpoint.Subsets {
 			for _, addr := range eps.Addresses {
 				ipList = append(ipList, addr.IP)
+				hostNameList = append(hostNameList, addr.Hostname)
 			}
 		}
 		if count != anyCount && len(ipList) != count {
@@ -290,10 +296,10 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 		return true, "", nil
 	})
 
-	return ipList
+	return ipList, hostNameList
 }
 
-func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string) (ipList []string) {
+func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string) (ipList, hostNameList []string) {
 	return f.AwaitEndpointIPs(targetCluster, name, namespace, anyCount)
 }
 

@@ -75,7 +75,8 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName, framework.ClusterB)
+	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
+		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -107,7 +108,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName, framework.ClusterB)
+	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
+		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
 
 	// Create StatefulSet on ClusterA
 	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterAName))
@@ -116,7 +118,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
-	nginxServiceClusterA := f.NewNginxHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName, appName, framework.ClusterA)
+	nginxServiceClusterA := f.NewNginxHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName, appName,
+		httpPortName, corev1.ProtocolTCP, framework.ClusterA)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -167,7 +170,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName, framework.ClusterB)
+	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
+		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -222,7 +226,7 @@ func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.Clus
 		cmd = append(cmd, query+"."+f.Namespace+".svc."+domains[i])
 	}
 
-	op := "are"
+	op := opAre
 	if !shouldContain {
 		op += not
 	}
