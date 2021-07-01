@@ -52,7 +52,7 @@ var _ = Describe("Reconciliation", func() {
 
 		It("should delete the ServiceImport and EndpointSlice on reconciliation", func() {
 			serviceImport := t.cluster1.awaitServiceImport(t.service, mcsv1a1.Headless, "")
-			endpointSlice := t.cluster1.awaitEndpointSlice(t.endpoints, t.service)
+			endpointSlice := t.cluster1.awaitEndpointSlice(t)
 
 			t.afterEach()
 			t = newTestDiver()
@@ -143,7 +143,7 @@ var _ = Describe("Reconciliation", func() {
 		})
 
 		It("should delete it from the local datastore on reconciliation", func() {
-			endpointSlice := t.cluster2.awaitEndpointSlice(t.endpoints, t.service)
+			endpointSlice := t.cluster2.awaitEndpointSlice(t)
 
 			t.afterEach()
 			t = newTestDiver()

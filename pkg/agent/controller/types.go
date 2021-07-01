@@ -61,6 +61,7 @@ type ServiceImportController struct {
 	endpointControllers sync.Map
 	clusterID           string
 	scheme              *runtime.Scheme
+	globalnetEnabled    bool
 }
 
 // Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
@@ -74,4 +75,7 @@ type EndpointController struct {
 	serviceImportSourceNameSpace string
 	stopCh                       chan struct{}
 	localClient                  dynamic.Interface
+	ingressIPClient              dynamic.NamespaceableResourceInterface
+	isHeadless                   bool
+	globalnetEnabled             bool
 }

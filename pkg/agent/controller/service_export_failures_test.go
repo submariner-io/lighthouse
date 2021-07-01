@@ -21,10 +21,8 @@ import (
 	"errors"
 
 	. "github.com/onsi/ginkgo"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("Service export failures", func() {
@@ -43,20 +41,6 @@ var _ = Describe("Service export failures", func() {
 
 	AfterEach(func() {
 		t.afterEach()
-	})
-
-	When("Endpoints retrieval initially fails", func() {
-		BeforeEach(func() {
-			t.service.Spec.ClusterIP = corev1.ClusterIPNone
-			t.cluster1.endpointsReactor.SetFailOnGet(errors.New("fake Get error"))
-		})
-
-		It("should update the ServiceExport status and eventually sync a ServiceImport", func() {
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionUnknown, "ServiceRetrievalFailed"))
-			t.cluster1.endpointsReactor.SetResetOnFailure(true)
-			t.awaitHeadlessServiceImport("")
-		})
 	})
 
 	When("a conflict initially occurs when updating the ServiceExport status", func() {

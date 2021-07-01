@@ -18,10 +18,13 @@ limitations under the License.
 package controller_test
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -45,14 +48,20 @@ var _ = Describe("Globalnet enabled", func() {
 	})
 
 	When("a ClusterIP Service is exported", func() {
+		var ingressIP *unstructured.Unstructured
+
+		BeforeEach(func() {
+			ingressIP = t.newGlobalIngressIP(t.service.Name, globalIP1)
+		})
+
 		Context("and it has a global IP", func() {
 			Context("via a GlobalIngressIP", func() {
 				BeforeEach(func() {
-					t.createGlobalIngressIP()
+					t.createGlobalIngressIP(ingressIP)
 				})
 
 				It("should sync a ServiceImport with the global IP", func() {
-					t.awaitServiceExported(globalIP, 0)
+					t.awaitServiceExported(globalIP1, 0)
 				})
 			})
 		})
@@ -63,25 +72,25 @@ var _ = Describe("Globalnet enabled", func() {
 					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
-					t.createGlobalIngressIP()
-					t.awaitServiceExported(globalIP, 1)
+					t.createGlobalIngressIP(ingressIP)
+					t.awaitServiceExported(globalIP1, 1)
 				})
 			})
 
 			Context("due to no AllocatedIP in the GlobalIngressIP", func() {
 				BeforeEach(func() {
-					setIngressAllocatedIP(t.ingressIP, "")
-					setIngressIPConditions(t.ingressIP)
-					t.createGlobalIngressIP()
+					setIngressAllocatedIP(ingressIP, "")
+					setIngressIPConditions(ingressIP)
+					t.createGlobalIngressIP(ingressIP)
 				})
 
 				It("should update the ServiceExport status appropriately and eventually sync a ServiceImport", func() {
 					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
-					setIngressAllocatedIP(t.ingressIP, globalIP)
-					test.UpdateResource(t.cluster1.localIngressIPClient, t.ingressIP)
-					t.awaitServiceExported(globalIP, 1)
+					setIngressAllocatedIP(ingressIP, globalIP1)
+					test.UpdateResource(t.cluster1.localIngressIPClient, ingressIP)
+					t.awaitServiceExported(globalIP1, 1)
 				})
 			})
 		})
@@ -95,9 +104,9 @@ var _ = Describe("Globalnet enabled", func() {
 			}
 
 			BeforeEach(func() {
-				setIngressAllocatedIP(t.ingressIP, "")
-				setIngressIPConditions(t.ingressIP, condition)
-				t.createGlobalIngressIP()
+				setIngressAllocatedIP(ingressIP, "")
+				setIngressIPConditions(ingressIP, condition)
+				t.createGlobalIngressIP(ingressIP)
 			})
 
 			It("should update the ServiceExport status with the condition details", func() {
@@ -113,11 +122,31 @@ var _ = Describe("Globalnet enabled", func() {
 			t.service.Spec.ClusterIP = corev1.ClusterIPNone
 		})
 
-		It("should update the ServiceExport status and not sync a ServiceImport", func() {
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionFalse, "UnsupportedServiceType"))
+		JustBeforeEach(func() {
+			t.createEndpoints()
+		})
 
-			t.awaitNoServiceImport(t.brokerServiceImportClient)
+		Context("and it has a global IP for all endpoint addresses", func() {
+			BeforeEach(func() {
+				t.createEndpointIngressIPs()
+			})
+
+			It("should sync a ServiceImport and EndpointSlice with the global IPs", func() {
+				t.awaitHeadlessServiceImport("")
+				t.awaitEndpointSlice()
+			})
+		})
+
+		Context("and it initially does not have a global IP for all endpoint addresses", func() {
+			It("should eventually sync a ServiceImport and EndpointSlice with the global IPs", func() {
+				time.Sleep(time.Millisecond * 300)
+				t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
+
+				t.createEndpointIngressIPs()
+
+				t.awaitHeadlessServiceImport("")
+				t.awaitEndpointSlice()
+			})
 		})
 	})
 })
