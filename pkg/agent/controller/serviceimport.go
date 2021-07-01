@@ -34,11 +34,12 @@ import (
 func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
 	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		serviceSyncer: serviceSyncer,
-		localClient:   localClient,
-		restMapper:    restMapper,
-		clusterID:     spec.ClusterID,
-		scheme:        scheme,
+		serviceSyncer:    serviceSyncer,
+		localClient:      localClient,
+		restMapper:       restMapper,
+		clusterID:        spec.ClusterID,
+		scheme:           scheme,
+		globalnetEnabled: spec.GlobalnetEnabled,
 	}
 
 	var err error
@@ -112,7 +113,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	}
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
-		serviceImport.ObjectMeta.UID, serviceImport.ObjectMeta.Name, serviceNameSpace, serviceName, c.clusterID)
+		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalnetEnabled)
 	if err != nil {
 		klog.Errorf(err.Error())
 		return true

@@ -276,40 +276,6 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
-	if a.globalnetEnabled && svcType == mcsv1a1.Headless {
-		klog.Infof("Headless Services not supported with globalnet yet")
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-			corev1.ConditionFalse, invalidServiceType, "Headless Services not supported with Globalnet IP")
-
-		return nil, false
-	}
-
-	var ips []string
-	var ports []mcsv1a1.ServicePort
-	if a.globalnetEnabled {
-		ip, reason, msg := a.getGlobalIP(svc)
-		if ip == "" {
-			klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
-			// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-			a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-				corev1.ConditionFalse, reason, msg)
-
-			return nil, true
-		}
-
-		ips = []string{ip}
-		ports = a.getPortsForService(svc)
-	} else {
-		ips, ports, err = a.getIPsAndPortsForService(svc, svcType)
-		if err != nil {
-			// Failed to get ips for some reason, requeue
-			a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
-				corev1.ConditionUnknown, "ServiceRetrievalFailed", err.Error())
-
-			return nil, true
-		}
-	}
-
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
@@ -327,12 +293,27 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	}
 
 	if svcType == mcsv1a1.ClusterSetIP {
-		serviceImport.Spec.IPs = ips
-		serviceImport.Spec.Ports = ports
+		if a.globalnetEnabled {
+			ip, reason, msg := a.getGlobalIP(svc)
+			if ip == "" {
+				klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
+				// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
+				a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
+					corev1.ConditionFalse, reason, msg)
+
+				return nil, true
+			}
+
+			serviceImport.Spec.IPs = []string{ip}
+		} else {
+			serviceImport.Spec.IPs = []string{svc.Spec.ClusterIP}
+		}
+
+		serviceImport.Spec.Ports = a.getPortsForService(svc)
 		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
 		cleared out when here's no backing Endpoint pods.
 		*/
-		serviceImport.Annotations[clusterIP] = ips[0]
+		serviceImport.Annotations[clusterIP] = serviceImport.Spec.IPs[0]
 	}
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
@@ -496,27 +477,6 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 	}
 }
 
-func (a *Controller) getIPsAndPortsForService(service *corev1.Service, siType mcsv1a1.ServiceImportType) (
-	[]string, []mcsv1a1.ServicePort, error) {
-	mcsPorts := a.getPortsForService(service)
-
-	if siType == mcsv1a1.ClusterSetIP {
-		return []string{service.Spec.ClusterIP}, mcsPorts, nil
-	}
-
-	endpoint, err := a.kubeClientSet.CoreV1().Endpoints(service.Namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Errorf("Error retrieving Endpoints for Service (%s/%s): %v", service.Namespace, service.Name, err)
-			return nil, nil, errors.WithMessage(err, "Error retrieving the Endpoints for the Service")
-		}
-
-		return make([]string, 0), nil, nil
-	}
-
-	return getIPsFromEndpoint(endpoint), mcsPorts, nil
-}
-
 func (a *Controller) getPortsForService(service *corev1.Service) []mcsv1a1.ServicePort {
 	var mcsPorts = make([]mcsv1a1.ServicePort, 0, len(service.Spec.Ports))
 
@@ -533,20 +493,6 @@ func (a *Controller) getPortsForService(service *corev1.Service) []mcsv1a1.Servi
 
 func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 	return name + "-" + namespace + "-" + a.clusterID
-}
-
-func getIPsFromEndpoint(endpoint *corev1.Endpoints) []string {
-	ipList := make([]string, 0)
-
-	for _, eps := range endpoint.Subsets {
-		for _, addr := range eps.Addresses {
-			ipList = append(ipList, addr.IP)
-		}
-	}
-
-	klog.V(log.DEBUG).Infof("IPList %v for endpoint (%s/%s)", ipList, endpoint.Namespace, endpoint.Name)
-
-	return ipList
 }
 
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
