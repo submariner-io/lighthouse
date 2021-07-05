@@ -287,7 +287,12 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 		for _, eps := range endpoint.Subsets {
 			for _, addr := range eps.Addresses {
 				ipList = append(ipList, addr.IP)
-				hostNameList = append(hostNameList, addr.Hostname)
+				switch {
+				case addr.Hostname != "":
+					hostNameList = append(hostNameList, addr.Hostname)
+				case addr.TargetRef != nil:
+					hostNameList = append(hostNameList, addr.TargetRef.Name)
+				}
 			}
 		}
 		if count != anyCount && len(ipList) != count {
@@ -299,8 +304,36 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	return ipList, hostNameList
 }
 
-func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string) (ipList, hostNameList []string) {
-	return f.AwaitEndpointIPs(targetCluster, name, namespace, anyCount)
+func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int) (ipList, hostNameList []string) {
+	podList := f.Framework.AwaitPodsByAppLabel(targetCluster, svc.Labels["app"], svc.Namespace, count)
+	hostNameList = make([]string, 0)
+	ipList = make([]string, 0)
+
+	for i := 0; i < len(podList.Items); i++ {
+		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
+		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
+		ipList = append(ipList, ingressIP)
+		hostname := podList.Items[i].Spec.Hostname
+		if hostname == "" {
+			hostname = podList.Items[i].Name
+		}
+
+		hostNameList = append(hostNameList, hostname)
+	}
+
+	return ipList, hostNameList
+}
+
+func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int) (ipList, hostNameList []string) {
+	if framework.TestContext.GlobalnetEnabled {
+		return f.AwaitPodIngressIPs(targetCluster, svc, count)
+	}
+
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count)
+}
+
+func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service) (ipList, hostNameList []string) {
+	return f.AwaitPodIPs(targetCluster, service, anyCount)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
