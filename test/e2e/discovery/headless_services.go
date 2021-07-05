@@ -145,7 +145,9 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	ipListB, hostNameListB := f.GetEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	ipListA, hostNameListA := f.GetEndpointIPs(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
-	ipList := append(ipListB, ipListA...)
+	ipList := make([]string, len(ipListB)+len(ipListA))
+	ipList = append(ipList, ipListB...)
+	ipList = append(ipList, ipListA...)
 
 	verifyHeadlessIpsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", true)
