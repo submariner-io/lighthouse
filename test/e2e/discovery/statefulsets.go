@@ -35,31 +35,19 @@ var _ = Describe("[discovery] Test Stateful Sets Discovery Across Clusters", fun
 
 	When("a pod tries to resolve a podname from stateful set in a remote cluster", func() {
 		It("should resolve the pod IP from the remote cluster", func() {
-			if !framework.TestContext.GlobalnetEnabled {
-				RunSSDiscoveryTest(f)
-			} else {
-				framework.Skipf("Globalnet is enabled, skipping the test...")
-			}
+			RunSSDiscoveryTest(f)
 		})
 	})
 
 	When("a pod tries to resolve a podname from stateful set in a local cluster", func() {
 		It("should resolve the pod IP from the local cluster", func() {
-			if !framework.TestContext.GlobalnetEnabled {
-				RunSSDiscoveryLocalTest(f)
-			} else {
-				framework.Skipf("Globalnet is enabled, skipping the test...")
-			}
+			RunSSDiscoveryLocalTest(f)
 		})
 	})
 
 	When("the number of active pods backing a stateful set changes", func() {
 		It("should only resolve the IPs from the active pods", func() {
-			if !framework.TestContext.GlobalnetEnabled {
-				RunSSPodsAvailabilityTest(f)
-			} else {
-				framework.Skipf("Globalnet is enabled, skipping the test...")
-			}
+			RunSSPodsAvailabilityTest(f)
 		})
 	})
 })
