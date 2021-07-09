@@ -92,12 +92,6 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 				return
 			}
 
-			// TODO: Enable this once globalnetv2 fixes health check
-			if framework.TestContext.GlobalnetEnabled {
-				Skip("Not supported with Globalnet v2 yet and hence skipping the test")
-				return
-			}
-
 			randomIP := "192.168.1.5"
 			endpointName, healthCheckIP = f.GetHealthCheckIPInfo(framework.ClusterC)
 			f.SetHealthCheckIP(framework.ClusterC, randomIP, endpointName)
