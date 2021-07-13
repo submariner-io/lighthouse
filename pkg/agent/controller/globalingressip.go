@@ -24,7 +24,7 @@ import (
 
 const (
 	ClusterIPService           = "ClusterIPService"
-	headlessServicePod         = "HeadlessServicePod"
+	HeadlessServicePod         = "HeadlessServicePod"
 	defaultReasonIPUnavailable = "ServiceGlobalIPUnavailable"
 	defaultMsgIPUnavailable    = "Service doesn't have a global IP yet"
 )
@@ -32,8 +32,6 @@ const (
 type IngressIP struct {
 	namespace         string
 	target            string
-	svcName           string
-	podName           string
 	allocatedIP       string
 	unallocatedReason string
 	unallocatedMsg    string
@@ -51,20 +49,6 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 	if !found || err != nil {
 		klog.Errorf("target field not found in spec %#v", obj.Object)
 		return nil
-	}
-
-	gip.svcName, found, err = unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
-	if !found || err != nil {
-		klog.Errorf("ServiceRef not found in spec %#v", obj.Object)
-		return nil
-	}
-
-	if gip.target == headlessServicePod {
-		gip.podName, found, err = unstructured.NestedString(obj.Object, "spec", "podRef", "name")
-		if !found || err != nil {
-			klog.Errorf("Expected PodRef in spec %#v", obj.Object)
-			return nil
-		}
 	}
 
 	gip.allocatedIP, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")

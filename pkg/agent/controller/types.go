@@ -20,6 +20,7 @@ package controller
 import (
 	"sync"
 
+	"github.com/submariner-io/admiral/pkg/watcher"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -41,7 +42,6 @@ type Controller struct {
 	endpointSliceSyncer     *broker.Syncer
 	serviceSyncer           syncer.Interface
 	serviceImportController *ServiceImportController
-	ingressIPClient         dynamic.NamespaceableResourceInterface
 }
 
 type AgentSpecification struct {
@@ -54,14 +54,14 @@ type AgentSpecification struct {
 // and creates an EndpointController in response. The EndpointController will use the app label as filter
 // to listen only for the endpoints event related to ServiceImport created
 type ServiceImportController struct {
-	serviceSyncer       syncer.Interface
-	localClient         dynamic.Interface
-	restMapper          meta.RESTMapper
-	serviceImportSyncer syncer.Interface
-	endpointControllers sync.Map
-	clusterID           string
-	scheme              *runtime.Scheme
-	globalnetEnabled    bool
+	serviceSyncer        syncer.Interface
+	localClient          dynamic.Interface
+	restMapper           meta.RESTMapper
+	serviceImportSyncer  syncer.Interface
+	endpointControllers  sync.Map
+	clusterID            string
+	scheme               *runtime.Scheme
+	globalIngressIPCache *globalIngressIPCache
 }
 
 // Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
@@ -77,5 +77,12 @@ type EndpointController struct {
 	localClient                  dynamic.Interface
 	ingressIPClient              dynamic.NamespaceableResourceInterface
 	isHeadless                   bool
-	globalnetEnabled             bool
+	globalIngressIPCache         *globalIngressIPCache
+}
+
+type globalIngressIPCache struct {
+	sync.Mutex
+	byService sync.Map
+	byPod     sync.Map
+	watcher   watcher.Interface
 }
