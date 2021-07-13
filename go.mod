@@ -6,6 +6,7 @@ require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.8.3
+	github.com/danibachar/gobalancing v0.0.0-20210713235731-3db9fc142709
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.43
 	github.com/onsi/ginkgo v1.16.4

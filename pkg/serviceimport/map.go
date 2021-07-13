@@ -18,9 +18,11 @@ limitations under the License.
 package serviceimport
 
 import (
+	"math"
+	"strconv"
 	"sync"
-	"sync/atomic"
 
+	gobalance "github.com/danibachar/gobalancing"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -35,22 +37,21 @@ type DNSRecord struct {
 type clusterInfo struct {
 	record *DNSRecord
 	name   string
-	weight uint64
+	weight float64
 }
 
 type serviceInfo struct {
-	key           string
-	records       map[string]*DNSRecord
-	clustersQueue []clusterInfo
-	rrCount       uint64
-	isHeadless    bool
+	key        string
+	records    map[string]*clusterInfo
+	balancer   *gobalance.SmoothWeightedRR
+	isHeadless bool
 }
 
-func (si *serviceInfo) buildClusterInfoQueue() {
-	si.clustersQueue = make([]clusterInfo, 0)
-	for cluster, record := range si.records {
-		c := clusterInfo{name: cluster, record: record, weight: 0}
-		si.clustersQueue = append(si.clustersQueue, c)
+func (si *serviceInfo) resetLoadBalancing() {
+	si.balancer.RemoveAll()
+
+	for _, info := range si.records {
+		_ = si.balancer.Add(info, info.weight)
 	}
 }
 
@@ -59,16 +60,11 @@ type Map struct {
 	sync.RWMutex
 }
 
-func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace string, checkCluster func(string) bool,
+func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) *DNSRecord {
-	queueLength := len(queue)
+	queueLength := len(si.balancer.All())
 	for i := 0; i < queueLength; i++ {
-		c := atomic.LoadUint64(counter)
-
-		info := queue[c%uint64(queueLength)]
-
-		atomic.AddUint64(counter, 1)
-
+		info := si.balancer.Next().(*clusterInfo)
 		if checkCluster(info.name) && checkEndpoint(name, namespace, info.name) {
 			return info.record
 		}
@@ -79,40 +75,35 @@ func (m *Map) selectIP(queue []clusterInfo, counter *uint64, name, namespace str
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) (record *DNSRecord, found, isLocal bool) {
-	dnsRecords, queue, counter, isHeadless := func() (map[string]*DNSRecord, []clusterInfo, *uint64, bool) {
-		m.RLock()
-		defer m.RUnlock()
+	m.RLock()
+	defer m.RUnlock()
 
-		si, ok := m.svcMap[keyFunc(namespace, name)]
-		if !ok {
-			return nil, nil, nil, false
-		}
-
-		return si.records, si.clustersQueue, &si.rrCount, si.isHeadless
-	}()
-
-	if dnsRecords == nil || isHeadless {
+	si, ok := m.svcMap[keyFunc(namespace, name)]
+	if !ok || si.isHeadless {
 		return nil, false, false
 	}
 
 	// If a clusterID is specified, we supply it even if the service is not there
 	if cluster != "" {
-		record, found = dnsRecords[cluster]
-		return record, found, cluster == localCluster
+		info, found := si.records[cluster]
+		if !found {
+			return nil, found, cluster == localCluster
+		}
+
+		return info.record, found, cluster == localCluster
 	}
 
 	// If we are aware of the local cluster
 	// And we found some accessible IP, we shall return it
 	if localCluster != "" {
-		record, found := dnsRecords[localCluster]
-
-		if found && record != nil && checkEndpoint(name, namespace, localCluster) {
-			return record, found, true
+		info, found := si.records[localCluster]
+		if found && info != nil && checkEndpoint(name, namespace, localCluster) {
+			return info.record, found, true
 		}
 	}
 
 	// Fall back to Round-Robin if service is not presented in the local cluster
-	record = m.selectIP(queue, counter, name, namespace, checkCluster, checkEndpoint)
+	record = m.selectIP(si, name, namespace, checkCluster, checkEndpoint)
 
 	if record != nil {
 		return record, true, false
@@ -140,8 +131,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		if !ok {
 			remoteService = &serviceInfo{
 				key:        key,
-				records:    make(map[string]*DNSRecord),
-				rrCount:    0,
+				records:    make(map[string]*clusterInfo),
+				balancer:   gobalance.NewSWRR(),
 				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
 			}
 		}
@@ -151,11 +142,16 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 				IP:    serviceImport.Spec.IPs[0],
 				Ports: serviceImport.Spec.Ports,
 			}
-			remoteService.records[serviceImport.GetLabels()[lhconstants.LabelSourceCluster]] = record
+			clusterName := serviceImport.GetLabels()[lhconstants.LabelSourceCluster]
+			remoteService.records[clusterName] = &clusterInfo{
+				name:   clusterName,
+				record: record,
+				weight: getServiceWeightFrom(serviceImport.Annotations),
+			}
 		}
 
 		if !remoteService.isHeadless {
-			remoteService.buildClusterInfoQueue()
+			remoteService.resetLoadBalancing()
 		}
 
 		m.svcMap[key] = remoteService
@@ -182,9 +178,20 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 		if len(remoteService.records) == 0 {
 			delete(m.svcMap, key)
 		} else if !remoteService.isHeadless {
-			remoteService.buildClusterInfoQueue()
+			remoteService.resetLoadBalancing()
 		}
 	}
+}
+
+func getServiceWeightFrom(annotation map[string]string) float64 {
+	if val, ok := annotation["remote-weight"]; ok {
+		f, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return f
+		}
+	}
+
+	return math.SmallestNonzeroFloat64 // Zero will cause no selection
 }
 
 func keyFunc(namespace, name string) string {
