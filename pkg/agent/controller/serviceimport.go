@@ -21,6 +21,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,12 +35,11 @@ import (
 func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
 	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		serviceSyncer:    serviceSyncer,
-		localClient:      localClient,
-		restMapper:       restMapper,
-		clusterID:        spec.ClusterID,
-		scheme:           scheme,
-		globalnetEnabled: spec.GlobalnetEnabled,
+		serviceSyncer: serviceSyncer,
+		localClient:   localClient,
+		restMapper:    restMapper,
+		clusterID:     spec.ClusterID,
+		scheme:        scheme,
 	}
 
 	var err error
@@ -59,10 +59,24 @@ func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.I
 		return nil, err
 	}
 
-	return controller, nil
+	if spec.GlobalnetEnabled {
+		controller.globalIngressIPCache, err = newGlobalIngressIPCache(watcher.Config{
+			RestMapper: restMapper,
+			Client:     localClient,
+			Scheme:     scheme,
+		})
+	}
+
+	return controller, err
 }
 
 func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
+	if c.globalIngressIPCache != nil {
+		if err := c.globalIngressIPCache.start(stopCh); err != nil {
+			return err
+		}
+	}
+
 	go func() {
 		<-stopCh
 
@@ -113,7 +127,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	}
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
-		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalnetEnabled)
+		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)
 	if err != nil {
 		klog.Errorf(err.Error())
 		return true

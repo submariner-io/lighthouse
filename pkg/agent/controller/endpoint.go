@@ -42,7 +42,7 @@ import (
 
 func startEndpointController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
 	serviceImport *mcsv1a1.ServiceImport, serviceImportNameSpace, serviceName, clusterID string,
-	globalnetEnabled bool) (*EndpointController, error) {
+	globalIngressIPCache *globalIngressIPCache) (*EndpointController, error) {
 	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
 
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
@@ -55,7 +55,7 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 		serviceName:                  serviceName,
 		stopCh:                       make(chan struct{}),
 		isHeadless:                   serviceImport.Spec.Type == mcsv1a1.Headless,
-		globalnetEnabled:             globalnetEnabled,
+		globalIngressIPCache:         globalIngressIPCache,
 		localClient:                  localClient,
 		ingressIPClient:              localClient.Resource(*globalIngressIPGVR),
 	}
@@ -189,7 +189,8 @@ func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.Endpoi
 	endpoints := []discovery.Endpoint{}
 	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
 
-	for _, address := range addresses {
+	for i := range addresses {
+		address := &addresses[i]
 		if utilnet.IsIPv6String(address.IP) == isIPv6AddressType {
 			endpoint, retry := e.endpointFromAddress(address, ready)
 			if retry {
@@ -203,7 +204,7 @@ func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.Endpoi
 	return endpoints, false
 }
 
-func (e *EndpointController) endpointFromAddress(address corev1.EndpointAddress, ready bool) (*discovery.Endpoint, bool) {
+func (e *EndpointController) endpointFromAddress(address *corev1.EndpointAddress, ready bool) (*discovery.Endpoint, bool) {
 	topology := map[string]string{}
 	if address.NodeName != nil {
 		topology["kubernetes.io/hostname"] = *address.NodeName
@@ -252,20 +253,17 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 	return true
 }
 
-func (e *EndpointController) getIP(address corev1.EndpointAddress) string {
-	if e.isHeadless && e.globalnetEnabled {
+func (e *EndpointController) getIP(address *corev1.EndpointAddress) string {
+	if e.isHeadless && e.globalIngressIPCache != nil {
+		obj, found := e.globalIngressIPCache.getForPod(e.serviceImportSourceNameSpace, address.TargetRef.Name)
+
 		var ip string
-
-		name := "pod-" + address.TargetRef.Name
-
-		// TODO: Replace with a syncer.GetResource() to reduce API calls
-		obj, err := e.ingressIPClient.Namespace(e.serviceImportSourceNameSpace).Get(context.TODO(), name, metav1.GetOptions{})
-		if err == nil {
+		if found {
 			ip, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
 		}
 
 		if ip == "" {
-			klog.Infof("GlobalIP for %s not allocated yet", name)
+			klog.Infof("GlobalIP for EndpointAddress %q is not allocated yet", address.TargetRef.Name)
 		}
 
 		return ip

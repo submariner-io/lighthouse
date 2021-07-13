@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -152,11 +151,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		syncerConf.RestMapper, syncerConf.LocalClient, syncerConf.Scheme)
 	if err != nil {
 		return nil, err
-	}
-
-	if agentController.globalnetEnabled {
-		gvr, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
-		agentController.ingressIPClient = syncerConf.LocalClient.Resource(*gvr)
 	}
 
 	return agentController, nil
@@ -531,14 +525,9 @@ func (a *Controller) getGlobalIP(service *corev1.Service) (ip, reason, msg strin
 }
 
 func (a *Controller) getIngressIP(name, namespace string) (*IngressIP, bool, error) {
-	obj, err := a.ingressIPClient.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-
-	if apierrors.IsNotFound(err) {
+	obj, found := a.serviceImportController.globalIngressIPCache.getForService(namespace, name)
+	if !found {
 		return nil, false, nil
-	}
-
-	if err != nil {
-		return nil, false, err
 	}
 
 	return parseIngressIP(obj), true, nil

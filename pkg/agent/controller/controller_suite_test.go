@@ -222,6 +222,14 @@ func (t *testDriver) newGlobalIngressIP(name, ip string) *unstructured.Unstructu
 	return ingressIP
 }
 
+func (t *testDriver) newHeadlessGlobalIngressIP(name, ip string) *unstructured.Unstructured {
+	ingressIP := t.newGlobalIngressIP("pod"+"-"+name, ip)
+	Expect(unstructured.SetNestedField(ingressIP.Object, controller.HeadlessServicePod, "spec", "target")).To(Succeed())
+	Expect(unstructured.SetNestedField(ingressIP.Object, name, "spec", "podRef", "name")).To(Succeed())
+
+	return ingressIP
+}
+
 func (t *testDriver) justBeforeEach() {
 	t.cluster1.start(t, *t.syncerConfig)
 	t.cluster2.start(t, *t.syncerConfig)
@@ -518,9 +526,9 @@ func (t *testDriver) createGlobalIngressIP(ingressIP *unstructured.Unstructured)
 
 func (t *testDriver) createEndpointIngressIPs() {
 	t.endpointGlobalIPs = []string{globalIP1, globalIP2, globalIP3}
-	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-one", globalIP1))
-	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-two", globalIP2))
-	t.createGlobalIngressIP(t.newGlobalIngressIP("pod-not-ready", globalIP3))
+	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("one", globalIP1))
+	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("two", globalIP2))
+	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("not-ready", globalIP3))
 }
 
 func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
