@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"sync"
 
-	gobalance "github.com/danibachar/gobalancing"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	loadbalance "github.com/submariner-io/lighthouse/pkg/loadbalance"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -43,7 +43,7 @@ type clusterInfo struct {
 type serviceInfo struct {
 	key        string
 	records    map[string]*clusterInfo
-	balancer   *gobalance.SmoothWeightedRR
+	balancer   *loadbalance.SmoothWeightedRR
 	isHeadless bool
 }
 
@@ -132,7 +132,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService = &serviceInfo{
 				key:        key,
 				records:    make(map[string]*clusterInfo),
-				balancer:   gobalance.NewSWRR(),
+				balancer:   loadbalance.NewSWRR(),
 				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
 			}
 		}
