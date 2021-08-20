@@ -152,7 +152,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService.records[clusterName] = &clusterInfo{
 				name:   clusterName,
 				record: record,
-				weight: getServiceWeightFrom(serviceImport.Annotations),
+				weight: getServiceWeightFrom(serviceImport),
 			}
 		}
 
@@ -189,12 +189,14 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 	}
 }
 
-func getServiceWeightFrom(annotation map[string]string) int64 {
-	if val, ok := annotation["load-balancer.submariner.io/weight"]; ok {
+func getServiceWeightFrom(si *mcsv1a1.ServiceImport) int64 {
+	if val, ok := si.Annotations["load-balancer.submariner.io/weight"]; ok {
 		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {
 			return f
 		}
+
+		klog.Errorf("Error: %v parsing the \"load-balancer.submariner.io/weight\" annotation from ServiceImport %q", err, si.Name)
 	}
 
 	return 1 // Zero will cause no selection
