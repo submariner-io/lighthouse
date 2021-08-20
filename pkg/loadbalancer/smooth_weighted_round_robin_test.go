@@ -50,14 +50,14 @@ var _ = Describe("Smooth Weighted RR", func() {
 		return rInt.Int64()
 	}
 
-	addServer := func(s server, lb loadbalancer.Interface) {
+	addServer := func(s server) {
 		err := lb.Add(s.name, s.weight)
 		Expect(err).To(Succeed())
 	}
 
-	addAllServers := func(servers []server, lb loadbalancer.Interface) {
+	addAllServers := func(servers []server) {
 		for _, s := range servers {
-			addServer(s, lb)
+			addServer(s)
 		}
 	}
 
@@ -70,7 +70,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	}
 
 	// Validations
-	validateServerAdded := func(s server, lb loadbalancer.Interface) {
+	validateServerAdded := func(s server) {
 		for i := 0; i < 100; i++ {
 			if lb.Next() == s.name {
 				return
@@ -79,20 +79,20 @@ var _ = Describe("Smooth Weighted RR", func() {
 		Fail("Could not validate server presence")
 	}
 
-	validateAllServersAdded := func(servers []server, lb loadbalancer.Interface) {
+	validateAllServersAdded := func(servers []server) {
 		for _, s := range servers {
-			validateServerAdded(s, lb)
+			validateServerAdded(s)
 		}
 	}
 
-	validateEmptyLBState := func(lb loadbalancer.Interface) {
+	validateEmptyLBState := func() {
 		Expect(lb.ItemCount()).To(Equal((0)))
 		for i := 0; i < 100; i++ {
 			Expect(lb.Next()).To(BeNil())
 		}
 	}
 
-	validateLoadBalancingByCount := func(rounds int, servers []server, lb loadbalancer.Interface) {
+	validateLoadBalancingByCount := func(rounds int, servers []server) {
 		totalServersWeight := getTotalServesWeight(servers)
 		results := make(map[string]int64)
 		for i := 0; i < rounds; i++ {
@@ -106,7 +106,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		}
 	}
 
-	validateSmoothLoadBalancing := func(servers []server, lb loadbalancer.Interface) {
+	validateSmoothLoadBalancing := func(servers []server) {
 		Expect(lb.Next().(string)).To(Equal(servers[0].name))
 		Expect(lb.Next().(string)).To(Equal(servers[0].name))
 		Expect(lb.Next().(string)).To(Equal(servers[1].name))
@@ -141,24 +141,24 @@ var _ = Describe("Smooth Weighted RR", func() {
 
 	When("first created", func() {
 		It("should have an empty state", func() {
-			validateEmptyLBState(lb)
+			validateEmptyLBState()
 		})
 	})
 
 	When("all items are removed", func() {
 		It("should have an empty state", func() {
-			addAllServers(roundRobinServers, lb)
-			validateAllServersAdded(roundRobinServers, lb)
+			addAllServers(roundRobinServers)
+			validateAllServersAdded(roundRobinServers)
 			lb.RemoveAll()
-			validateEmptyLBState(lb)
+			validateEmptyLBState()
 		})
 	})
 
 	When("an item is added", func() {
 		It("should be added to the internal state", func() {
 			s := servers[0]
-			addServer(s, lb)
-			validateServerAdded(s, lb)
+			addServer(s)
+			validateServerAdded(s)
 		})
 	})
 
@@ -166,7 +166,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("should return an error", func() {
 			err := lb.Add(nil, 100)
 			Expect(err).ToNot(BeNil())
-			validateEmptyLBState(lb)
+			validateEmptyLBState()
 		})
 	})
 
@@ -174,14 +174,14 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("should return an error", func() {
 			err := lb.Add(servers[0], -100)
 			Expect(err).ToNot(BeNil())
-			validateEmptyLBState(lb)
+			validateEmptyLBState()
 		})
 	})
 
 	When("a single item is added", func() {
 		It("Next() should return it all the time", func() {
 			s := servers[0]
-			addServer(s, lb)
+			addServer(s)
 			for i := 0; i < 10; i++ {
 				Expect(lb.Next()).To(Equal(s.name))
 			}
@@ -191,7 +191,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	When("adding an item that is already present", func() {
 		It("should return an error", func() {
 			s := servers[0]
-			addServer(s, lb)
+			addServer(s)
 			err := lb.Add(s.name, s.weight)
 			Expect(err).ToNot(BeNil())
 			Expect(lb.ItemCount()).To(Equal(1))
@@ -199,15 +199,13 @@ var _ = Describe("Smooth Weighted RR", func() {
 	})
 
 	When("all items have equal weight", func() {
-		It("should balance them equaly", func() {
-			var rrs = make([]server, len(roundRobinServers))
-			_ = copy(rrs, roundRobinServers)
-			for _, s := range rrs {
+		It("should balance between them in an equal manner", func() {
+			for _, s := range roundRobinServers {
 				err := lb.Add(s.name, s.weight)
 				Expect(err).To(BeNil())
 			}
 			for i := 0; i < 100; i++ {
-				for _, s := range rrs {
+				for _, s := range roundRobinServers {
 					Expect(lb.Next().(string)).To(Equal(s.name))
 				}
 			}
@@ -216,24 +214,24 @@ var _ = Describe("Smooth Weighted RR", func() {
 
 	When("the items are weighted randomly", func() {
 		It("should correctly balance between them", func() {
-			addAllServers(servers, lb)
-			validateLoadBalancingByCount(100, servers, lb)
+			addAllServers(servers)
+			validateLoadBalancingByCount(100, servers)
 		})
 	})
 
 	When("the items are weighted by 5,1,1", func() {
 		It("should correctly balance between them", func() {
-			addAllServers(smoothTestingServers, lb)
-			validateSmoothLoadBalancing(smoothTestingServers, lb)
-			validateLoadBalancingByCount(100, smoothTestingServers, lb)
+			addAllServers(smoothTestingServers)
+			validateSmoothLoadBalancing(smoothTestingServers)
+			validateLoadBalancingByCount(100, smoothTestingServers)
 		})
 	})
 
 	When("an item is skipped", func() {
 		It("should be omitted from the next round", func() {
-			addAllServers(smoothTestingServers, lb)
+			addAllServers(smoothTestingServers)
 			// Normal Smoothing
-			validateSmoothLoadBalancing(smoothTestingServers, lb)
+			validateSmoothLoadBalancing(smoothTestingServers)
 			// Skip the item
 			failedItem := smoothTestingServers[0].name
 			lb.Skip(failedItem)
@@ -244,9 +242,9 @@ var _ = Describe("Smooth Weighted RR", func() {
 		})
 	})
 
-	When("adding a new item while balancing", func() {
+	When("a new item is added while balancing", func() {
 		It("should accommodate the addition", func() {
-			addAllServers(smoothTestingServers, lb)
+			addAllServers(smoothTestingServers)
 
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
@@ -261,12 +259,12 @@ var _ = Describe("Smooth Weighted RR", func() {
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[2].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[3].name))
+			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[3].name)) // new
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[1].name))
 
-			validateLoadBalancingByCount(100, smoothTestingServers, lb)
+			validateLoadBalancingByCount(100, smoothTestingServers)
 		})
 	})
 })
