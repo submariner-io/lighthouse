@@ -4,7 +4,7 @@ linters-settings:
     enabled-tags:
       - diagnostic
       - opinionated
-      #- performance
+      # - performance
       - style
   gocyclo:
     min-complexity: 15
