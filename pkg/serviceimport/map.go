@@ -190,7 +190,7 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func getServiceWeightFrom(annotation map[string]string) int64 {
-	if val, ok := annotation["weight"]; ok {
+	if val, ok := annotation["load-balancer.submariner.io/weight"]; ok {
 		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {
 			return f
