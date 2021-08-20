@@ -15,20 +15,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package loadbalance
+package loadbalancer_test
 
-// LoadBalance - general interface explaining the API of all load balancers available in the package
-type LoadBalancer interface {
-	// Next gets next selected item.
-	Next() (item interface{})
-	// Updates the weight of an item that is already in queue
-	Update(item interface{}, weight float64) (err error)
-	// Add adds a weighted item for selection. if not already in queue
-	Add(item interface{}, weight float64) (err error)
-	// All returns all items.
-	All() map[interface{}]float64
-	// RemoveAll removes all weighted items.
-	RemoveAll()
-	// Reset resets the balancing algorithm.
-	Reset()
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+func TestLoadBalancer(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "LoadBalancer Suite")
 }

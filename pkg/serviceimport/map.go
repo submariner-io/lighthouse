@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	loadbalance "github.com/submariner-io/lighthouse/pkg/loadbalance"
+	"github.com/submariner-io/lighthouse/pkg/loadbalancer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -43,7 +43,7 @@ type clusterInfo struct {
 type serviceInfo struct {
 	key        string
 	records    map[string]*clusterInfo
-	balancer   *loadbalance.SmoothWeightedRR
+	balancer   loadbalancer.Interface
 	isHeadless bool
 }
 
@@ -51,7 +51,7 @@ func (si *serviceInfo) resetLoadBalancing() {
 	si.balancer.RemoveAll()
 
 	for _, info := range si.records {
-		_ = si.balancer.Add(info, info.weight)
+		_ = si.balancer.Add(info.name, info.weight)
 	}
 }
 
@@ -62,11 +62,14 @@ type Map struct {
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) *DNSRecord {
-	queueLength := len(si.balancer.All())
+	queueLength := si.balancer.ItemsCount()
 	for i := 0; i < queueLength; i++ {
-		info := si.balancer.Next().(*clusterInfo)
+		selectedName := si.balancer.Next().(string)
+		info := si.records[selectedName]
 		if checkCluster(info.name) && checkEndpoint(name, namespace, info.name) {
 			return info.record
+		} else { // Notify the Load Balancer on a failure
+			si.balancer.ItemFailed(selectedName)
 		}
 	}
 
@@ -102,7 +105,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 		}
 	}
 
-	// Fall back to Round-Robin if service is not presented in the local cluster
+	// Fall back to chosen load balancer (weighted/RR/etc) if service is not presented in the local cluster
 	record = m.selectIP(si, name, namespace, checkCluster, checkEndpoint)
 
 	if record != nil {
@@ -132,7 +135,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService = &serviceInfo{
 				key:        key,
 				records:    make(map[string]*clusterInfo),
-				balancer:   loadbalance.NewSWRR(),
+				balancer:   loadbalancer.NewSmoothWeightedRR(),
 				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
 			}
 		}
@@ -184,7 +187,7 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func getServiceWeightFrom(annotation map[string]string) float64 {
-	if val, ok := annotation["remote-weight"]; ok {
+	if val, ok := annotation["weight"]; ok {
 		f, err := strconv.ParseFloat(val, 64)
 		if err != nil {
 			return f

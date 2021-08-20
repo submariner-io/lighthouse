@@ -15,16 +15,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package loadbalance_test
+package loadbalancer
 
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-)
-
-func TestLoadBalance(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "LoadBalance Suite")
+// Interface - general interface explaining the API of all load balancers available in the package
+type Interface interface {
+	// Next gets next selected item.
+	Next() (item interface{})
+	// If the item fetched suffer from some failure or is not well suted, you can notify the lb to accomodate and not fetch it for a full Next() round
+	ItemFailed(item interface{})
+	// Add adds a weighted item for selection. if not already in queue
+	Add(item interface{}, weight float64) (err error)
+	// RemoveAll removes all weighted items.
+	RemoveAll()
+	// The amount of items to balance between
+	ItemsCount() int
 }
