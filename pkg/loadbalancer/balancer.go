@@ -19,14 +19,14 @@ package loadbalancer
 
 // Interface - general interface explaining the API of all load balancers available in the package
 type Interface interface {
-	// Next gets next selected item.
+	// Next returns next item accordingly or nil if none present.
 	Next() (item interface{})
-	// If the item fetched suffer from some failure or is not well suted, you can notify the lb to accomodate and not fetch it for a full Next() round
-	ItemFailed(item interface{})
-	// Add adds a weighted item for selection. if not already in queue
-	Add(item interface{}, weight float64) (err error)
+	// Skip selecting the given item for a full round. This is useful if the item encountered a temporary failure.
+	Skip(item interface{})
+	// Add adds a weighted item for selection, if not already present.
+	Add(item interface{}, weight int64) (err error)
 	// RemoveAll removes all weighted items.
 	RemoveAll()
-	// The amount of items to balance between
-	ItemsCount() int
+	// The number of items in this instance.
+	ItemCount() int
 }

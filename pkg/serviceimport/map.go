@@ -18,12 +18,12 @@ limitations under the License.
 package serviceimport
 
 import (
-	"math"
 	"strconv"
 	"sync"
 
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/loadbalancer"
+	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -37,7 +37,7 @@ type DNSRecord struct {
 type clusterInfo struct {
 	record *DNSRecord
 	name   string
-	weight float64
+	weight int64
 }
 
 type serviceInfo struct {
@@ -51,7 +51,10 @@ func (si *serviceInfo) resetLoadBalancing() {
 	si.balancer.RemoveAll()
 
 	for _, info := range si.records {
-		_ = si.balancer.Add(info.name, info.weight)
+		err := si.balancer.Add(info.name, info.weight)
+		if err != nil {
+			klog.Error(err)
+		}
 	}
 }
 
@@ -62,14 +65,14 @@ type Map struct {
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) *DNSRecord {
-	queueLength := si.balancer.ItemsCount()
+	queueLength := si.balancer.ItemCount()
 	for i := 0; i < queueLength; i++ {
 		selectedName := si.balancer.Next().(string)
 		info := si.records[selectedName]
 		if checkCluster(info.name) && checkEndpoint(name, namespace, info.name) {
 			return info.record
-		} else { // Notify the Load Balancer on a failure
-			si.balancer.ItemFailed(selectedName)
+		} else { // Will Skip the selected name until a full "round" of the items is done
+			si.balancer.Skip(selectedName)
 		}
 	}
 
@@ -105,7 +108,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 		}
 	}
 
-	// Fall back to chosen load balancer (weighted/RR/etc) if service is not presented in the local cluster
+	// Fall back to selected load balancer (weighted/RR/etc) if service is not presented in the local cluster
 	record = m.selectIP(si, name, namespace, checkCluster, checkEndpoint)
 
 	if record != nil {
@@ -186,15 +189,15 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 	}
 }
 
-func getServiceWeightFrom(annotation map[string]string) float64 {
+func getServiceWeightFrom(annotation map[string]string) int64 {
 	if val, ok := annotation["weight"]; ok {
-		f, err := strconv.ParseFloat(val, 64)
+		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {
 			return f
 		}
 	}
 
-	return math.SmallestNonzeroFloat64 // Zero will cause no selection
+	return 1 // Zero will cause no selection
 }
 
 func keyFunc(namespace, name string) string {

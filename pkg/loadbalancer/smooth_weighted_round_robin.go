@@ -18,65 +18,65 @@ limitations under the License.
 package loadbalancer
 
 import (
-	"errors"
+	"fmt"
 
 	"k8s.io/klog"
 )
 
 type weightedItem struct {
 	item            interface{}
-	weight          float64
-	currentWeight   float64
-	effectiveWeight float64
+	weight          int64
+	currentWeight   int64
+	effectiveWeight int64
 }
 
-// SmoothWeightedRR - Load Balancer implementation, Smooth Weighted Round Robin
+// Smooth Weighted Round Robin load balancer implementation.
 type smoothWeightedRR struct {
-	items    []*weightedItem
-	itemsMap map[interface{}]*weightedItem
+	items   []*weightedItem
+	itemMap map[interface{}]*weightedItem
 }
 
-// NewSWRR - SmoothWeightedRR - Load Balancer constructor
+// NewSmoothWeightedRR returns a Smooth Weighted Round Robin load balancer.
 func NewSmoothWeightedRR() Interface {
 	return &smoothWeightedRR{
-		items:    make([]*weightedItem, 0),
-		itemsMap: make(map[interface{}]*weightedItem),
+		items:   make([]*weightedItem, 0),
+		itemMap: make(map[interface{}]*weightedItem),
 	}
 }
 
-func (lb *smoothWeightedRR) ItemFailed(item interface{}) {
-	if wt, ok := lb.itemsMap[item]; ok {
+func (lb *smoothWeightedRR) Skip(item interface{}) {
+	if wt, ok := lb.itemMap[item]; ok {
 		wt.effectiveWeight -= wt.weight
 		if wt.effectiveWeight < 0 {
 			wt.effectiveWeight = 0
 		}
 	} else {
-		klog.Errorf("could not find item to reduce effective weight %v", item)
+		klog.Errorf("Could not find item to skip: %v", item)
 	}
 }
 
 // Number of Items added
-func (lb *smoothWeightedRR) ItemsCount() int {
+func (lb *smoothWeightedRR) ItemCount() int {
 	return len(lb.items)
 }
 
 // Add - adds a new unique item to the list
-func (lb *smoothWeightedRR) Add(item interface{}, weight float64) (err error) {
+func (lb *smoothWeightedRR) Add(item interface{}, weight int64) (err error) {
 	if item == nil {
-		return errors.New("item cannot be nil")
+		return fmt.Errorf("item cannot be nil")
 	}
 
 	if weight < 0 {
-		return errors.New("weight cannot be negative")
+		return fmt.Errorf("item weight %v cannot be negative", weight)
 	}
 
-	if lb.itemsMap[item] != nil {
-		return errors.New("item already in queue")
+	if lb.itemMap[item] != nil {
+		return fmt.Errorf("item %v already present", item)
 	}
 
-	weightedItem := &weightedItem{item: item, weight: weight, effectiveWeight: weight}
+	weightedItem := &weightedItem{item: item, weight: weight, currentWeight: 0, effectiveWeight: weight}
 
-	lb.itemsMap[item] = weightedItem
+	lb.itemMap[item] = weightedItem
 	lb.items = append(lb.items, weightedItem)
 
 	return nil
@@ -85,10 +85,10 @@ func (lb *smoothWeightedRR) Add(item interface{}, weight float64) (err error) {
 // RemoveAll - removes all items and reset state
 func (lb *smoothWeightedRR) RemoveAll() {
 	lb.items = lb.items[:0]
-	lb.itemsMap = make(map[interface{}]*weightedItem)
+	lb.itemMap = make(map[interface{}]*weightedItem)
 }
 
-// Next - fetches next item according to the smooth weighted round robin fashion
+// Next - fetches the next item according to the smooth weighted round robin algorithm.
 func (lb *smoothWeightedRR) Next() interface{} {
 	i := lb.nextWeightedItem()
 	if i == nil {
@@ -112,7 +112,7 @@ func (lb *smoothWeightedRR) nextWeightedItem() *weightedItem {
 }
 
 func nextSmoothWeightedItem(items []*weightedItem) (best *weightedItem) {
-	total := 0.0
+	total := int64(0)
 
 	for _, item := range items {
 		item.currentWeight += item.effectiveWeight
