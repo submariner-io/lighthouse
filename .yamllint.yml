@@ -12,5 +12,3 @@ ignore: |
   /vendor
   # Correcting breaks `make e2e using=helm`
   /scripts/resources/coredns-cm.yaml
-
-strict: true
