@@ -99,6 +99,12 @@ func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx conte
 		return lh.emptyResponse(state)
 	}
 
+	// Count records
+	localClusterID := lh.clusterStatus.LocalClusterID()
+	for _, record := range dnsRecords {
+		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace, record.IP)
+	}
+
 	records := make([]dns.RR, 0)
 
 	if state.QType() == dns.TypeA {

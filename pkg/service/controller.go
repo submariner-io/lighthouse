@@ -37,18 +37,20 @@ import (
 
 type Controller struct {
 	// Indirection hook for unit tests to supply fake client sets
-	NewClientset func(kubeConfig *rest.Config) (kubernetes.Interface, error)
-	svcInformer  cache.Controller
-	svcStore     cache.Store
-	stopCh       chan struct{}
+	NewClientset   func(kubeConfig *rest.Config) (kubernetes.Interface, error)
+	svcInformer    cache.Controller
+	svcStore       cache.Store
+	stopCh         chan struct{}
+	localClusterID string
 }
 
-func NewController() *Controller {
+func NewController(localClusterID string) *Controller {
 	return &Controller{
 		NewClientset: func(c *rest.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(c)
 		},
-		stopCh: make(chan struct{}),
+		stopCh:         make(chan struct{}),
+		localClusterID: localClusterID,
 	}
 }
 
@@ -122,8 +124,9 @@ func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bo
 	}
 
 	record := &serviceimport.DNSRecord{
-		IP:    svc.Spec.ClusterIP,
-		Ports: mcsServicePorts,
+		IP:          svc.Spec.ClusterIP,
+		Ports:       mcsServicePorts,
+		ClusterName: c.localClusterID,
 	}
 
 	return record, true
