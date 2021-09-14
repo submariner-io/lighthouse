@@ -144,11 +144,14 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			record := &DNSRecord{
-				IP:    serviceImport.Spec.IPs[0],
-				Ports: serviceImport.Spec.Ports,
-			}
 			clusterName := serviceImport.GetLabels()[lhconstants.LabelSourceCluster]
+
+			record := &DNSRecord{
+				IP:          serviceImport.Spec.IPs[0],
+				Ports:       serviceImport.Spec.Ports,
+				ClusterName: clusterName,
+			}
+
 			remoteService.records[clusterName] = &clusterInfo{
 				name:   clusterName,
 				record: record,

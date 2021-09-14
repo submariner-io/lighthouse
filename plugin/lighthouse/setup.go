@@ -94,7 +94,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, fmt.Errorf("error starting the Gateway controller: %v", err)
 	}
 
-	svcController := service.NewController()
+	svcController := service.NewController(gwController.LocalClusterID())
 	err = svcController.Start(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error starting the Service controller: %v", err)
