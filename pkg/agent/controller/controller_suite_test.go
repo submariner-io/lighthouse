@@ -20,6 +20,7 @@ package controller_test
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -340,7 +341,7 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 		}
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		if serviceIP == "" {
 			Expect(len(serviceImport.Spec.IPs)).To(Equal(0))
 		} else {
@@ -443,7 +444,7 @@ func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, en
 		return reflect.DeepEqual(actualIPs, expectedIPs), nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		Expect(actualIPs).To(Equal(expectedIPs))
 	}
 
@@ -584,7 +585,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		if found == nil {
 			Fail("ServiceExport not found")
 		}
