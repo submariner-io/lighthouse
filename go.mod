@@ -6,6 +6,7 @@ require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.8.3
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.43
 	github.com/onsi/ginkgo v1.16.4
@@ -37,3 +38,8 @@ replace (
 
 // Pinned for coredns
 replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
+
+// CVE-2020-26160
+// This shouldn't be needed once we upgrade CoreDNS; but see
+// https://github.com/submariner-io/lighthouse/issues/576
+replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.1+incompatible
