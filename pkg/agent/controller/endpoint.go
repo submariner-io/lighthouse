@@ -94,7 +94,10 @@ func (e *EndpointController) cleanup() {
 	resourceClient := e.localClient.Resource(schema.GroupVersionResource{Group: "discovery.k8s.io",
 		Version: "v1beta1", Resource: "endpointslices"}).Namespace(e.serviceImportSourceNameSpace)
 
-	endpointSliceLabels := labels.SelectorFromSet(map[string]string{lhconstants.LabelServiceImportName: e.serviceImportName})
+	endpointSliceLabels := labels.SelectorFromSet(map[string]string{
+		lhconstants.LabelSourceNamespace: e.serviceImportSourceNameSpace,
+		lhconstants.LabelSourceCluster:   e.clusterID,
+		lhconstants.LabelSourceName:      e.serviceName})
 	listEndpointSliceOptions := metav1.ListOptions{
 		LabelSelector: endpointSliceLabels.String(),
 	}
@@ -137,11 +140,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		lhconstants.LabelServiceImportName: e.serviceImportName,
-		discovery.LabelManagedBy:           lhconstants.LabelValueManagedBy,
-		lhconstants.LabelSourceNamespace:   e.serviceImportSourceNameSpace,
-		lhconstants.LabelSourceCluster:     e.clusterID,
-		lhconstants.LabelSourceName:        e.serviceName,
+		discovery.LabelManagedBy:         lhconstants.LabelValueManagedBy,
+		lhconstants.LabelSourceNamespace: e.serviceImportSourceNameSpace,
+		lhconstants.LabelSourceCluster:   e.clusterID,
+		lhconstants.LabelSourceName:      e.serviceName,
 	}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4
