@@ -157,7 +157,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService.records[clusterName] = &clusterInfo{
 				name:   clusterName,
 				record: record,
-				weight: getServiceWeightFrom(serviceImport),
+				weight: getServiceWeightFrom(serviceImport, clusterName),
 			}
 		}
 
@@ -194,8 +194,9 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 	}
 }
 
-func getServiceWeightFrom(si *mcsv1a1.ServiceImport) int64 {
-	if val, ok := si.Annotations["load-balancer.submariner.io/weight"]; ok {
+func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int64 {
+	weightKey := "load-balancer.submariner.io/weight/" + forClusterName
+	if val, ok := si.Annotations[weightKey]; ok {
 		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {
 			return f
