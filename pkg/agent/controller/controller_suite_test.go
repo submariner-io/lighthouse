@@ -364,13 +364,9 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 
 	endpointSlice := &discovery.EndpointSlice{}
 	Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
-
-	siName := service.Name + "-" + service.Namespace + "-" + clusterID1
-
 	Expect(endpointSlice.Namespace).To(Equal(namespace))
 
 	labels := endpointSlice.GetLabels()
-	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelServiceImportName, siName))
 	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
 	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
 	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceCluster, clusterID1))
