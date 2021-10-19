@@ -34,7 +34,7 @@ const (
 
 var dnsQueryCounter *prometheus.GaugeVec
 
-func initLighthouseMetrics() {
+func init() {
 	klog.Infof("Initializing dns query counter")
 
 	dnsQueryCounter = prometheus.NewGaugeVec(
@@ -51,10 +51,6 @@ func initLighthouseMetrics() {
 }
 
 func incDNSQueryCounter(srcCluster, dstCluster, dstSvcName, dstSvcNamespace, dstSvcIP string) {
-	if dnsQueryCounter == nil {
-		initLighthouseMetrics()
-	}
-
 	labels := prometheus.Labels{
 		srcClusterKey:      srcCluster,
 		dstClusterKey:      dstCluster,
