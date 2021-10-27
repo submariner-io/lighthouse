@@ -58,6 +58,7 @@ type Framework struct {
 
 var MCSClients []*mcsClientset.Clientset
 var EndpointClients []dynamic.ResourceInterface
+var SubmarinerClients []dynamic.ResourceInterface
 
 func init() {
 	framework.AddBeforeSuite(beforeSuite)
@@ -86,6 +87,7 @@ func beforeSuite() {
 	for _, restConfig := range framework.RestConfigs {
 		MCSClients = append(MCSClients, createLighthouseClient(restConfig))
 		EndpointClients = append(EndpointClients, createEndpointClientSet(restConfig))
+		SubmarinerClients = append(SubmarinerClients, createSubmarinerClientSet(restConfig))
 	}
 
 	framework.DetectGlobalnet()
@@ -108,6 +110,18 @@ func createEndpointClientSet(restConfig *rest.Config) dynamic.ResourceInterface 
 	Expect(err).To(Not(HaveOccurred()))
 
 	return endpointsClient
+}
+
+func createSubmarinerClientSet(restConfig *rest.Config) dynamic.ResourceInterface {
+	clientSet, err := dynamic.NewForConfig(restConfig)
+	Expect(err).To(Not(HaveOccurred()))
+
+	gvr, _ := schema.ParseResourceArg("submariners.v1alpha1.submariner.io")
+	submarinersClient := clientSet.Resource(*gvr).Namespace("submariner-operator")
+	_, err = submarinersClient.List(context.TODO(), metav1.ListOptions{})
+	Expect(err).To(Not(HaveOccurred()))
+
+	return submarinersClient
 }
 
 func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
@@ -487,6 +501,32 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpoi
 	})
 
 	return endpointName, healthCheckIP
+}
+
+func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) (healthCheckEnabled bool) {
+	framework.AwaitUntil("Get healthCheckEnabled Configuration", func() (interface{}, error) {
+		unstructuredSubmarinerConfig, err := SubmarinerClients[cluster].Get(context.TODO(),
+			"submariner", metav1.GetOptions{})
+		return unstructuredSubmarinerConfig, err
+	}, func(result interface{}) (bool, string, error) {
+		unstructuredSubmarinerConfig := result.(*unstructured.Unstructured)
+		By(fmt.Sprintf("Getting the Submariner Config, for cluster %s", framework.TestContext.ClusterIDs[cluster]))
+		var found bool
+		var err error
+		healthCheckEnabled, found, err = unstructured.NestedBool(unstructuredSubmarinerConfig.Object,
+			"spec", "connectionHealthCheck", "enabled")
+
+		if err != nil {
+			return false, "", err
+		}
+
+		if !found {
+			return true, "", nil
+		}
+		return true, "", nil
+	})
+
+	return healthCheckEnabled
 }
 
 func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpointName string) {

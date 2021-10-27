@@ -93,6 +93,12 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 			}
 
 			randomIP := "192.168.1.5"
+			healthCheckEnabled := f.GetHealthCheckEnabledInfo(framework.ClusterC)
+			if !healthCheckEnabled {
+				Skip("Healthcheck is not enabled hence skipping the test")
+				return
+			}
+
 			endpointName, healthCheckIP = f.GetHealthCheckIPInfo(framework.ClusterC)
 			f.SetHealthCheckIP(framework.ClusterC, randomIP, endpointName)
 		})
