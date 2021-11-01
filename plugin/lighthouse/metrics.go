@@ -29,7 +29,7 @@ const (
 	dstSvcIPKey        = "destination_service_ip"
 	dstSvcNamespaceKey = "destination_service_namespace"
 
-	ServiceDiscoveryQueryCounterName = "submariner_service_discovery_query_counter"
+	ServiceDiscoveryQueryCounterName = "submariner_service_discovery_query"
 )
 
 var dnsQueryCounter *prometheus.GaugeVec
@@ -40,14 +40,12 @@ func init() {
 	dnsQueryCounter = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: ServiceDiscoveryQueryCounterName,
-			Help: "Count the numebr of dns queries",
+			Help: "Count DNS queries",
 		},
 		[]string{srcClusterKey, dstClusterKey, dstSvcNameKey, dstSvcNamespaceKey, dstSvcIPKey},
 	)
 
-	if err := prometheus.Register(dnsQueryCounter); err != nil {
-		klog.Errorf("Failed to register: %s with prometheus due to: %v", ServiceDiscoveryQueryCounterName, err)
-	}
+	prometheus.MustRegister(dnsQueryCounter)
 }
 
 func incDNSQueryCounter(srcCluster, dstCluster, dstSvcName, dstSvcNamespace, dstSvcIP string) {
