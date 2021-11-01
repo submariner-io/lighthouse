@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.11.0-rc1
-	github.com/submariner-io/shipyard v0.11.0-rc1
+	github.com/submariner-io/shipyard v0.12.0-m0
 	github.com/uw-labs/lichen v0.1.4
 	go.uber.org/zap v1.15.0 // indirect
 	k8s.io/api v0.21.0
