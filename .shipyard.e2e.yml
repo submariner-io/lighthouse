@@ -1,0 +1,9 @@
+---
+cni: weave
+submariner: true
+nodes: control-plane worker worker
+clusters:
+  cluster1:
+  cluster2:
+  cluster3:
+    nodes: control-plane worker
