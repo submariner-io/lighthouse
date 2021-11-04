@@ -34,9 +34,6 @@ bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
 bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
 	${SCRIPTS_DIR}/compile.sh $@ pkg/coredns/main.go $(BUILD_ARGS)
 
-deploy: images clusters
-	./scripts/$@ $(DEPLOY_ARGS)
-
 licensecheck: BUILD_ARGS=--noupx
 licensecheck: $(BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(BINARIES)
