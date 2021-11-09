@@ -15,7 +15,7 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
 CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.yml
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
-override E2E_ARGS += $(CLUSTER_SETTINGS_FLAG) cluster1 cluster2 cluster3
+override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
 override DEPLOY_ARGS += --service_discovery
 
