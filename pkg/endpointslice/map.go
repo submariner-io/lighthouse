@@ -40,15 +40,15 @@ type clusterInfo struct {
 
 type Map struct {
 	epMap map[string]*endpointInfo
-	sync.RWMutex
+	mutex sync.RWMutex
 }
 
 func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
 	key := keyFunc(name, namespace)
 
 	clusterInfos := func() map[string]*clusterInfo {
-		m.RLock()
-		defer m.RUnlock()
+		m.mutex.RLock()
+		defer m.mutex.RUnlock()
 
 		result, ok := m.epMap[key]
 		if !ok {
@@ -105,8 +105,8 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		return
 	}
 
-	m.Lock()
-	defer m.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	epInfo, ok := m.epMap[key]
 	if !ok {
@@ -171,8 +171,8 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 			return
 		}
 
-		m.Lock()
-		defer m.Unlock()
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
 
 		epInfo, ok := m.epMap[key]
 		if !ok {
@@ -185,8 +185,8 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 }
 
 func (m *Map) Get(key string) *endpointInfo {
-	m.RLock()
-	defer m.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 	endpointInfo := m.epMap[key]
 
 	return endpointInfo

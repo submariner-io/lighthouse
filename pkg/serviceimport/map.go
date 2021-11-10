@@ -60,7 +60,7 @@ func (si *serviceInfo) resetLoadBalancing() {
 
 type Map struct {
 	svcMap map[string]*serviceInfo
-	sync.RWMutex
+	mutex  sync.RWMutex
 }
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
@@ -81,8 +81,8 @@ func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster fun
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool) (record *DNSRecord, found, isLocal bool) {
-	m.RLock()
-	defer m.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
 	si, ok := m.svcMap[keyFunc(namespace, name)]
 	if !ok || si.isHeadless {
@@ -129,8 +129,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)
 
-		m.Lock()
-		defer m.Unlock()
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
 
 		remoteService, ok := m.svcMap[key]
 
@@ -169,8 +169,8 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 		namespace := serviceImport.Annotations["origin-namespace"]
 		key := keyFunc(namespace, name)
 
-		m.Lock()
-		defer m.Unlock()
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
 
 		remoteService, ok := m.svcMap[key]
 		if !ok {
