@@ -342,9 +342,9 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 
 		if serviceIP == "" {
 			return len(serviceImport.Spec.IPs) == 0, nil
-		} else {
-			return reflect.DeepEqual(serviceImport.Spec.IPs, []string{serviceIP}), nil
 		}
+
+		return reflect.DeepEqual(serviceImport.Spec.IPs, []string{serviceIP}), nil
 	})
 
 	if errors.Is(err, wait.ErrWaitTimeout) {

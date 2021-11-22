@@ -184,7 +184,7 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 	}
 }
 
-func (m *Map) Get(key string) *endpointInfo {
+func (m *Map) get(key string) *endpointInfo {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	endpointInfo := m.epMap[key]
