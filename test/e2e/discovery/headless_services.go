@@ -292,7 +292,8 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
 	ports := service.Spec.Ports
 	for i := range domains {
-		for _, port := range ports {
+		for j := range ports {
+			port := &ports[j]
 			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
 			op := opAre
 			if !shouldContain {
@@ -339,7 +340,7 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 	}
 }
 
-func createSRVQuery(f *framework.Framework, port corev1.ServicePort, service *corev1.Service,
+func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *corev1.Service,
 	domain string, clusterName string, withPort, withcluster bool) (cmd []string, domainName string) {
 	cmd = []string{"dig", "+short", "SRV"}
 

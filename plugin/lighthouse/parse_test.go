@@ -42,7 +42,7 @@ func testParseValid() {
 			tc := parseTest{"webs.mynamespace.svc.inter.webs.tests.", "..webs.mynamespace.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -53,7 +53,7 @@ func testParseValid() {
 			tc := parseTest{"host1.cluster1.webs.mynamespace.svc.inter.webs.tests.", "host1.cluster1.webs.mynamespace.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -64,7 +64,7 @@ func testParseValid() {
 			tc := parseTest{"cluster1.webs.mynamespace.svc.inter.webs.tests.", ".cluster1.webs.mynamespace.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -75,7 +75,7 @@ func testParseValid() {
 			tc := parseTest{"*.any.*.any.svc.inter.webs.tests.", "*.any.*.any.svc"}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -86,7 +86,7 @@ func testParseValid() {
 			tc := parseTest{"inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -97,7 +97,7 @@ func testParseValid() {
 			tc := parseTest{"svc.inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -108,7 +108,7 @@ func testParseValid() {
 			tc := parseTest{"pod.inter.webs.tests.", bareResult}
 			m := new(dns.Msg)
 			m.SetQuestion(tc.query, dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			r, e := parseRequest(state)
 			Expect(e).NotTo(HaveOccurred())
 			Expect(r.String()).Should(Equal(tc.expected))
@@ -121,7 +121,7 @@ func testParseInvalid() {
 		It("Should give error", func() {
 			m := new(dns.Msg)
 			m.SetQuestion("webs.mynamespace.pood.inter.webs.test.", dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			_, e := parseRequest(state)
 			Expect(e).To(HaveOccurred())
 		})
@@ -130,7 +130,7 @@ func testParseInvalid() {
 		It("Should give error", func() {
 			m := new(dns.Msg)
 			m.SetQuestion("too.long.for.what.I.am.trying.to.pod.inter.webs.tests.", dns.TypeA)
-			state := request.Request{Zone: zone, Req: m}
+			state := &request.Request{Zone: zone, Req: m}
 			_, e := parseRequest(state)
 			Expect(e).To(HaveOccurred())
 		})

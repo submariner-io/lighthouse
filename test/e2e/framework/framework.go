@@ -194,7 +194,8 @@ func (f *Framework) AwaitServiceImportWithIP(targetCluster framework.ClusterInde
 		if len(siList.Items) < 1 {
 			return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
 		}
-		for i, si := range siList.Items {
+		for i := range siList.Items {
+			si := &siList.Items[i]
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				if si.Spec.IPs[0] == serviceIP {
 					retServiceImport = &siList.Items[i]
@@ -216,7 +217,8 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 		return si.List(context.TODO(), metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
-		for _, si := range siList.Items {
+		for i := range siList.Items {
+			si := &siList.Items[i]
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				return false, fmt.Sprintf("ServiceImport with name prefix %s still exists", siNamePrefix), nil
 			}
@@ -438,7 +440,8 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 		sliceCount := 0
 		epCount := 0
 
-		for _, es := range endpointSliceList.Items {
+		for i := range endpointSliceList.Items {
+			es := &endpointSliceList.Items[i]
 			if name == "" || strings.HasPrefix(es.Name, name) {
 				sliceCount++
 				epCount += len(es.Endpoints)

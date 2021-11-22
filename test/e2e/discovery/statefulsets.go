@@ -128,7 +128,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	verifyCount := 0
 
-	for _, endpointSlice := range endpointSlices.Items {
+	for i := range endpointSlices.Items {
+		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
 		for _, endpoint := range endpointSlice.Endpoints {
@@ -174,7 +175,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	f.SetNginxStatefulSetReplicas(framework.ClusterB, 1)
 
-	for _, endpointSlice := range endpointSlices.Items {
+	for i := range endpointSlices.Items {
+		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
 		for _, endpoint := range endpointSlice.Endpoints {
@@ -191,7 +193,8 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 	endpointSlices *v1beta1.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
 	count := 0
 
-	for _, endpointSlice := range endpointSlices.Items {
+	for i := range endpointSlices.Items {
+		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
 		for _, endpoint := range endpointSlice.Endpoints {
