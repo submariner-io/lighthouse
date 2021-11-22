@@ -25,6 +25,7 @@ linters:
     - errorlint
     - exportloopref
     - gci
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
