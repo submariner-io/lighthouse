@@ -32,7 +32,7 @@ const PluginName = "lighthouse"
 
 // ServeDNS implements the plugin.Handler interface.
 func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	state := request.Request{W: w, Req: r}
+	state := &request.Request{W: w, Req: r}
 	qname := state.QName()
 
 	log.Debugf("Request received for %q", qname)
@@ -66,8 +66,8 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	return lh.getDNSRecord(zone, state, ctx, w, r, pReq)
 }
 
-func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx context.Context, w dns.ResponseWriter,
-	r *dns.Msg, pReq recordRequest) (int, error) {
+func (lh *Lighthouse) getDNSRecord(zone string, state *request.Request, ctx context.Context, w dns.ResponseWriter,
+	r *dns.Msg, pReq *recordRequest) (int, error) {
 	var isHeadless bool
 	var (
 		dnsRecords []serviceimport.DNSRecord
@@ -136,7 +136,7 @@ func (lh *Lighthouse) getDNSRecord(zone string, state request.Request, ctx conte
 	return dns.RcodeSuccess, nil
 }
 
-func (lh *Lighthouse) emptyResponse(state request.Request) (int, error) {
+func (lh *Lighthouse) emptyResponse(state *request.Request) (int, error) {
 	a := new(dns.Msg)
 	a.SetReply(state.Req)
 	a.Authoritative = true

@@ -52,17 +52,21 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-const clusterID1 = "east"
-const clusterID2 = "west"
-const serviceNamespace = "service-ns"
-const globalIP1 = "242.254.1.1"
-const globalIP2 = "242.254.1.2"
-const globalIP3 = "242.254.1.3"
+const (
+	clusterID1       = "east"
+	clusterID2       = "west"
+	serviceNamespace = "service-ns"
+	globalIP1        = "242.254.1.1"
+	globalIP2        = "242.254.1.2"
+	globalIP3        = "242.254.1.3"
+)
 
-var nodeName = "my-node"
-var hostName = "my-host"
-var ready = true
-var notReady = false
+var (
+	nodeName = "my-node"
+	hostName = "my-host"
+	ready    = true
+	notReady = false
+)
 
 func init() {
 	klog.InitFlags(nil)
@@ -199,8 +203,8 @@ func newTestDiver() *testDriver {
 	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace).(*fake.DynamicResourceClient)
 
-	t.cluster1.init(*t.syncerConfig)
-	t.cluster2.init(*t.syncerConfig)
+	t.cluster1.init(t.syncerConfig)
+	t.cluster2.init(t.syncerConfig)
 
 	return t
 }
@@ -240,7 +244,7 @@ func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(syncerConfig broker.SyncerConfig) {
+func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.localDynClient = fake.NewDynamicClient(syncerConfig.Scheme)
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
@@ -260,6 +264,7 @@ func (c *cluster) init(syncerConfig broker.SyncerConfig) {
 	c.localKubeClient = fakeCS
 }
 
+// nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	syncerConfig.LocalClient = c.localDynClient
 	bigint, err := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -275,7 +280,8 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	agentController, err := controller.New(&c.agentSpec, syncerConfig, c.localKubeClient,
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
-			ServiceExportCounterName: serviceExportCounterName})
+			ServiceExportCounterName: serviceExportCounterName,
+		})
 
 	Expect(err).To(Succeed())
 	Expect(agentController.Start(t.stopCh)).To(Succeed())
@@ -375,8 +381,10 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 
 	addresses := globalIPs
 	if addresses == nil {
-		addresses = []string{endpoints.Subsets[0].Addresses[0].IP, endpoints.Subsets[0].Addresses[1].IP,
-			endpoints.Subsets[0].NotReadyAddresses[0].IP}
+		addresses = []string{
+			endpoints.Subsets[0].Addresses[0].IP, endpoints.Subsets[0].Addresses[1].IP,
+			endpoints.Subsets[0].NotReadyAddresses[0].IP,
+		}
 	}
 
 	Expect(endpointSlice.Endpoints).To(HaveLen(3))

@@ -116,6 +116,7 @@ func (m *MockLocalServices) GetIP(name, namespace string) (*serviceimport.DNSRec
 func getKey(name, namespace string) string {
 	return namespace + "/" + name
 }
+
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
@@ -1045,6 +1046,7 @@ func testSRVMultiplePorts() {
 	})
 }
 
+// nolint:gocritic // (hugeParam) It's fine to pass 'tc' by value here.
 func executeTestCase(lh *Lighthouse, rec *dnstest.Recorder, tc test.Case) {
 	code, err := lh.ServeDNS(context.TODO(), rec, tc.Msg())
 

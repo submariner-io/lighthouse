@@ -27,19 +27,21 @@ import (
 	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state request.Request) []dns.RR {
+func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state *request.Request) []dns.RR {
 	records := make([]dns.RR, 0)
 
 	for _, record := range dnsrecords {
-		dnsRecord := &dns.A{Hdr: dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(),
-			Ttl: lh.ttl}, A: net.ParseIP(record.IP).To4()}
+		dnsRecord := &dns.A{Hdr: dns.RR_Header{
+			Name: state.QName(), Rrtype: dns.TypeA, Class: state.QClass(),
+			Ttl: lh.ttl,
+		}, A: net.ParseIP(record.IP).To4()}
 		records = append(records, dnsRecord)
 	}
 
 	return records
 }
 
-func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, state request.Request, pReq recordRequest, zone string,
+func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, state *request.Request, pReq *recordRequest, zone string,
 	isHeadless bool) []dns.RR {
 	var records []dns.RR
 
@@ -92,7 +94,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, sta
 	return records
 }
 
-func (lh *Lighthouse) getClusterIPForSvc(pReq recordRequest) (*serviceimport.DNSRecord, bool) {
+func (lh *Lighthouse) getClusterIPForSvc(pReq *recordRequest) (*serviceimport.DNSRecord, bool) {
 	localClusterID := lh.clusterStatus.LocalClusterID()
 
 	record, found, isLocal := lh.serviceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.clusterStatus.IsConnected,
