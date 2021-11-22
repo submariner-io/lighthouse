@@ -20,15 +20,14 @@ package controller
 import (
 	"sync"
 
-	"github.com/submariner-io/admiral/pkg/watcher"
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 type Controller struct {
