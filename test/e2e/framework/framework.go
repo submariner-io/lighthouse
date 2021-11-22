@@ -54,9 +54,11 @@ type Framework struct {
 	*framework.Framework
 }
 
-var MCSClients []*mcsClientset.Clientset
-var EndpointClients []dynamic.ResourceInterface
-var SubmarinerClients []dynamic.ResourceInterface
+var (
+	MCSClients        []*mcsClientset.Clientset
+	EndpointClients   []dynamic.ResourceInterface
+	SubmarinerClients []dynamic.ResourceInterface
+)
 
 func init() {
 	framework.AddBeforeSuite(beforeSuite)

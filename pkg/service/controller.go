@@ -93,7 +93,6 @@ func (c *Controller) Stop() {
 func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bool) {
 	key := namespace + "/" + name
 	obj, exists, err := c.svcStore.GetByKey(key)
-
 	if err != nil {
 		klog.V(log.DEBUG).Infof("Error trying to get service for key %q", key)
 		return nil, false

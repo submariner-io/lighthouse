@@ -138,7 +138,6 @@ var _ = Describe("EndpointSlice Map", func() {
 			expectIPs("", "", namespace1, service1, []string{endpointIP})
 		})
 	})
-
 })
 
 func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {

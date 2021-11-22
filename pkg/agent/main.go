@@ -110,7 +110,8 @@ func main() {
 	}, kubeClientSet,
 		controller.AgentConfig{
 			ServiceImportCounterName: "submariner_service_import",
-			ServiceExportCounterName: "submariner_service_export"})
+			ServiceExportCounterName: "submariner_service_export",
+		})
 	if err != nil {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}

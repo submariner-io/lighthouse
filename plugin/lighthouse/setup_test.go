@@ -40,8 +40,7 @@ import (
 	fakeMCSClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned/fake"
 )
 
-type fakeHandler struct {
-}
+type fakeHandler struct{}
 
 func (f *fakeHandler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	return dns.RcodeSuccess, nil

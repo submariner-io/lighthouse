@@ -37,9 +37,11 @@ import (
 	"k8s.io/klog"
 )
 
-const localClusterID = "east"
-const remoteClusterID1 = "west"
-const remoteClusterID2 = "south"
+const (
+	localClusterID   = "east"
+	remoteClusterID1 = "west"
+	remoteClusterID2 = "south"
+)
 
 var _ = Describe("Gateway controller", func() {
 	t := newTestDiver()
