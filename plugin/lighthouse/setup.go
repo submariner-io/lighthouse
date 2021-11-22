@@ -109,8 +109,8 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	})
 
 	lh := &Lighthouse{
-		ttl: defaultTTL, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
-		endpointsStatus: epController, localServices: svcController,
+		TTL: defaultTTL, ServiceImports: siMap, ClusterStatus: gwController, EndpointSlices: epMap,
+		EndpointsStatus: epController, LocalServices: svcController,
 	}
 
 	// Changed `for` to `if` to satisfy golint:
@@ -136,7 +136,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 					return nil, err
 				}
 
-				lh.ttl = t
+				lh.TTL = t
 			default:
 				if c.Val() != "}" {
 					return nil, c.Errf("unknown property '%s'", c.Val())
