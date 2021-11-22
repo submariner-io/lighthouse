@@ -43,11 +43,11 @@ type Controller struct {
 	NewClientset NewClientsetFunc
 	epsInformer  cache.Controller
 	stopCh       chan struct{}
-	store        Store
+	store        *Map
 	clientSet    kubernetes.Interface
 }
 
-func NewController(endpointSliceStore Store) *Controller {
+func NewController(endpointSliceStore *Map) *Controller {
 	return &Controller{
 		NewClientset: getNewClientsetFunc(),
 		stopCh:       make(chan struct{}),
@@ -134,7 +134,7 @@ func (c *Controller) Stop() {
 
 func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {
 	key := keyFunc(name, namespace)
-	endpointInfo := c.store.Get(key)
+	endpointInfo := c.store.get(key)
 	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
 		info := endpointInfo.clusterInfo[clusterID]
 		if info != nil {

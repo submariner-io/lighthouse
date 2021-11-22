@@ -43,14 +43,14 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	zone := plugin.Zones(lh.Zones).Matches(qname)
 	if zone == "" {
 		log.Debugf("Request does not match configured zones %v", lh.Zones)
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotZone, "No matching zone found")
+		return lh.nextOrFailure(ctx, state.Name(), w, r, dns.RcodeNotZone, "No matching zone found")
 	}
 
 	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA && state.QType() != dns.TypeSRV {
 		msg := fmt.Sprintf("Query of type %d is not supported", state.QType())
 		log.Debugf(msg)
 
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNotImplemented, msg)
+		return lh.nextOrFailure(ctx, state.Name(), w, r, dns.RcodeNotImplemented, msg)
 	}
 
 	zone = qname[len(qname)-len(zone):] // maintain case of original query
@@ -60,13 +60,13 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	if pErr != nil || pReq.podOrSvc != Svc {
 		// We only support svc type queries i.e. *.svc.*
 		log.Debugf("Request type %q is not a 'svc' type query - err was %v", pReq.podOrSvc, pErr)
-		return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "Only services supported")
+		return lh.nextOrFailure(ctx, state.Name(), w, r, dns.RcodeNameError, "Only services supported")
 	}
 
-	return lh.getDNSRecord(zone, state, ctx, w, r, pReq)
+	return lh.getDNSRecord(ctx, zone, state, w, r, pReq)
 }
 
-func (lh *Lighthouse) getDNSRecord(zone string, state *request.Request, ctx context.Context, w dns.ResponseWriter,
+func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
 	r *dns.Msg, pReq *recordRequest) (int, error) {
 	var isHeadless bool
 	var (
@@ -81,7 +81,7 @@ func (lh *Lighthouse) getDNSRecord(zone string, state *request.Request, ctx cont
 			pReq.service, lh.clusterStatus.IsConnected)
 		if !found {
 			log.Debugf("No record found for %q", state.QName())
-			return lh.nextOrFailure(state.Name(), ctx, w, r, dns.RcodeNameError, "record not found")
+			return lh.nextOrFailure(ctx, state.Name(), w, r, dns.RcodeNameError, "record not found")
 		}
 
 		isHeadless = true
@@ -160,10 +160,10 @@ func (lh *Lighthouse) error(str string) error {
 	return plugin.Error(lh.Name(), errors.New(str))
 }
 
-func (lh *Lighthouse) nextOrFailure(name string, ctx context.Context, w dns.ResponseWriter, r *dns.Msg, code int, err string) (int, error) {
+func (lh *Lighthouse) nextOrFailure(ctx context.Context, name string, w dns.ResponseWriter, r *dns.Msg, code int, err string) (int, error) {
 	if lh.Fall.Through(name) {
 		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, w, r)
-	} else {
-		return code, lh.error(err)
 	}
+
+	return code, lh.error(err)
 }
