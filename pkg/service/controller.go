@@ -19,8 +19,8 @@ package service
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -59,7 +59,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
 	c.svcStore, c.svcInformer = cache.NewInformer(

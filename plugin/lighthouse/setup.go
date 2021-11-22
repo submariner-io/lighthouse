@@ -19,12 +19,12 @@ package lighthouse
 
 import (
 	"flag"
-	"fmt"
 	"strconv"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/service"
@@ -70,7 +70,7 @@ func setupLighthouse(c *caddy.Controller) error {
 func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	cfg, err := buildKubeConfigFunc(masterURL, kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("error building kubeconfig: %v", err)
+		return nil, errors.Wrap(err, "error building kubeconfig")
 	}
 
 	siMap := serviceimport.NewMap()
@@ -78,26 +78,26 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	err = siController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the ServiceImport controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the ServiceImport controller")
 	}
 
 	epMap := endpointslice.NewMap()
 	epController := endpointslice.NewController(epMap)
 	err = epController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the EndpointSlice controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
 	}
 
 	gwController := gateway.NewController()
 	err = gwController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the Gateway controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
 
 	svcController := service.NewController(gwController.LocalClusterID())
 	err = svcController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the Service controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the Service controller")
 	}
 
 	c.OnShutdown(func() error {

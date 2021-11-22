@@ -23,10 +23,11 @@ import (
 	"os"
 	"sync/atomic"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +83,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.Infof("Gateway resource not found, disabling Gateway status controller")
 
 		c.gatewayAvailable = false
@@ -135,7 +136,7 @@ func (c *Controller) processNextGateway(key, name, ns string) (bool, error) {
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
 		// requeue the item to work on later
-		return true, fmt.Errorf("error retrieving Gateway with key %q from the cache: %v", key, err)
+		return true, errors.Wrapf(err, "error retrieving Gateway with key %q from the cache", key)
 	}
 
 	if exists {
@@ -259,7 +260,7 @@ func (c *Controller) getClusterStatusMap() map[string]bool {
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error creating client set: %v", err)
+		return nil, errors.Wrap(err, "error creating client set")
 	}
 
 	gvr, _ := schema.ParseResourceArg("gateways.v1.submariner.io")
