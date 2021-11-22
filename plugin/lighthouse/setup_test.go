@@ -21,8 +21,6 @@ import (
 	"context"
 	"errors"
 
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin/pkg/fall"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"

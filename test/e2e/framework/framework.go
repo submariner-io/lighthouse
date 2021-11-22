@@ -22,11 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/client-go/dynamic"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
@@ -35,8 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"

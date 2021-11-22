@@ -22,6 +22,8 @@ package main
 
 import (
 	_ "github.com/caddyserver/caddy/onevent"
+	"github.com/coredns/coredns/core/dnsserver"
+	"github.com/coredns/coredns/coremain"
 	_ "github.com/coredns/coredns/plugin/any"
 	_ "github.com/coredns/coredns/plugin/auto"
 	_ "github.com/coredns/coredns/plugin/autopath"
@@ -59,9 +61,6 @@ import (
 	_ "github.com/coredns/coredns/plugin/trace"
 	_ "github.com/coredns/coredns/plugin/whoami"
 	_ "github.com/submariner-io/lighthouse/plugin/lighthouse"
-
-	"github.com/coredns/coredns/core/dnsserver"
-	"github.com/coredns/coredns/coremain"
 )
 
 var directives = []string{
