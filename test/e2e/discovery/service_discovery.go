@@ -35,11 +35,10 @@ const (
 	not              = " not"
 )
 
-// Both domains need to be checked, until the operator is updated to use clusterset
+// Both domains need to be checked, until the operator is updated to use clusterset.
 var checkedDomains = []string{clustersetDomain}
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
-
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {

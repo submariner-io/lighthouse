@@ -37,7 +37,7 @@ var (
 	kubeconfig string
 )
 
-// Hook for unit tests
+// Hook for unit tests.
 var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the

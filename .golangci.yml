@@ -29,6 +29,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - godot
     - gofmt
     - goimports
     # - golint
