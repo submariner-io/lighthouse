@@ -96,8 +96,8 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 			AddFunc: func(obj interface{}) {
 				c.store.Put(obj.(*discovery.EndpointSlice))
 			},
-			UpdateFunc: func(old interface{}, new interface{}) {
-				c.store.Put(new.(*discovery.EndpointSlice))
+			UpdateFunc: func(_ interface{}, newObj interface{}) {
+				c.store.Put(newObj.(*discovery.EndpointSlice))
 			},
 			DeleteFunc: func(obj interface{}) {
 				var endpointSlice *discovery.EndpointSlice

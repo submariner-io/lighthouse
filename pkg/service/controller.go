@@ -73,9 +73,9 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		&v1.Service{},
 		0,
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) {},
-			UpdateFunc: func(old interface{}, new interface{}) {},
-			DeleteFunc: func(obj interface{}) {},
+			AddFunc:    func(_ interface{}) {},
+			UpdateFunc: func(_, _ interface{}) {},
+			DeleteFunc: func(_ interface{}) {},
 		},
 	)
 
