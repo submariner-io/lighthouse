@@ -106,8 +106,8 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		},
 	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: c.queue.Enqueue,
-		UpdateFunc: func(old interface{}, new interface{}) {
-			c.queue.Enqueue(new)
+		UpdateFunc: func(_ interface{}, newObj interface{}) {
+			c.queue.Enqueue(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
