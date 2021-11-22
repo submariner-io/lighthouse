@@ -77,8 +77,8 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 
 	record, found = lh.getClusterIPForSvc(pReq)
 	if !found {
-		dnsRecords, found = lh.endpointSlices.GetDNSRecords(pReq.hostname, pReq.cluster, pReq.namespace,
-			pReq.service, lh.clusterStatus.IsConnected)
+		dnsRecords, found = lh.EndpointSlices.GetDNSRecords(pReq.hostname, pReq.cluster, pReq.namespace,
+			pReq.service, lh.ClusterStatus.IsConnected)
 		if !found {
 			log.Debugf("No record found for %q", state.QName())
 			return lh.nextOrFailure(ctx, state.Name(), w, r, dns.RcodeNameError, "record not found")
@@ -100,7 +100,7 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 	}
 
 	// Count records
-	localClusterID := lh.clusterStatus.LocalClusterID()
+	localClusterID := lh.ClusterStatus.LocalClusterID()
 	for _, record := range dnsRecords {
 		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace, record.IP)
 	}

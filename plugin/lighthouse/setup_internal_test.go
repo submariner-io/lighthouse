@@ -135,7 +135,7 @@ func testCorrectConfig() {
 		})
 
 		It("should succeed with the ttl field populated correctly", func() {
-			Expect(lh.ttl).Should(Equal(uint32(30)))
+			Expect(lh.TTL).Should(Equal(uint32(30)))
 		})
 	})
 
@@ -148,7 +148,7 @@ func testCorrectConfig() {
 		Expect(setupErr).NotTo(HaveOccurred())
 		Expect(lh.Fall).Should(Equal(fall.F{}))
 		Expect(lh.Zones).Should(BeEmpty())
-		Expect(lh.ttl).Should(Equal(defaultTTL))
+		Expect(lh.TTL).Should(Equal(defaultTTL))
 	})
 }
 

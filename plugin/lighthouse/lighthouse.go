@@ -43,12 +43,12 @@ type Lighthouse struct {
 	Next            plugin.Handler
 	Fall            fall.F
 	Zones           []string
-	ttl             uint32
-	serviceImports  *serviceimport.Map
-	endpointSlices  *endpointslice.Map
-	clusterStatus   ClusterStatus
-	endpointsStatus EndpointsStatus
-	localServices   LocalServices
+	TTL             uint32
+	ServiceImports  *serviceimport.Map
+	EndpointSlices  *endpointslice.Map
+	ClusterStatus   ClusterStatus
+	EndpointsStatus EndpointsStatus
+	LocalServices   LocalServices
 }
 
 type ClusterStatus interface {
