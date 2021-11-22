@@ -108,8 +108,10 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil
 	})
 
-	lh := &Lighthouse{ttl: defaultTTL, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
-		endpointsStatus: epController, localServices: svcController}
+	lh := &Lighthouse{
+		ttl: defaultTTL, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
+		endpointsStatus: epController, localServices: svcController,
+	}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
@@ -130,7 +132,6 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
 			case "ttl":
 				t, err := parseTTL(c)
-
 				if err != nil {
 					return nil, err
 				}

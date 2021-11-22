@@ -91,13 +91,16 @@ func (e *EndpointController) stop() {
 }
 
 func (e *EndpointController) cleanup() {
-	resourceClient := e.localClient.Resource(schema.GroupVersionResource{Group: "discovery.k8s.io",
-		Version: "v1beta1", Resource: "endpointslices"}).Namespace(e.serviceImportSourceNameSpace)
+	resourceClient := e.localClient.Resource(schema.GroupVersionResource{
+		Group:   "discovery.k8s.io",
+		Version: "v1beta1", Resource: "endpointslices",
+	}).Namespace(e.serviceImportSourceNameSpace)
 
 	endpointSliceLabels := labels.SelectorFromSet(map[string]string{
 		lhconstants.LabelSourceNamespace: e.serviceImportSourceNameSpace,
 		lhconstants.LabelSourceCluster:   e.clusterID,
-		lhconstants.LabelSourceName:      e.serviceName})
+		lhconstants.LabelSourceName:      e.serviceName,
+	})
 	listEndpointSliceOptions := metav1.ListOptions{
 		LabelSelector: endpointSliceLabels.String(),
 	}
