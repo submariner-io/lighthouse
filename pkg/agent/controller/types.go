@@ -51,7 +51,7 @@ type AgentSpecification struct {
 
 // The ServiceImportController listens for ServiceImport resources created in the target namespace
 // and creates an EndpointController in response. The EndpointController will use the app label as filter
-// to listen only for the endpoints event related to ServiceImport created
+// to listen only for the endpoints event related to ServiceImport created.
 type ServiceImportController struct {
 	serviceSyncer        syncer.Interface
 	localClient          dynamic.Interface

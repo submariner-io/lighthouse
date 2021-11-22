@@ -41,7 +41,7 @@ import (
 
 type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
 
-// NewClientset is an indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets.
 var NewClientset NewClientsetFunc
 
 type Controller struct {
@@ -135,7 +135,7 @@ func (c *Controller) Stop() {
 func (c *Controller) processNextGateway(key, name, ns string) (bool, error) {
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
-		// requeue the item to work on later
+		// requeue the item to work on later.
 		return true, errors.Wrapf(err, "error retrieving Gateway with key %q from the cache", key)
 	}
 
@@ -279,7 +279,7 @@ func copyMap(src map[string]bool) map[string]bool {
 	return m
 }
 
-// Public API
+// Public API.
 func (c *Controller) IsConnected(clusterID string) bool {
 	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
 }

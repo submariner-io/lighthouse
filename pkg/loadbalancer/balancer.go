@@ -17,7 +17,7 @@ limitations under the License.
 */
 package loadbalancer
 
-// Interface - general interface explaining the API of all load balancers available in the package
+// Interface - general interface explaining the API of all load balancers available in the package.
 type Interface interface {
 	// Next returns next item accordingly or nil if none present.
 	Next() (item interface{})

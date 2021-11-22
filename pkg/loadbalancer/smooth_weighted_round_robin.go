@@ -55,12 +55,12 @@ func (lb *smoothWeightedRR) Skip(item interface{}) {
 	}
 }
 
-// Number of Items added
+// Number of Items added.
 func (lb *smoothWeightedRR) ItemCount() int {
 	return len(lb.items)
 }
 
-// Add - adds a new unique item to the list
+// Add - adds a new unique item to the list.
 func (lb *smoothWeightedRR) Add(item interface{}, weight int64) (err error) {
 	if item == nil {
 		return fmt.Errorf("item cannot be nil")
@@ -82,7 +82,7 @@ func (lb *smoothWeightedRR) Add(item interface{}, weight int64) (err error) {
 	return nil
 }
 
-// RemoveAll - removes all items and reset state
+// RemoveAll - removes all items and reset state.
 func (lb *smoothWeightedRR) RemoveAll() {
 	lb.items = lb.items[:0]
 	lb.itemMap = make(map[interface{}]*weightedItem)

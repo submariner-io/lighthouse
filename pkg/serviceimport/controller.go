@@ -33,11 +33,11 @@ import (
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (mcsClientset.Interface, error)
 
-// NewClientset is an indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets.
 var NewClientset NewClientsetFunc
 
 type Controller struct {
-	// Indirection hook for unit tests to supply fake client sets
+	// Indirection hook for unit tests to supply fake client sets.
 	NewClientset    NewClientsetFunc
 	serviceInformer cache.SharedIndexInformer
 	stopCh          chan struct{}
