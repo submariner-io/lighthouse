@@ -618,7 +618,7 @@ func (t *testDriver) awaitNotServiceExportStatus(notCond *mcsv1a1.ServiceExportC
 		return false, nil
 	})
 
-	if err != wait.ErrWaitTimeout {
+	if !errors.Is(err, wait.ErrWaitTimeout) {
 		Fail(err.Error())
 	}
 }

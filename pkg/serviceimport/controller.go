@@ -20,6 +20,7 @@ package serviceimport
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -66,7 +67,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
 	informerFactory := mcsInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,

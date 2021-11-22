@@ -19,8 +19,8 @@ package endpointslice
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +70,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
 	c.clientSet = clientSet
