@@ -287,6 +287,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 	})
 }
 
+// nolint:gocognit // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
 	ports := service.Spec.Ports
