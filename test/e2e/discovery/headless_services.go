@@ -239,6 +239,7 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
+
 	var clusterDNSName string
 	if clusterName != "" {
 		clusterDNSName = clusterName + "."
@@ -297,6 +298,7 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 			port := &ports[j]
 			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
 			op := opAre
+
 			if !shouldContain {
 				op += not
 			}
@@ -347,6 +349,7 @@ func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *c
 
 	domainName = service.Name + "." + f.Namespace + ".svc." + domain
 	clusterDNSName := domainName
+
 	if withcluster {
 		clusterDNSName = clusterName + "." + clusterDNSName
 	}

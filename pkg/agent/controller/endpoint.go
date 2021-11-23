@@ -172,6 +172,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		}
 
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
+
 		newEndpoints, retry = e.getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)
 		if retry {
 			// TODO: We may not want unready endpoints at all

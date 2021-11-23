@@ -80,18 +80,21 @@ func parseRequest(state *request.Request) (*recordRequest, error) {
 	if r.podOrSvc != "pod" && r.podOrSvc != Svc {
 		return r, errInvalidRequest
 	}
+
 	last--
 	if last < 0 {
 		return r, nil
 	}
 
 	r.namespace = segs[last]
+
 	last--
 	if last < 0 {
 		return r, nil
 	}
 
 	r.service = segs[last]
+
 	last--
 	if last < 0 {
 		return r, nil

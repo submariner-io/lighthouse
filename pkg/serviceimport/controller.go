@@ -108,6 +108,7 @@ func (c *Controller) serviceImportDeleted(obj interface{}) {
 
 	var si *mcsv1a1.ServiceImport
 	var ok bool
+
 	if si, ok = obj.(*mcsv1a1.ServiceImport); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {

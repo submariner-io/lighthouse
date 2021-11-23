@@ -358,6 +358,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	}
 
 	svc := obj.(*corev1.Service)
+
 	obj, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
@@ -440,6 +441,7 @@ func (a *Controller) getServiceExport(name, namespace string) (*mcsv1a1.ServiceE
 	}
 
 	se := &mcsv1a1.ServiceExport{}
+
 	err = a.serviceImportController.scheme.Convert(obj, se, nil)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Error converting %#v to ServiceExport", obj)
