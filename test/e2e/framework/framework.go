@@ -329,6 +329,7 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
 		ipList = append(ipList, ingressIP)
+
 		hostname := podList.Items[i].Spec.Hostname
 		if hostname == "" {
 			hostname = podList.Items[i].Name

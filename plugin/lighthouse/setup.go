@@ -83,18 +83,21 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	epMap := endpointslice.NewMap()
 	epController := endpointslice.NewController(epMap)
+
 	err = epController.Start(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
 	}
 
 	gwController := gateway.NewController()
+
 	err = gwController.Start(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
 
 	svcController := service.NewController(gwController.LocalClusterID())
+
 	err = svcController.Start(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Service controller")

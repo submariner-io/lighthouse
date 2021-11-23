@@ -135,6 +135,7 @@ func (c *Controller) Stop() {
 
 func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {
 	key := keyFunc(name, namespace)
+
 	endpointInfo := c.store.get(key)
 	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
 		info := endpointInfo.clusterInfo[clusterID]
