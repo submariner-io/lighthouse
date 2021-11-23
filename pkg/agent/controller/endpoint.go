@@ -20,13 +20,14 @@ package controller
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -75,11 +76,11 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 		Scheme:              scheme,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating Endpoints syncer")
 	}
 
 	if err := epsSyncer.Start(controller.stopCh); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error starting Endpoints syncer")
 	}
 
 	return controller, nil
@@ -107,7 +108,7 @@ func (e *EndpointController) cleanup() {
 
 	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listEndpointSliceOptions)
 
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
 	}
 }

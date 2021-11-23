@@ -61,7 +61,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	}
 
 	return func(c *rest.Config) (kubernetes.Interface, error) {
-		return kubernetes.NewForConfig(c)
+		return kubernetes.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
 	}
 }
 
@@ -79,6 +79,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	}
 	labelSelector := labels.Set(labelMap).String()
 
+	// nolint:wrapcheck // Let the caller wrap these errors.
 	_, c.epsInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {

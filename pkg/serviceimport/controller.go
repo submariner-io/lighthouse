@@ -58,7 +58,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	}
 
 	return func(c *rest.Config) (mcsClientset.Interface, error) {
-		return mcsClientset.NewForConfig(c)
+		return mcsClientset.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
 	}
 }
 
