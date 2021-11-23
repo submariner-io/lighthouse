@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -69,8 +68,7 @@ var _ = Describe("Globalnet enabled", func() {
 		Context("and it does not initially have a global IP", func() {
 			Context("due to missing GlobalIngressIP", func() {
 				It("should update the ServiceExport status appropriately and eventually sync a ServiceImport", func() {
-					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 					t.createGlobalIngressIP(ingressIP)
 					t.awaitServiceExported(globalIP1, 1)
@@ -85,8 +83,7 @@ var _ = Describe("Globalnet enabled", func() {
 				})
 
 				It("should update the ServiceExport status appropriately and eventually sync a ServiceImport", func() {
-					t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-						corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 					setIngressAllocatedIP(ingressIP, globalIP1)
 					test.UpdateResource(t.cluster1.localIngressIPClient, ingressIP)
@@ -110,7 +107,7 @@ var _ = Describe("Globalnet enabled", func() {
 			})
 
 			It("should update the ServiceExport status with the condition details", func() {
-				c := newServiceExportCondition(mcsv1a1.ServiceExportValid, corev1.ConditionFalse, condition.Reason)
+				c := newServiceExportCondition(corev1.ConditionFalse, condition.Reason)
 				c.Message = &condition.Message
 				t.awaitServiceExportStatus(0, c)
 			})
@@ -132,7 +129,7 @@ var _ = Describe("Globalnet enabled", func() {
 			})
 
 			It("should sync a ServiceImport and EndpointSlice with the global IPs", func() {
-				t.awaitHeadlessServiceImport("")
+				t.awaitHeadlessServiceImport()
 				t.awaitEndpointSlice()
 			})
 		})
@@ -144,7 +141,7 @@ var _ = Describe("Globalnet enabled", func() {
 
 				t.createEndpointIngressIPs()
 
-				t.awaitHeadlessServiceImport("")
+				t.awaitHeadlessServiceImport()
 				t.awaitEndpointSlice()
 			})
 		})

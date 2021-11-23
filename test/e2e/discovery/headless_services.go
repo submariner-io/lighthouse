@@ -235,6 +235,7 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 		clusterBName, false, true, true)
 }
 
+// nolint:unparam // cluster` always receives `framework.ClusterA`.
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
@@ -287,7 +288,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 	})
 }
 
-// nolint:gocognit // This really isn't that complex and would be awkward to refactor.
+// nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
 	ports := service.Spec.Ports

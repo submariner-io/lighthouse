@@ -95,8 +95,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createServiceExport()
 
 			message := "AwaitingSync"
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionFalse, message))
+			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, message))
 
 			t.awaitNotServiceExportStatus(&mcsv1a1.ServiceExportCondition{
 				Type:    mcsv1a1.ServiceExportValid,
@@ -125,8 +124,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createService()
 			t.createServiceExport()
 
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionTrue, ""))
+			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionTrue, ""))
 		})
 	})
 
@@ -139,8 +137,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createService()
 			t.createServiceExport()
 
-			t.awaitServiceExportStatus(0, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-				corev1.ConditionFalse, "UnsupportedServiceType"))
+			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
 		})
 	})
