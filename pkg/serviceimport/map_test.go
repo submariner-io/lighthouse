@@ -52,7 +52,7 @@ var _ = Describe("ServiceImport Map", func() {
 		return clusterStatusMap[id]
 	}
 
-	checkEndpoint := func(name, namespace, id string) bool {
+	checkEndpoint := func(_, _, id string) bool {
 		return endpointStatusMap[id]
 	}
 

@@ -45,6 +45,7 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 
 	gip := &IngressIP{}
 	gip.namespace = obj.GetNamespace()
+
 	gip.target, found, err = unstructured.NestedString(obj.Object, "spec", "target")
 	if !found || err != nil {
 		klog.Errorf("target field not found in spec %#v", obj.Object)

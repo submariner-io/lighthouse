@@ -19,11 +19,10 @@ package service
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
-
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,7 +46,7 @@ type Controller struct {
 func NewController(localClusterID string) *Controller {
 	return &Controller{
 		NewClientset: func(c *rest.Config) (kubernetes.Interface, error) {
-			return kubernetes.NewForConfig(c)
+			return kubernetes.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
 		},
 		stopCh:         make(chan struct{}),
 		localClusterID: localClusterID,
@@ -59,9 +58,10 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
+	// nolint:wrapcheck // Let the caller wrap these errors.
 	c.svcStore, c.svcInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -74,9 +74,9 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		&v1.Service{},
 		0,
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) {},
-			UpdateFunc: func(old interface{}, new interface{}) {},
-			DeleteFunc: func(obj interface{}) {},
+			AddFunc:    func(_ interface{}) {},
+			UpdateFunc: func(_, _ interface{}) {},
+			DeleteFunc: func(_ interface{}) {},
 		},
 	)
 
@@ -93,8 +93,8 @@ func (c *Controller) Stop() {
 
 func (c *Controller) GetIP(name, namespace string) (*serviceimport.DNSRecord, bool) {
 	key := namespace + "/" + name
-	obj, exists, err := c.svcStore.GetByKey(key)
 
+	obj, exists, err := c.svcStore.GetByKey(key)
 	if err != nil {
 		klog.V(log.DEBUG).Infof("Error trying to get service for key %q", key)
 		return nil, false

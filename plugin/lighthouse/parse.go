@@ -51,7 +51,9 @@ type recordRequest struct {
 // 3. (service): service.namespace.pod|svc.zone
 //
 // Federations are handled in the federation plugin. And aren't parsed here.
-func parseRequest(state request.Request) (r recordRequest, err error) {
+func parseRequest(state *request.Request) (*recordRequest, error) {
+	r := &recordRequest{}
+
 	base, _ := dnsutil.TrimZone(state.Name(), state.Zone)
 	// return NODATA for apex queries
 	if base == "" || base == Svc || base == Pod {
@@ -78,29 +80,32 @@ func parseRequest(state request.Request) (r recordRequest, err error) {
 	if r.podOrSvc != "pod" && r.podOrSvc != Svc {
 		return r, errInvalidRequest
 	}
+
 	last--
 	if last < 0 {
 		return r, nil
 	}
 
 	r.namespace = segs[last]
+
 	last--
 	if last < 0 {
 		return r, nil
 	}
 
 	r.service = segs[last]
+
 	last--
 	if last < 0 {
 		return r, nil
 	}
 
-	return parseSegments(segs, last, r, state)
+	return parseSegments(segs, last, r, state.QType())
 }
 
 // String return a string representation of r, it just returns all fields concatenated with dots.
 // This is mostly used in tests.
-func (r recordRequest) String() string {
+func (r *recordRequest) String() string {
 	s := r.hostname
 	s += "." + r.cluster
 	s += "." + r.service
@@ -110,10 +115,10 @@ func (r recordRequest) String() string {
 	return s
 }
 
-func parseSegments(segs []string, count int, r recordRequest, state request.Request) (recordRequest, error) {
+func parseSegments(segs []string, count int, r *recordRequest, qType uint16) (*recordRequest, error) {
 	// Because of ambiguity we check the labels left: 1: a cluster. 2: hostname and cluster.
 	// Anything else is a query that is too long to answer and can safely be delegated to return an nxdomain.
-	if state.QType() == dns.TypeA {
+	if qType == dns.TypeA {
 		switch count {
 		case 0: // cluster only
 			r.cluster = segs[count]
@@ -123,7 +128,7 @@ func parseSegments(segs []string, count int, r recordRequest, state request.Requ
 		default: // too long
 			return r, errInvalidRequest
 		}
-	} else if state.QType() == dns.TypeSRV {
+	} else if qType == dns.TypeSRV {
 		switch count {
 		case 0: // cluster only
 			r.cluster = segs[count]

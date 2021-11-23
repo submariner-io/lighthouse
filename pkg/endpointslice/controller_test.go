@@ -32,18 +32,20 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const cluster1EndPointIP1 = "192.168.0.1"
-const cluster2EndPointIP1 = "192.169.0.1"
-const cluster1HostNamePod1 = "cl1host1"
-const cluster2HostNamePod1 = "cl2host1"
-const remoteClusterID1 = "west"
-const remoteClusterID2 = "south"
-const testName1 = "testName1"
-const testName2 = "testName2"
-const testService1 = "testService1"
-const testService2 = "testService2"
-const testNS1 = "testNameSpace1"
-const testNS2 = "testNameSpace2"
+const (
+	cluster1EndPointIP1  = "192.168.0.1"
+	cluster2EndPointIP1  = "192.169.0.1"
+	cluster1HostNamePod1 = "cl1host1"
+	cluster2HostNamePod1 = "cl2host1"
+	remoteClusterID1     = "west"
+	remoteClusterID2     = "south"
+	testName1            = "testName1"
+	testName2            = "testName2"
+	testService1         = "testService1"
+	testService2         = "testService2"
+	testNS1              = "testNameSpace1"
+	testNS2              = "testNameSpace2"
+)
 
 var _ = Describe("EndpointSlice controller", func() {
 	t := newEndpointSliceTestDiver()

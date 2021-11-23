@@ -34,7 +34,6 @@ const (
 )
 
 var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", func() {
-
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a headless service in a remote cluster", func() {
@@ -128,7 +127,8 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	ipListB, hostNameListB := f.GetPodIPs(framework.ClusterB, nginxHeadlessClusterB)
 	ipListA, hostNameListA := f.GetPodIPs(framework.ClusterA, nginxHeadlessClusterA)
-	ipList := make([]string, len(ipListB)+len(ipListA))
+
+	var ipList []string
 	ipList = append(ipList, ipListB...)
 	ipList = append(ipList, ipListA...)
 
@@ -235,9 +235,11 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 		clusterBName, false, true, true)
 }
 
+// nolint:unparam // cluster` always receives `framework.ClusterA`.
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
+
 	var clusterDNSName string
 	if clusterName != "" {
 		clusterDNSName = clusterName + "."
@@ -287,13 +289,16 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 	})
 }
 
+// nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
 	ports := service.Spec.Ports
 	for i := range domains {
-		for _, port := range ports {
+		for j := range ports {
+			port := &ports[j]
 			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
 			op := opAre
+
 			if !shouldContain {
 				op += not
 			}
@@ -338,12 +343,13 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 	}
 }
 
-func createSRVQuery(f *framework.Framework, port corev1.ServicePort, service *corev1.Service,
+func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *corev1.Service,
 	domain string, clusterName string, withPort, withcluster bool) (cmd []string, domainName string) {
 	cmd = []string{"dig", "+short", "SRV"}
 
 	domainName = service.Name + "." + f.Namespace + ".svc." + domain
 	clusterDNSName := domainName
+
 	if withcluster {
 		clusterDNSName = clusterName + "." + clusterDNSName
 	}

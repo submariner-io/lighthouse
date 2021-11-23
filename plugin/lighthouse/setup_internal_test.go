@@ -21,8 +21,6 @@ import (
 	"context"
 	"errors"
 
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin/pkg/fall"
@@ -35,14 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
 	fakeMCSClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned/fake"
 )
 
-type fakeHandler struct {
-}
+type fakeHandler struct{}
 
 func (f *fakeHandler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	return dns.RcodeSuccess, nil
@@ -137,7 +135,7 @@ func testCorrectConfig() {
 		})
 
 		It("should succeed with the ttl field populated correctly", func() {
-			Expect(lh.ttl).Should(Equal(uint32(30)))
+			Expect(lh.TTL).Should(Equal(uint32(30)))
 		})
 	})
 
@@ -150,7 +148,7 @@ func testCorrectConfig() {
 		Expect(setupErr).NotTo(HaveOccurred())
 		Expect(lh.Fall).Should(Equal(fall.F{}))
 		Expect(lh.Zones).Should(BeEmpty())
-		Expect(lh.ttl).Should(Equal(defaultTTL))
+		Expect(lh.TTL).Should(Equal(defaultTTL))
 	})
 }
 

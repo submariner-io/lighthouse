@@ -69,11 +69,13 @@ func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster fun
 	for i := 0; i < queueLength; i++ {
 		selectedName := si.balancer.Next().(string)
 		info := si.records[selectedName]
+
 		if checkCluster(info.name) && checkEndpoint(name, namespace, info.name) {
 			return info.record
-		} else { // Will Skip the selected name until a full "round" of the items is done
-			si.balancer.Skip(selectedName)
 		}
+
+		// Will Skip the selected name until a full "round" of the items is done
+		si.balancer.Skip(selectedName)
 	}
 
 	return nil

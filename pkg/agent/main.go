@@ -19,6 +19,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -110,7 +110,8 @@ func main() {
 	}, kubeClientSet,
 		controller.AgentConfig{
 			ServiceImportCounterName: "submariner_service_import",
-			ServiceExportCounterName: "submariner_service_export"})
+			ServiceExportCounterName: "submariner_service_export",
+		})
 	if err != nil {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
@@ -140,7 +141,7 @@ func startHTTPServer() *http.Server {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			klog.Errorf("Error starting metrics server: %v", err)
 		}
 	}()

@@ -20,12 +20,14 @@ package controller
 import (
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// nolint:gocritic // (hugeParam) This function modifies config so we don't want to pass by pointer.
 func newGlobalIngressIPCache(config watcher.Config) (*globalIngressIPCache, error) {
 	c := &globalIngressIPCache{}
 
@@ -55,11 +57,11 @@ func newGlobalIngressIPCache(config watcher.Config) (*globalIngressIPCache, erro
 
 	c.watcher, err = watcher.New(&config)
 
-	return c, err
+	return c, errors.Wrap(err, "error creating GlobalIngressIP watcher")
 }
 
 func (c *globalIngressIPCache) start(stopCh <-chan struct{}) error {
-	return c.watcher.Start(stopCh)
+	return errors.Wrap(c.watcher.Start(stopCh), "error starting GlobalIngressIP watcher")
 }
 
 func (c *globalIngressIPCache) onCreateOrUpdate(obj *unstructured.Unstructured) {

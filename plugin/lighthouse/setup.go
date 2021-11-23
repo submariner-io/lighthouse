@@ -19,12 +19,12 @@ package lighthouse
 
 import (
 	"flag"
-	"fmt"
 	"strconv"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/service"
@@ -37,7 +37,7 @@ var (
 	kubeconfig string
 )
 
-// Hook for unit tests
+// Hook for unit tests.
 var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
@@ -56,7 +56,7 @@ func setupLighthouse(c *caddy.Controller) error {
 
 	l, err := lighthouseParse(c)
 	if err != nil {
-		return plugin.Error(PluginName, err)
+		return plugin.Error(PluginName, err) // nolint:wrapcheck // No need to wrap this.
 	}
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
@@ -70,7 +70,7 @@ func setupLighthouse(c *caddy.Controller) error {
 func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	cfg, err := buildKubeConfigFunc(masterURL, kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("error building kubeconfig: %v", err)
+		return nil, errors.Wrap(err, "error building kubeconfig")
 	}
 
 	siMap := serviceimport.NewMap()
@@ -78,26 +78,29 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	err = siController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the ServiceImport controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the ServiceImport controller")
 	}
 
 	epMap := endpointslice.NewMap()
 	epController := endpointslice.NewController(epMap)
+
 	err = epController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the EndpointSlice controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
 	}
 
 	gwController := gateway.NewController()
+
 	err = gwController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the Gateway controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
 
 	svcController := service.NewController(gwController.LocalClusterID())
+
 	err = svcController.Start(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error starting the Service controller: %v", err)
+		return nil, errors.Wrap(err, "error starting the Service controller")
 	}
 
 	c.OnShutdown(func() error {
@@ -108,8 +111,10 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil
 	})
 
-	lh := &Lighthouse{ttl: defaultTTL, serviceImports: siMap, clusterStatus: gwController, endpointSlices: epMap,
-		endpointsStatus: epController, localServices: svcController}
+	lh := &Lighthouse{
+		TTL: defaultTTL, ServiceImports: siMap, ClusterStatus: gwController, EndpointSlices: epMap,
+		EndpointsStatus: epController, LocalServices: svcController,
+	}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
@@ -130,15 +135,14 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
 			case "ttl":
 				t, err := parseTTL(c)
-
 				if err != nil {
 					return nil, err
 				}
 
-				lh.ttl = t
+				lh.TTL = t
 			default:
 				if c.Val() != "}" {
-					return nil, c.Errf("unknown property '%s'", c.Val())
+					return nil, c.Errf("unknown property '%s'", c.Val()) // nolint:wrapcheck // No need to wrap this.
 				}
 			}
 		}
@@ -151,16 +155,16 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 	// Refer: https://github.com/coredns/coredns/blob/master/plugin/kubernetes/setup.go
 	args := c.RemainingArgs()
 	if len(args) == 0 {
-		return 0, c.ArgErr()
+		return 0, c.ArgErr() // nolint:wrapcheck // No need to wrap this.
 	}
 
 	t, err := strconv.Atoi(args[0])
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "error parsing TTL")
 	}
 
 	if t < 0 || t > 3600 {
-		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t)
+		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t) // nolint:wrapcheck // No need to wrap this.
 	}
 
 	return uint32(t), nil

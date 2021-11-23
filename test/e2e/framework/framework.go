@@ -22,11 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/client-go/dynamic"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
@@ -35,8 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
@@ -56,9 +54,11 @@ type Framework struct {
 	*framework.Framework
 }
 
-var MCSClients []*mcsClientset.Clientset
-var EndpointClients []dynamic.ResourceInterface
-var SubmarinerClients []dynamic.ResourceInterface
+var (
+	MCSClients        []*mcsClientset.Clientset
+	EndpointClients   []dynamic.ResourceInterface
+	SubmarinerClients []dynamic.ResourceInterface
+)
 
 func init() {
 	framework.AddBeforeSuite(beforeSuite)
@@ -196,7 +196,8 @@ func (f *Framework) AwaitServiceImportWithIP(targetCluster framework.ClusterInde
 		if len(siList.Items) < 1 {
 			return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
 		}
-		for i, si := range siList.Items {
+		for i := range siList.Items {
+			si := &siList.Items[i]
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				if si.Spec.IPs[0] == serviceIP {
 					retServiceImport = &siList.Items[i]
@@ -218,7 +219,8 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 		return si.List(context.TODO(), metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		siList := result.(*mcsv1a1.ServiceImportList)
-		for _, si := range siList.Items {
+		for i := range siList.Items {
+			si := &siList.Items[i]
 			if strings.HasPrefix(si.Name, siNamePrefix) {
 				return false, fmt.Sprintf("ServiceImport with name prefix %s still exists", siNamePrefix), nil
 			}
@@ -327,6 +329,7 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
 		ipList = append(ipList, ingressIP)
+
 		hostname := podList.Items[i].Spec.Hostname
 		if hostname == "" {
 			hostname = podList.Items[i].Name
@@ -440,7 +443,8 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 		sliceCount := 0
 		epCount := 0
 
-		for _, es := range endpointSliceList.Items {
+		for i := range endpointSliceList.Items {
+			es := &endpointSliceList.Items[i]
 			if name == "" || strings.HasPrefix(es.Name, name) {
 				sliceCount++
 				epCount += len(es.Endpoints)

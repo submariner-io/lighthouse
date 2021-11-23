@@ -19,8 +19,8 @@ package endpointslice
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,19 +35,19 @@ import (
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (kubernetes.Interface, error)
 
-// NewClientset is an indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets.
 var NewClientset NewClientsetFunc
 
 type Controller struct {
-	// Indirection hook for unit tests to supply fake client sets
+	// Indirection hook for unit tests to supply fake client sets.
 	NewClientset NewClientsetFunc
 	epsInformer  cache.Controller
 	stopCh       chan struct{}
-	store        Store
+	store        *Map
 	clientSet    kubernetes.Interface
 }
 
-func NewController(endpointSliceStore Store) *Controller {
+func NewController(endpointSliceStore *Map) *Controller {
 	return &Controller{
 		NewClientset: getNewClientsetFunc(),
 		stopCh:       make(chan struct{}),
@@ -61,7 +61,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	}
 
 	return func(c *rest.Config) (kubernetes.Interface, error) {
-		return kubernetes.NewForConfig(c)
+		return kubernetes.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
 	}
 }
 
@@ -70,7 +70,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
 	c.clientSet = clientSet
@@ -79,6 +79,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	}
 	labelSelector := labels.Set(labelMap).String()
 
+	// nolint:wrapcheck // Let the caller wrap these errors.
 	_, c.epsInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -96,8 +97,8 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 			AddFunc: func(obj interface{}) {
 				c.store.Put(obj.(*discovery.EndpointSlice))
 			},
-			UpdateFunc: func(old interface{}, new interface{}) {
-				c.store.Put(new.(*discovery.EndpointSlice))
+			UpdateFunc: func(_ interface{}, newObj interface{}) {
+				c.store.Put(newObj.(*discovery.EndpointSlice))
 			},
 			DeleteFunc: func(obj interface{}) {
 				var endpointSlice *discovery.EndpointSlice
@@ -134,7 +135,8 @@ func (c *Controller) Stop() {
 
 func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {
 	key := keyFunc(name, namespace)
-	endpointInfo := c.store.Get(key)
+
+	endpointInfo := c.store.get(key)
 	if endpointInfo != nil && endpointInfo.clusterInfo != nil {
 		info := endpointInfo.clusterInfo[clusterID]
 		if info != nil {

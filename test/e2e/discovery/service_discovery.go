@@ -35,11 +35,10 @@ const (
 	not              = " not"
 )
 
-// Both domains need to be checked, until the operator is updated to use clusterset
+// Both domains need to be checked, until the operator is updated to use clusterset.
 var checkedDomains = []string{clustersetDomain}
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
-
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
@@ -520,6 +519,7 @@ func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
 		checkedDomains, "", false)
 }
 
+// nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
 func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	domains []string, clusterName string, withPort, shouldContain bool) {
 	ports := service.Spec.Ports

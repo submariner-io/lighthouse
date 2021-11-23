@@ -33,9 +33,7 @@ const (
 	defaultTTL = uint32(5)
 )
 
-var (
-	errInvalidRequest = errors.New("invalid query name")
-)
+var errInvalidRequest = errors.New("invalid query name")
 
 // Define log to be a logger with the plugin name in it. This way we can just use log.Info and
 // friends to log.
@@ -45,12 +43,12 @@ type Lighthouse struct {
 	Next            plugin.Handler
 	Fall            fall.F
 	Zones           []string
-	ttl             uint32
-	serviceImports  *serviceimport.Map
-	endpointSlices  *endpointslice.Map
-	clusterStatus   ClusterStatus
-	endpointsStatus EndpointsStatus
-	localServices   LocalServices
+	TTL             uint32
+	ServiceImports  *serviceimport.Map
+	EndpointSlices  *endpointslice.Map
+	ClusterStatus   ClusterStatus
+	EndpointsStatus EndpointsStatus
+	LocalServices   LocalServices
 }
 
 type ClusterStatus interface {

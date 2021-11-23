@@ -20,13 +20,11 @@ package endpointslice_test
 import (
 	"sort"
 
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/pkg/endpointslice"
-
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/endpointslice"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -63,7 +61,7 @@ var _ = Describe("EndpointSlice Map", func() {
 		return ips
 	}
 
-	expectIPs := func(hostname, cluster, ns, name string, expIPs []string) {
+	expectIPs := func(hostname, cluster string, expIPs []string) {
 		sort.Strings(expIPs)
 		for i := 0; i < 5; i++ {
 			var ips []string
@@ -84,7 +82,7 @@ var _ = Describe("EndpointSlice Map", func() {
 				es2 := newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2})
 				endpointSliceMap.Put(es2)
 
-				expectIPs("", "", namespace1, service1, []string{endpointIP, endpointIP2})
+				expectIPs("", "", []string{endpointIP, endpointIP2})
 			})
 		})
 		When("requested for specific cluster", func() {
@@ -94,7 +92,7 @@ var _ = Describe("EndpointSlice Map", func() {
 				es2 := newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2})
 				endpointSliceMap.Put(es2)
 
-				expectIPs("", clusterID2, namespace1, service1, []string{endpointIP2})
+				expectIPs("", clusterID2, []string{endpointIP2})
 			})
 		})
 		When("specific host is queried", func() {
@@ -106,7 +104,7 @@ var _ = Describe("EndpointSlice Map", func() {
 				es2 := newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2})
 				endpointSliceMap.Put(es2)
 
-				expectIPs(hostname, clusterID1, namespace1, service1, []string{endpointIP})
+				expectIPs(hostname, clusterID1, []string{endpointIP})
 			})
 		})
 	})
@@ -122,7 +120,7 @@ var _ = Describe("EndpointSlice Map", func() {
 
 			clusterStatusMap[clusterID2] = false
 
-			expectIPs("", "", namespace1, service1, []string{endpointIP, endpointIP3})
+			expectIPs("", "", []string{endpointIP, endpointIP3})
 		})
 	})
 
@@ -133,16 +131,16 @@ var _ = Describe("EndpointSlice Map", func() {
 			es2 := newEndpointSlice(namespace1, service1, clusterID2, []string{endpointIP2})
 			endpointSliceMap.Put(es2)
 
-			expectIPs("", "", namespace1, service1, []string{endpointIP, endpointIP2})
+			expectIPs("", "", []string{endpointIP, endpointIP2})
 
 			endpointSliceMap.Remove(es2)
 
-			expectIPs("", "", namespace1, service1, []string{endpointIP})
+			expectIPs("", "", []string{endpointIP})
 		})
 	})
-
 })
 
+// nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{

@@ -20,6 +20,7 @@ package serviceimport
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -32,11 +33,11 @@ import (
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (mcsClientset.Interface, error)
 
-// NewClientset is an indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets.
 var NewClientset NewClientsetFunc
 
 type Controller struct {
-	// Indirection hook for unit tests to supply fake client sets
+	// Indirection hook for unit tests to supply fake client sets.
 	NewClientset    NewClientsetFunc
 	serviceInformer cache.SharedIndexInformer
 	stopCh          chan struct{}
@@ -57,7 +58,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	}
 
 	return func(c *rest.Config) (mcsClientset.Interface, error) {
-		return mcsClientset.NewForConfig(c)
+		return mcsClientset.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
 	}
 }
 
@@ -66,7 +67,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error creating client set: %v", err)
+		return errors.Wrap(err, "error creating client set")
 	}
 
 	informerFactory := mcsInformers.NewSharedInformerFactoryWithOptions(clientSet, 0,
@@ -107,6 +108,7 @@ func (c *Controller) serviceImportDeleted(obj interface{}) {
 
 	var si *mcsv1a1.ServiceImport
 	var ok bool
+
 	if si, ok = obj.(*mcsv1a1.ServiceImport); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {

@@ -23,10 +23,11 @@ import (
 	"os"
 	"sync/atomic"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +41,7 @@ import (
 
 type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
 
-// NewClientset is an indirection hook for unit tests to supply fake client sets
+// NewClientset is an indirection hook for unit tests to supply fake client sets.
 var NewClientset NewClientsetFunc
 
 type Controller struct {
@@ -82,7 +83,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.Infof("Gateway resource not found, disabling Gateway status controller")
 
 		c.gatewayAvailable = false
@@ -96,6 +97,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	klog.Infof("Starting Gateway status Controller")
 
+	// nolint:wrapcheck // Let the caller wrap these errors.
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return gwClientset.List(context.TODO(), metav1.ListOptions{})
@@ -105,8 +107,8 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		},
 	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: c.queue.Enqueue,
-		UpdateFunc: func(old interface{}, new interface{}) {
-			c.queue.Enqueue(new)
+		UpdateFunc: func(_ interface{}, newObj interface{}) {
+			c.queue.Enqueue(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -134,8 +136,8 @@ func (c *Controller) Stop() {
 func (c *Controller) processNextGateway(key, name, ns string) (bool, error) {
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
-		// requeue the item to work on later
-		return true, fmt.Errorf("error retrieving Gateway with key %q from the cache: %v", key, err)
+		// requeue the item to work on later.
+		return true, errors.Wrapf(err, "error retrieving Gateway with key %q from the cache", key)
 	}
 
 	if exists {
@@ -259,14 +261,14 @@ func (c *Controller) getClusterStatusMap() map[string]bool {
 func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error creating client set: %v", err)
+		return nil, errors.Wrap(err, "error creating client set")
 	}
 
 	gvr, _ := schema.ParseResourceArg("gateways.v1.submariner.io")
 	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
 	_, err = gwClient.List(context.TODO(), metav1.ListOptions{})
 
-	return gwClient, err
+	return gwClient, errors.Wrap(err, "error listing resources")
 }
 
 func copyMap(src map[string]bool) map[string]bool {
@@ -278,7 +280,7 @@ func copyMap(src map[string]bool) map[string]bool {
 	return m
 }
 
-// Public API
+// Public API.
 func (c *Controller) IsConnected(clusterID string) bool {
 	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
 }
