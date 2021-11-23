@@ -97,6 +97,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	klog.Infof("Starting Gateway status Controller")
 
+	// nolint:wrapcheck // Let the caller wrap these errors.
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return gwClientset.List(context.TODO(), metav1.ListOptions{})
@@ -267,7 +268,7 @@ func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.Resou
 	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
 	_, err = gwClient.List(context.TODO(), metav1.ListOptions{})
 
-	return gwClient, err
+	return gwClient, errors.Wrap(err, "error listing resources")
 }
 
 func copyMap(src map[string]bool) map[string]bool {

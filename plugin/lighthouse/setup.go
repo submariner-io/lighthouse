@@ -56,7 +56,7 @@ func setupLighthouse(c *caddy.Controller) error {
 
 	l, err := lighthouseParse(c)
 	if err != nil {
-		return plugin.Error(PluginName, err)
+		return plugin.Error(PluginName, err) // nolint:wrapcheck // No need to wrap this.
 	}
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
@@ -139,7 +139,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 				lh.TTL = t
 			default:
 				if c.Val() != "}" {
-					return nil, c.Errf("unknown property '%s'", c.Val())
+					return nil, c.Errf("unknown property '%s'", c.Val()) // nolint:wrapcheck // No need to wrap this.
 				}
 			}
 		}
@@ -152,16 +152,16 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 	// Refer: https://github.com/coredns/coredns/blob/master/plugin/kubernetes/setup.go
 	args := c.RemainingArgs()
 	if len(args) == 0 {
-		return 0, c.ArgErr()
+		return 0, c.ArgErr() // nolint:wrapcheck // No need to wrap this.
 	}
 
 	t, err := strconv.Atoi(args[0])
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "error parsing TTL")
 	}
 
 	if t < 0 || t > 3600 {
-		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t)
+		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t) // nolint:wrapcheck // No need to wrap this.
 	}
 
 	return uint32(t), nil

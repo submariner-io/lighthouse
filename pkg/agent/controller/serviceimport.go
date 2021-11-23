@@ -18,6 +18,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -56,7 +57,7 @@ func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.I
 		Scheme:          scheme,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating ServiceImport watcher")
 	}
 
 	if spec.GlobalnetEnabled {
@@ -89,7 +90,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 	}()
 
 	if err := c.serviceImportSyncer.Start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting ServiceImport watcher")
 	}
 
 	return nil

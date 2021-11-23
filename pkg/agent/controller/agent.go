@@ -68,7 +68,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 
 	_, gvr, err := util.ToUnstructuredResource(&mcsv1a1.ServiceExport{}, syncerConf.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	agentController.serviceExportClient = syncerConf.LocalClient.Resource(*gvr)
@@ -90,7 +90,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 
 	agentController.serviceImportSyncer, err = broker.NewSyncer(syncerConf)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating ServiceImport syncer")
 	}
 
 	syncerConf.LocalNamespace = metav1.NamespaceAll
@@ -112,7 +112,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 
 	agentController.endpointSliceSyncer, err = broker.NewSyncer(syncerConf)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating EndpointSlice syncer")
 	}
 
 	agentController.serviceExportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -131,7 +131,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating ServiceExport syncer")
 	}
 
 	agentController.serviceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -145,7 +145,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		Scheme:          syncerConf.Scheme,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating Service syncer")
 	}
 
 	agentController.serviceImportController, err = newServiceImportController(spec, agentController.serviceSyncer,
@@ -164,23 +164,23 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	klog.Info("Starting Agent controller")
 
 	if err := a.serviceExportSyncer.Start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting ServiceExport syncer")
 	}
 
 	if err := a.serviceSyncer.Start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting Service syncer")
 	}
 
 	if err := a.endpointSliceSyncer.Start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting EndpointSlice syncer")
 	}
 
 	if err := a.serviceImportSyncer.Start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting ServiceImport syncer")
 	}
 
 	if err := a.serviceImportController.start(stopCh); err != nil {
-		return err
+		return errors.Wrap(err, "error starting ServiceImport controller")
 	}
 
 	a.serviceExportSyncer.Reconcile(func() []runtime.Object {
@@ -420,22 +420,23 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, status 
 
 		raw, err := resource.ToUnstructured(toUpdate)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error converting resource")
 		}
 
 		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).UpdateStatus(context.TODO(), raw, metav1.UpdateOptions{})
 
-		return err
+		return errors.Wrap(err, "error from UpdateStatus")
 	})
+
 	if retryErr != nil {
-		klog.Errorf("Error updating status for ServiceExport (%s/%s): %v", namespace, name, retryErr)
+		klog.Errorf("Error updating status for ServiceExport (%s/%s): %+v", namespace, name, retryErr)
 	}
 }
 
 func (a *Controller) getServiceExport(name, namespace string) (*mcsv1a1.ServiceExport, error) {
 	obj, err := a.serviceExportClient.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error retrieving ServiceExport")
 	}
 
 	se := &mcsv1a1.ServiceExport{}
