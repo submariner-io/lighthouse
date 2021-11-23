@@ -327,8 +327,7 @@ func (c *cluster) awaitServiceImport(service *corev1.Service, sType mcsv1a1.Serv
 	return awaitServiceImport(c.localServiceImportClient, service, sType, serviceIP)
 }
 
-func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service,
-	serviceIP string) *mcsv1a1.ServiceImport {
+func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service, serviceIP string) {
 	name := service.Name + "-" + service.Namespace + "-" + clusterID1
 
 	var serviceImport *mcsv1a1.ServiceImport
@@ -356,8 +355,6 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 	}
 
 	Expect(err).To(Succeed())
-
-	return serviceImport
 }
 
 func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP string) {
@@ -636,14 +633,14 @@ func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int
 	t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, serviceIP)
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
 
-	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-		corev1.ConditionFalse, "AwaitingSync"), newServiceExportCondition(mcsv1a1.ServiceExportValid,
-		corev1.ConditionTrue, ""))
+	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(corev1.ConditionFalse, "AwaitingSync"),
+		newServiceExportCondition(corev1.ConditionTrue, ""))
 
 	return statusIndex + 2
 }
 
-func (t *testDriver) awaitHeadlessServiceImport(serviceIP string) {
+func (t *testDriver) awaitHeadlessServiceImport() {
+	serviceIP := ""
 	t.awaitBrokerServiceImport(mcsv1a1.Headless, serviceIP)
 	t.cluster1.awaitServiceImport(t.service, mcsv1a1.Headless, serviceIP)
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.Headless, serviceIP)
@@ -673,8 +670,7 @@ func (t *testDriver) awaitHeadlessServiceUnexported() {
 }
 
 func (t *testDriver) awaitServiceUnavailableStatus(atIndex int) {
-	t.awaitServiceExportStatus(atIndex, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-		corev1.ConditionFalse, "ServiceUnavailable"))
+	t.awaitServiceExportStatus(atIndex, newServiceExportCondition(corev1.ConditionFalse, "ServiceUnavailable"))
 }
 
 func (t *testDriver) endpointIPs() []string {
@@ -686,10 +682,9 @@ func (t *testDriver) endpointIPs() []string {
 	return ips
 }
 
-func newServiceExportCondition(cType mcsv1a1.ServiceExportConditionType,
-	status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+func newServiceExportCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
 	return &mcsv1a1.ServiceExportCondition{
-		Type:   cType,
+		Type:   mcsv1a1.ServiceExportValid,
 		Status: status,
 		Reason: &reason,
 	}

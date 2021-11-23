@@ -242,7 +242,7 @@ func (t *testDriver) setGatewayLocalClusterID(clusterID string) {
 	Expect(unstructured.SetNestedField(t.gatewayObj.Object, clusterID, "status", "localEndpoint", "cluster_id")).To(Succeed())
 }
 
-func (t *testDriver) addGatewayStatusConnection(clusterID, status string) *unstructured.Unstructured {
+func (t *testDriver) addGatewayStatusConnection(clusterID, status string) {
 	current, _, err := unstructured.NestedSlice(t.gatewayObj.Object, "status", "connections")
 	Expect(err).To(Succeed())
 
@@ -251,8 +251,6 @@ func (t *testDriver) addGatewayStatusConnection(clusterID, status string) *unstr
 	Expect(unstructured.SetNestedField(conn, clusterID, "endpoint", "cluster_id")).To(Succeed())
 
 	Expect(unstructured.SetNestedSlice(t.gatewayObj.Object, append(current, conn), "status", "connections")).To(Succeed())
-
-	return t.gatewayObj
 }
 
 func newGateway() *unstructured.Unstructured {

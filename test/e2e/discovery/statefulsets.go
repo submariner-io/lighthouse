@@ -189,6 +189,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
 }
 
+// nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.
 func verifyEndpointSlices(f *framework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
 	endpointSlices *v1beta1.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
 	count := 0

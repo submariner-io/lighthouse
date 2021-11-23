@@ -1029,6 +1029,7 @@ func setupEndpointSliceMap() *endpointslice.Map {
 	return esMap
 }
 
+// nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	portNumber int32, protocol v1.Protocol, siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
@@ -1064,6 +1065,7 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	}
 }
 
+// nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID, portName string, hostName, endpointIPs []string, portNumber int32,
 	protocol v1.Protocol) *discovery.EndpointSlice {
 	endpoints := make([]discovery.Endpoint, len(endpointIPs))

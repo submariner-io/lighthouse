@@ -45,7 +45,7 @@ var _ = Describe("Headless service syncing", func() {
 				t.createEndpoints()
 				t.createServiceExport()
 
-				t.awaitHeadlessServiceImport("")
+				t.awaitHeadlessServiceImport()
 				t.awaitEndpointSlice()
 			})
 		})
@@ -53,7 +53,7 @@ var _ = Describe("Headless service syncing", func() {
 		When("the Endpoints doesn't initially exist", func() {
 			It("should eventually sync a correct ServiceImport and EndpointSlice", func() {
 				t.createServiceExport()
-				t.awaitHeadlessServiceImport("")
+				t.awaitHeadlessServiceImport()
 
 				t.createEndpoints()
 				t.awaitUpdatedServiceImport("")
@@ -67,7 +67,7 @@ var _ = Describe("Headless service syncing", func() {
 			t.createEndpoints()
 			t.createServiceExport()
 
-			t.awaitHeadlessServiceImport("")
+			t.awaitHeadlessServiceImport()
 			t.awaitEndpointSlice()
 
 			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
@@ -81,7 +81,7 @@ var _ = Describe("Headless service syncing", func() {
 		It("should delete the ServiceImport and EndpointSlice", func() {
 			t.createEndpoints()
 			t.createServiceExport()
-			t.awaitHeadlessServiceImport("")
+			t.awaitHeadlessServiceImport()
 			t.awaitEndpointSlice()
 
 			t.deleteServiceExport()
