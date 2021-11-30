@@ -15,14 +15,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package constants
+package weights_test
 
-const (
-	OriginName             = "origin-name"
-	OriginNamespace        = "origin-namespace"
-	LabelSourceName        = "lighthouse.submariner.io/sourceName"
-	LabelSourceNamespace   = "lighthouse.submariner.io/sourceNamespace"
-	LabelSourceCluster     = "lighthouse.submariner.io/sourceCluster"
-	LabelValueManagedBy    = "lighthouse-agent.submariner.io"
-	SubmarinerWeightMapKey = "submariner-weights"
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
+
+func init() {
+	klog.InitFlags(nil)
+}
+
+func TestServiceImportWeights(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "ServiceImportWeights	 Suite")
+}

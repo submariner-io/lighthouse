@@ -18,7 +18,6 @@ limitations under the License.
 package serviceimport
 
 import (
-	"strconv"
 	"sync"
 
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
@@ -59,8 +58,9 @@ func (si *serviceInfo) resetLoadBalancing() {
 }
 
 type Map struct {
-	svcMap map[string]*serviceInfo
-	mutex  sync.RWMutex
+	svcMap             map[string]*serviceInfo
+	weightFetchingFunc func(service, namesapce, inCluster string) int64
+	mutex              sync.RWMutex
 }
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
@@ -120,9 +120,10 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	return nil, true, false
 }
 
-func NewMap() *Map {
+func NewMap(weightFetchingFunc func(service, namesapce, inCluster string) int64) *Map {
 	return &Map{
-		svcMap: make(map[string]*serviceInfo),
+		svcMap:             make(map[string]*serviceInfo),
+		weightFetchingFunc: weightFetchingFunc,
 	}
 }
 
@@ -157,7 +158,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService.records[clusterName] = &clusterInfo{
 				name:   clusterName,
 				record: record,
-				weight: getServiceWeightFrom(serviceImport, clusterName),
+				weight: m.getServiceWeightFrom(serviceImport, clusterName),
 			}
 		}
 
@@ -194,15 +195,10 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 	}
 }
 
-func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int64 {
-	weightKey := "load-balancer.submariner.io/weight/" + forClusterName
-	if val, ok := si.Annotations[weightKey]; ok {
-		f, err := strconv.ParseInt(val, 0, 64)
-		if err != nil {
-			return f
-		}
-
-		klog.Errorf("Error: %v parsing the \"load-balancer.submariner.io/weight\" annotation from ServiceImport %q", err, si.Name)
+func (m *Map) getServiceWeightFrom(serviceImport *mcsv1a1.ServiceImport, inCluster string) int64 {
+	if name, ok := serviceImport.Annotations["origin-name"]; ok {
+		namespace := serviceImport.Annotations["origin-namespace"]
+		return m.weightFetchingFunc(name, namespace, inCluster)
 	}
 
 	return 1 // Zero will cause no selection

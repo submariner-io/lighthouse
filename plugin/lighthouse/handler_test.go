@@ -118,6 +118,10 @@ func getKey(name, namespace string) string {
 	return namespace + "/" + name
 }
 
+func GetWeightFor(service, namesapce, inCluster string) int64 {
+	return 1
+}
+
 func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
@@ -1016,7 +1020,7 @@ func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case)
 }
 
 func setupServiceImportMap() *serviceimport.Map {
-	siMap := serviceimport.NewMap()
+	siMap := serviceimport.NewMap(GetWeightFor)
 	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protocol1, mcsv1a1.ClusterSetIP))
 
 	return siMap

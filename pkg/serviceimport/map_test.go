@@ -23,6 +23,10 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 )
 
+func GetWeightFor(service, namesapce, inCluster string) int64 {
+	return 1
+}
+
 var _ = Describe("ServiceImport Map", func() {
 	const (
 		service1   = "service1"
@@ -44,7 +48,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
-		serviceImportMap = serviceimport.NewMap()
+		serviceImportMap = serviceimport.NewMap(GetWeightFor)
 		endpointStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
 	})
 

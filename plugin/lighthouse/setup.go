@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/service"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+	"github.com/submariner-io/lighthouse/pkg/serviceimport/weights"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -73,7 +74,21 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error building kubeconfig")
 	}
 
-	siMap := serviceimport.NewMap()
+	gwController := gateway.NewController()
+
+	err = gwController.Start(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "error starting the Gateway controller")
+	}
+
+	siWeightMapController := weights.NewController(gwController.LocalClusterID())
+	err = siWeightMapController.Start(cfg)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error starting the ServiceImportWeightMap controller")
+	}
+
+	siMap := serviceimport.NewMap(siWeightMapController.GetWeightFor)
 	siController := serviceimport.NewController(siMap)
 
 	err = siController.Start(cfg)
@@ -89,13 +104,6 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
 	}
 
-	gwController := gateway.NewController()
-
-	err = gwController.Start(cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "error starting the Gateway controller")
-	}
-
 	svcController := service.NewController(gwController.LocalClusterID())
 
 	err = svcController.Start(cfg)
@@ -104,6 +112,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	}
 
 	c.OnShutdown(func() error {
+		siWeightMapController.Stop()
 		siController.Stop()
 		epController.Stop()
 		gwController.Stop()

@@ -1,0 +1,20 @@
+---
+apiVersion: lighthouse.submariner.io/v1alpha1
+kind: ServiceImportWeights
+metadata:
+  name: serviceimportweights-sample
+spec:
+  # Add fields here
+  source_cluster_weight_map:
+    cluster1:
+      namespace_weight_map:
+        ns1:
+          service_weight_map:
+            svc1:
+              target_cluster_weight_map:
+                cluster2: 2
+                cluster3: 8
+            scv2:
+              target_cluster_weight_map:
+                cluster2: 2
+                cluster3: 8
