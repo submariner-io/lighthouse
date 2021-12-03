@@ -48,7 +48,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
-		serviceImportMap = serviceimport.NewMap(GetWeightFor)
+		serviceImportMap = serviceimport.NewMap(func(_, _, _) int64 { return 1 })
 		endpointStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
 	})
 

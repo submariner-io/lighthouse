@@ -31,5 +31,5 @@ func init() {
 
 func TestServiceImportWeights(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "ServiceImportWeights	 Suite")
+	RunSpecs(t, "ServiceImportWeights Suite")
 }

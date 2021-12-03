@@ -100,10 +100,10 @@ func (c *Controller) Stop() {
 	klog.Infof("ServiceImportsWeights Controller stopped")
 }
 
-func (c *Controller) GetWeightFor(service, namesapce, inCluster string) int64 {
+func (c *Controller) GetWeightFor(service, namespace, inCluster string) int64 {
 	obj, exists, err := c.weightsStore.GetByKey(lhconstants.SubmarinerWeightMapKey)
 	if err != nil {
-		klog.V(log.DEBUG).Infof("Error trying to get weight map for local cluster %q", c.localClusterID)
+		klog.Errorf("Error - %v, trying to get weight map for local cluster %q", err, c.localClusterID)
 		return 1
 	}
 

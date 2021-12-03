@@ -57,9 +57,11 @@ func (si *serviceInfo) resetLoadBalancing() {
 	}
 }
 
+type WeightFunc(service, namespace, cluster string) int64
+
 type Map struct {
 	svcMap             map[string]*serviceInfo
-	weightFetchingFunc func(service, namesapce, inCluster string) int64
+	weightFetchingFunc WeightFunc
 	mutex              sync.RWMutex
 }
 
@@ -120,7 +122,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	return nil, true, false
 }
 
-func NewMap(weightFetchingFunc func(service, namesapce, inCluster string) int64) *Map {
+func NewMap(WeightFunc) *Map {
 	return &Map{
 		svcMap:             make(map[string]*serviceInfo),
 		weightFetchingFunc: weightFetchingFunc,

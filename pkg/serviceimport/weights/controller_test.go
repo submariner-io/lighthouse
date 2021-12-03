@@ -23,25 +23,76 @@ import (
 	fakeClientSet "github.com/submariner-io/lighthouse/pkg/client/clientset/versioned/fake"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport/weights"
-	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
 
 const (
 	weightMapName = lhconstants.SubmarinerWeightMapKey
 
-	ns1      = "ns1"
-	cluster1 = "cluster1" // local
-	cluster2 = "cluster2" // remote
-	cluster3 = "cluster3" // remote
-	scv1     = "scv1"
+	ns1            = "test"
+	localCluster   = "local"   // local
+	remoteCluster1 = "remote1" // remote
+	remoteCluster2 = "remote2" // remote
+	serviceName    = "test-service"
 )
+
+var _ = Describe("ServiceImportWeights controller", func() {
+	t := newWeightMapTestDiver()
+
+	When("no weight is defined", func() {
+		It("should return default weight of 1", func() {
+			t.validateWeightNotAvailable(serviceName, "non-existing-ns", remoteCluster1)
+			t.validateWeightNotAvailable("non-existing-svc", ns1, remoteCluster1)
+			t.validateWeightNotAvailable(serviceName, ns1, "non-existing-cluster")
+		})
+	})
+
+	When("a ServiceImportWeightMap is added", func() {
+		BeforeEach(func() {
+			t.createWeightsMap(weightMapName)
+		})
+		It("should return the relevant weight for the query", func() {
+			t.validateWeightAvailable(serviceName, ns1, remoteCluster1, 8)
+		})
+		Context("and then removed", func() {
+			It("should return default weight of 1", func() {
+				t.deleteWeightsMap(weightMapName)
+				t.validateWeightNotAvailable(serviceName, ns1, remoteCluster1)
+			})
+		})
+		Context("and then updated", func() {
+			It("should return the update weight", func() {
+				t.updateWeightsMap(weightMapName, serviceName, ns1, remoteCluster1, 15)
+				t.validateWeightAvailable(serviceName, ns1, remoteCluster1, 15)
+			})
+		})
+	})
+})
 
 type weightMapTestDriver struct {
 	controller *weights.Controller
 	kubeClient lighthouseClientset.Interface
+}
+
+func newWeightMapTestDiver() *weightMapTestDriver {
+	t := &weightMapTestDriver{}
+
+	BeforeEach(func() {
+		t.kubeClient = fakeClientSet.NewSimpleClientset()
+		t.controller = weights.NewController(localCluster)
+		t.controller.NewClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
+			return t.kubeClient, nil
+		}
+
+		Expect(t.controller.Start(&rest.Config{})).To(Succeed())
+	})
+
+	AfterEach(func() {
+		t.controller.Stop()
+	})
+
+	return t
 }
 
 func createDefaultWeightMap(name string) *lighthousev1a1.ServiceImportWeightMap {
@@ -52,14 +103,14 @@ func createDefaultWeightMap(name string) *lighthousev1a1.ServiceImportWeightMap 
 		Spec: lighthousev1a1.ServiceImportWeightMapSpec{
 
 			SourceClusterWeightMap: map[string]*lighthousev1a1.ClusterWeightMap{
-				cluster1: {
+				localCluster: {
 					NamespaceWeightMap: map[string]*lighthousev1a1.NamespaceWeightMap{
 						ns1: {
 							ServiceWeightMap: map[string]*lighthousev1a1.ServiceWeightMap{
-								scv1: {
+								serviceName: {
 									TargetClusterWeightMap: map[string]int64{
-										cluster2: 8,
-										cluster3: 2,
+										remoteCluster1: 8,
+										remoteCluster2: 2,
 									},
 								},
 							},
@@ -71,12 +122,12 @@ func createDefaultWeightMap(name string) *lighthousev1a1.ServiceImportWeightMap 
 	}
 }
 
-func (n *weightMapTestDriver) updateWeightsMap(name, service, namesapce, inCluster string, weight int64) {
+func (n *weightMapTestDriver) updateWeightsMap(name, service, namespace, inCluster string, weight int64) {
 	weightMapObj := createDefaultWeightMap(name)
 	weightMapObj.
 		Spec.
-		SourceClusterWeightMap[cluster1].
-		NamespaceWeightMap[namesapce].
+		SourceClusterWeightMap[localCluster].
+		NamespaceWeightMap[namespace].
 		ServiceWeightMap[service].
 		TargetClusterWeightMap[inCluster] = weight
 
@@ -100,68 +151,14 @@ func (n *weightMapTestDriver) deleteWeightsMap(name string) {
 	Expect(err).To(Succeed())
 }
 
-func newWeightMapTestDiver() *weightMapTestDriver {
-	t := &weightMapTestDriver{}
-
-	BeforeEach(func() {
-		t.kubeClient = fakeClientSet.NewSimpleClientset()
-		t.controller = weights.NewController(cluster1)
-		t.controller.NewClientset = func(c *rest.Config) (lighthouseClientset.Interface, error) {
-			return t.kubeClient, nil
-		}
-
-		Expect(t.controller.Start(&rest.Config{})).To(Succeed())
-		Expect(v1.AddToScheme(scheme.Scheme)).To(Succeed())
-	})
-
-	AfterEach(func() {
-		t.controller.Stop()
-	})
-
-	return t
+func (n *weightMapTestDriver) validateWeightAvailable(service, namesapce, inCluster string, weight int64) {
+	Eventually(func() int64 {
+		return t.controller.GetWeightFor(service, namesapce, inCluster)
+	}, 5).Should(Equal(weight))
 }
 
-var _ = Describe("ServiceImportWeights controller", func() {
-	t := newWeightMapTestDiver()
-
-	validateWeightAvailable := func(service, namesapce, inCluster string, weight int64) {
-		Eventually(func() int64 {
-			return t.controller.GetWeightFor(service, namesapce, inCluster)
-		}, 5).Should(Equal(weight))
-	}
-
-	validateWeightNotAvailable := func(service, namesapce, inCluster string) {
-		Eventually(func() int64 {
-			return t.controller.GetWeightFor(service, namesapce, inCluster)
-		}, 5).Should(Equal(int64(1)))
-	}
-
-	When("weigth does not exists for query", func() {
-		It("should return default weight of 1", func() {
-			validateWeightNotAvailable(scv1, "non-existing-ns", cluster2)
-			validateWeightNotAvailable("non-existing-svc", ns1, cluster2)
-			validateWeightNotAvailable(scv1, ns1, "non-existing-cluster")
-		})
-	})
-
-	When("weight map is added", func() {
-		BeforeEach(func() {
-			t.createWeightsMap(weightMapName)
-		})
-		It("should return the relevant weight for the query", func() {
-			validateWeightAvailable(scv1, ns1, cluster2, 8)
-		})
-		When("weigth map is removed", func() {
-			It("should return default weight of 1", func() {
-				t.deleteWeightsMap(weightMapName)
-				validateWeightNotAvailable(scv1, ns1, cluster2)
-			})
-		})
-		When("weigth map is updated", func() {
-			It("should return the update weight", func() {
-				t.updateWeightsMap(weightMapName, scv1, ns1, cluster2, 15)
-				validateWeightAvailable(scv1, ns1, cluster2, 15)
-			})
-		})
-	})
-})
+func (n *weightMapTestDriver) validateWeightNotAvailable(service, namesapce, inCluster string) {
+	Eventually(func() int64 {
+		return t.controller.GetWeightFor(service, namesapce, inCluster)
+	}, 5).Should(Equal(int64(1)))
+}
