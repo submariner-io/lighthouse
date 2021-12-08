@@ -25,15 +25,16 @@ import (
 
 var _ = Describe("ServiceImport Map", func() {
 	const (
-		service1   = "service1"
-		namespace1 = "namespace1"
-		namespace2 = "namespace2"
-		serviceIP1 = "192.168.56.21"
-		serviceIP2 = "192.168.56.22"
-		serviceIP3 = "192.168.56.23"
-		clusterID1 = "clusterID1"
-		clusterID2 = "clusterID2"
-		clusterID3 = "clusterID3"
+		service1       = "service1"
+		namespace1     = "namespace1"
+		namespace2     = "namespace2"
+		serviceIP1     = "192.168.56.21"
+		serviceIP2     = "192.168.56.22"
+		serviceIP3     = "192.168.56.23"
+		localClusterID = "local"
+		clusterID1     = "clusterID1"
+		clusterID2     = "clusterID2"
+		clusterID3     = "clusterID3"
 	)
 
 	var (
@@ -44,7 +45,7 @@ var _ = Describe("ServiceImport Map", func() {
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
-		serviceImportMap = serviceimport.NewMap()
+		serviceImportMap = serviceimport.NewMap(localClusterID)
 		endpointStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
 	})
 

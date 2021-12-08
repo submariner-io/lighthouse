@@ -39,23 +39,24 @@ import (
 )
 
 const (
-	service1    = "service1"
-	namespace1  = "namespace1"
-	namespace2  = "namespace2"
-	serviceIP   = "100.96.156.101"
-	serviceIP2  = "100.96.156.102"
-	clusterID   = "cluster1"
-	clusterID2  = "cluster2"
-	endpointIP  = "100.96.157.101"
-	endpointIP2 = "100.96.157.102"
-	portName1   = "http"
-	portName2   = "dns"
-	protocol1   = v1.ProtocolTCP
-	portNumber1 = int32(8080)
-	protocol2   = v1.ProtocolUDP
-	portNumber2 = int32(53)
-	hostName1   = "hostName1"
-	hostName2   = "hostName2"
+	service1       = "service1"
+	namespace1     = "namespace1"
+	namespace2     = "namespace2"
+	serviceIP      = "100.96.156.101"
+	serviceIP2     = "100.96.156.102"
+	localClusterID = "local"
+	clusterID      = "cluster1"
+	clusterID2     = "cluster2"
+	endpointIP     = "100.96.157.101"
+	endpointIP2    = "100.96.157.102"
+	portName1      = "http"
+	portName2      = "dns"
+	protocol1      = v1.ProtocolTCP
+	portNumber1    = int32(8080)
+	protocol2      = v1.ProtocolUDP
+	portNumber2    = int32(53)
+	hostName1      = "hostName1"
+	hostName2      = "hostName2"
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
@@ -1016,7 +1017,7 @@ func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case)
 }
 
 func setupServiceImportMap() *serviceimport.Map {
-	siMap := serviceimport.NewMap()
+	siMap := serviceimport.NewMap(localClusterID)
 	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protocol1, mcsv1a1.ClusterSetIP))
 
 	return siMap

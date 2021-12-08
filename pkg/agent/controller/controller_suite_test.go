@@ -55,6 +55,8 @@ import (
 const (
 	clusterID1       = "east"
 	clusterID2       = "west"
+	clusterID1Weight = "30"
+	clusterID2Weight = "70"
 	serviceNamespace = "service-ns"
 	globalIP1        = "242.254.1.1"
 	globalIP2        = "242.254.1.2"
@@ -151,6 +153,10 @@ func newTestDiver() *testDriver {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      t.service.Name,
 			Namespace: t.service.Namespace,
+			Annotations: map[string]string{
+				lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + clusterID1: clusterID1Weight,
+				lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + clusterID2: clusterID2Weight,
+			},
 		},
 	}
 
@@ -296,6 +302,11 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 
 	Expect(serviceImport.GetAnnotations()["origin-name"]).To(Equal(service.Name))
 	Expect(serviceImport.GetAnnotations()["origin-namespace"]).To(Equal(service.Namespace))
+	weightKeyCluster1 := lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + clusterID1
+	Expect(serviceImport.GetAnnotations()[weightKeyCluster1]).To(Equal(clusterID1Weight))
+	weightKeyCluster2 := lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + clusterID2
+	Expect(serviceImport.GetAnnotations()[weightKeyCluster2]).To(Equal(clusterID2Weight))
+
 	Expect(serviceImport.Spec.Type).To(Equal(sType))
 
 	Expect(serviceImport.Status.Clusters).To(HaveLen(1))
