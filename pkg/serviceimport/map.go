@@ -59,8 +59,9 @@ func (si *serviceInfo) resetLoadBalancing() {
 }
 
 type Map struct {
-	svcMap map[string]*serviceInfo
-	mutex  sync.RWMutex
+	svcMap         map[string]*serviceInfo
+	localClusterID string
+	mutex          sync.RWMutex
 }
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
@@ -120,9 +121,10 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	return nil, true, false
 }
 
-func NewMap() *Map {
+func NewMap(localClusterID string) *Map {
 	return &Map{
-		svcMap: make(map[string]*serviceInfo),
+		svcMap:         make(map[string]*serviceInfo),
+		localClusterID: localClusterID,
 	}
 }
 
@@ -157,7 +159,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService.records[clusterName] = &clusterInfo{
 				name:   clusterName,
 				record: record,
-				weight: getServiceWeightFrom(serviceImport, clusterName),
+				weight: getServiceWeightFrom(serviceImport, m.localClusterID),
 			}
 		}
 
@@ -195,14 +197,14 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int64 {
-	weightKey := "load-balancer.submariner.io/weight/" + forClusterName
+	weightKey := lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + forClusterName
 	if val, ok := si.Annotations[weightKey]; ok {
 		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {
 			return f
 		}
 
-		klog.Errorf("Error: %v parsing the \"load-balancer.submariner.io/weight\" annotation from ServiceImport %q", err, si.Name)
+		klog.Errorf("Error: %v parsing the %q annotation from ServiceImport %q", err, weightKey, si.Name)
 	}
 
 	return 1 // Zero will cause no selection
