@@ -73,7 +73,14 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error building kubeconfig")
 	}
 
-	siMap := serviceimport.NewMap()
+	gwController := gateway.NewController()
+
+	err = gwController.Start(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "error starting the Gateway controller")
+	}
+
+	siMap := serviceimport.NewMap(gwController.LocalClusterID())
 	siController := serviceimport.NewController(siMap)
 
 	err = siController.Start(cfg)
@@ -87,13 +94,6 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	err = epController.Start(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
-	}
-
-	gwController := gateway.NewController()
-
-	err = gwController.Start(cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
 
 	svcController := service.NewController(gwController.LocalClusterID())
