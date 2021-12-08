@@ -234,7 +234,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	klog.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
 
 	if op == syncer.Delete {
-		return a.newServiceImport(svcExport.Name, svcExport.Namespace), false
+		return a.newServiceImport(svcExport), false
 	}
 
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
@@ -271,7 +271,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
-	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
+	serviceImport := a.newServiceImport(svcExport)
 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
@@ -373,7 +373,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
 
-	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
+	serviceImport := a.newServiceImport(svcExport)
 
 	// Update the status and requeue
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, corev1.ConditionFalse, serviceUnavailable,
@@ -455,13 +455,19 @@ func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
 		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
-func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceImport {
+func (a *Controller) newServiceImport(svcExport *mcsv1a1.ServiceExport) *mcsv1a1.ServiceImport {
+	name := svcExport.Name
+	namespace := svcExport.Namespace
+	weightKey := lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + a.clusterID
+	exportedAnnotations := svcExport.GetAnnotations()
+
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{
 				lhconstants.OriginName:      name,
 				lhconstants.OriginNamespace: namespace,
+				weightKey:                   exportedAnnotations[weightKey], // copy weight annotations for our cluster
 			},
 			Labels: map[string]string{
 				lhconstants.LabelSourceName:      name,
