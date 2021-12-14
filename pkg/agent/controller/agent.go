@@ -198,9 +198,8 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        si.GetAnnotations()[lhconstants.OriginName],
-					Namespace:   si.GetAnnotations()[lhconstants.OriginNamespace],
-					Annotations: si.GetAnnotations(),
+					Name:      si.GetAnnotations()[lhconstants.OriginName],
+					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
 				},
 			}
 		})
