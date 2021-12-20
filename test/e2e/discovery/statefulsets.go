@@ -132,8 +132,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
+		for j := range endpointSlice.Endpoints {
+			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				nginxServiceClusterB.Name, checkedDomains, sourceCluster == clusterAName)
 			verifyCount++
 		}
@@ -179,9 +179,9 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, endpoint, sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, *endpoint.Hostname == "web-0")
+		for j := range endpointSlice.Endpoints {
+			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+				nginxServiceClusterB.Name, checkedDomains, *endpointSlice.Endpoints[j].Hostname == "web-0")
 		}
 	}
 
@@ -198,8 +198,8 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
 
-		for _, endpoint := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f, targetCluster, netshootPodList, endpoint, sourceCluster,
+		for j := range endpointSlice.Endpoints {
+			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				svcName, checkedDomains, shouldContain)
 			count++
 		}
@@ -209,7 +209,7 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 }
 
 func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
-	endpoint v1beta1.Endpoint, sourceCluster, service string, domains []string, shouldContain bool) {
+	endpoint *v1beta1.Endpoint, sourceCluster, service string, domains []string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
 
 	query := *endpoint.Hostname + "." + sourceCluster + "." + service
