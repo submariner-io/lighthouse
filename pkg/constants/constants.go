@@ -20,7 +20,7 @@ package constants
 const (
 	OriginName                         = "origin-name"
 	OriginNamespace                    = "origin-namespace"
-	LoadBalancerWeightAnnotationPrefix = "lighthouse-load-balancer-weight.submariner.io"
+	LoadBalancerWeightAnnotationPrefix = "lighthouse-lb-weight.submariner.io"
 	LabelSourceName                    = "lighthouse.submariner.io/sourceName"
 	LabelSourceNamespace               = "lighthouse.submariner.io/sourceNamespace"
 	LabelSourceCluster                 = "lighthouse.submariner.io/sourceCluster"
