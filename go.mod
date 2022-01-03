@@ -17,14 +17,13 @@ require (
 	github.com/submariner-io/admiral v0.12.0-m1
 	github.com/submariner-io/shipyard v0.12.0-m1
 	github.com/uw-labs/lichen v0.1.4
-	go.uber.org/zap v1.15.0 // indirect
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.4.0 // indirect
 	k8s.io/utils v0.0.0-20210305010621-2afb4311ab10
-	sigs.k8s.io/controller-runtime v0.6.5
+	sigs.k8s.io/controller-runtime v0.7.2
 	sigs.k8s.io/mcs-api v0.1.0
 )
 
