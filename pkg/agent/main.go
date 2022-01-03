@@ -98,7 +98,7 @@ func main() {
 	klog.Infof("Starting submariner-lighthouse-agent %v", agentSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	ctx := signals.SetupSignalHandler()
 
 	httpServer := startHTTPServer()
 
@@ -116,11 +116,11 @@ func main() {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
 
-	if err := lightHouseAgent.Start(stopCh); err != nil {
+	if err := lightHouseAgent.Start(ctx.Done()); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 
 	klog.Info("All controllers stopped or exited. Stopping main loop")
 
