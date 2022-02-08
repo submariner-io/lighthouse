@@ -464,9 +464,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 				lhconstants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LabelSourceName:      name,
-				lhconstants.LabelSourceNamespace: namespace,
-				lhconstants.LabelSourceCluster:   a.clusterID,
+				lhconstants.LighthouseLabelSourceName:    name,
+				lhconstants.LabelSourceNamespace:         namespace,
+				lhconstants.LighthouseLabelSourceCluster: a.clusterID,
 			},
 		},
 	}

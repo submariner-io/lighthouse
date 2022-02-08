@@ -130,7 +130,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[lhconstants.MCSLabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
@@ -177,7 +177,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[lhconstants.MCSLabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
@@ -196,7 +196,7 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[lhconstants.LabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[lhconstants.MCSLabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,

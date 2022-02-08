@@ -21,8 +21,10 @@ const (
 	OriginName                         = "origin-name"
 	OriginNamespace                    = "origin-namespace"
 	LoadBalancerWeightAnnotationPrefix = "lighthouse-lb-weight.submariner.io"
-	LabelSourceName                    = "lighthouse.submariner.io/sourceName"
+	LighthouseLabelSourceName          = "lighthouse.submariner.io/sourceName"
 	LabelSourceNamespace               = "lighthouse.submariner.io/sourceNamespace"
-	LabelSourceCluster                 = "lighthouse.submariner.io/sourceCluster"
+	LighthouseLabelSourceCluster       = "lighthouse.submariner.io/sourceCluster"
 	LabelValueManagedBy                = "lighthouse-agent.submariner.io"
+	MCSLabelServiceName                = "multicluster.kubernetes.io/service-name"
+	MCSLabelSourceCluster              = "multicluster.kubernetes.io/source-cluster"
 )
