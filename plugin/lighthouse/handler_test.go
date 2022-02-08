@@ -1042,7 +1042,7 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 				"origin-namespace": namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LabelSourceCluster: clusterID,
+				lhconstants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
@@ -1084,10 +1084,10 @@ func newEndpointSlice(namespace, name, clusterID, portName string, hostName, end
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				discovery.LabelManagedBy:         lhconstants.LabelValueManagedBy,
-				lhconstants.LabelSourceNamespace: namespace,
-				lhconstants.LabelSourceCluster:   clusterID,
-				lhconstants.LabelSourceName:      name,
+				discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
+				lhconstants.LabelSourceNamespace:  namespace,
+				lhconstants.MCSLabelSourceCluster: clusterID,
+				lhconstants.MCSLabelServiceName:   name,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

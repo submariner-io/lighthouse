@@ -153,7 +153,7 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.Ser
 				"origin-namespace": namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LabelSourceCluster: clusterID,
+				lhconstants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{

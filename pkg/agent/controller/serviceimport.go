@@ -102,7 +102,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 		return false
 	}
 
-	if serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+	if serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster] != c.clusterID {
 		return false
 	}
 
@@ -140,7 +140,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 }
 
 func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.ServiceImport, key string) {
-	if serviceImport.GetLabels()[lhconstants.LabelSourceCluster] != c.clusterID {
+	if serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster] != c.clusterID {
 		return
 	}
 

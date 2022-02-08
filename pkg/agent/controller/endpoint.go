@@ -97,16 +97,27 @@ func (e *EndpointController) cleanup() {
 		Version: "v1beta1", Resource: "endpointslices",
 	}).Namespace(e.serviceImportSourceNameSpace)
 
-	endpointSliceLabels := labels.SelectorFromSet(map[string]string{
-		lhconstants.LabelSourceNamespace: e.serviceImportSourceNameSpace,
-		lhconstants.LabelSourceCluster:   e.clusterID,
-		lhconstants.LabelSourceName:      e.serviceName,
+	// MCS-compliant labels
+	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+			lhconstants.MCSLabelSourceCluster: e.clusterID,
+			lhconstants.MCSLabelServiceName:   e.serviceName,
+		}).String(),
 	})
-	listEndpointSliceOptions := metav1.ListOptions{
-		LabelSelector: endpointSliceLabels.String(),
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
 	}
 
-	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listEndpointSliceOptions)
+	// Lighthouse-proprietary labels
+	err = resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			lhconstants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
+			lhconstants.LighthouseLabelSourceCluster: e.clusterID,
+			lhconstants.LighthouseLabelSourceName:    e.serviceName,
+		}).String(),
+	})
 
 	if err != nil && !apierrors.IsNotFound(err) {
 		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
@@ -144,10 +155,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		discovery.LabelManagedBy:         lhconstants.LabelValueManagedBy,
-		lhconstants.LabelSourceNamespace: e.serviceImportSourceNameSpace,
-		lhconstants.LabelSourceCluster:   e.clusterID,
-		lhconstants.LabelSourceName:      e.serviceName,
+		discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
+		lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+		lhconstants.MCSLabelSourceCluster: e.clusterID,
+		lhconstants.MCSLabelServiceName:   e.serviceName,
 	}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4

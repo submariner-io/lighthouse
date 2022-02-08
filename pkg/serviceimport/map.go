@@ -148,7 +148,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			clusterName := serviceImport.GetLabels()[lhconstants.LabelSourceCluster]
+			clusterName := serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster]
 
 			record := &DNSRecord{
 				IP:          serviceImport.Spec.IPs[0],

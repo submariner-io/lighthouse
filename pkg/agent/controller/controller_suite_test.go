@@ -317,8 +317,8 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 
 	labels := serviceImport.GetObjectMeta().GetLabels()
 	Expect(labels[lhconstants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
-	Expect(labels[lhconstants.LabelSourceName]).To(Equal(service.GetName()))
-	Expect(labels[lhconstants.LabelSourceCluster]).To(Equal(clusterID1))
+	Expect(labels[lhconstants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
+	Expect(labels[lhconstants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
 
 	return serviceImport
 }
@@ -372,7 +372,8 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 	labels := endpointSlice.GetLabels()
 	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
 	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceCluster, clusterID1))
+	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelSourceCluster, clusterID1))
+	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelServiceName, service.Name))
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 
