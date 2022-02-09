@@ -100,8 +100,6 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
 
-	httpServer := startHTTPServer()
-
 	lightHouseAgent, err := controller.New(&agentSpec, broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalClient:     localClient,
@@ -116,9 +114,22 @@ func main() {
 		klog.Fatalf("Failed to create lighthouse agent: %v", err)
 	}
 
+	if agentSpec.Uninstall {
+		klog.Info("Uninstalling lighthouse")
+
+		err := lightHouseAgent.Cleanup()
+		if err != nil {
+			klog.Fatalf("Error cleaning up the lighthouse agent controller: %+v", err)
+		}
+
+		return
+	}
+
 	if err := lightHouseAgent.Start(ctx.Done()); err != nil {
 		klog.Fatalf("Failed to start lighthouse agent: %v", err)
 	}
+
+	httpServer := startHTTPServer()
 
 	<-ctx.Done()
 

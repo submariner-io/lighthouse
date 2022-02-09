@@ -91,6 +91,7 @@ type cluster struct {
 	localEndpointSliceClient dynamic.ResourceInterface
 	localKubeClient          kubernetes.Interface
 	endpointsReactor         *fake.FailingReactor
+	agentController          *controller.Controller
 }
 
 type testDriver struct {
@@ -104,6 +105,7 @@ type testDriver struct {
 	stopCh                    chan struct{}
 	syncerConfig              *broker.SyncerConfig
 	endpointGlobalIPs         []string
+	doStart                   bool
 }
 
 func newTestDiver() *testDriver {
@@ -144,7 +146,8 @@ func newTestDiver() *testDriver {
 			BrokerClient: fake.NewDynamicClient(syncerScheme),
 			Scheme:       syncerScheme,
 		},
-		stopCh: make(chan struct{}),
+		stopCh:  make(chan struct{}),
+		doStart: true,
 	}
 
 	t.serviceExport = &mcsv1a1.ServiceExport{
@@ -277,14 +280,17 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 
 	serviceExportCounterName := "submariner_service_export" + bigint.String()
 
-	agentController, err := controller.New(&c.agentSpec, syncerConfig, c.localKubeClient,
+	c.agentController, err = controller.New(&c.agentSpec, syncerConfig, c.localKubeClient,
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
 			ServiceExportCounterName: serviceExportCounterName,
 		})
 
 	Expect(err).To(Succeed())
-	Expect(agentController.Start(t.stopCh)).To(Succeed())
+
+	if t.doStart {
+		Expect(c.agentController.Start(t.stopCh)).To(Succeed())
+	}
 }
 
 func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Service, sType mcsv1a1.ServiceImportType,
@@ -457,6 +463,10 @@ func (c *cluster) awaitUpdatedEndpointSlice(endpoints *corev1.Endpoints, expecte
 	awaitUpdatedEndpointSlice(c.localEndpointSliceClient, endpoints, expectedIPs)
 }
 
+func (c *cluster) dynamicServiceClient() dynamic.NamespaceableResourceInterface {
+	return c.localDynClient.Resource(schema.GroupVersionResource{Version: "v1", Resource: "services"})
+}
+
 func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, serviceIP string) *mcsv1a1.ServiceImport {
 	return awaitServiceImport(t.brokerServiceImportClient, t.service, sType, serviceIP)
 }
@@ -487,7 +497,7 @@ func (t *testDriver) createService() {
 	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Create(context.TODO(), t.service, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
-	test.CreateResource(t.dynamicServiceClient(), t.service)
+	test.CreateResource(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace), t.service)
 }
 
 func (t *testDriver) createEndpoints() {
@@ -517,7 +527,8 @@ func (t *testDriver) deleteServiceExport() {
 }
 
 func (t *testDriver) deleteService() {
-	Expect(t.dynamicServiceClient().Delete(context.TODO(), t.service.Name, metav1.DeleteOptions{})).To(Succeed())
+	Expect(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace).Delete(context.TODO(), t.service.Name,
+		metav1.DeleteOptions{})).To(Succeed())
 
 	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(context.TODO(), t.service.Name,
 		metav1.DeleteOptions{})).To(Succeed())
@@ -532,10 +543,6 @@ func (t *testDriver) createEndpointIngressIPs() {
 	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("one", globalIP1))
 	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("two", globalIP2))
 	t.createGlobalIngressIP(t.newHeadlessGlobalIngressIP("not-ready", globalIP3))
-}
-
-func (t *testDriver) dynamicServiceClient() dynamic.ResourceInterface {
-	return t.cluster1.localDynClient.Resource(schema.GroupVersionResource{Version: "v1", Resource: "services"}).Namespace(t.service.Namespace)
 }
 
 func (t *testDriver) awaitNoServiceImport(client dynamic.ResourceInterface) {
