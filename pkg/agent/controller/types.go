@@ -47,6 +47,7 @@ type AgentSpecification struct {
 	ClusterID        string
 	Namespace        string
 	GlobalnetEnabled bool `split_words:"true"`
+	Uninstall        bool
 }
 
 // The ServiceImportController listens for ServiceImport resources created in the target namespace
