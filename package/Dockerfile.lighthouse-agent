@@ -1,7 +1,20 @@
+ARG BASE_BRANCH
+ARG SOURCE=/go/src/github.com/submariner-io/lighthouse
+ARG TARGETPLATFORM=linux/amd64
+
+FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY . ${SOURCE}
+
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/lighthouse-agent
+
 FROM scratch
+ARG SOURCE
 
 WORKDIR /var/submariner
 
-COPY bin/lighthouse-agent /usr/local/bin/
+COPY --from=builder ${SOURCE}/bin/lighthouse-agent /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
