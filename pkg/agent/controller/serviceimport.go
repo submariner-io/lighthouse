@@ -24,7 +24,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -109,23 +108,6 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	annotations := serviceImport.ObjectMeta.Annotations
 	serviceNameSpace := annotations[lhconstants.OriginNamespace]
 	serviceName := annotations[lhconstants.OriginName]
-
-	obj, found, err := c.serviceSyncer.GetResource(serviceName, serviceNameSpace)
-	if err != nil {
-		klog.Errorf("Error retrieving the service  %q from the namespace %q : %v", serviceName, serviceNameSpace, err)
-
-		return true
-	}
-
-	if !found {
-		return false
-	}
-
-	service := obj.(*corev1.Service)
-	if service.Spec.Selector == nil {
-		klog.Errorf("The service %s/%s without a Selector is not supported", serviceNameSpace, serviceName)
-		return false
-	}
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
 		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)
