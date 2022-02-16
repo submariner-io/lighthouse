@@ -225,7 +225,7 @@ func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.Clus
 
 	By(fmt.Sprintf("Executing %q to verify IPs %v for pod %q %q discoverable", strings.Join(cmd, " "), endpoint.Addresses, query, op))
 	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,
 			PodName:       targetPod.Items[0].Name,

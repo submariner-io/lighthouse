@@ -549,7 +549,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 			By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
 				service.Name, op))
 			framework.AwaitUntil("verify if service Ports is discoverable", func() (interface{}, error) {
-				stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+				stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 					Command:       cmd,
 					Namespace:     f.Namespace,
 					PodName:       targetPod.Items[0].Name,
@@ -604,7 +604,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 
 	for count := 0; count < 10; count++ {
 		framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
-			stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace,
 				PodName:       targetPod.Items[0].Name,
@@ -646,7 +646,7 @@ func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, ta
 	*/
 	cmd := []string{"cat", "/etc/resolv.conf"}
 
-	if stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+	if stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 		Command:       cmd,
 		Namespace:     f.Namespace,
 		PodName:       targetPod.Items[0].Name,
