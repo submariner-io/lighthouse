@@ -256,7 +256,7 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 
 	By(fmt.Sprintf("Executing %q to verify IPs %v for service %q %q discoverable", strings.Join(cmd, " "), ipList, service.Name, op))
 	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,
 			PodName:       targetPod.Items[0].Name,
@@ -306,7 +306,7 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 			By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
 				strings.Join(cmd, " "), hostNameList, service.Name, op))
 			framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
-				stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+				stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 					Command:       cmd,
 					Namespace:     f.Namespace,
 					PodName:       targetPod.Items[0].Name,
