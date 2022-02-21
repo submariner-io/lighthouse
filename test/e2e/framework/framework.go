@@ -570,7 +570,7 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 
 	By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP, service.Name, op))
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,
 			PodName:       targetPod.Items[0].Name,
