@@ -8,13 +8,11 @@ ifneq (,$(DAPPER_HOST_ARCH))
 BINARIES := bin/lighthouse-agent bin/lighthouse-coredns
 IMAGES := lighthouse-agent lighthouse-coredns
 PRELOAD_IMAGES := submariner-gateway submariner-operator submariner-route-agent $(IMAGES)
+SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
-CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.yml
-override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
-override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
 override DEPLOY_ARGS += --service_discovery
