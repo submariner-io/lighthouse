@@ -1,25 +1,26 @@
 ARG BASE_BRANCH
 ARG SOURCE=/go/src/github.com/submariner-io/lighthouse
-ARG TARGETPLATFORM=linux/amd64
 
-FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
 ARG SOURCE
 ARG TARGETPLATFORM
 
 COPY . ${SOURCE}
 
-RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/lighthouse-coredns
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/lighthouse-coredns
 
-FROM debian:stable-slim AS certificates
+FROM --platform=${TARGETPLATFORM} debian:stable-slim AS certificates
 ARG SOURCE
+ARG TARGETPLATFORM
 
 RUN apt-get update && apt-get -y install ca-certificates && update-ca-certificates
 
-FROM scratch
+FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
+ARG TARGETPLATFORM
 
 COPY --from=certificates /etc/ssl/certs /etc/ssl/certs
-COPY --from=builder ${SOURCE}/bin/lighthouse-coredns /usr/local/bin/
+COPY --from=builder ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-coredns /usr/local/bin/
 
 EXPOSE 53 53/udp
 EXPOSE 9153 9153/tcp

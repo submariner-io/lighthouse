@@ -5,9 +5,19 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
-BINARIES := bin/lighthouse-agent bin/lighthouse-coredns
+gotodockerarch = $(patsubst arm,arm/v7,$(1))
+dockertogoarch = $(patsubst arm/v7,arm,$(1))
+
+nullstring :=
+space := $(nullstring) # end of the line
+comma := ,
+
+PLATFORMS ?= linux/amd64,linux/arm64
+BINARIES := lighthouse-agent lighthouse-coredns
+ARCH_BINARIES := $(foreach platform,$(subst $(comma),$(space),$(PLATFORMS)),$(foreach binary,$(BINARIES),bin/$(call gotodockerarch,$(platform))/$(binary)))
 IMAGES := lighthouse-agent lighthouse-coredns
 PRELOAD_IMAGES := submariner-gateway submariner-operator submariner-route-agent $(IMAGES)
+MULTIARCH_IMAGES := $(IMAGES)
 SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
 
 include $(SHIPYARD_DIR)/Makefile.inc
@@ -19,26 +29,21 @@ override DEPLOY_ARGS += --service_discovery
 
 # Targets to make
 
-# Explicitly depend on the binary, since if it doesn't exist Shipyard won't find it
-package/.image.lighthouse-agent: bin/lighthouse-agent
+build: $(ARCH_BINARIES)
 
-package/.image.lighthouse-coredns: bin/lighthouse-coredns
+bin/%/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/agent $(BUILD_ARGS)
 
-build: $(BINARIES)
-
-bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
-	${SCRIPTS_DIR}/compile.sh $@ ./pkg/agent $(BUILD_ARGS)
-
-bin/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
+bin/%/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
 	mkdir -p $(@D)
-	cd coredns && ${SCRIPTS_DIR}/compile.sh $@ . $(BUILD_ARGS)
+	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ . $(BUILD_ARGS)
 	mv coredns/$@ $@
 
 e2e: vendor/modules.txt
 
 licensecheck: BUILD_ARGS=--noupx
-licensecheck: $(BINARIES) bin/lichen
-	bin/lichen -c .lichen.yaml $(BINARIES)
+licensecheck: $(ARCH_BINARIES) bin/lichen
+	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
 
 bin/lichen: vendor/modules.txt
 	mkdir -p $(@D)
