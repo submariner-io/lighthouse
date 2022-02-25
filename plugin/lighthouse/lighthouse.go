@@ -53,7 +53,6 @@ type Lighthouse struct {
 
 type ClusterStatus interface {
 	IsConnected(clusterID string) bool
-
 	LocalClusterID() string
 }
 
