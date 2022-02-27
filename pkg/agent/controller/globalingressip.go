@@ -19,7 +19,6 @@ package controller
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/klog"
 )
 
 const (
@@ -48,7 +47,7 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 
 	gip.target, found, err = unstructured.NestedString(obj.Object, "spec", "target")
 	if !found || err != nil {
-		klog.Errorf("target field not found in spec %#v", obj.Object)
+		logger.Error(nil, "target field not found in spec", "value", obj.Object)
 		return nil
 	}
 
