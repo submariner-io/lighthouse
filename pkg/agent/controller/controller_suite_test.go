@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -33,6 +34,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -51,7 +53,6 @@ import (
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -72,7 +73,12 @@ var (
 )
 
 func init() {
-	klog.InitFlags(nil)
+	// set logging verbosity of agent in unit test to DEBUG
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	// nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
+	flags.Parse([]string{"-v=2"})
+	kzerolog.InitK8sLogging()
 
 	err := mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {
