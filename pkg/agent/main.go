@@ -29,6 +29,8 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -44,60 +47,75 @@ import (
 var (
 	masterURL  string
 	kubeConfig string
+	help       = false
+	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
-func main() {
-	agentSpec := controller.AgentSpecification{}
+func init() {
+	flag.BoolVar(&help, "help", help, "Print usage options")
+}
 
+func exitOnError(err error, reason string) {
+	if err == nil {
+		return
+	}
+
+	logger.Error(err, "Failed to initialize.", "reason", reason)
+	os.Exit(255)
+}
+
+func main() {
 	// Handle environment variables:
 	// SUBMARINER_VERBOSITY determines the verbosity level (1 by default)
 	// SUBMARINER_DEBUG, if set to true, sets the verbosity level to 3
 	if debug := os.Getenv("SUBMARINER_DEBUG"); debug == "true" {
-		os.Args = append(os.Args, "-v=3")
+		os.Args = append(os.Args, fmt.Sprintf("-v=%d", log.LIBDEBUG))
 	} else if verbosity := os.Getenv("SUBMARINER_VERBOSITY"); verbosity != "" {
 		os.Args = append(os.Args, fmt.Sprintf("-v=%s", verbosity))
 	} else {
-		os.Args = append(os.Args, "-v=2")
+		os.Args = append(os.Args, fmt.Sprintf("-v=%d", log.DEBUG))
 	}
 
-	klog.InitFlags(nil)
-
+	kzerolog.AddFlags(nil)
 	flag.Parse()
 
-	err := envconfig.Process("submariner", &agentSpec)
-	if err != nil {
-		klog.Fatal(err)
+	if help {
+		flag.PrintDefaults()
+		return
 	}
 
-	klog.Infof("Arguments: %v", os.Args)
-	klog.Infof("AgentSpec: %v", agentSpec)
+	kzerolog.InitK8sLogging()
+
+	// initialize klog as well, since some internal k8s packages still log with klog directly
+	// we want at least the verbosity level to match what was requested
+	klogFlags := flag.NewFlagSet("klog", flag.ExitOnError)
+	klog.InitFlags(klogFlags)
+	// nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
+	klogFlags.Parse(os.Args[1:])
+
+	logger.Infof("Arguments: %v", os.Args)
+
+	agentSpec := controller.AgentSpecification{}
+	err := envconfig.Process("submariner", &agentSpec)
+	exitOnError(err, "Error processing env config for agent spec")
+	logger.Infof("AgentSpec: %#v", agentSpec)
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		klog.Exitf("Error adding Multicluster v1alpha1 to the scheme: %v", err)
-	}
+	exitOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
-	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
+	exitOnError(err, "Error building kubeconfig")
 
 	kubeClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
-	}
+	exitOnError(err, "Error building clientset")
 
 	restMapper, err := util.BuildRestMapper(cfg)
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
+	exitOnError(err, "Error building rest mapper")
 
 	localClient, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("error creating dynamic client: %v", err)
-	}
+	exitOnError(err, "Error creating dynamic client")
 
-	klog.Infof("Starting submariner-lighthouse-agent %v", agentSpec)
+	logger.Info("Starting submariner-lighthouse-agent")
 
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
@@ -112,33 +130,28 @@ func main() {
 			ServiceImportCounterName: "submariner_service_import",
 			ServiceExportCounterName: "submariner_service_export",
 		})
-	if err != nil {
-		klog.Fatalf("Failed to create lighthouse agent: %v", err)
-	}
+	exitOnError(err, "Failed to create lighthouse agent")
 
 	if agentSpec.Uninstall {
-		klog.Info("Uninstalling lighthouse")
+		logger.Info("Uninstalling lighthouse")
 
 		err := lightHouseAgent.Cleanup()
-		if err != nil {
-			klog.Fatalf("Error cleaning up the lighthouse agent controller: %+v", err)
-		}
+		exitOnError(err, "Error cleaning up the lighthouse agent controller")
 
 		return
 	}
 
-	if err := lightHouseAgent.Start(ctx.Done()); err != nil {
-		klog.Fatalf("Failed to start lighthouse agent: %v", err)
-	}
+	err = lightHouseAgent.Start(ctx.Done())
+	exitOnError(err, "Failed to start lighthouse agent")
 
 	httpServer := startHTTPServer()
 
 	<-ctx.Done()
 
-	klog.Info("All controllers stopped or exited. Stopping main loop")
+	logger.Info("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
-		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
+		logger.Error(err, "Error shutting down metrics HTTP server")
 	}
 }
 
@@ -155,7 +168,7 @@ func startHTTPServer() *http.Server {
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			klog.Errorf("Error starting metrics server: %v", err)
+			logger.Error(err, "Error starting metrics server")
 		}
 	}()
 
