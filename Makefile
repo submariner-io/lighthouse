@@ -34,6 +34,8 @@ bin/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
 	cd coredns && ${SCRIPTS_DIR}/compile.sh $@ . $(BUILD_ARGS)
 	mv coredns/$@ $@
 
+e2e: vendor/modules.txt
+
 licensecheck: BUILD_ARGS=--noupx
 licensecheck: $(BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(BINARIES)
