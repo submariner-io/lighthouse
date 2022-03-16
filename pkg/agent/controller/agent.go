@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	validations "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
@@ -60,6 +61,10 @@ var MaxExportStatusConditions = 10
 // nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
 	syncerMetricNames AgentConfig) (*Controller, error) {
+	if errs := validations.IsDNS1123Label(spec.ClusterID); len(errs) > 0 {
+		return nil, errors.Errorf("%s is not a valid ClusterID %v", spec.ClusterID, errs)
+	}
+
 	agentController := &Controller{
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
