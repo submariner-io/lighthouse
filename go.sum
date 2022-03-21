@@ -750,8 +750,9 @@ github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5Cc
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/submariner-io/admiral v0.12.0-rc1 h1:RU9i3yuq6aUYCLoKnDnnJK76svW3rH6l8YOmq00zsuk=
 github.com/submariner-io/admiral v0.12.0-rc1/go.mod h1:2tOba3zraxDT0/iE5K5HTuoFT8IveTLPcDKzfIsuZtI=
-github.com/submariner-io/shipyard v0.12.0-rc1 h1:qJ1NqifT9EOMB0KjxYlQFHC7KmSmLPstQCkszPfCCDc=
 github.com/submariner-io/shipyard v0.12.0-rc1/go.mod h1:i3KjrLOHgG1uL+OeYolFNV1BmaOGlh2jEMQfNKtXOAo=
+github.com/submariner-io/shipyard v0.12.0 h1:vdOFYnSx/5WqMXfebhWWEzdaTdoBNBIvg/URRfGaYRY=
+github.com/submariner-io/shipyard v0.12.0/go.mod h1:i3KjrLOHgG1uL+OeYolFNV1BmaOGlh2jEMQfNKtXOAo=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/timewasted/linode v0.0.0-20160829202747-37e84520dcf7/go.mod h1:imsgLplxEC/etjIhdr3dNzV3JeT27LbVu5pYWm0JCBY=
 github.com/tinylib/msgp v1.1.2 h1:gWmO7n0Ys2RBEb7GPYB9Ujq8Mk5p2U08lRnmMcGy6BQ=
