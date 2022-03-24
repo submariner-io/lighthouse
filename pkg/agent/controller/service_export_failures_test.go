@@ -51,7 +51,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually update the ServiceExport status", func() {
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 		})
 	})
 })

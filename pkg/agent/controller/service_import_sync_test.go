@@ -20,7 +20,6 @@ package controller_test
 
 import (
 	. "github.com/onsi/ginkgo"
-	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	corev1 "k8s.io/api/core/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -45,17 +44,17 @@ var _ = Describe("ServiceImport syncing", func() {
 			It("should correctly sync a ServiceImport and update the ServiceExport status", func() {
 				t.createService()
 				t.createServiceExport()
-				t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+				t.awaitServiceExported(t.service.Spec.ClusterIP)
 			})
 		})
 
 		When("the Service doesn't initially exist", func() {
 			It("should initially update the ServiceExport status to Initialized and eventually sync a ServiceImport", func() {
 				t.createServiceExport()
-				t.awaitServiceUnavailableStatus(0)
+				t.awaitServiceUnavailableStatus()
 
 				t.createService()
-				t.awaitServiceExported(t.service.Spec.ClusterIP, 1)
+				t.awaitServiceExported(t.service.Spec.ClusterIP)
 			})
 		})
 	})
@@ -64,7 +63,7 @@ var _ = Describe("ServiceImport syncing", func() {
 		It("should delete the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 
 			t.deleteServiceExport()
 			t.awaitServiceUnexported()
@@ -75,14 +74,14 @@ var _ = Describe("ServiceImport syncing", func() {
 		It("should delete and recreate the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
-			nextStatusIndex := t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 
 			t.deleteService()
 			t.awaitServiceUnexported()
-			t.awaitServiceUnavailableStatus(nextStatusIndex)
+			t.awaitServiceUnavailableStatus()
 
 			t.createService()
-			t.awaitServiceExported(t.service.Spec.ClusterIP, nextStatusIndex+1)
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 		})
 	})
 
@@ -96,7 +95,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createServiceExport()
 
 			message := "AwaitingSync"
-			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, message))
+			t.awaitServiceExportStatus(newServiceExportCondition(corev1.ConditionFalse, message))
 
 			t.awaitNotServiceExportStatus(&mcsv1a1.ServiceExportCondition{
 				Type:    mcsv1a1.ServiceExportValid,
@@ -105,27 +104,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			})
 
 			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("")
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
-		})
-	})
-
-	When("the ServiceExportCondition list count reaches MaxExportStatusConditions", func() {
-		var oldMaxExportStatusConditions int
-
-		BeforeEach(func() {
-			oldMaxExportStatusConditions = controller.MaxExportStatusConditions
-			controller.MaxExportStatusConditions = 1
-		})
-
-		AfterEach(func() {
-			controller.MaxExportStatusConditions = oldMaxExportStatusConditions
-		})
-
-		It("should correctly truncate the ServiceExportCondition list", func() {
-			t.createService()
-			t.createServiceExport()
-
-			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionTrue, ""))
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 		})
 	})
 
@@ -138,7 +117,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createService()
 			t.createServiceExport()
 
-			t.awaitServiceExportStatus(0, newServiceExportCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+			t.awaitServiceExportStatus(newServiceExportCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
 		})
 	})
@@ -162,7 +141,7 @@ var _ = Describe("ServiceImport syncing", func() {
 		It("should set the appropriate port information in the ServiceImport", func() {
 			t.createService()
 			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP, 0)
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
 		})
 	})
 })
