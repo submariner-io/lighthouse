@@ -56,8 +56,6 @@ type AgentConfig struct {
 	ServiceExportCounterName string
 }
 
-var MaxExportStatusConditions = 10
-
 // nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
 	syncerMetricNames AgentConfig) (*Controller, error) {
@@ -410,20 +408,14 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, status 
 			Message:            &msg,
 		}
 
-		numCond := len(toUpdate.Status.Conditions)
-		if numCond > 0 && serviceExportConditionEqual(&toUpdate.Status.Conditions[numCond-1], &exportCondition) {
+		// TODO: Currently we only check for conditionType Valid. Revisit this when Conflict is supported.
+		if len(toUpdate.Status.Conditions) > 0 && serviceExportConditionEqual(&toUpdate.Status.Conditions[0], &exportCondition) {
 			klog.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
-				namespace, name, toUpdate.Status.Conditions[numCond-1])
+				namespace, name, toUpdate.Status.Conditions[0])
 			return nil
 		}
 
-		if numCond >= MaxExportStatusConditions {
-			copy(toUpdate.Status.Conditions[0:], toUpdate.Status.Conditions[1:])
-			toUpdate.Status.Conditions = toUpdate.Status.Conditions[:MaxExportStatusConditions]
-			toUpdate.Status.Conditions[MaxExportStatusConditions-1] = exportCondition
-		} else {
-			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, exportCondition)
-		}
+		toUpdate.Status.Conditions = []mcsv1a1.ServiceExportCondition{exportCondition}
 
 		raw, err := resource.ToUnstructured(toUpdate)
 		if err != nil {
