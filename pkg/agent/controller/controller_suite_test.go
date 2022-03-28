@@ -554,7 +554,7 @@ func (t *testDriver) awaitNoEndpointSlice(client dynamic.ResourceInterface) {
 	test.AwaitNoResource(client, t.endpoints.Name+"-"+clusterID1)
 }
 
-func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.ServiceExportCondition) {
+func (t *testDriver) awaitServiceExportStatus(expCond ...*mcsv1a1.ServiceExportCondition) {
 	var found *mcsv1a1.ServiceExport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
@@ -572,24 +572,21 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 
 		found = se
 
-		if (atIndex + len(expCond)) != len(se.Status.Conditions) {
+		if (len(expCond)) != len(se.Status.Conditions) {
 			return false, nil
 		}
 
-		j := atIndex
-		for _, exp := range expCond {
-			actual := se.Status.Conditions[j]
-			j++
-			Expect(actual.Type).To(Equal(exp.Type))
-			Expect(actual.Status).To(Equal(exp.Status))
-			Expect(actual.LastTransitionTime).To(Not(BeNil()))
-			Expect(actual.Reason).To(Not(BeNil()))
-			Expect(*actual.Reason).To(Equal(*exp.Reason))
-			Expect(actual.Message).To(Not(BeNil()))
+		exp := expCond[0]
+		actual := se.Status.Conditions[0]
+		Expect(actual.Type).To(Equal(exp.Type))
+		Expect(actual.Status).To(Equal(exp.Status))
+		Expect(actual.LastTransitionTime).To(Not(BeNil()))
+		Expect(actual.Reason).To(Not(BeNil()))
+		Expect(*actual.Reason).To(Equal(*exp.Reason))
+		Expect(actual.Message).To(Not(BeNil()))
 
-			if exp.Message != nil {
-				Expect(*actual.Message).To(Equal(*exp.Message))
-			}
+		if exp.Message != nil {
+			Expect(*actual.Message).To(Equal(*exp.Message))
 		}
 
 		return true, nil
@@ -600,7 +597,7 @@ func (t *testDriver) awaitServiceExportStatus(atIndex int, expCond ...*mcsv1a1.S
 			Fail("ServiceExport not found")
 		}
 
-		Fail(format.Message(found.Status.Conditions, fmt.Sprintf("to contain at index %d", atIndex), expCond))
+		Fail(format.Message(found.Status.Conditions, fmt.Sprintf("to contain at index %d", 0), expCond))
 	} else {
 		Expect(err).To(Succeed())
 	}
@@ -637,15 +634,13 @@ func (t *testDriver) awaitNotServiceExportStatus(notCond *mcsv1a1.ServiceExportC
 	}
 }
 
-func (t *testDriver) awaitServiceExported(serviceIP string, statusIndex int) int {
+func (t *testDriver) awaitServiceExported(serviceIP string) {
 	t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
+
 	t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, serviceIP)
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
 
-	t.awaitServiceExportStatus(statusIndex, newServiceExportCondition(corev1.ConditionFalse, "AwaitingSync"),
-		newServiceExportCondition(corev1.ConditionTrue, ""))
-
-	return statusIndex + 2
+	t.awaitServiceExportStatus(newServiceExportCondition(corev1.ConditionTrue, ""))
 }
 
 func (t *testDriver) awaitHeadlessServiceImport() {
@@ -678,8 +673,8 @@ func (t *testDriver) awaitHeadlessServiceUnexported() {
 	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
 }
 
-func (t *testDriver) awaitServiceUnavailableStatus(atIndex int) {
-	t.awaitServiceExportStatus(atIndex, newServiceExportCondition(corev1.ConditionFalse, "ServiceUnavailable"))
+func (t *testDriver) awaitServiceUnavailableStatus() {
+	t.awaitServiceExportStatus(newServiceExportCondition(corev1.ConditionFalse, "ServiceUnavailable"))
 }
 
 func (t *testDriver) endpointIPs() []string {
