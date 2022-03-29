@@ -127,10 +127,9 @@ func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.Se
 		return
 	}
 
-	if obj, found := c.endpointControllers.Load(key); found {
+	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
 		endpointController := obj.(*EndpointController)
 		endpointController.stop()
-		c.endpointControllers.Delete(key)
 	}
 }
 

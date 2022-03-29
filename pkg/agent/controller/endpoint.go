@@ -88,8 +88,10 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 }
 
 func (e *EndpointController) stop() {
-	close(e.stopCh)
-	e.cleanup()
+	e.stopOnce.Do(func() {
+		close(e.stopCh)
+		e.cleanup()
+	})
 }
 
 func (e *EndpointController) cleanup() {

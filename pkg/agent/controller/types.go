@@ -75,9 +75,10 @@ type EndpointController struct {
 	serviceName                  string
 	serviceImportSourceNameSpace string
 	stopCh                       chan struct{}
+	stopOnce                     sync.Once
+	isHeadless                   bool
 	localClient                  dynamic.Interface
 	ingressIPClient              dynamic.NamespaceableResourceInterface
-	isHeadless                   bool
 	globalIngressIPCache         *globalIngressIPCache
 }
 
