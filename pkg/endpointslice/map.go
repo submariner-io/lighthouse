@@ -24,7 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )

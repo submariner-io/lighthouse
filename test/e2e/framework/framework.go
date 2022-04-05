@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -426,10 +426,10 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 }
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
-	expSliceCount, expEpCount int) (endpointSliceList *v1beta1.EndpointSliceList) {
-	ep := framework.KubeClients[targetCluster].DiscoveryV1beta1().EndpointSlices(namespace)
+	expSliceCount, expEpCount int) (endpointSliceList *discovery.EndpointSliceList) {
+	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
-		v1beta1.LabelManagedBy: lhconstants.LabelValueManagedBy,
+		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
 	}
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelMap).String(),
@@ -440,7 +440,7 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
 		return ep.List(context.TODO(), listOptions)
 	}, func(result interface{}) (bool, string, error) {
-		endpointSliceList = result.(*v1beta1.EndpointSliceList)
+		endpointSliceList = result.(*discovery.EndpointSliceList)
 		sliceCount := 0
 		epCount := 0
 

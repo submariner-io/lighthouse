@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"

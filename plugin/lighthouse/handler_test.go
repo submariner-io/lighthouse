@@ -34,7 +34,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"github.com/submariner-io/lighthouse/plugin/lighthouse"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )

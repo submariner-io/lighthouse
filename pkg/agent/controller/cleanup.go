@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
