@@ -101,7 +101,7 @@ func (lh *Lighthouse) getClusterIPForSvc(pReq *recordRequest) (*serviceimport.DN
 	record, found, isLocal := lh.ServiceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.ClusterStatus.IsConnected,
 		lh.EndpointsStatus.IsHealthy)
 
-	getLocal := isLocal || (pReq.cluster != "" && pReq.cluster == localClusterID)
+	getLocal := isLocal || pReq.cluster != "" && pReq.cluster == localClusterID
 	if found && getLocal {
 		record, found = lh.LocalServices.GetIP(pReq.service, pReq.namespace)
 	}

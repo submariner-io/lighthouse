@@ -86,7 +86,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	}
 
 	validateEmptyLBState := func() {
-		Expect(lb.ItemCount()).To(Equal((0)))
+		Expect(lb.ItemCount()).To(Equal(0))
 		for i := 0; i < 100; i++ {
 			Expect(lb.Next()).To(BeNil())
 		}
