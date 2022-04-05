@@ -28,7 +28,7 @@ import (
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 )
 
 var _ = Describe("[discovery] Test Stateful Sets Discovery Across Clusters", func() {
@@ -192,7 +192,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 // nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.
 func verifyEndpointSlices(f *framework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
-	endpointSlices *v1beta1.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
+	endpointSlices *discovery.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
 	count := 0
 
 	for i := range endpointSlices.Items {
@@ -210,7 +210,7 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 }
 
 func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
-	endpoint *v1beta1.Endpoint, sourceCluster, service string, domains []string, shouldContain bool) {
+	endpoint *discovery.Endpoint, sourceCluster, service string, domains []string, shouldContain bool) {
 	cmd := []string{"dig", "+short"}
 
 	query := *endpoint.Hostname + "." + sourceCluster + "." + service

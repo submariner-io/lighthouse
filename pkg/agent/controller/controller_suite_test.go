@@ -38,7 +38,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -402,7 +402,7 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 		Addresses:  []string{addresses[1]},
 		Hostname:   &endpoints.Subsets[0].Addresses[1].TargetRef.Name,
 		Conditions: discovery.EndpointConditions{Ready: &ready},
-		Topology:   map[string]string{"kubernetes.io/hostname": nodeName},
+		NodeName:   &nodeName,
 	}))
 	Expect(endpointSlice.Endpoints[2]).To(Equal(discovery.Endpoint{
 		Addresses:  []string{addresses[2]},

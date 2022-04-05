@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,11 +85,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labelSelector
-				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).List(context.TODO(), options)
+				return clientSet.DiscoveryV1().EndpointSlices(metav1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labelSelector
-				return clientSet.DiscoveryV1beta1().EndpointSlices(metav1.NamespaceAll).Watch(context.TODO(), options)
+				return clientSet.DiscoveryV1().EndpointSlices(metav1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&discovery.EndpointSlice{},
