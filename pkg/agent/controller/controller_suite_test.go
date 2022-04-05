@@ -115,6 +115,12 @@ func newTestDiver() *testDriver {
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(mcsv1a1.AddToScheme(syncerScheme)).To(Succeed())
 
+	syncerScheme.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group:   "submariner.io",
+		Version: "v1",
+		Kind:    "GlobalIngressIPList",
+	}, &unstructured.UnstructuredList{})
+
 	t := &testDriver{
 		cluster1: cluster{
 			agentSpec: controller.AgentSpecification{
@@ -250,6 +256,9 @@ func (t *testDriver) afterEach() {
 
 func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.localDynClient = fake.NewDynamicClient(syncerConfig.Scheme)
+
+	fake.AddDeleteCollectionReactor(&c.localDynClient.(*fake.DynamicClient).Fake,
+		discovery.SchemeGroupVersion.WithKind("EndpointSlice"))
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace).(*fake.DynamicResourceClient)

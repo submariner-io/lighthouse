@@ -96,8 +96,9 @@ func (e *EndpointController) stop() {
 
 func (e *EndpointController) cleanup() {
 	resourceClient := e.localClient.Resource(schema.GroupVersionResource{
-		Group:   "discovery.k8s.io",
-		Version: "v1", Resource: "endpointslices",
+		Group:    discovery.SchemeGroupVersion.Group,
+		Version:  discovery.SchemeGroupVersion.Version,
+		Resource: "endpointslices",
 	}).Namespace(e.serviceImportSourceNameSpace)
 
 	// MCS-compliant labels

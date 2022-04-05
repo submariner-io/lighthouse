@@ -167,13 +167,17 @@ func newTestDiver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
-		t.dynClient = fakeClient.NewSimpleDynamicClient(runtime.NewScheme())
-
-		t.gatewayClient = t.dynClient.Resource(schema.GroupVersionResource{
+		gatewaysGVR := schema.GroupVersionResource{
 			Group:    "submariner.io",
 			Version:  "v1",
 			Resource: "gateways",
-		}).Namespace(corev1.NamespaceAll)
+		}
+
+		t.dynClient = fakeClient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gatewaysGVR: "GatewayList",
+		})
+
+		t.gatewayClient = t.dynClient.Resource(gatewaysGVR).Namespace(corev1.NamespaceAll)
 
 		t.gatewayReactor = fake.NewFailingReactorForResource(&t.dynClient.Fake, "gateways")
 		t.gatewayObj = newGateway()
