@@ -572,7 +572,7 @@ func (t *testDriver) awaitServiceExportStatus(expCond ...*mcsv1a1.ServiceExportC
 
 		found = se
 
-		if (len(expCond)) != len(se.Status.Conditions) {
+		if len(expCond) != len(se.Status.Conditions) {
 			return false, nil
 		}
 
