@@ -5,8 +5,7 @@ go 1.13
 require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.1
-	github.com/coredns/coredns v1.8.3
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/coredns/coredns v1.9.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.48
 	github.com/onsi/ginkgo v1.16.5
@@ -16,8 +15,8 @@ require (
 	github.com/submariner-io/admiral v0.12.0-m3.0.20220223161649-65232cddf5c0
 	github.com/submariner-io/shipyard v0.12.0-m3.0.20220217165059-b87e9080b8d1
 	github.com/uw-labs/lichen v0.1.5
-	k8s.io/api v0.21.11
-	k8s.io/apimachinery v0.21.11
+	k8s.io/api v0.23.4
+	k8s.io/apimachinery v0.23.4
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
@@ -35,7 +34,7 @@ replace (
 )
 
 // Pinned for coredns
-replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
+replace google.golang.org/grpc => google.golang.org/grpc v1.44.0
 
 // CVE-2020-26160
 // This shouldn't be needed once we upgrade CoreDNS; but see
