@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/endpointslice"
-	"k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
@@ -56,7 +56,7 @@ var _ = Describe("EndpointSlice controller", func() {
 			It("should return true", func() {
 				esName := testName1 + remoteClusterID1
 				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
-				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{endPoint1})
+				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []discovery.Endpoint{endPoint1})
 				t.createEndpointSlice(testNS1, endpointSlice)
 				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
 			})
@@ -72,7 +72,7 @@ var _ = Describe("EndpointSlice controller", func() {
 	When("IsHealthy is called for a service with no endpoints", func() {
 		It("should return false", func() {
 			esName := testName1 + remoteClusterID1
-			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []v1beta1.Endpoint{})
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []discovery.Endpoint{})
 			t.createEndpointSlice(testNS1, endpointSlice)
 			t.awaitNotIsHealthy(testService1, testNS1, remoteClusterID1)
 		})
@@ -83,12 +83,12 @@ var _ = Describe("EndpointSlice controller", func() {
 			It("should return true", func() {
 				esName1 := testName1 + remoteClusterID1
 				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
-				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []v1beta1.Endpoint{endPoint1})
+				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []discovery.Endpoint{endPoint1})
 				t.createEndpointSlice(testNS1, endpointSlice)
 
 				esName2 := testName2 + remoteClusterID2
 				endPoint2 := t.newEndpoint(cluster2HostNamePod1, cluster2EndPointIP1)
-				endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []v1beta1.Endpoint{endPoint2})
+				endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []discovery.Endpoint{endPoint2})
 				t.createEndpointSlice(testNS2, endpointSlice2)
 
 				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
@@ -101,7 +101,7 @@ var _ = Describe("EndpointSlice controller", func() {
 		It("should return false", func() {
 			esName1 := testName1 + remoteClusterID1
 			endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
-			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []v1beta1.Endpoint{endPoint1})
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []discovery.Endpoint{endPoint1})
 			t.createEndpointSlice(testNS1, endpointSlice)
 
 			t.awaitNotIsHealthy(testService1, testNS1, "randomcluster")
@@ -136,19 +136,19 @@ func newEndpointSliceTestDiver() *endpointSliceTestDriver {
 	return t
 }
 
-func (t *endpointSliceTestDriver) createEndpointSlice(namespace string, endpointSlice *v1beta1.EndpointSlice) {
-	_, err := t.kubeClient.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+func (t *endpointSliceTestDriver) createEndpointSlice(namespace string, endpointSlice *discovery.EndpointSlice) {
+	_, err := t.kubeClient.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 }
 
 func (t *endpointSliceTestDriver) newEndpointSliceFromEndpoint(serviceName, remoteCluster, esName,
-	esNs string, endPoints []v1beta1.Endpoint) *v1beta1.EndpointSlice {
-	return &v1beta1.EndpointSlice{
+	esNs string, endPoints []discovery.Endpoint) *discovery.EndpointSlice {
+	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      esName,
 			Namespace: esNs,
 			Labels: map[string]string{
-				v1beta1.LabelManagedBy:            lhconstants.LabelValueManagedBy,
+				discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
 				lhconstants.MCSLabelServiceName:   serviceName,
 				lhconstants.MCSLabelSourceCluster: remoteCluster,
 				lhconstants.LabelSourceNamespace:  esNs,
@@ -158,10 +158,10 @@ func (t *endpointSliceTestDriver) newEndpointSliceFromEndpoint(serviceName, remo
 	}
 }
 
-func (t *endpointSliceTestDriver) newEndpoint(hostname, ipaddress string) v1beta1.Endpoint {
-	return v1beta1.Endpoint{
+func (t *endpointSliceTestDriver) newEndpoint(hostname, ipaddress string) discovery.Endpoint {
+	return discovery.Endpoint{
 		Addresses:  []string{ipaddress},
-		Conditions: v1beta1.EndpointConditions{},
+		Conditions: discovery.EndpointConditions{},
 		Hostname:   &hostname,
 	}
 }

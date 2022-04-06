@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/gateway"
 	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
@@ -53,8 +54,16 @@ func (f *fakeHandler) Name() string {
 
 var _ = Describe("Plugin setup", func() {
 	BeforeEach(func() {
+		gatewaysGVR := schema.GroupVersionResource{
+			Group:    "submariner.io",
+			Version:  "v1",
+			Resource: "gateways",
+		}
+
 		gateway.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
-			return fakeClient.NewSimpleDynamicClient(runtime.NewScheme()), nil
+			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+				gatewaysGVR: "GatewayList",
+			}), nil
 		}
 
 		serviceimport.NewClientset = func(kubeConfig *rest.Config) (mcsClientset.Interface, error) {

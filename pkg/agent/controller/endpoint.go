@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,8 +96,9 @@ func (e *EndpointController) stop() {
 
 func (e *EndpointController) cleanup() {
 	resourceClient := e.localClient.Resource(schema.GroupVersionResource{
-		Group:   "discovery.k8s.io",
-		Version: "v1beta1", Resource: "endpointslices",
+		Group:    discovery.SchemeGroupVersion.Group,
+		Version:  discovery.SchemeGroupVersion.Version,
+		Resource: "endpointslices",
 	}).Namespace(e.serviceImportSourceNameSpace)
 
 	// MCS-compliant labels
@@ -226,11 +227,6 @@ func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.Endpoi
 }
 
 func (e *EndpointController) endpointFromAddress(address *corev1.EndpointAddress, ready bool) (*discovery.Endpoint, bool) {
-	topology := map[string]string{}
-	if address.NodeName != nil {
-		topology["kubernetes.io/hostname"] = *address.NodeName
-	}
-
 	ip := e.getIP(address)
 
 	if ip == "" {
@@ -240,7 +236,7 @@ func (e *EndpointController) endpointFromAddress(address *corev1.EndpointAddress
 	endpoint := &discovery.Endpoint{
 		Addresses:  []string{ip},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
-		Topology:   topology,
+		NodeName:   address.NodeName,
 	}
 
 	/*

@@ -38,7 +38,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -114,6 +114,12 @@ func newTestDiver() *testDriver {
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(mcsv1a1.AddToScheme(syncerScheme)).To(Succeed())
+
+	syncerScheme.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group:   "submariner.io",
+		Version: "v1",
+		Kind:    "GlobalIngressIPList",
+	}, &unstructured.UnstructuredList{})
 
 	t := &testDriver{
 		cluster1: cluster{
@@ -250,6 +256,9 @@ func (t *testDriver) afterEach() {
 
 func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.localDynClient = fake.NewDynamicClient(syncerConfig.Scheme)
+
+	fake.AddDeleteCollectionReactor(&c.localDynClient.(*fake.DynamicClient).Fake,
+		discovery.SchemeGroupVersion.WithKind("EndpointSlice"))
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
@@ -402,7 +411,7 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 		Addresses:  []string{addresses[1]},
 		Hostname:   &endpoints.Subsets[0].Addresses[1].TargetRef.Name,
 		Conditions: discovery.EndpointConditions{Ready: &ready},
-		Topology:   map[string]string{"kubernetes.io/hostname": nodeName},
+		NodeName:   &nodeName,
 	}))
 	Expect(endpointSlice.Endpoints[2]).To(Equal(discovery.Endpoint{
 		Addresses:  []string{addresses[2]},
