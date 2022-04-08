@@ -192,7 +192,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 // nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.
 func verifyEndpointSlices(f *framework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
-	endpointSlices *discovery.EndpointSliceList, svcName string, verifyCount int, shouldContain bool) {
+	endpointSlices *discovery.EndpointSliceList, svcName string, verifyCount int, shouldContain bool,
+) {
 	count := 0
 
 	for i := range endpointSlices.Items {
@@ -210,7 +211,8 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 }
 
 func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
-	endpoint *discovery.Endpoint, sourceCluster, service string, domains []string, shouldContain bool) {
+	endpoint *discovery.Endpoint, sourceCluster, service string, domains []string, shouldContain bool,
+) {
 	cmd := []string{"dig", "+short"}
 
 	query := *endpoint.Hostname + "." + sourceCluster + "." + service

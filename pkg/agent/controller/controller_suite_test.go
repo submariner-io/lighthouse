@@ -304,7 +304,8 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 }
 
 func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Service, sType mcsv1a1.ServiceImportType,
-	serviceIP string) *mcsv1a1.ServiceImport {
+	serviceIP string,
+) *mcsv1a1.ServiceImport {
 	obj := test.AwaitResource(client, service.Name+"-"+service.Namespace+"-"+clusterID1)
 
 	serviceImport := &mcsv1a1.ServiceImport{}
@@ -378,7 +379,8 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 }
 
 func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
-	service *corev1.Service, namespace string, globalIPs []string) *discovery.EndpointSlice {
+	service *corev1.Service, namespace string, globalIPs []string,
+) *discovery.EndpointSlice {
 	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
 
 	endpointSlice := &discovery.EndpointSlice{}

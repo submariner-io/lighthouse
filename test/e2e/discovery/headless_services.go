@@ -238,7 +238,8 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 // nolint:unparam // cluster` always receives `framework.ClusterA`.
 func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
-	ipList, domains []string, clusterName string, shouldContain bool) {
+	ipList, domains []string, clusterName string, shouldContain bool,
+) {
 	cmd := []string{"dig", "+short"}
 
 	var clusterDNSName string
@@ -292,7 +293,8 @@ func verifyHeadlessIpsWithDig(f *framework.Framework, cluster framework.ClusterI
 
 // nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
-	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool) {
+	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool,
+) {
 	ports := service.Spec.Ports
 	for i := range domains {
 		for j := range ports {
@@ -345,7 +347,8 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 }
 
 func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *corev1.Service,
-	domain string, clusterName string, withPort, withcluster bool) (cmd []string, domainName string) {
+	domain string, clusterName string, withPort, withcluster bool,
+) (cmd []string, domainName string) {
 	cmd = []string{"dig", "+short", "SRV"}
 
 	domainName = service.Name + "." + f.Namespace + ".svc." + domain

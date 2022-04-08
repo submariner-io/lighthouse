@@ -184,7 +184,8 @@ func (f *Framework) AwaitServiceImportIP(srcCluster, targetCluster framework.Clu
 }
 
 func (f *Framework) AwaitServiceImportWithIP(targetCluster framework.ClusterIndex, svc *v1.Service,
-	serviceIP string) *mcsv1a1.ServiceImport {
+	serviceIP string,
+) *mcsv1a1.ServiceImport {
 	var retServiceImport *mcsv1a1.ServiceImport
 
 	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
@@ -253,7 +254,8 @@ func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex
 }
 
 func (f *Framework) NewNginxHeadlessServiceWithParams(name, app, portName string, protcol v1.Protocol,
-	cluster framework.ClusterIndex) *v1.Service {
+	cluster framework.ClusterIndex,
+) *v1.Service {
 	var port int32 = 80
 
 	nginxService := v1.Service{
@@ -292,7 +294,8 @@ func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.
 }
 
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
-	namespace string, count int) (ipList, hostNameList []string) {
+	namespace string, count int,
+) (ipList, hostNameList []string) {
 	ep := framework.KubeClients[targetCluster].CoreV1().Endpoints(namespace)
 	By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
@@ -426,7 +429,8 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 }
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
-	expSliceCount, expEpCount int) (endpointSliceList *discovery.EndpointSliceList) {
+	expSliceCount, expEpCount int,
+) (endpointSliceList *discovery.EndpointSliceList) {
 	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
 		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
@@ -546,13 +550,15 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 }
 
 func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
-	domains []string, clusterName string, shouldContain bool) {
+	domains []string, clusterName string, shouldContain bool,
+) {
 	serviceIP := f.GetServiceIP(targetCluster, service, srcCluster == targetCluster)
 	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
 }
 
 func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
-	domains []string, clusterName, serviceIP string, shouldContain bool) {
+	domains []string, clusterName, serviceIP string, shouldContain bool,
+) {
 	cmd := []string{"dig", "+short"}
 
 	var clusterDNSName string

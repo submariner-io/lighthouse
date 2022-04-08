@@ -68,7 +68,8 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 }
 
 func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
-	r *dns.Msg, pReq *recordRequest) (int, error) {
+	r *dns.Msg, pReq *recordRequest,
+) (int, error) {
 	var isHeadless bool
 	var (
 		dnsRecords []serviceimport.DNSRecord
