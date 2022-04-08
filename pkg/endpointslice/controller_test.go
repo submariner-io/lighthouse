@@ -142,7 +142,8 @@ func (t *endpointSliceTestDriver) createEndpointSlice(namespace string, endpoint
 }
 
 func (t *endpointSliceTestDriver) newEndpointSliceFromEndpoint(serviceName, remoteCluster, esName,
-	esNs string, endPoints []discovery.Endpoint) *discovery.EndpointSlice {
+	esNs string, endPoints []discovery.Endpoint,
+) *discovery.EndpointSlice {
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      esName,

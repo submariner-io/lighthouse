@@ -43,7 +43,8 @@ func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state
 }
 
 func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, state *request.Request, pReq *recordRequest, zone string,
-	isHeadless bool) []dns.RR {
+	isHeadless bool,
+) []dns.RR {
 	var records []dns.RR
 
 	for _, dnsRecord := range dnsrecords {

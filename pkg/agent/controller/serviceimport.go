@@ -34,7 +34,8 @@ import (
 )
 
 func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
-	localClient dynamic.Interface, scheme *runtime.Scheme) (*ServiceImportController, error) {
+	localClient dynamic.Interface, scheme *runtime.Scheme,
+) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
 		serviceSyncer: serviceSyncer,
 		localClient:   localClient,
@@ -134,7 +135,8 @@ func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.Se
 }
 
 func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, numRequeues int,
-	op syncer.Operation) (runtime.Object, bool) {
+	op syncer.Operation,
+) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 

@@ -58,7 +58,8 @@ type AgentConfig struct {
 
 // nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
-	syncerMetricNames AgentConfig) (*Controller, error) {
+	syncerMetricNames AgentConfig,
+) (*Controller, error) {
 	if errs := validations.IsDNS1123Label(spec.ClusterID); len(errs) > 0 {
 		return nil, errors.Errorf("%s is not a valid ClusterID %v", spec.ClusterID, errs)
 	}

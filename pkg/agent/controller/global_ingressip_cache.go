@@ -78,7 +78,8 @@ func (c *globalIngressIPCache) onDelete(obj *unstructured.Unstructured) {
 }
 
 func (c *globalIngressIPCache) applyToCache(obj *unstructured.Unstructured,
-	apply func(to *sync.Map, key string, obj *unstructured.Unstructured)) {
+	apply func(to *sync.Map, key string, obj *unstructured.Unstructured),
+) {
 	target, _, _ := unstructured.NestedString(obj.Object, "spec", "target")
 	switch target {
 	case ClusterIPService:

@@ -66,7 +66,8 @@ type Map struct {
 }
 
 func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster func(string) bool,
-	checkEndpoint func(string, string, string) bool) *DNSRecord {
+	checkEndpoint func(string, string, string) bool,
+) *DNSRecord {
 	queueLength := si.balancer.ItemCount()
 	for i := 0; i < queueLength; i++ {
 		selectedName := si.balancer.Next().(string)
@@ -84,7 +85,8 @@ func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster fun
 }
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
-	checkEndpoint func(string, string, string) bool) (record *DNSRecord, found, isLocal bool) {
+	checkEndpoint func(string, string, string) bool,
+) (record *DNSRecord, found, isLocal bool) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 

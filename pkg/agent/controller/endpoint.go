@@ -44,7 +44,8 @@ import (
 
 func startEndpointController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
 	serviceImport *mcsv1a1.ServiceImport, serviceImportNameSpace, serviceName, clusterID string,
-	globalIngressIPCache *globalIngressIPCache) (*EndpointController, error) {
+	globalIngressIPCache *globalIngressIPCache,
+) (*EndpointController, error) {
 	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
 
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
@@ -154,7 +155,8 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 }
 
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) (
-	runtime.Object, bool) {
+	runtime.Object, bool,
+) {
 	endpointSlice := &discovery.EndpointSlice{}
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
@@ -207,7 +209,8 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 }
 
 func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType,
-	ready bool) ([]discovery.Endpoint, bool) {
+	ready bool,
+) ([]discovery.Endpoint, bool) {
 	endpoints := []discovery.Endpoint{}
 	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
 
