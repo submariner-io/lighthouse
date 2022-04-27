@@ -9,7 +9,7 @@ jobs:
   e2e:
     name: E2E
     if: contains(github.event.pull_request.labels.*.name, 'ready-to-test')
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
