@@ -367,7 +367,7 @@ func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uin
 
 func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.StatefulSet {
 	var replicaCount int32 = 1
-	var port int32 = 80
+	var port int32 = 8080
 
 	nginxStatefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -391,7 +391,7 @@ func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.
 					Containers: []v1.Container{
 						{
 							Name:            statefulServiceName,
-							Image:           "quay.io/testing-farm/nginx:latest",
+							Image:           "quay.io/submariner/nettest:devel",
 							ImagePullPolicy: v1.PullAlways,
 							Ports: []v1.ContainerPort{
 								{
@@ -399,7 +399,7 @@ func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.
 									Name:          "web",
 								},
 							},
-							Command: []string{},
+							Command: []string{"/app/simpleserver"},
 						},
 					},
 					RestartPolicy: v1.RestartPolicyAlways,
