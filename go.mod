@@ -3,11 +3,10 @@ module github.com/submariner-io/lighthouse
 go 1.13
 
 require (
-	github.com/caddyserver/caddy v1.0.5
-	github.com/coredns/caddy v1.1.1
-	github.com/coredns/coredns v1.9.1
+	cloud.google.com/go/compute v1.3.0 // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/miekg/dns v1.1.48
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
@@ -15,28 +14,16 @@ require (
 	github.com/submariner-io/admiral v0.12.0-m3.0.20220223161649-65232cddf5c0
 	github.com/submariner-io/shipyard v0.12.0-m3.0.20220421170648-adf7571e55ed
 	github.com/uw-labs/lichen v0.1.5
-	k8s.io/api v0.23.4
-	k8s.io/apimachinery v0.23.4
-	k8s.io/client-go v11.0.0+incompatible
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	k8s.io/api v0.21.11
+	k8s.io/apimachinery v0.21.11
+	k8s.io/client-go v0.21.11
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.40.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/controller-runtime v0.7.2
 	sigs.k8s.io/mcs-api v0.1.0
 )
-
-// Pinned to kubernetes-1.21.11
-replace (
-	k8s.io/api => k8s.io/api v0.21.11
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.11
-	k8s.io/apimachinery => k8s.io/apimachinery v0.21.11
-	k8s.io/client-go => k8s.io/client-go v0.21.11
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.21.11
-)
-
-// Pinned for coredns
-replace google.golang.org/grpc => google.golang.org/grpc v1.44.0
-
-// CVE-2020-26160
-// This shouldn't be needed once we upgrade CoreDNS; but see
-// https://github.com/submariner-io/lighthouse/issues/576
-replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.1+incompatible
