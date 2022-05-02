@@ -29,8 +29,9 @@ build: $(BINARIES)
 bin/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
 	${SCRIPTS_DIR}/compile.sh $@ pkg/agent/main.go $(BUILD_ARGS)
 
-bin/lighthouse-coredns: vendor/modules.txt $(shell find pkg/coredns)
-	${SCRIPTS_DIR}/compile.sh $@ pkg/coredns/main.go $(BUILD_ARGS)
+bin/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
+	cd coredns && ${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
+	mv coredns/$@ $@
 
 licensecheck: BUILD_ARGS=--noupx
 licensecheck: $(BINARIES) bin/lichen
