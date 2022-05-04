@@ -19,6 +19,8 @@ allow:
 override:
   - path: "github.com/flynn/go-shlex"
     licenses: ["Apache-2.0"]
+  - path: "../"
+    licenses: ["Apache-2.0"]
 
 # https://github.com/cncf/foundation/tree/master/license-exceptions
 exceptions:

@@ -7,7 +7,7 @@ junit.xml
 Makefile.dapper
 output
 package/.image.*
-/vendor
+vendor
 /submariner
 .project
 .settings
