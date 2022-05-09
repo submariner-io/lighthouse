@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/submariner-io/admiral v0.12.0-m3.0.20220223161649-65232cddf5c0
-	github.com/submariner-io/shipyard v0.12.0-m3.0.20220421170648-adf7571e55ed
+	github.com/submariner-io/shipyard v0.13.0-m1
 	github.com/uw-labs/lichen v0.1.7
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
