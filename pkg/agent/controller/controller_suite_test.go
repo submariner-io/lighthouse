@@ -50,6 +50,7 @@ import (
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -71,6 +72,8 @@ var (
 
 func init() {
 	klog.InitFlags(nil)
+
+	logf.SetLogger(logf.NullLogger{})
 
 	err := mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {

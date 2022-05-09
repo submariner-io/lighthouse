@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
-	github.com/submariner-io/admiral v0.12.0-m3.0.20220223161649-65232cddf5c0
+	github.com/submariner-io/admiral v0.13.0-m1
 	github.com/submariner-io/shipyard v0.13.0-m1
 	github.com/uw-labs/lichen v0.1.7
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
@@ -21,7 +21,6 @@ require (
 	k8s.io/apimachinery v0.21.11
 	k8s.io/client-go v0.21.11
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.40.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/controller-runtime v0.7.2
