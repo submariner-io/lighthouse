@@ -26,10 +26,10 @@ import (
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/lighthouse/pkg/endpointslice"
-	"github.com/submariner-io/lighthouse/pkg/gateway"
-	"github.com/submariner-io/lighthouse/pkg/service"
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+	"github.com/submariner-io/lighthouse/coredns/endpointslice"
+	"github.com/submariner-io/lighthouse/coredns/gateway"
+	"github.com/submariner-io/lighthouse/coredns/service"
+	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
