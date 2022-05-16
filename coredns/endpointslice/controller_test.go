@@ -24,8 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/lighthouse/coredns/endpointslice"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	"github.com/submariner-io/lighthouse/pkg/endpointslice"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

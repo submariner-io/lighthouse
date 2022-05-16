@@ -20,10 +20,10 @@ package service
 
 import (
 	"context"
+	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
