@@ -24,8 +24,8 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
-	"github.com/submariner-io/lighthouse/pkg/endpointslice"
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+	"github.com/submariner-io/lighthouse/coredns/endpointslice"
+	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 )
 
 const (

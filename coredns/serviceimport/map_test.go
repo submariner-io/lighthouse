@@ -21,7 +21,7 @@ package serviceimport_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/pkg/serviceimport"
+	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 )
 
 var _ = Describe("ServiceImport Map", func() {
