@@ -1,6 +1,6 @@
 module github.com/submariner-io/lighthouse/coredns
 
-go 1.13
+go 1.16
 
 require (
 	github.com/caddyserver/caddy v1.0.5
@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
-	github.com/submariner-io/admiral v0.13.0-m1
+	github.com/submariner-io/admiral v0.13.0-m2
 	github.com/submariner-io/lighthouse v0.13.0-m1
 	k8s.io/api v0.21.11
 	k8s.io/apimachinery v0.21.11
