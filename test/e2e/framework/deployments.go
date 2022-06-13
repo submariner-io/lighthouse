@@ -53,7 +53,7 @@ func (f *Framework) NewNetShootDeployment(cluster framework.ClusterIndex) *corev
 					Containers: []corev1.Container{
 						{
 							Name:            "netshoot",
-							Image:           "quay.io/submariner/nettest:devel",
+							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							Command: []string{
 								"sleep", "600",
@@ -93,7 +93,7 @@ func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.P
 					Containers: []corev1.Container{
 						{
 							Name:            "nginx-demo",
-							Image:           "quay.io/submariner/nettest:devel",
+							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{

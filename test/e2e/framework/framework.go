@@ -394,7 +394,7 @@ func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.
 					Containers: []v1.Container{
 						{
 							Name:            statefulServiceName,
-							Image:           "quay.io/submariner/nettest:devel",
+							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: v1.PullAlways,
 							Ports: []v1.ContainerPort{
 								{
