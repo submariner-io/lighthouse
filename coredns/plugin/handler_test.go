@@ -29,13 +29,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
+	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -1025,7 +1026,7 @@ func setupServiceImportMap() *serviceimport.Map {
 }
 
 func setupEndpointSliceMap() *endpointslice.Map {
-	esMap := endpointslice.NewMap()
+	esMap := endpointslice.NewMap(localClusterID, fakeKubeClient.NewSimpleClientset())
 	esMap.Put(newEndpointSlice(namespace1, service1, clusterID, portName1, []string{hostName1}, []string{endpointIP}, portNumber1, protocol1))
 
 	return esMap
