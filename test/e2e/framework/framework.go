@@ -324,7 +324,9 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	return ipList, hostNameList
 }
 
-func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int) (ipList, hostNameList []string) {
+func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int,
+	isLocal bool,
+) (ipList, hostNameList []string) {
 	podList := f.Framework.AwaitPodsByAppLabel(targetCluster, svc.Labels["app"], svc.Namespace, count)
 	hostNameList = make([]string, 0)
 	ipList = make([]string, 0)
@@ -332,7 +334,12 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 	for i := 0; i < len(podList.Items); i++ {
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
-		ipList = append(ipList, ingressIP)
+
+		if isLocal {
+			ipList = append(ipList, podList.Items[i].Status.PodIP)
+		} else {
+			ipList = append(ipList, ingressIP)
+		}
 
 		hostname := podList.Items[i].Spec.Hostname
 		if hostname == "" {
@@ -345,16 +352,18 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 	return ipList, hostNameList
 }
 
-func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int) (ipList, hostNameList []string) {
+func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int,
+	isLocal bool,
+) (ipList, hostNameList []string) {
 	if framework.TestContext.GlobalnetEnabled {
-		return f.AwaitPodIngressIPs(targetCluster, svc, count)
+		return f.AwaitPodIngressIPs(targetCluster, svc, count, isLocal)
 	}
 
 	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count)
 }
 
-func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service) (ipList, hostNameList []string) {
-	return f.AwaitPodIPs(targetCluster, service, anyCount)
+func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) (ipList, hostNameList []string) {
+	return f.AwaitPodIPs(targetCluster, service, anyCount, isLocal)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
@@ -599,6 +608,60 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 
 		if !doesContain && shouldContain {
 			return false, fmt.Sprintf("expected execution result %q to contain %q", result, serviceIP), nil
+		}
+
+		return true, "", nil
+	})
+}
+
+func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
+	ipList, domains []string, clusterName string, shouldContain bool,
+) {
+	cmd := []string{"dig", "+short"}
+
+	var clusterDNSName string
+	if clusterName != "" {
+		clusterDNSName = clusterName + "."
+	}
+
+	for i := range domains {
+		cmd = append(cmd, clusterDNSName+service.Name+"."+f.Namespace+".svc."+domains[i])
+	}
+
+	op := "are"
+	if !shouldContain {
+		op += not
+	}
+
+	By(fmt.Sprintf("Executing %q to verify IPs %v for service %q %q discoverable", strings.Join(cmd, " "), ipList, service.Name, op))
+	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
+		stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace,
+			PodName:       targetPod.Items[0].Name,
+			ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
+			CaptureStdout: true,
+			CaptureStderr: true,
+		}, cluster)
+		if err != nil {
+			return nil, err
+		}
+
+		return stdout, nil
+	}, func(result interface{}) (bool, string, error) {
+		By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+		if len(ipList) == 0 && result != "" {
+			return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
+		}
+		for _, ip := range ipList {
+			doesContain := strings.Contains(result.(string), ip)
+			if doesContain && !shouldContain {
+				return false, fmt.Sprintf("expected execution result %q not to contain %q", result, ip), nil
+			}
+
+			if !doesContain && shouldContain {
+				return false, fmt.Sprintf("expected execution result %q to contain %q", result, ip), nil
+			}
 		}
 
 		return true, "", nil

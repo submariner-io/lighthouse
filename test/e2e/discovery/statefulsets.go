@@ -20,7 +20,6 @@ package discovery
 
 import (
 	"fmt"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -76,13 +75,13 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 1, true)
+	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, true, clusterAName)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
 
-	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 1, false)
+	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, false, clusterAName)
 }
 
 func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
@@ -122,7 +121,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
-	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 2, true)
+	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 2, true, clusterAName)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1)
@@ -134,8 +133,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		sourceCluster := endpointSlice.Labels[lhconstants.MCSLabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, sourceCluster == clusterAName)
+			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+				nginxServiceClusterB, checkedDomains, sourceCluster == clusterAName, sourceCluster == clusterAName)
 			verifyCount++
 		}
 	}
@@ -172,7 +171,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 3)
 
-	verifyEndpointSlices(f.Framework, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB.Name, 3, true)
+	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 3, true, clusterAName)
 
 	f.SetNginxStatefulSetReplicas(framework.ClusterB, 1)
 
@@ -181,8 +180,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 		sourceCluster := endpointSlice.Labels[lhconstants.MCSLabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f.Framework, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
-				nginxServiceClusterB.Name, checkedDomains, *endpointSlice.Endpoints[j].Hostname == "web-0")
+			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+				nginxServiceClusterB, checkedDomains, *endpointSlice.Endpoints[j].Hostname == "web-0", sourceCluster == clusterAName)
 		}
 	}
 
@@ -191,8 +190,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 }
 
 // nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.
-func verifyEndpointSlices(f *framework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
-	endpointSlices *discovery.EndpointSliceList, svcName string, verifyCount int, shouldContain bool,
+func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
+	endpointSlices *discovery.EndpointSliceList, service *corev1.Service, verifyCount int, shouldContain bool, localClusterName string,
 ) {
 	count := 0
 
@@ -202,7 +201,7 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
-				svcName, checkedDomains, shouldContain)
+				service, checkedDomains, shouldContain, sourceCluster == localClusterName)
 			count++
 		}
 	}
@@ -210,53 +209,13 @@ func verifyEndpointSlices(f *framework.Framework, targetCluster framework.Cluste
 	Expect(count).To(Equal(verifyCount), "Mismatch in count of IPs to be validated with dig")
 }
 
-func verifyEndpointsWithDig(f *framework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
-	endpoint *discovery.Endpoint, sourceCluster, service string, domains []string, shouldContain bool,
+func verifyEndpointsWithDig(f *lhframework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
+	endpoint *discovery.Endpoint, sourceCluster string, service *corev1.Service, domains []string, shouldContain bool, isLocal bool,
 ) {
-	cmd := []string{"dig", "+short"}
-
-	query := *endpoint.Hostname + "." + sourceCluster + "." + service
-
-	for i := range domains {
-		cmd = append(cmd, query+"."+f.Namespace+".svc."+domains[i])
+	addresses := endpoint.Addresses
+	if isLocal {
+		addresses, _ = f.GetPodIPs(targetCluster, service, true)
 	}
 
-	op := opAre
-	if !shouldContain {
-		op += not
-	}
-
-	By(fmt.Sprintf("Executing %q to verify IPs %v for pod %q %q discoverable", strings.Join(cmd, " "), endpoint.Addresses, query, op))
-	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
-		stdout, _, err := f.ExecWithOptions(&framework.ExecOptions{
-			Command:       cmd,
-			Namespace:     f.Namespace,
-			PodName:       targetPod.Items[0].Name,
-			ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
-			CaptureStdout: true,
-			CaptureStderr: true,
-		}, targetCluster)
-		if err != nil {
-			return nil, err
-		}
-
-		return stdout, nil
-	}, func(result interface{}) (bool, string, error) {
-		By(fmt.Sprintf("Validating that dig result %s %q", op, result))
-		if len(endpoint.Addresses) == 0 && result != "" {
-			return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
-		}
-		for _, ip := range endpoint.Addresses {
-			doesContain := strings.Contains(result.(string), ip)
-			if doesContain && !shouldContain {
-				return false, fmt.Sprintf("expected execution result %q not to contain %q", result, ip), nil
-			}
-
-			if !doesContain && shouldContain {
-				return false, fmt.Sprintf("expected execution result %q to contain %q", result, ip), nil
-			}
-		}
-
-		return true, "", nil
-	})
+	f.VerifyIPsWithDig(targetCluster, service, targetPod, addresses, domains, *endpoint.Hostname+"."+sourceCluster, shouldContain)
 }
