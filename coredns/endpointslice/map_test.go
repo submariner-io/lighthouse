@@ -28,18 +28,20 @@ import (
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 )
 
 var _ = Describe("EndpointSlice Map", func() {
 	const (
-		service1    = "service1"
-		namespace1  = "namespace1"
-		clusterID1  = "clusterID1"
-		clusterID2  = "clusterID2"
-		clusterID3  = "clusterID3"
-		endpointIP  = "100.96.157.101"
-		endpointIP2 = "100.96.157.102"
-		endpointIP3 = "100.96.157.103"
+		service1       = "service1"
+		namespace1     = "namespace1"
+		clusterID1     = "clusterID1"
+		clusterID2     = "clusterID2"
+		clusterID3     = "clusterID3"
+		localClusterID = "local"
+		endpointIP     = "100.96.157.101"
+		endpointIP2    = "100.96.157.102"
+		endpointIP3    = "100.96.157.103"
 	)
 
 	var (
@@ -49,7 +51,7 @@ var _ = Describe("EndpointSlice Map", func() {
 
 	BeforeEach(func() {
 		clusterStatusMap = map[string]bool{clusterID1: true, clusterID2: true, clusterID3: true}
-		endpointSliceMap = endpointslice.NewMap()
+		endpointSliceMap = endpointslice.NewMap(localClusterID, fakeKubeClient.NewSimpleClientset())
 	})
 
 	checkCluster := func(id string) bool {

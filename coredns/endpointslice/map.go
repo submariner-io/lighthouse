@@ -19,12 +19,19 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -40,8 +47,10 @@ type clusterInfo struct {
 }
 
 type Map struct {
-	epMap map[string]*endpointInfo
-	mutex sync.RWMutex
+	epMap          map[string]*endpointInfo
+	mutex          sync.RWMutex
+	localClusterID string
+	kubeClient     kubernetes.Interface
 }
 
 func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
@@ -86,9 +95,11 @@ func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkClus
 	}
 }
 
-func NewMap() *Map {
+func NewMap(localClusterID string, kubeClient kubernetes.Interface) *Map {
 	return &Map{
-		epMap: make(map[string]*endpointInfo),
+		epMap:          make(map[string]*endpointInfo),
+		localClusterID: localClusterID,
+		kubeClient:     kubeClient,
 	}
 }
 
@@ -109,6 +120,39 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	if !ok {
 		klog.Warningf("Cluster label missing on %#v", es.ObjectMeta)
 		return
+	}
+
+	// TODO: Only do this look up if globalnet enabled to reduce unnessary call to Kube API
+	var localSlice *discovery.EndpointSlice
+	if cluster == m.localClusterID {
+		retryErr := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+			return !apierrors.IsNotFound(err)
+		}, func() error {
+			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labels.Set(map[string]string{
+					constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
+				}).String(),
+			})
+			if err != nil {
+				return err
+			}
+
+			if len(localSlices.Items) == 0 {
+				return apierrors.NewNotFound(schema.GroupResource{
+					Group:    discovery.SchemeGroupVersion.Group,
+					Resource: "endpointslices",
+				}, "")
+			}
+			localSlice = &localSlices.Items[0]
+			return nil
+		})
+		if retryErr != nil {
+			klog.Errorf("Error finding local endpoint slice for service (%s/%s): %+v", es.Labels[constants.LabelSourceNamespace], es.Labels[constants.MCSLabelServiceName], retryErr)
+			return
+		}
+		if localSlice == nil {
+			return
+		}
 	}
 
 	m.mutex.Lock()
@@ -142,7 +186,18 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	for _, endpoint := range es.Endpoints {
 		var records []serviceimport.DNSRecord
 
-		for _, address := range endpoint.Addresses {
+		addresses := endpoint.Addresses
+		if localSlice != nil {
+			for _, localEndpoint := range localSlice.Endpoints {
+				if localEndpoint.NodeName != nil && endpoint.NodeName != nil && *localEndpoint.NodeName == *endpoint.NodeName &&
+					(endpoint.Hostname == nil || localEndpoint.TargetRef.Name == *endpoint.Hostname) {
+					addresses = localEndpoint.Addresses
+				}
+			}
+		}
+
+		for _, address := range addresses {
+
 			record := serviceimport.DNSRecord{
 				IP:          address,
 				Ports:       mcsPorts,

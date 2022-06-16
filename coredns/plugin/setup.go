@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/gateway"
 	"github.com/submariner-io/lighthouse/coredns/service"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -89,7 +90,8 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error starting the ServiceImport controller")
 	}
 
-	epMap := endpointslice.NewMap()
+	kubeClient := kubernetes.NewForConfigOrDie(cfg)
+	epMap := endpointslice.NewMap(gwController.LocalClusterID(), kubeClient)
 	epController := endpointslice.NewController(epMap)
 
 	err = epController.Start(cfg)
