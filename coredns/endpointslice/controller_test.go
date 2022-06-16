@@ -46,6 +46,7 @@ const (
 	testService2         = "testService2"
 	testNS1              = "testNameSpace1"
 	testNS2              = "testNameSpace2"
+	localClusterID       = "local"
 )
 
 var _ = Describe("EndpointSlice controller", func() {
@@ -120,7 +121,7 @@ func newEndpointSliceTestDiver() *endpointSliceTestDriver {
 
 	BeforeEach(func() {
 		t.kubeClient = fakeKubeClient.NewSimpleClientset()
-		t.epMap = endpointslice.NewMap()
+		t.epMap = endpointslice.NewMap(localClusterID, t.kubeClient)
 		t.controller = endpointslice.NewController(t.epMap)
 		t.controller.NewClientset = func(c *rest.Config) (kubernetes.Interface, error) {
 			return t.kubeClient, nil
