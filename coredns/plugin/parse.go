@@ -78,7 +78,7 @@ func parseRequest(state *request.Request) (*recordRequest, error) {
 	}
 
 	r.podOrSvc = segs[last]
-	if r.podOrSvc != "pod" && r.podOrSvc != Svc {
+	if r.podOrSvc != Pod && r.podOrSvc != Svc {
 		return r, errInvalidRequest
 	}
 
