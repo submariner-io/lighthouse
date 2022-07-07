@@ -67,7 +67,7 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 
 	When("there are active pods for a service in only one cluster", func() {
 		It("should not resolve the service on the cluster without active pods", func() {
-			RunServicesPodAvailabilityMutliClusterTest(f)
+			RunServicesPodAvailabilityMultiClusterTest(f)
 		})
 	})
 
@@ -104,7 +104,7 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 
 		It("should not resolve that cluster's service IP", func() {
-			RunServicesClusterAvailabilityMutliClusterTest(f)
+			RunServicesClusterAvailabilityMultiClusterTest(f)
 		})
 
 		AfterEach(func() {
@@ -288,7 +288,7 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 		true, true)
 }
 
-func RunServicesPodAvailabilityMutliClusterTest(f *lhframework.Framework) {
+func RunServicesPodAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	if len(framework.TestContext.ClusterIDs) < 3 {
 		Skip("Only two clusters are deployed and hence skipping the test")
 		return
@@ -471,7 +471,7 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, serviceIPList, netshootPodList, checkedDomains)
 }
 
-func RunServicesClusterAvailabilityMutliClusterTest(f *lhframework.Framework) {
+func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
