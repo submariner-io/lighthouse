@@ -34,3 +34,7 @@ updates:
       - dependency-name: sigs.k8s.io/controller-runtime
         versions:
           - ">= 0.7.0"
+  - package-ecosystem: gomod
+    directory: "/coredns"
+    schedule:
+      interval: daily
