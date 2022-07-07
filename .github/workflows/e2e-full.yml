@@ -16,10 +16,10 @@ jobs:
       matrix:
         deploytool: ['operator', 'helm']
         globalnet: ['', 'globalnet']
-        k8s_version: ['1.23']
+        k8s_version: ['1.24']
         include:
-          - k8s_version: '1.21'
           - k8s_version: '1.22'
+          - k8s_version: '1.23'
     steps:
       - name: Check out the repository
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
