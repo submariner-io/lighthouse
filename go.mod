@@ -2,6 +2,8 @@ module github.com/submariner-io/lighthouse
 
 go 1.17
 
+replace golang.org/x/text => golang.org/x/text v0.3.7
+
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.5

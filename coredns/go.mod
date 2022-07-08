@@ -2,6 +2,8 @@ module github.com/submariner-io/lighthouse/coredns
 
 go 1.16
 
+replace golang.org/x/text => golang.org/x/text v0.3.7
+
 require (
 	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.1
