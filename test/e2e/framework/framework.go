@@ -237,17 +237,14 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 	})
 }
 
-func (f *Framework) NewNginxHeadlessServiceWithParams(name, app, portName string, protcol v1.Protocol,
-	cluster framework.ClusterIndex,
+func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol v1.Protocol,
+	labelsMap map[string]string, cluster framework.ClusterIndex,
 ) *v1.Service {
 	var port int32 = 80
 
 	nginxService := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			Labels: map[string]string{
-				"app": app,
-			},
 		},
 		Spec: v1.ServiceSpec{
 			Type:      "ClusterIP",
@@ -259,10 +256,12 @@ func (f *Framework) NewNginxHeadlessServiceWithParams(name, app, portName string
 					Protocol: protcol,
 				},
 			},
-			Selector: map[string]string{
-				"app": app,
-			},
 		},
+	}
+
+	if len(labelsMap) != 0 {
+		nginxService.Labels = labelsMap
+		nginxService.Spec.Selector = labelsMap
 	}
 
 	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)
@@ -274,7 +273,48 @@ func (f *Framework) NewNginxHeadlessServiceWithParams(name, app, portName string
 }
 
 func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
-	return f.NewNginxHeadlessServiceWithParams("nginx-headless", "nginx-demo", "http", v1.ProtocolTCP, cluster)
+	return f.NewHeadlessServiceWithParams("nginx-headless", "http", v1.ProtocolTCP,
+		map[string]string{"app": "nginx-demo"}, cluster)
+}
+
+func (f *Framework) NewHeadlessServiceEndpointIP(cluster framework.ClusterIndex) *v1.Service {
+	return f.NewHeadlessServiceWithParams("ep-headless", "http", v1.ProtocolTCP,
+		map[string]string{}, cluster)
+}
+
+func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex, svc *v1.Service) {
+	ep := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: svc.Name,
+		},
+		Subsets: []v1.EndpointSubset{
+			{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP:       "192.168.5.1",
+						Hostname: "host1",
+					},
+					{
+						IP:       "192.168.5.2",
+						Hostname: "host2",
+					},
+				},
+			},
+		},
+	}
+
+	for i := range svc.Spec.Ports {
+		ep.Subsets[0].Ports = append(ep.Subsets[0].Ports, v1.EndpointPort{
+			Name:     svc.Spec.Ports[i].Name,
+			Port:     svc.Spec.Ports[i].Port,
+			Protocol: svc.Spec.Ports[i].Protocol,
+		})
+	}
+
+	ec := framework.KubeClients[cluster].CoreV1().Endpoints(svc.Namespace)
+	framework.AwaitUntil("create endpoint", func() (interface{}, error) {
+		return ec.Create(context.TODO(), ep, metav1.CreateOptions{})
+	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
@@ -348,6 +388,38 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) (ipList, hostNameList []string) {
 	return f.AwaitPodIPs(targetCluster, service, anyCount, isLocal)
+}
+
+func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) (ipList, hostNameList []string) {
+	hostNameList = make([]string, 0)
+	ipList = make([]string, 0)
+
+	endpoint := framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
+		return framework.KubeClients[targetCluster].CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	}, framework.NoopCheckResult).(*v1.Endpoints)
+
+	for _, subset := range endpoint.Subsets {
+		for _, address := range subset.Addresses {
+			// Add hostname to hostNameList
+			if address.Hostname != "" {
+				hostNameList = append(hostNameList, address.Hostname)
+			}
+
+			// Add globalIP to ipList
+			gip := f.Framework.AwaitGlobalIngressIP(targetCluster, fmt.Sprintf("ep-%.44s-%.15s", endpoint.Name, address.IP), svc.Namespace)
+			ipList = append(ipList, gip)
+		}
+	}
+
+	return ipList, hostNameList
+}
+
+func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1.Service) (ipList, hostNameList []string) {
+	if framework.TestContext.GlobalnetEnabled {
+		return f.AwaitEndpointIngressIPs(targetCluster, svc)
+	}
+
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {

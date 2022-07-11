@@ -317,15 +317,31 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 
 func (e *EndpointController) getIP(address *corev1.EndpointAddress) string {
 	if e.isHeadless() && e.globalIngressIPCache != nil {
-		obj, found := e.globalIngressIPCache.getForPod(e.serviceNamespace, address.TargetRef.Name)
+		var (
+			obj    *unstructured.Unstructured
+			found  bool
+			ip     string
+			forPod bool
+		)
 
-		var ip string
+		if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+			forPod = true
+			obj, found = e.globalIngressIPCache.getForPod(e.serviceNamespace, address.TargetRef.Name)
+		} else {
+			forPod = false
+			obj, found = e.globalIngressIPCache.getForEndpoints(e.serviceNamespace, address.IP)
+		}
+
 		if found {
 			ip, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
 		}
 
 		if ip == "" {
-			logger.Infof("GlobalIP for EndpointAddress %q is not allocated yet", address.TargetRef.Name)
+			if forPod {
+				logger.Infof("GlobalIP for EndpointAddress pod name %q is not allocated yet", address.TargetRef.Name)
+			} else {
+				logger.Infof("GlobalIP for EndpointAddress IP %q is not allocated yet", address.IP)
+			}
 		}
 
 		return ip

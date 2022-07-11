@@ -63,8 +63,8 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
-		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
+		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -96,8 +96,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
-		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
+		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
 
 	// Create StatefulSet on ClusterA
 	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterAName))
@@ -106,8 +106,8 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
-	nginxServiceClusterA := f.NewNginxHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName, appName,
-		httpPortName, corev1.ProtocolTCP, framework.ClusterA)
+	nginxServiceClusterA := f.NewHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName,
+		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterA)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
@@ -159,8 +159,8 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, appName,
-		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
+		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)

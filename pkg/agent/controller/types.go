@@ -119,7 +119,8 @@ type ServiceExportClient struct {
 
 type globalIngressIPCache struct {
 	sync.Mutex
-	byService sync.Map
-	byPod     sync.Map
-	watcher   watcher.Interface
+	byService   sync.Map
+	byPod       sync.Map
+	byEndpoints sync.Map
+	watcher     watcher.Interface
 }
