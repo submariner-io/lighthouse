@@ -21,16 +21,19 @@ updates:
       interval: daily
     open-pull-requests-limit: 10
     ignore:
-      - dependency-name: k8s.io/api
-        versions:
-          - "> 0.17.0"
-      - dependency-name: k8s.io/apimachinery
-        versions:
-          - "> 0.17.0"
-      - dependency-name: k8s.io/client-go
-        versions:
-          - "> 0.17.0"
+      # K8s dependencies must be handled manually
+      - dependency-name: k8s.io/*
+      - dependency-name: sigs.k8s.io/*
+      # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
-      - dependency-name: sigs.k8s.io/controller-runtime
-        versions:
-          - ">= 0.7.0"
+  - package-ecosystem: gomod
+    directory: "/coredns"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    ignore:
+      # K8s dependencies must be handled manually
+      - dependency-name: k8s.io/*
+      - dependency-name: sigs.k8s.io/*
+      # Our own dependencies are handled during releases
+      - dependency-name: github.com/submariner-io/*
