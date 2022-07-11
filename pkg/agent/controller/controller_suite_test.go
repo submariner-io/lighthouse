@@ -63,11 +63,17 @@ const (
 	globalIP1        = "242.254.1.1"
 	globalIP2        = "242.254.1.2"
 	globalIP3        = "242.254.1.3"
+	epIP1            = "192.168.5.1"
+	epIP2            = "192.168.5.2"
+	epIP3            = "10.253.6.1"
 )
 
 var (
 	nodeName = "my-node"
 	hostName = "my-host"
+	host1    = "host1"
+	host2    = "host2"
+	host3    = "host3"
 
 	port1 = mcsv1a1.ServicePort{
 		Name:     "http",
@@ -201,24 +207,27 @@ func newTestDiver() *testDriver {
 						},
 						Addresses: []corev1.EndpointAddress{
 							{
-								IP:       "192.168.5.1",
+								IP:       epIP1,
 								Hostname: hostName,
 								TargetRef: &corev1.ObjectReference{
+									Kind: "Pod",
 									Name: "one",
 								},
 							},
 							{
-								IP:       "192.168.5.2",
+								IP:       epIP2,
 								NodeName: &nodeName,
 								TargetRef: &corev1.ObjectReference{
+									Kind: "Pod",
 									Name: "two",
 								},
 							},
 						},
 						NotReadyAddresses: []corev1.EndpointAddress{
 							{
-								IP: "10.253.6.1",
+								IP: epIP3,
 								TargetRef: &corev1.ObjectReference{
+									Kind: "Pod",
 									Name: "not-ready",
 								},
 							},
@@ -415,10 +424,21 @@ func (c *cluster) createGlobalIngressIP(ingressIP *unstructured.Unstructured) {
 	test.CreateResource(c.localIngressIPClient, ingressIP)
 }
 
-func (c *cluster) newHeadlessGlobalIngressIP(target, ip string) *unstructured.Unstructured {
+func (c *cluster) newHeadlessGlobalIngressIPForPod(target, ip string) *unstructured.Unstructured {
 	ingressIP := c.newGlobalIngressIP("pod"+"-"+target, ip)
 	Expect(unstructured.SetNestedField(ingressIP.Object, controller.HeadlessServicePod, "spec", "target")).To(Succeed())
 	Expect(unstructured.SetNestedField(ingressIP.Object, target, "spec", "podRef", "name")).To(Succeed())
+
+	return ingressIP
+}
+
+func (c *cluster) newHeadlessGlobalIngressIPForEndpointIP(name, ip, endpointIP string) *unstructured.Unstructured {
+	ingressIP := c.newGlobalIngressIP("ep"+"-"+name+"-"+endpointIP, ip)
+	Expect(unstructured.SetNestedField(ingressIP.Object, controller.HeadlessServiceEndpoints, "spec", "target")).To(Succeed())
+	Expect(unstructured.SetNestedField(ingressIP.Object, name, "spec", "serviceRef", "name")).To(Succeed())
+
+	annotations := map[string]string{"submariner.io/headless-svc-endpoints-ip": endpointIP}
+	ingressIP.SetAnnotations(annotations)
 
 	return ingressIP
 }

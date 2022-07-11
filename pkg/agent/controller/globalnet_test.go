@@ -22,8 +22,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/utils/pointer"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -126,9 +128,9 @@ var _ = Describe("Globalnet enabled", func() {
 
 		Context("and it has global IPs for all endpoint addresses", func() {
 			BeforeEach(func() {
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("one", globalIP1))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("two", globalIP2))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("not-ready", globalIP3))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
 			})
 
 			It("should export the service with the global IPs", func() {
@@ -140,15 +142,70 @@ var _ = Describe("Globalnet enabled", func() {
 			It("should eventually export the service with the global IPs", func() {
 				t.cluster1.ensureNoEndpointSlice()
 
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("one", globalIP1))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
 
 				t.cluster1.ensureNoEndpointSlice()
 
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("two", globalIP2))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("not-ready", globalIP3))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
 
 				t.awaitEndpointSlice(&t.cluster1)
 			})
+		})
+	})
+
+	When("a headless Service without a selector is exported", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
+
+			t.cluster1.endpointSliceAddresses[0].Addresses = []string{globalIP1}
+			t.cluster1.endpointSliceAddresses[1].Addresses = []string{globalIP2}
+			t.cluster1.endpointSliceAddresses[2].Addresses = []string{globalIP3}
+
+			// subsets[*].adresses[*].TargetRef = nil for all Endpoints of headless Service without selector
+			// and Hostname must be set.
+			t.cluster1.endpoints.Subsets[0].Addresses = []corev1.EndpointAddress{
+				{
+					IP:       epIP1,
+					Hostname: host1,
+				},
+				{
+					IP:       epIP2,
+					Hostname: host2,
+				},
+			}
+			t.cluster1.endpoints.Subsets[0].NotReadyAddresses = []corev1.EndpointAddress{
+				{
+					IP:       epIP3,
+					Hostname: host3,
+				},
+			}
+
+			t.cluster1.endpointSliceAddresses = []discovery.Endpoint{
+				{
+					Addresses:  []string{globalIP1},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Hostname:   &t.cluster1.endpoints.Subsets[0].Addresses[0].Hostname,
+				},
+				{
+					Addresses:  []string{globalIP2},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Hostname:   &t.cluster1.endpoints.Subsets[0].Addresses[1].Hostname,
+				},
+				{
+					Addresses:  []string{globalIP3},
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+					Hostname:   &t.cluster1.endpoints.Subsets[0].NotReadyAddresses[0].Hostname,
+				},
+			}
+
+			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("one", globalIP1, epIP1))
+			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("two", globalIP2, epIP2))
+			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("not-ready", globalIP3, epIP3))
+		})
+
+		It("should export the service with the global IPs", func() {
+			t.awaitHeadlessServiceExported(&t.cluster1)
 		})
 	})
 })

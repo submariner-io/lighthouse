@@ -25,6 +25,7 @@ import (
 const (
 	ClusterIPService           = "ClusterIPService"
 	HeadlessServicePod         = "HeadlessServicePod"
+	HeadlessServiceEndpoints   = "HeadlessServiceEndpoints"
 	defaultReasonIPUnavailable = "ServiceGlobalIPUnavailable"
 	defaultMsgIPUnavailable    = "Service doesn't have a global IP yet"
 )
