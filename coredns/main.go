@@ -22,7 +22,7 @@ package main
 // https://coredns.io/2017/07/25/compile-time-enabling-or-disabling-plugins/#build-with-external-golang-source-code
 
 import (
-	_ "github.com/caddyserver/caddy/onevent"
+	_ "github.com/coredns/caddy/onevent"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/coremain"
 	_ "github.com/coredns/coredns/plugin/any"
