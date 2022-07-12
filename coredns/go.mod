@@ -13,9 +13,9 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/submariner-io/admiral v0.13.0-m2
 	github.com/submariner-io/lighthouse v0.13.0-m1
-	k8s.io/api v0.24.1
-	k8s.io/apimachinery v0.24.1
-	k8s.io/client-go v0.24.1
+	k8s.io/api v0.24.2
+	k8s.io/apimachinery v0.24.2
+	k8s.io/client-go v0.24.2
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/mcs-api v0.1.0
 )
