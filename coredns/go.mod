@@ -3,7 +3,6 @@ module github.com/submariner-io/lighthouse/coredns
 go 1.17
 
 require (
-	github.com/caddyserver/caddy v1.0.5
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.9.3
 	github.com/miekg/dns v1.1.50
