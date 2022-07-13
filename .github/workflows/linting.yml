@@ -114,10 +114,13 @@ jobs:
         id: scan
         with:
           path: "."
-          fail-build: false
+          fail-build: true
+          severity-cutoff: negligible
       - name: Show Anchore scan SARIF report
+        if: always()
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
+        if: always()
         uses: github/codeql-action/upload-sarif@9885f86fab4879632b7e44514f19148225dfbdcd
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
