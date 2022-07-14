@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/submariner-io/admiral v0.13.0-m2
-	github.com/submariner-io/lighthouse v0.13.0-m1
+	github.com/submariner-io/lighthouse v0.13.0-rc2
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
@@ -109,8 +109,11 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
+// Pin to a non-local version of lighthouse. This is not ideal, but there's a limitation in Cachito.
+// This will hopefully be fixed, but need a workaround for now.
+// https://issues.redhat.com/browse/CLOUDBLD-10559
 // Local project
-replace github.com/submariner-io/lighthouse => ../
+// replace github.com/submariner-io/lighthouse => ../
 
 // Avoid an ambiguous import (cloud.google.com/go/compute/metadata in both
 // cloud.google.com/go v0.81.0 and cloud.google.com/go/compute v0.1.3.0)
