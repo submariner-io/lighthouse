@@ -802,12 +802,10 @@ github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1 h1:5TQK59W5E3v0r2duFAb7P95B6hEeOyEnHRa8MjYSMTY=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
-github.com/submariner-io/admiral v0.13.0-rc2/go.mod h1:ZRuSTYk6P8+TU8cUQLF8mqDHUZdcjSrAQNMwajbkbd4=
 github.com/submariner-io/admiral v0.13.0 h1:yYetkLd+mZkvT9KuZJQ+yq2+WhKAacHxDaxwR6aD/0w=
 github.com/submariner-io/admiral v0.13.0/go.mod h1:vNeo49m+YJrgyngj2A2PTrA8WWCqsv2coBHQnHwevMM=
-github.com/submariner-io/lighthouse v0.13.0-rc2 h1:MSGzqVRPUjm1rwwTKBVTi8mhaKX9Qm/sOPZU1AGcLlE=
-github.com/submariner-io/lighthouse v0.13.0-rc2/go.mod h1:zzYze3ui+vkKJL98HqiHWFBM4qxGBef3BVXDIP/VGO0=
-github.com/submariner-io/shipyard v0.13.0-rc2/go.mod h1:QC3tq6LKRCaavN3/pGw/QqSVIsVJKA9rbmNueihTydE=
+github.com/submariner-io/lighthouse v0.13.0 h1:gcAYkKtQ5J1QiJaytCVaIqNV0Qf6t6dCbgy7Z4tfOpU=
+github.com/submariner-io/lighthouse v0.13.0/go.mod h1:ijDct9D2OfGzPz3p6XbXcmTxM0YH7f/n+sWOhmROsZE=
 github.com/submariner-io/shipyard v0.13.0/go.mod h1:QC3tq6LKRCaavN3/pGw/QqSVIsVJKA9rbmNueihTydE=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/timewasted/linode v0.0.0-20160829202747-37e84520dcf7/go.mod h1:imsgLplxEC/etjIhdr3dNzV3JeT27LbVu5pYWm0JCBY=
