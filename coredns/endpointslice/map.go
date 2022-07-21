@@ -53,6 +53,8 @@ type Map struct {
 	kubeClient     kubernetes.Interface
 }
 
+const kubernetesServiceName = "kubernetes.io/service-name"
+
 func (m *Map) GetDNSRecords(hostname, cluster, namespace, name string, checkCluster func(string) bool) ([]serviceimport.DNSRecord, bool) {
 	key := keyFunc(name, namespace)
 
@@ -130,7 +132,7 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		}, func() error {
 			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(map[string]string{
-					constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
+					kubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
 				}).String(),
 			})
 			if err != nil {
