@@ -25,23 +25,23 @@ include $(SHIPYARD_DIR)/Makefile.inc
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
 override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
-override DEPLOY_ARGS += --service_discovery
+export LIGHTHOUSE = true
 
 # Targets to make
 
 build: $(ARCH_BINARIES)
 
 bin/%/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/agent $(BUILD_ARGS)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/agent
 
 bin/%/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
 	mkdir -p $(@D)
-	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ . $(BUILD_ARGS)
+	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 	mv coredns/$@ $@
 
 e2e: vendor/modules.txt
 
-licensecheck: BUILD_ARGS=--noupx
+licensecheck: export BUILD_UPX = false
 licensecheck: $(ARCH_BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
 
