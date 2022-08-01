@@ -89,7 +89,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	// Create StatefulSet on ClusterB
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
@@ -100,7 +100,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		httpPortName, corev1.ProtocolTCP, framework.ClusterB)
 
 	// Create StatefulSet on ClusterA
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterAName))
+	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterAName))
 
 	nginxSSClusterA := f.NewNginxStatefulSet(framework.ClusterA)
 
@@ -150,7 +150,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	f.SetNginxStatefulSetReplicas(framework.ClusterB, 3)

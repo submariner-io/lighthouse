@@ -70,7 +70,7 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
@@ -108,7 +108,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
@@ -117,7 +117,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterAName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
@@ -162,7 +162,7 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 	f.SetNginxReplicaSet(framework.ClusterB, 3)
 
@@ -196,7 +196,7 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 func RunHeadlessPodsAvailabilityTestLocal(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterAName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 	f.SetNginxReplicaSet(framework.ClusterA, 3)
 
@@ -231,7 +231,7 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterAName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
@@ -241,7 +241,7 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 	f.NewServiceExport(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
