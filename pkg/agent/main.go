@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -148,7 +149,7 @@ func init() {
 }
 
 func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8082"}
+	srv := &http.Server{Addr: ":8082", ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
 
