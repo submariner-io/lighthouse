@@ -1,6 +1,6 @@
 module github.com/submariner-io/lighthouse/coredns
 
-go 1.17
+go 1.18
 
 require (
 	github.com/coredns/caddy v1.1.1
