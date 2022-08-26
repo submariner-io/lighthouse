@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/test"
@@ -328,7 +329,12 @@ func testWithFallback() {
 		t.mockCs.localClusterID = clusterID
 		t.mockEs.endpointStatusMap[clusterID] = true
 		t.lh.Fall = fall.F{Zones: []string{"clusterset.local."}}
-		t.lh.Next = test.NextHandler(dns.RcodeBadCookie, errors.New("dummy plugin"))
+		t.lh.Next = test.HandlerFunc(func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+			m := new(dns.Msg)
+			m.SetRcode(r, dns.RcodeBadCookie)
+			_ = w.WriteMsg(m)
+			return dns.RcodeBadCookie, nil
+		})
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -1008,13 +1014,12 @@ func newHandlerTestDriver() *handlerTestDriver {
 func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case) {
 	code, err := t.lh.ServeDNS(context.TODO(), rec, tc.Msg())
 
-	Expect(code).Should(Equal(tc.Rcode))
-
-	if tc.Rcode == dns.RcodeSuccess {
+	if plugin.ClientWrite(tc.Rcode) {
 		Expect(err).To(Succeed())
 		Expect(test.SortAndCheck(rec.Msg, tc)).To(Succeed())
 	} else {
 		Expect(err).To(HaveOccurred())
+		Expect(code).Should(Equal(tc.Rcode))
 	}
 }
 
