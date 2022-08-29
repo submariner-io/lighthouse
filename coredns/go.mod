@@ -7,7 +7,7 @@ require (
 	github.com/coredns/coredns v1.9.3
 	github.com/miekg/dns v1.1.50
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.20.0
+	github.com/onsi/gomega v1.20.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/submariner-io/admiral v0.14.0-m0
