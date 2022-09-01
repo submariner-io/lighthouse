@@ -21,7 +21,7 @@ package loadbalancer
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type weightedItem struct {
