@@ -24,7 +24,7 @@ import (
 
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/lighthouse/pkg/loadbalancer"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 

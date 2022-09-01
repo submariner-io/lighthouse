@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
 	mcsInformers "sigs.k8s.io/mcs-api/pkg/client/informers/externalversions"
