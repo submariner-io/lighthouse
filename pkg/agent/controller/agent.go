@@ -273,7 +273,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 			fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
 		klog.Errorf("Service type %q not supported", svc.Spec.Type)
 
-		return nil, false
+		return nil, true
 	}
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
