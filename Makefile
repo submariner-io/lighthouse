@@ -16,9 +16,14 @@ PLATFORMS ?= linux/amd64,linux/arm64
 BINARIES := lighthouse-agent lighthouse-coredns
 ARCH_BINARIES := $(foreach platform,$(subst $(comma),$(space),$(PLATFORMS)),$(foreach binary,$(BINARIES),bin/$(call gotodockerarch,$(platform))/$(binary)))
 IMAGES := lighthouse-agent lighthouse-coredns
-PRELOAD_IMAGES := submariner-gateway submariner-operator submariner-route-agent $(IMAGES)
 MULTIARCH_IMAGES := $(IMAGES)
 SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
+
+# TODO: Remove once 0.14.0/0.13.1 helm chart is released
+# This is needed because the operator was erroneously using image names for overrides, and it has been fixed on devel
+ifeq ($(DEPLOYTOOL),helm)
+PRELOAD_IMAGES := submariner-operator
+endif
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
