@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/coredns/caddy v1.1.1
-	github.com/coredns/coredns v1.9.4
+	github.com/coredns/coredns v1.10.0
 	github.com/miekg/dns v1.1.50
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.2
@@ -15,7 +15,7 @@ require (
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.24.4
-	k8s.io/klog/v2 v2.80.0
+	k8s.io/klog/v2 v2.80.1
 	sigs.k8s.io/mcs-api v0.1.0
 )
 
@@ -29,7 +29,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.91 // indirect
+	github.com/aws/aws-sdk-go v1.44.95 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
