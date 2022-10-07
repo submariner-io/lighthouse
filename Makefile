@@ -19,12 +19,6 @@ IMAGES := lighthouse-agent lighthouse-coredns
 MULTIARCH_IMAGES := $(IMAGES)
 SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
 
-# TODO: Remove once 0.14.0/0.13.1 helm chart is released
-# This is needed because the operator was erroneously using image names for overrides, and it has been fixed on devel
-ifeq ($(DEPLOYTOOL),helm)
-PRELOAD_IMAGES := submariner-operator
-endif
-
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
