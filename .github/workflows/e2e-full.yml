@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        deploytool: ['operator', 'helm']
+        deploytool: ['operator']
         globalnet: ['', 'globalnet']
         k8s_version: ['1.25']
         include:
