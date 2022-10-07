@@ -22,7 +22,7 @@ SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
 # TODO: Remove once 0.14.0/0.13.1 helm chart is released
 # This is needed because the operator was erroneously using image names for overrides, and it has been fixed on devel
 ifeq ($(DEPLOYTOOL),helm)
-PRELOAD_IMAGES := submariner-operator
+PRELOAD_IMAGES := submariner-operator submariner-route-agent
 endif
 
 include $(SHIPYARD_DIR)/Makefile.inc
