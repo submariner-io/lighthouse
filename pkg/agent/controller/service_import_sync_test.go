@@ -20,8 +20,8 @@ package controller_test
 
 import (
 	. "github.com/onsi/ginkgo"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("ServiceImport syncing", func() {
@@ -79,6 +79,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.deleteService()
 			t.awaitServiceUnexported()
 			t.awaitServiceUnavailableStatus()
+			t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
 
 			t.createService()
 			t.awaitServiceExported(t.service.Spec.ClusterIP)
@@ -90,18 +91,12 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("mock create error")
 		})
 
-		It("should not update the ServiceExport status to Exported until the sync is successful", func() {
+		It("should eventually update the ServiceExport status to successfully synced", func() {
 			t.createService()
 			t.createServiceExport()
 
-			message := "AwaitingSync"
-			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, message))
-
-			t.awaitNotServiceExportStatus(&mcsv1a1.ServiceExportCondition{
-				Type:    mcsv1a1.ServiceExportValid,
-				Status:  corev1.ConditionTrue,
-				Message: &message,
-			})
+			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
+			t.ensureNoServiceExportCondition(constants.ServiceExportSynced)
 
 			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("")
 			t.awaitServiceExported(t.service.Spec.ClusterIP)

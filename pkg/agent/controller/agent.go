@@ -83,9 +83,11 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 
 	syncerConf.ResourceConfigs = []broker.ResourceConfig{
 		{
-			LocalSourceNamespace: metav1.NamespaceAll,
-			LocalResourceType:    &mcsv1a1.ServiceImport{},
-			BrokerResourceType:   &mcsv1a1.ServiceImport{},
+			LocalSourceNamespace:  metav1.NamespaceAll,
+			LocalResourceType:     &mcsv1a1.ServiceImport{},
+			LocalTransform:        agentController.onLocalServiceImport,
+			LocalOnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
+			BrokerResourceType:    &mcsv1a1.ServiceImport{},
 			SyncCounterOpts: &prometheus.GaugeOpts{
 				Name: syncerMetricNames.ServiceImportCounterName,
 				Help: "Count of imported services",
@@ -121,15 +123,17 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 	}
 
 	agentController.serviceExportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:             "ServiceExport -> ServiceImport",
-		SourceClient:     syncerConf.LocalClient,
-		SourceNamespace:  metav1.NamespaceAll,
-		RestMapper:       syncerConf.RestMapper,
-		Federator:        agentController.serviceImportSyncer.GetLocalFederator(),
-		ResourceType:     &mcsv1a1.ServiceExport{},
-		Transform:        agentController.serviceExportToServiceImport,
-		OnSuccessfulSync: agentController.onSuccessfulServiceImportSync,
-		Scheme:           syncerConf.Scheme,
+		Name:            "ServiceExport -> ServiceImport",
+		SourceClient:    syncerConf.LocalClient,
+		SourceNamespace: metav1.NamespaceAll,
+		RestMapper:      syncerConf.RestMapper,
+		Federator:       agentController.serviceImportSyncer.GetLocalFederator(),
+		ResourceType:    &mcsv1a1.ServiceExport{},
+		Transform:       agentController.serviceExportToServiceImport,
+		ResourcesEquivalent: func(oldObj, newObj *unstructured.Unstructured) bool {
+			return !agentController.shouldProcessServiceExportUpdate(oldObj, newObj)
+		},
+		Scheme: syncerConf.Scheme,
 		SyncCounterOpts: &prometheus.GaugeOpts{
 			Name: syncerMetricNames.ServiceExportCounterName,
 			Help: "Count of exported services",
@@ -260,10 +264,6 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		return nil, true
 	}
 
-	if op == syncer.Update && getLastExportConditionReason(svcExport) != serviceUnavailable {
-		return nil, false
-	}
-
 	svc := obj.(*corev1.Service)
 
 	svcType, ok := getServiceImportType(svc)
@@ -316,21 +316,11 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		serviceImport.Annotations[clusterIP] = serviceImport.Spec.IPs[0]
 	}
 
-	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
-		"AwaitingSync", "Awaiting sync of the ServiceImport to the broker")
+	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionTrue, "", "")
 
 	klog.V(log.DEBUG).Infof("Returning ServiceImport: %#v", serviceImport)
 
 	return serviceImport, false
-}
-
-func getLastExportConditionReason(svcExport *mcsv1a1.ServiceExport) string {
-	numCond := len(svcExport.Status.Conditions)
-	if numCond > 0 && svcExport.Status.Conditions[numCond-1].Reason != nil {
-		return *svcExport.Status.Conditions[numCond-1].Reason
-	}
-
-	return ""
 }
 
 func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, bool) {
@@ -345,6 +335,24 @@ func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, b
 	return mcsv1a1.ClusterSetIP, true
 }
 
+func (a *Controller) onLocalServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+	serviceImport := obj.(*mcsv1a1.ServiceImport)
+
+	if op == syncer.Delete {
+		a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
+			serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+			"NoServiceImport", "ServiceImport was deleted")
+
+		return obj, false
+	}
+
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
+		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+		"AwaitingSync", fmt.Sprintf("ServiceImport %sd - awaiting sync to the broker", op))
+
+	return obj, false
+}
+
 func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syncer.Operation) {
 	if op == syncer.Delete {
 		return
@@ -353,8 +361,19 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
 	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], mcsv1a1.ServiceExportValid, corev1.ConditionTrue, "",
-		"Service was successfully synced to the broker")
+		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionTrue, "",
+		"ServiceImport was successfully synced to the broker")
+}
+
+func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
+	oldValidCond := findServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	newValidCond := findServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+
+	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == corev1.ConditionFalse {
+		return true
+	}
+
+	return false
 }
 
 func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
@@ -456,14 +475,18 @@ func (a *Controller) getServiceExport(name, namespace string) (*mcsv1a1.ServiceE
 		return nil, errors.Wrap(err, "error retrieving ServiceExport")
 	}
 
+	return a.toServiceExport(obj), nil
+}
+
+func (a *Controller) toServiceExport(obj *unstructured.Unstructured) *mcsv1a1.ServiceExport {
 	se := &mcsv1a1.ServiceExport{}
 
-	err = a.serviceImportController.scheme.Convert(obj, se, nil)
+	err := a.serviceImportController.scheme.Convert(obj, se, nil)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Error converting %#v to ServiceExport", obj)
+		panic(errors.WithMessagef(err, "Error converting %#v to ServiceExport", obj))
 	}
 
-	return se, nil
+	return se
 }
 
 func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {

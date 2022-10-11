@@ -18,6 +18,8 @@ limitations under the License.
 
 package constants
 
+import "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+
 const (
 	OriginName                         = "origin-name"
 	OriginNamespace                    = "origin-namespace"
@@ -30,3 +32,5 @@ const (
 	MCSLabelSourceCluster              = "multicluster.kubernetes.io/source-cluster"
 	KubernetesServiceName              = "kubernetes.io/service-name"
 )
+
+const ServiceExportSynced v1alpha1.ServiceExportConditionType = "Synced"
