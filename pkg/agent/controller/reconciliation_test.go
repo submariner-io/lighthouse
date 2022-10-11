@@ -80,6 +80,7 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.start(t, *t.syncerConfig)
 
 			t.awaitServiceUnexported()
+			t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
 		})
 	})
 

@@ -20,6 +20,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -141,26 +142,27 @@ func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, names
 }
 
 func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
-	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 	By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
+
+	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
+
 	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
 		return se.Get(context.TODO(), name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		se := result.(*mcsv1a1.ServiceExport)
-		if len(se.Status.Conditions) == 0 {
-			return false, "No ServiceExportConditions", nil
+
+		for i := range se.Status.Conditions {
+			if se.Status.Conditions[i].Type == lhconstants.ServiceExportSynced {
+				if se.Status.Conditions[i].Status != v1.ConditionTrue {
+					out, _ := json.MarshalIndent(se.Status.Conditions[i], "", "  ")
+					return false, fmt.Sprintf("ServiceExport %s condition status is %s", lhconstants.ServiceExportSynced, out), nil
+				}
+
+				return true, "", nil
+			}
 		}
 
-		last := se.Status.Conditions[len(se.Status.Conditions)-1]
-		if last.Type != mcsv1a1.ServiceExportValid {
-			return false, fmt.Sprintf("ServiceExportCondition Type is %v", last.Type), nil
-		}
-
-		if last.Status != v1.ConditionTrue {
-			return false, fmt.Sprintf("ServiceExportCondition Status is %v", last.Status), nil
-		}
-
-		return true, "", nil
+		return false, fmt.Sprintf("ServiceExport %s condition status not found", lhconstants.ServiceExportSynced), nil
 	})
 }
 
