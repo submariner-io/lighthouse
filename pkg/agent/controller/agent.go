@@ -274,7 +274,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 			invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
 		klog.Errorf("Service type %q not supported", svc.Spec.Type)
 
-		return nil, true
+		return nil, false
 	}
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
@@ -390,8 +390,8 @@ func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
-	if op != syncer.Delete {
-		// Ignore create/update
+	if op == syncer.Create {
+		// Ignore create
 		return nil, false
 	}
 
@@ -407,6 +407,10 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	if !found {
 		// Service Export not created yet
 		return nil, false
+	}
+
+	if op == syncer.Update {
+		return a.serviceExportToServiceImport(obj, numRequeues, op)
 	}
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
