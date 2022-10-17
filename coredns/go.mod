@@ -13,6 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/submariner-io/admiral v0.13.1
 	github.com/submariner-io/lighthouse v0.13.0
+	golang.org/x/text v0.3.9-0.20221014173359-1bdb400fb39a // indirect
 	k8s.io/api v0.21.11
 	k8s.io/apimachinery v0.21.11
 	k8s.io/client-go v0.21.11
