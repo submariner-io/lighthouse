@@ -17,6 +17,7 @@ require (
 	github.com/submariner-io/admiral v0.12.2
 	github.com/submariner-io/shipyard v0.12.2
 	github.com/uw-labs/lichen v0.1.5
+	golang.org/x/text v0.3.9-0.20221014173359-1bdb400fb39a // indirect
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v11.0.0+incompatible
