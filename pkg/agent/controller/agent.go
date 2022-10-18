@@ -272,9 +272,16 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	if !ok {
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
-		klog.Errorf("Service type %q not supported", svc.Spec.Type)
+		klog.Errorf("Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
 
-		return nil, false
+		err = a.serviceImportSyncer.GetLocalFederator().Delete(a.newServiceImport(svcExport.Name, svcExport.Namespace))
+		if err == nil || apierrors.IsNotFound(err) {
+			return nil, false
+		}
+
+		klog.Errorf("Error deleting ServiceImport for Service (%s/%s)", svcExport.Namespace, svcExport.Name)
+
+		return nil, true
 	}
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
