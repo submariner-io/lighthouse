@@ -373,8 +373,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 }
 
 func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
-	oldValidCond := findServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
-	newValidCond := findServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	oldValidCond := FindServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	newValidCond := FindServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 
 	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == corev1.ConditionFalse {
 		return true
@@ -383,7 +383,7 @@ func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructur
 	return false
 }
 
-func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
+func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
 	condType mcsv1a1.ServiceExportConditionType,
 ) *mcsv1a1.ServiceExportCondition {
 	for i := range conditions {
@@ -454,7 +454,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			Message:            &msg,
 		}
 
-		prevCond := findServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
+		prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
 		if prevCond == nil {
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, newCondition)
 		} else if serviceExportConditionEqual(prevCond, &newCondition) {
