@@ -163,12 +163,12 @@ func (lh *Lighthouse) Name() string {
 }
 
 func (lh *Lighthouse) error(str string) error {
-	return plugin.Error(lh.Name(), errors.New(str)) // nolint:wrapcheck // Let the caller wrap it.
+	return plugin.Error(lh.Name(), errors.New(str)) //nolint:wrapcheck // Let the caller wrap it.
 }
 
 func (lh *Lighthouse) nextOrFailure(ctx context.Context, state *request.Request, r *dns.Msg, rcode int) (int, error) {
 	if lh.Fall.Through(state.Name()) {
-		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, state.W, r) // nolint:wrapcheck // Let the caller wrap it.
+		return plugin.NextOrFailure(lh.Name(), lh.Next, ctx, state.W, r) //nolint:wrapcheck // Let the caller wrap it.
 	}
 
 	a := new(dns.Msg)

@@ -90,13 +90,13 @@ func (a *Controller) Cleanup() error {
 func deleteResources(client dynamic.NamespaceableResourceInterface, ns string, options *metav1.ListOptions) error {
 	list, err := client.Namespace(ns).List(context.TODO(), *options)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return err // nolint:wrapcheck // Let the caller wrap
+		return err //nolint:wrapcheck // Let the caller wrap
 	}
 
 	for i := range list.Items {
 		err = client.Namespace(list.Items[i].GetNamespace()).Delete(context.TODO(), list.Items[i].GetName(), metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err // nolint:wrapcheck // Let the caller wrap
+			return err //nolint:wrapcheck // Let the caller wrap
 		}
 	}
 

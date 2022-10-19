@@ -284,7 +284,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.chanByCondType[lhconstants.ServiceExportSynced] = make(chan mcsv1a1.ServiceExportCondition, 100)
 }
 
-// nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
+//nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	processServiceExportConditions := func(oldObj, newObj interface{}) {
 		defer GinkgoRecover()

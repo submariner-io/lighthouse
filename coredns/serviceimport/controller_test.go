@@ -143,7 +143,7 @@ func testLifecycleNotifications() {
 	})
 }
 
-// nolint:unparam // `name` always receives `service1'.
+//nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
