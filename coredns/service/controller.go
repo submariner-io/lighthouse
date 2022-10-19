@@ -20,6 +20,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 
 	"github.com/pkg/errors"
