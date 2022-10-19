@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -105,9 +105,9 @@ func (e *EndpointController) cleanup() {
 	// MCS-compliant labels
 	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
-			lhconstants.MCSLabelSourceCluster: e.clusterID,
-			lhconstants.MCSLabelServiceName:   e.serviceName,
+			constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+			constants.MCSLabelSourceCluster: e.clusterID,
+			constants.MCSLabelServiceName:   e.serviceName,
 		}).String(),
 	})
 
@@ -118,9 +118,9 @@ func (e *EndpointController) cleanup() {
 	// Lighthouse-proprietary labels
 	err = resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			lhconstants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
-			lhconstants.LighthouseLabelSourceCluster: e.clusterID,
-			lhconstants.LighthouseLabelSourceName:    e.serviceName,
+			constants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
+			constants.LighthouseLabelSourceCluster: e.clusterID,
+			constants.LighthouseLabelSourceName:    e.serviceName,
 		}).String(),
 	})
 
@@ -161,10 +161,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
-		lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
-		lhconstants.MCSLabelSourceCluster: e.clusterID,
-		lhconstants.MCSLabelServiceName:   e.serviceName,
+		discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+		constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+		constants.MCSLabelSourceCluster: e.clusterID,
+		constants.MCSLabelServiceName:   e.serviceName,
 	}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4

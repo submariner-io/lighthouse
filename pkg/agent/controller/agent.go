@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -514,9 +515,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 				lhconstants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LighthouseLabelSourceName:    name,
-				lhconstants.LabelSourceNamespace:         namespace,
-				lhconstants.LighthouseLabelSourceCluster: a.clusterID,
+				constants.LighthouseLabelSourceName:    name,
+				constants.LabelSourceNamespace:         namespace,
+				constants.LighthouseLabelSourceCluster: a.clusterID,
 			},
 		},
 	}
@@ -542,7 +543,7 @@ func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
+	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
 
 	return endpointSlice, false
 }
@@ -551,7 +552,7 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
-	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
+	if labels[discovery.LabelManagedBy] != constants.LabelValueManagedBy {
 		return nil, false
 	}
 
