@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"sync"
 
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
-	"github.com/submariner-io/lighthouse/pkg/loadbalancer"
+	"github.com/submariner-io/lighthouse/coredns/constants"
+	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
 	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -151,7 +151,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			clusterName := serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster]
+			clusterName := serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster]
 
 			record := &DNSRecord{
 				IP:          serviceImport.Spec.IPs[0],
@@ -200,7 +200,7 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int64 {
-	weightKey := lhconstants.LoadBalancerWeightAnnotationPrefix + "/" + forClusterName
+	weightKey := constants.LoadBalancerWeightAnnotationPrefix + "/" + forClusterName
 	if val, ok := si.Annotations[weightKey]; ok {
 		f, err := strconv.ParseInt(val, 0, 64)
 		if err != nil {

@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
@@ -444,7 +445,7 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 ) (endpointSliceList *discovery.EndpointSliceList) {
 	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
-		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
+		discovery.LabelManagedBy: constants.LabelValueManagedBy,
 	}
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelMap).String(),
