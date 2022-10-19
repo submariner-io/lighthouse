@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -76,7 +76,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	c.clientSet = clientSet
 	labelMap := map[string]string{
-		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
+		discovery.LabelManagedBy: constants.LabelValueManagedBy,
 	}
 	labelSelector := labels.Set(labelMap).String()
 

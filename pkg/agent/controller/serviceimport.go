@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,7 +104,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 		return false
 	}
 
-	if serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster] != c.clusterID {
+	if serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster] != c.clusterID {
 		return false
 	}
 
@@ -124,7 +125,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 }
 
 func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.ServiceImport, key string) {
-	if serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster] != c.clusterID {
+	if serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster] != c.clusterID {
 		return
 	}
 
