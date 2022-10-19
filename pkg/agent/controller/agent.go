@@ -56,7 +56,7 @@ type AgentConfig struct {
 	ServiceExportCounterName string
 }
 
-// nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
+//nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
 	syncerMetricNames AgentConfig,
 ) (*Controller, error) {

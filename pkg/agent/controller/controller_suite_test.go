@@ -279,7 +279,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.localKubeClient = fakeCS
 }
 
-// nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
+//nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	syncerConfig.LocalClient = c.localDynClient
 	bigint, err := rand.Int(rand.Reader, big.NewInt(1000000))

@@ -1010,7 +1010,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 	return t
 }
 
-// nolint:gocritic // (hugeParam) It's fine to pass 'tc' by value here.
+//nolint:gocritic // (hugeParam) It's fine to pass 'tc' by value here.
 func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case) {
 	code, err := t.lh.ServeDNS(context.TODO(), rec, tc.Msg())
 
@@ -1037,7 +1037,7 @@ func setupEndpointSliceMap() *endpointslice.Map {
 	return esMap
 }
 
-// nolint:unparam // `name` always receives `service1'.
+//nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	portNumber int32, protocol v1.Protocol, siType mcsv1a1.ServiceImportType,
 ) *mcsv1a1.ServiceImport {
@@ -1074,7 +1074,7 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	}
 }
 
-// nolint:unparam // `namespace` always receives `namespace1`.
+//nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID, portName string, hostName, endpointIPs []string, portNumber int32,
 	protocol v1.Protocol,
 ) *discovery.EndpointSlice {
