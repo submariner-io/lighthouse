@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -57,7 +57,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-" + serviceNamespace + "-" + clusterID1,
 				Labels: map[string]string{
-					lhconstants.LighthouseLabelSourceCluster: clusterID1,
+					constants.LighthouseLabelSourceCluster: clusterID1,
 				},
 			},
 		}
@@ -72,7 +72,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "other-" + serviceNamespace + "-" + clusterID2,
 				Labels: map[string]string{
-					lhconstants.LighthouseLabelSourceCluster: clusterID2,
+					constants.LighthouseLabelSourceCluster: clusterID2,
 				},
 			},
 		}
@@ -83,7 +83,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx2-" + serviceNamespace + "-" + clusterID2,
 				Labels: map[string]string{
-					lhconstants.LighthouseLabelSourceCluster: clusterID2,
+					constants.LighthouseLabelSourceCluster: clusterID2,
 				},
 			},
 		}
@@ -95,8 +95,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-" + clusterID1,
 				Labels: map[string]string{
-					lhconstants.MCSLabelSourceCluster: clusterID1,
-					discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
+					constants.MCSLabelSourceCluster: clusterID1,
+					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				},
 			},
 		}
@@ -111,8 +111,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "other-" + clusterID2,
 				Labels: map[string]string{
-					lhconstants.MCSLabelSourceCluster: clusterID2,
-					discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
+					constants.MCSLabelSourceCluster: clusterID2,
+					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				},
 			},
 		}
@@ -123,8 +123,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx2-" + clusterID2,
 				Labels: map[string]string{
-					lhconstants.MCSLabelSourceCluster: clusterID2,
-					discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
+					constants.MCSLabelSourceCluster: clusterID2,
+					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				},
 			},
 		}

@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -335,9 +336,9 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 	}
 
 	labels := serviceImport.GetObjectMeta().GetLabels()
-	Expect(labels[lhconstants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
-	Expect(labels[lhconstants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
-	Expect(labels[lhconstants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
+	Expect(labels[constants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
+	Expect(labels[constants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
+	Expect(labels[constants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
 
 	return serviceImport
 }
@@ -390,10 +391,10 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 	Expect(endpointSlice.Namespace).To(Equal(namespace))
 
 	labels := endpointSlice.GetLabels()
-	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelSourceCluster, clusterID1))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelServiceName, service.Name))
+	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, constants.LabelValueManagedBy))
+	Expect(labels).To(HaveKeyWithValue(constants.LabelSourceNamespace, service.Namespace))
+	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelSourceCluster, clusterID1))
+	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelServiceName, service.Name))
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 

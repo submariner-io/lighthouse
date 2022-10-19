@@ -11,7 +11,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/submariner-io/admiral v0.14.0-m2
-	github.com/submariner-io/lighthouse v0.13.0-m1
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.24.4
@@ -108,9 +107,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-// Local project
-replace github.com/submariner-io/lighthouse => ../
 
 // Avoid an ambiguous import (cloud.google.com/go/compute/metadata in both
 // cloud.google.com/go v0.81.0 and cloud.google.com/go/compute v0.1.3.0)
