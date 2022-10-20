@@ -143,7 +143,7 @@ var _ = Describe("EndpointSlice Map", func() {
 	})
 })
 
-// nolint:unparam // `namespace` always receives `namespace1`.
+//nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// nolint:gocritic // (hugeParam) This function modifies config so we don't want to pass by pointer.
+//nolint:gocritic // (hugeParam) This function modifies config so we don't want to pass by pointer.
 func newGlobalIngressIPCache(config watcher.Config) (*globalIngressIPCache, error) {
 	c := &globalIngressIPCache{}
 
