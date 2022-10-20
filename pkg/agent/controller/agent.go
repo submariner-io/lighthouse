@@ -272,7 +272,14 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	if !ok {
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
-		klog.Errorf("Service type %q not supported", svc.Spec.Type)
+		klog.Errorf("Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
+
+		err = a.serviceImportSyncer.GetLocalFederator().Delete(a.newServiceImport(svcExport.Name, svcExport.Namespace))
+		if err == nil || apierrors.IsNotFound(err) {
+			return nil, false
+		}
+
+		klog.Errorf("Error deleting ServiceImport for Service (%s/%s)", svcExport.Namespace, svcExport.Name)
 
 		return nil, true
 	}
@@ -367,8 +374,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 }
 
 func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
-	oldValidCond := findServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
-	newValidCond := findServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	oldValidCond := FindServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	newValidCond := FindServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 
 	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == corev1.ConditionFalse {
 		return true
@@ -377,7 +384,7 @@ func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructur
 	return false
 }
 
-func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
+func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
 	condType mcsv1a1.ServiceExportConditionType,
 ) *mcsv1a1.ServiceExportCondition {
 	for i := range conditions {
@@ -390,8 +397,8 @@ func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
-	if op != syncer.Delete {
-		// Ignore create/update
+	if op == syncer.Create {
+		// Ignore create
 		return nil, false
 	}
 
@@ -407,6 +414,10 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	if !found {
 		// Service Export not created yet
 		return nil, false
+	}
+
+	if op == syncer.Update {
+		return a.serviceExportToServiceImport(obj, numRequeues, op)
 	}
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
@@ -444,7 +455,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			Message:            &msg,
 		}
 
-		prevCond := findServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
+		prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
 		if prevCond == nil {
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, newCondition)
 		} else if serviceExportConditionEqual(prevCond, &newCondition) {
