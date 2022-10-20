@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -271,7 +272,14 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	if !ok {
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
-		klog.Errorf("Service type %q not supported", svc.Spec.Type)
+		klog.Errorf("Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
+
+		err = a.serviceImportSyncer.GetLocalFederator().Delete(a.newServiceImport(svcExport.Name, svcExport.Namespace))
+		if err == nil || apierrors.IsNotFound(err) {
+			return nil, false
+		}
+
+		klog.Errorf("Error deleting ServiceImport for Service (%s/%s)", svcExport.Namespace, svcExport.Name)
 
 		return nil, true
 	}
@@ -366,8 +374,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 }
 
 func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
-	oldValidCond := findServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
-	newValidCond := findServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	oldValidCond := FindServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	newValidCond := FindServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 
 	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == corev1.ConditionFalse {
 		return true
@@ -376,7 +384,7 @@ func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructur
 	return false
 }
 
-func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
+func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
 	condType mcsv1a1.ServiceExportConditionType,
 ) *mcsv1a1.ServiceExportCondition {
 	for i := range conditions {
@@ -389,8 +397,8 @@ func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
-	if op != syncer.Delete {
-		// Ignore create/update
+	if op == syncer.Create {
+		// Ignore create
 		return nil, false
 	}
 
@@ -406,6 +414,10 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	if !found {
 		// Service Export not created yet
 		return nil, false
+	}
+
+	if op == syncer.Update {
+		return a.serviceExportToServiceImport(obj, numRequeues, op)
 	}
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
@@ -443,7 +455,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			Message:            &msg,
 		}
 
-		prevCond := findServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
+		prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
 		if prevCond == nil {
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, newCondition)
 		} else if serviceExportConditionEqual(prevCond, &newCondition) {
@@ -503,9 +515,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 				lhconstants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LighthouseLabelSourceName:    name,
-				lhconstants.LabelSourceNamespace:         namespace,
-				lhconstants.LighthouseLabelSourceCluster: a.clusterID,
+				constants.LighthouseLabelSourceName:    name,
+				constants.LabelSourceNamespace:         namespace,
+				constants.LighthouseLabelSourceCluster: a.clusterID,
 			},
 		},
 	}
@@ -531,7 +543,7 @@ func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
+	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
 
 	return endpointSlice, false
 }
@@ -540,7 +552,7 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
-	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
+	if labels[discovery.LabelManagedBy] != constants.LabelValueManagedBy {
 		return nil, false
 	}
 

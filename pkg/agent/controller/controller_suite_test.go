@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"reflect"
 	"sort"
@@ -31,15 +32,14 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,6 +95,7 @@ type cluster struct {
 	localKubeClient          kubernetes.Interface
 	endpointsReactor         *fake.FailingReactor
 	agentController          *controller.Controller
+	chanByCondType           map[mcsv1a1.ServiceExportConditionType]chan mcsv1a1.ServiceExportCondition
 }
 
 type testDriver struct {
@@ -277,10 +278,60 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	fakeCS := fakeKubeClient.NewSimpleClientset()
 	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
 	c.localKubeClient = fakeCS
+
+	c.chanByCondType = map[mcsv1a1.ServiceExportConditionType]chan mcsv1a1.ServiceExportCondition{}
+	c.chanByCondType[mcsv1a1.ServiceExportValid] = make(chan mcsv1a1.ServiceExportCondition, 100)
+	c.chanByCondType[lhconstants.ServiceExportSynced] = make(chan mcsv1a1.ServiceExportCondition, 100)
 }
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
+	processServiceExportConditions := func(oldObj, newObj interface{}) {
+		defer GinkgoRecover()
+
+		var oldSE *mcsv1a1.ServiceExport
+		if oldObj != nil {
+			oldSE = toServiceExport(oldObj)
+		}
+
+		newSE := toServiceExport(newObj)
+
+		for i := range newSE.Status.Conditions {
+			newCond := &newSE.Status.Conditions[i]
+
+			condChan := c.chanByCondType[newCond.Type]
+			if condChan == nil {
+				continue
+			}
+
+			if oldSE != nil {
+				prevCond := controller.FindServiceExportStatusCondition(oldSE.Status.Conditions, newCond.Type)
+				if prevCond != nil && reflect.DeepEqual(prevCond, newCond) {
+					continue
+				}
+			}
+
+			condChan <- *newCond
+		}
+	}
+
+	_, informer := cache.NewInformer(&cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return t.cluster1.localServiceExportClient.List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return t.cluster1.localServiceExportClient.Watch(context.TODO(), options)
+		},
+	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			processServiceExportConditions(nil, obj)
+		},
+		UpdateFunc: processServiceExportConditions,
+	})
+
+	go informer.Run(t.stopCh)
+	Expect(cache.WaitForCacheSync(t.stopCh, informer.HasSynced)).To(BeTrue())
+
 	syncerConfig.LocalClient = c.localDynClient
 	bigint, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	Expect(err).To(Succeed())
@@ -335,9 +386,9 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 	}
 
 	labels := serviceImport.GetObjectMeta().GetLabels()
-	Expect(labels[lhconstants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
-	Expect(labels[lhconstants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
-	Expect(labels[lhconstants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
+	Expect(labels[constants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
+	Expect(labels[constants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
+	Expect(labels[constants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
 
 	return serviceImport
 }
@@ -390,10 +441,10 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 	Expect(endpointSlice.Namespace).To(Equal(namespace))
 
 	labels := endpointSlice.GetLabels()
-	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, lhconstants.LabelValueManagedBy))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.LabelSourceNamespace, service.Namespace))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelSourceCluster, clusterID1))
-	Expect(labels).To(HaveKeyWithValue(lhconstants.MCSLabelServiceName, service.Name))
+	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, constants.LabelValueManagedBy))
+	Expect(labels).To(HaveKeyWithValue(constants.LabelSourceNamespace, service.Namespace))
+	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelSourceCluster, clusterID1))
+	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelServiceName, service.Name))
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 
@@ -514,6 +565,13 @@ func (t *testDriver) createService() {
 	test.CreateResource(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace), t.service)
 }
 
+func (t *testDriver) updateService() {
+	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Update(context.TODO(), t.service, metav1.UpdateOptions{})
+	Expect(err).To(Succeed())
+
+	test.UpdateResource(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace), t.service)
+}
+
 func (t *testDriver) createEndpoints() {
 	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(context.TODO(), t.endpoints, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
@@ -567,109 +625,87 @@ func (t *testDriver) awaitNoEndpointSlice(client dynamic.ResourceInterface) {
 	test.AwaitNoResource(client, t.endpoints.Name+"-"+clusterID1)
 }
 
-func (t *testDriver) assertServiceExportCondition(se *mcsv1a1.ServiceExport, expCond *mcsv1a1.ServiceExportCondition) bool {
-	for i := range se.Status.Conditions {
-		actual := &se.Status.Conditions[i]
-		if actual.Type == expCond.Type {
-			out, _ := json.MarshalIndent(actual, "", "  ")
+func assertEquivalentConditions(actual, expected *mcsv1a1.ServiceExportCondition) {
+	out, _ := json.MarshalIndent(actual, "", "  ")
 
-			Expect(actual.Status).To(Equal(expCond.Status), "Actual: %s", out)
-			Expect(actual.LastTransitionTime).To(Not(BeNil()), "Actual: %s", out)
-			Expect(actual.Reason).To(Not(BeNil()), "Actual: %s", out)
-			Expect(*actual.Reason).To(Equal(*expCond.Reason), "Actual: %s", out)
-			Expect(actual.Message).To(Not(BeNil()), "Actual: %s", out)
+	Expect(actual.Status).To(Equal(expected.Status), "Actual: %s", out)
+	Expect(actual.LastTransitionTime).To(Not(BeNil()), "Actual: %s", out)
+	Expect(actual.Reason).To(Not(BeNil()), "Actual: %s", out)
+	Expect(*actual.Reason).To(Equal(*expected.Reason), "Actual: %s", out)
+	Expect(actual.Message).To(Not(BeNil()), "Actual: %s", out)
 
-			if expCond.Message != nil {
-				Expect(*actual.Message).To(Equal(*expCond.Message), "Actual: %s", out)
-			}
-
-			return true
-		}
+	if expected.Message != nil {
+		Expect(*actual.Message).To(Equal(*expected.Message), "Actual: %s", out)
 	}
-
-	return false
 }
 
-func (t *testDriver) toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
+func toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
 	se := &mcsv1a1.ServiceExport{}
 	Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 	return se
 }
 
-func (t *testDriver) awaitServiceExportCondition(expCond *mcsv1a1.ServiceExportCondition) {
-	var found *mcsv1a1.ServiceExport
+func (t *testDriver) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExportCondition) {
+	conditionsEqual := func(actual, expected *mcsv1a1.ServiceExportCondition) bool {
+		return actual != nil && actual.Type == expected.Type && actual.Status == expected.Status &&
+			reflect.DeepEqual(actual.Reason, expected.Reason)
+	}
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		defer GinkgoRecover()
+	actual := make([]*mcsv1a1.ServiceExportCondition, len(expected))
 
-		obj, err := t.cluster1.localServiceExportClient.Get(context.TODO(), t.service.Name, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return false, nil
+	for i := range expected {
+		actual[i] = t.retrieveServiceExportCondition(expected[i].Type)
+		if conditionsEqual(actual[i], expected[i]) {
+			continue
+		}
+
+		condChan := t.cluster1.chanByCondType[expected[i].Type]
+
+		var received *mcsv1a1.ServiceExportCondition
+		nIter := 0
+
+		for received == nil && nIter <= 50 {
+			select {
+			case c := <-condChan:
+				if conditionsEqual(&c, expected[i]) {
+					received = &c
+				}
+			case <-time.After(100 * time.Millisecond):
 			}
 
-			return false, err
+			nIter++
 		}
 
-		found = t.toServiceExport(obj)
-		return t.assertServiceExportCondition(found, expCond), nil
-	})
-
-	if errors.Is(err, wait.ErrWaitTimeout) {
-		if found == nil {
-			Fail("ServiceExport not found")
+		if received == nil {
+			out, _ := json.MarshalIndent(expected[i], "", "  ")
+			Fail(fmt.Sprintf("ServiceExport condition not received. Expected: %s", out))
 		}
 
-		Fail(format.Message(found.Status.Conditions, "to contain", expCond))
-	} else {
-		Expect(err).To(Succeed())
+		actual[i] = received
 	}
+
+	for i := range expected {
+		assertEquivalentConditions(actual[i], expected[i])
+	}
+
+	time.Sleep(time.Millisecond * 100)
+
+	lastCond := expected[len(expected)-1]
+	assertEquivalentConditions(t.retrieveServiceExportCondition(lastCond.Type), lastCond)
 }
 
 func (t *testDriver) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) {
 	Consistently(func() interface{} {
-		obj, err := t.cluster1.localServiceExportClient.Get(context.TODO(), t.service.Name, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		se := &mcsv1a1.ServiceExport{}
-		Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
-
-		for i := range se.Status.Conditions {
-			if se.Status.Conditions[i].Type == condType {
-				return &se.Status.Conditions[i]
-			}
-		}
-
-		return nil
+		return t.retrieveServiceExportCondition(condType)
 	}).Should(BeNil(), "Unexpected ServiceExport status condition")
 }
 
-func (t *testDriver) ensureServiceExportCondition(expCond *mcsv1a1.ServiceExportCondition) {
-	_, informer := cache.NewInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return t.cluster1.localServiceExportClient.List(context.TODO(), options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return t.cluster1.localServiceExportClient.Watch(context.TODO(), options)
-		},
-	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			defer GinkgoRecover()
-			Expect(t.assertServiceExportCondition(t.toServiceExport(obj), expCond)).To(BeTrue())
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			defer GinkgoRecover()
-			Expect(t.assertServiceExportCondition(t.toServiceExport(newObj), expCond)).To(BeTrue())
-		},
-	})
+func (t *testDriver) retrieveServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) *mcsv1a1.ServiceExportCondition {
+	obj, err := t.cluster1.localServiceExportClient.Get(context.TODO(), t.service.Name, metav1.GetOptions{})
+	Expect(err).To(Succeed())
 
-	stopCh := make(chan struct{})
-	go informer.Run(stopCh)
-	Expect(cache.WaitForCacheSync(stopCh, informer.HasSynced)).To(BeTrue())
-
-	time.Sleep(time.Millisecond * 100)
-	close(stopCh)
+	return controller.FindServiceExportStatusCondition(toServiceExport(obj).Status.Conditions, condType)
 }
 
 func (t *testDriver) awaitServiceExported(serviceIP string) {
@@ -679,10 +715,8 @@ func (t *testDriver) awaitServiceExported(serviceIP string) {
 	t.cluster2.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, serviceIP)
 
 	t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-
-	expCond := newServiceExportSyncedCondition(corev1.ConditionTrue, "")
-	t.awaitServiceExportCondition(expCond)
-	t.ensureServiceExportCondition(expCond)
+	t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingSync"),
+		newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
 }
 
 func (t *testDriver) awaitHeadlessServiceImport() {
