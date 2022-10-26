@@ -30,8 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
-	"github.com/submariner-io/lighthouse/coredns/constants"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -199,8 +198,8 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &mcsv1a1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetAnnotations()[lhconstants.OriginName],
-					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+					Name:      si.GetAnnotations()[constants.OriginName],
+					Namespace: si.GetAnnotations()[constants.OriginNamespace],
 				},
 			}
 		})
@@ -210,8 +209,8 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetAnnotations()[lhconstants.OriginName],
-					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+					Name:      si.GetAnnotations()[constants.OriginName],
+					Namespace: si.GetAnnotations()[constants.OriginNamespace],
 				},
 			}
 		})
@@ -350,15 +349,15 @@ func (a *Controller) onLocalServiceImport(obj runtime.Object, _ int, op syncer.O
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	if op == syncer.Delete {
-		a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-			serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+		a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+			serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 			"NoServiceImport", "ServiceImport was deleted")
 
 		return obj, false
 	}
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+		serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 		"AwaitingSync", fmt.Sprintf("ServiceImport %sd - awaiting sync to the broker", op))
 
 	return obj, false
@@ -371,8 +370,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionTrue, "",
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+		serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionTrue, "",
 		"ServiceImport was successfully synced to the broker")
 }
 
@@ -514,8 +513,8 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{
-				lhconstants.OriginName:      name,
-				lhconstants.OriginNamespace: namespace,
+				constants.OriginName:      name,
+				constants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
 				constants.LighthouseLabelSourceName:    name,
