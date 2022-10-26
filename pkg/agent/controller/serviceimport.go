@@ -24,8 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	"github.com/submariner-io/lighthouse/coredns/constants"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -108,8 +107,8 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	}
 
 	annotations := serviceImport.ObjectMeta.Annotations
-	serviceNameSpace := annotations[lhconstants.OriginNamespace]
-	serviceName := annotations[lhconstants.OriginName]
+	serviceNameSpace := annotations[constants.OriginNamespace]
+	serviceName := annotations[constants.OriginName]
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
 		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)

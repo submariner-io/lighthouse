@@ -26,8 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/coredns/constants"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -153,17 +152,17 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 		se := result.(*mcsv1a1.ServiceExport)
 
 		for i := range se.Status.Conditions {
-			if se.Status.Conditions[i].Type == lhconstants.ServiceExportSynced {
+			if se.Status.Conditions[i].Type == constants.ServiceExportSynced {
 				if se.Status.Conditions[i].Status != v1.ConditionTrue {
 					out, _ := json.MarshalIndent(se.Status.Conditions[i], "", "  ")
-					return false, fmt.Sprintf("ServiceExport %s condition status is %s", lhconstants.ServiceExportSynced, out), nil
+					return false, fmt.Sprintf("ServiceExport %s condition status is %s", constants.ServiceExportSynced, out), nil
 				}
 
 				return true, "", nil
 			}
 		}
 
-		return false, fmt.Sprintf("ServiceExport %s condition status not found", lhconstants.ServiceExportSynced), nil
+		return false, fmt.Sprintf("ServiceExport %s condition status not found", constants.ServiceExportSynced), nil
 	})
 }
 

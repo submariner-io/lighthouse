@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/lighthouse/coredns/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
