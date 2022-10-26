@@ -9,7 +9,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/submariner-io/admiral v0.14.0-rc0
-	github.com/submariner-io/lighthouse/coredns v0.14.0-m2
 	github.com/submariner-io/shipyard v0.14.0-rc0
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.25.0
@@ -20,9 +19,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.12.1
 	sigs.k8s.io/mcs-api v0.1.0
 )
-
-// Local submodule
-replace github.com/submariner-io/lighthouse/coredns => ./coredns
 
 require (
 	cloud.google.com/go/compute v1.7.0 // indirect

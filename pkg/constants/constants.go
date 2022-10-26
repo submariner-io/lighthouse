@@ -23,8 +23,14 @@ import (
 )
 
 const (
-	OriginName      = "origin-name"
-	OriginNamespace = "origin-namespace"
+	OriginName                   = "origin-name"
+	OriginNamespace              = "origin-namespace"
+	LighthouseLabelSourceName    = "lighthouse.submariner.io/sourceName"
+	LabelSourceNamespace         = "lighthouse.submariner.io/sourceNamespace"
+	LighthouseLabelSourceCluster = "lighthouse.submariner.io/sourceCluster"
+	LabelValueManagedBy          = "lighthouse-agent.submariner.io"
+	MCSLabelServiceName          = "multicluster.kubernetes.io/service-name"
+	MCSLabelSourceCluster        = "multicluster.kubernetes.io/source-cluster"
 )
 
 const ServiceExportSynced v1alpha1.ServiceExportConditionType = "Synced"

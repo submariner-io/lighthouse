@@ -37,9 +37,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
-	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -287,7 +286,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 
 	c.chanByCondType = map[mcsv1a1.ServiceExportConditionType]chan mcsv1a1.ServiceExportCondition{}
 	c.chanByCondType[mcsv1a1.ServiceExportValid] = make(chan mcsv1a1.ServiceExportCondition, 100)
-	c.chanByCondType[lhconstants.ServiceExportSynced] = make(chan mcsv1a1.ServiceExportCondition, 100)
+	c.chanByCondType[constants.ServiceExportSynced] = make(chan mcsv1a1.ServiceExportCondition, 100)
 }
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
@@ -778,7 +777,7 @@ func newServiceExportValidCondition(status corev1.ConditionStatus, reason string
 
 func newServiceExportSyncedCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
 	return &mcsv1a1.ServiceExportCondition{
-		Type:   lhconstants.ServiceExportSynced,
+		Type:   constants.ServiceExportSynced,
 		Status: status,
 		Reason: &reason,
 	}
