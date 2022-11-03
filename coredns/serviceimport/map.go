@@ -24,7 +24,6 @@ import (
 
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -152,7 +151,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			clusterName := serviceImport.GetLabels()[lhconstants.LighthouseLabelSourceCluster]
+			clusterName := serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster]
 
 			record := &DNSRecord{
 				IP:          serviceImport.Spec.IPs[0],
