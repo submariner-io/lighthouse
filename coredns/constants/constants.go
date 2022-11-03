@@ -21,4 +21,10 @@ package constants
 const (
 	LoadBalancerWeightAnnotationPrefix = "lighthouse-lb-weight.submariner.io"
 	KubernetesServiceName              = "kubernetes.io/service-name"
+	LabelValueManagedBy                = "lighthouse-agent.submariner.io"
+	LabelSourceNamespace               = "lighthouse.submariner.io/sourceNamespace"
+	LighthouseLabelSourceCluster       = "lighthouse.submariner.io/sourceCluster"
+	LighthouseLabelSourceName          = "lighthouse.submariner.io/sourceName"
+	MCSLabelServiceName                = "multicluster.kubernetes.io/service-name"
+	MCSLabelSourceCluster              = "multicluster.kubernetes.io/source-cluster"
 )
