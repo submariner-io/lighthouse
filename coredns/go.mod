@@ -11,16 +11,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/submariner-io/admiral v0.14.0-m2
-	github.com/submariner-io/lighthouse v0.14.0-m1
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.24.4
 	k8s.io/klog/v2 v2.80.1
 	sigs.k8s.io/mcs-api v0.1.0
 )
-
-// Local project
-replace github.com/submariner-io/lighthouse => ../
 
 require (
 	cloud.google.com/go/compute v1.7.0 // indirect
