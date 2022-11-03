@@ -23,9 +23,8 @@ import (
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	coredns "github.com/submariner-io/lighthouse/coredns/constants"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,7 +131,7 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
 				metav1.ListOptions{
 					LabelSelector: labels.Set(map[string]string{
-						coredns.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
+						constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
 					}).String(),
 				})
 			if err != nil {
