@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,7 +62,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 	}
 
 	return func(c *rest.Config) (kubernetes.Interface, error) {
-		return kubernetes.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
+		return kubernetes.NewForConfig(c) //nolint:wrapcheck // Let the caller wrap it.
 	}
 }
 
@@ -76,11 +76,11 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 
 	c.clientSet = clientSet
 	labelMap := map[string]string{
-		discovery.LabelManagedBy: lhconstants.LabelValueManagedBy,
+		discovery.LabelManagedBy: constants.LabelValueManagedBy,
 	}
 	labelSelector := labels.Set(labelMap).String()
 
-	// nolint:wrapcheck // Let the caller wrap these errors.
+	//nolint:wrapcheck // Let the caller wrap these errors.
 	_, c.epsInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {

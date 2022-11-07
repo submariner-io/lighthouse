@@ -30,10 +30,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
 	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1010,7 +1010,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 	return t
 }
 
-// nolint:gocritic // (hugeParam) It's fine to pass 'tc' by value here.
+//nolint:gocritic // (hugeParam) It's fine to pass 'tc' by value here.
 func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case) {
 	code, err := t.lh.ServeDNS(context.TODO(), rec, tc.Msg())
 
@@ -1037,7 +1037,7 @@ func setupEndpointSliceMap() *endpointslice.Map {
 	return esMap
 }
 
-// nolint:unparam // `name` always receives `service1'.
+//nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	portNumber int32, protocol v1.Protocol, siType mcsv1a1.ServiceImportType,
 ) *mcsv1a1.ServiceImport {
@@ -1050,7 +1050,7 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 				"origin-namespace": namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LighthouseLabelSourceCluster: clusterID,
+				constants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
@@ -1074,7 +1074,7 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 	}
 }
 
-// nolint:unparam // `namespace` always receives `namespace1`.
+//nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID, portName string, hostName, endpointIPs []string, portNumber int32,
 	protocol v1.Protocol,
 ) *discovery.EndpointSlice {
@@ -1093,10 +1093,10 @@ func newEndpointSlice(namespace, name, clusterID, portName string, hostName, end
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
-				lhconstants.LabelSourceNamespace:  namespace,
-				lhconstants.MCSLabelSourceCluster: clusterID,
-				lhconstants.MCSLabelServiceName:   name,
+				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: clusterID,
+				constants.MCSLabelServiceName:   name,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

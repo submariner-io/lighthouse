@@ -48,7 +48,7 @@ type Controller struct {
 func NewController(localClusterID string) *Controller {
 	return &Controller{
 		NewClientset: func(c *rest.Config) (kubernetes.Interface, error) {
-			return kubernetes.NewForConfig(c) // nolint:wrapcheck // Let the caller wrap it.
+			return kubernetes.NewForConfig(c) //nolint:wrapcheck // Let the caller wrap it.
 		},
 		stopCh:         make(chan struct{}),
 		localClusterID: localClusterID,
@@ -63,7 +63,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 		return errors.Wrap(err, "error creating client set")
 	}
 
-	// nolint:wrapcheck // Let the caller wrap these errors.
+	//nolint:wrapcheck // Let the caller wrap these errors.
 	c.svcStore, c.svcInformer = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {

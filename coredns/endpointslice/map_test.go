@@ -23,9 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
@@ -143,17 +143,17 @@ var _ = Describe("EndpointSlice Map", func() {
 	})
 })
 
-// nolint:unparam // `namespace` always receives `namespace1`.
+//nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *discovery.EndpointSlice {
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
-				lhconstants.LabelSourceNamespace:  namespace,
-				lhconstants.MCSLabelSourceCluster: clusterID,
-				lhconstants.MCSLabelServiceName:   name,
+				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: clusterID,
+				constants.MCSLabelServiceName:   name,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

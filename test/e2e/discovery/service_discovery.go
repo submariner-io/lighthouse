@@ -520,7 +520,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 		checkedDomains, "", false)
 }
 
-// nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
+//nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
 func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	domains []string, clusterName string, withPort, shouldContain bool,
 ) {

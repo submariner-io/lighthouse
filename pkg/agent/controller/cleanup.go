@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +61,7 @@ func (a *Controller) Cleanup() error {
 	// Delete all local ServiceImports from the broker.
 	err = deleteResources(a.serviceImportSyncer.GetBrokerClient().Resource(serviceImportGVR), a.serviceImportSyncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
-			LabelSelector: labels.Set(map[string]string{lhconstants.LighthouseLabelSourceCluster: a.clusterID}).String(),
+			LabelSelector: labels.Set(map[string]string{constants.LighthouseLabelSourceCluster: a.clusterID}).String(),
 		})
 	if err != nil {
 		return errors.Wrap(err, "error deleting remote ServiceImports")
@@ -72,7 +72,7 @@ func (a *Controller) Cleanup() error {
 	err = deleteResources(a.endpointSliceSyncer.GetLocalClient().Resource(endpointSliceGVR), metav1.NamespaceAll,
 		&metav1.ListOptions{
 			FieldSelector: fields.OneTermNotEqualSelector("metadata.namespace", a.serviceImportSyncer.GetBrokerNamespace()).String(),
-			LabelSelector: labels.Set(map[string]string{discovery.LabelManagedBy: lhconstants.LabelValueManagedBy}).String(),
+			LabelSelector: labels.Set(map[string]string{discovery.LabelManagedBy: constants.LabelValueManagedBy}).String(),
 		})
 	if err != nil {
 		return errors.Wrap(err, "error deleting local EndpointSlices")
@@ -81,7 +81,7 @@ func (a *Controller) Cleanup() error {
 	// Delete all local EndpointSlices from the broker.
 	err = deleteResources(a.endpointSliceSyncer.GetBrokerClient().Resource(endpointSliceGVR), a.endpointSliceSyncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
-			LabelSelector: labels.Set(map[string]string{lhconstants.MCSLabelSourceCluster: a.clusterID}).String(),
+			LabelSelector: labels.Set(map[string]string{constants.MCSLabelSourceCluster: a.clusterID}).String(),
 		})
 
 	return errors.Wrap(err, "error deleting remote EndpointSlices")
@@ -90,13 +90,13 @@ func (a *Controller) Cleanup() error {
 func deleteResources(client dynamic.NamespaceableResourceInterface, ns string, options *metav1.ListOptions) error {
 	list, err := client.Namespace(ns).List(context.TODO(), *options)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return err // nolint:wrapcheck // Let the caller wrap
+		return err //nolint:wrapcheck // Let the caller wrap
 	}
 
 	for i := range list.Items {
 		err = client.Namespace(list.Items[i].GetNamespace()).Delete(context.TODO(), list.Items[i].GetName(), metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err // nolint:wrapcheck // Let the caller wrap
+			return err //nolint:wrapcheck // Let the caller wrap
 		}
 	}
 

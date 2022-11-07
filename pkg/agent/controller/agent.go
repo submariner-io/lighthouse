@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +41,7 @@ import (
 	validations "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -56,7 +56,9 @@ type AgentConfig struct {
 	ServiceExportCounterName string
 }
 
-// nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
+var logger = log.Logger{Logger: logf.Log.WithName("agent")}
+
+//nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
 	syncerMetricNames AgentConfig,
 ) (*Controller, error) {
@@ -170,7 +172,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
-	klog.Info("Starting Agent controller")
+	logger.Info("Starting Agent controller")
 
 	if err := a.serviceExportSyncer.Start(stopCh); err != nil {
 		return errors.Wrap(err, "error starting ServiceExport syncer")
@@ -196,8 +198,8 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &mcsv1a1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetAnnotations()[lhconstants.OriginName],
-					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+					Name:      si.GetAnnotations()[constants.OriginName],
+					Namespace: si.GetAnnotations()[constants.OriginNamespace],
 				},
 			}
 		})
@@ -207,14 +209,14 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetAnnotations()[lhconstants.OriginName],
-					Namespace: si.GetAnnotations()[lhconstants.OriginNamespace],
+					Name:      si.GetAnnotations()[constants.OriginName],
+					Namespace: si.GetAnnotations()[constants.OriginNamespace],
 				},
 			}
 		})
 	})
 
-	klog.Info("Agent controller started")
+	logger.Info("Agent controller started")
 
 	return nil
 }
@@ -222,7 +224,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 func (a *Controller) serviceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
 	siList, err := a.serviceImportSyncer.ListLocalResources(&mcsv1a1.ServiceImport{})
 	if err != nil {
-		klog.Errorf("Error listing serviceImports: %v", err)
+		logger.Error(err, "Error listing serviceImports")
 		return nil
 	}
 
@@ -240,7 +242,7 @@ func (a *Controller) serviceImportLister(transform func(si *mcsv1a1.ServiceImpor
 func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	svcExport := obj.(*mcsv1a1.ServiceExport)
 
-	klog.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
+	logger.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
 
 	if op == syncer.Delete {
 		return a.newServiceImport(svcExport.Name, svcExport.Namespace), false
@@ -251,13 +253,13 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		// some other error. Log and requeue
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionUnknown,
 			"ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err))
-		klog.Errorf("Error retrieving Service (%s/%s): %v", svcExport.Namespace, svcExport.Name, err)
+		logger.Errorf(err, "Error retrieving Service %s/%s", svcExport.Namespace, svcExport.Name)
 
 		return nil, true
 	}
 
 	if !found {
-		klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
+		logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			serviceUnavailable, "Service to be exported doesn't exist")
 
@@ -271,7 +273,14 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	if !ok {
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type))
-		klog.Errorf("Service type %q not supported", svc.Spec.Type)
+		logger.Errorf(nil, "Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
+
+		err = a.serviceImportSyncer.GetLocalFederator().Delete(a.newServiceImport(svcExport.Name, svcExport.Namespace))
+		if err == nil || apierrors.IsNotFound(err) {
+			return nil, false
+		}
+
+		logger.Errorf(nil, "Error deleting ServiceImport for Service (%s/%s)", svcExport.Namespace, svcExport.Name)
 
 		return nil, true
 	}
@@ -296,7 +305,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		if a.globalnetEnabled {
 			ip, reason, msg := a.getGlobalIP(svc)
 			if ip == "" {
-				klog.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet", svcExport.Namespace, svcExport.Name)
+				logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
+					svcExport.Namespace, svcExport.Name)
 				// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
 				a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid,
 					corev1.ConditionFalse, reason, msg)
@@ -318,7 +328,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionTrue, "", "")
 
-	klog.V(log.DEBUG).Infof("Returning ServiceImport: %#v", serviceImport)
+	logger.V(log.DEBUG).Infof("Returning ServiceImport : %#v", serviceImport)
 
 	return serviceImport, false
 }
@@ -339,15 +349,15 @@ func (a *Controller) onLocalServiceImport(obj runtime.Object, _ int, op syncer.O
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	if op == syncer.Delete {
-		a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-			serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+		a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+			serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 			"NoServiceImport", "ServiceImport was deleted")
 
 		return obj, false
 	}
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionFalse,
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+		serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 		"AwaitingSync", fmt.Sprintf("ServiceImport %sd - awaiting sync to the broker", op))
 
 	return obj, false
@@ -360,14 +370,14 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[lhconstants.OriginName],
-		serviceImport.GetAnnotations()[lhconstants.OriginNamespace], lhconstants.ServiceExportSynced, corev1.ConditionTrue, "",
+	a.updateExportedServiceStatus(serviceImport.GetAnnotations()[constants.OriginName],
+		serviceImport.GetAnnotations()[constants.OriginNamespace], constants.ServiceExportSynced, corev1.ConditionTrue, "",
 		"ServiceImport was successfully synced to the broker")
 }
 
 func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
-	oldValidCond := findServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
-	newValidCond := findServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	oldValidCond := FindServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	newValidCond := FindServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 
 	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == corev1.ConditionFalse {
 		return true
@@ -376,7 +386,7 @@ func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructur
 	return false
 }
 
-func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
+func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportCondition,
 	condType mcsv1a1.ServiceExportConditionType,
 ) *mcsv1a1.ServiceExportCondition {
 	for i := range conditions {
@@ -389,8 +399,8 @@ func findServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
-	if op != syncer.Delete {
-		// Ignore create/update
+	if op == syncer.Create {
+		// Ignore create
 		return nil, false
 	}
 
@@ -399,13 +409,17 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	obj, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
-		klog.Errorf("Error retrieving ServiceExport for Service (%s/%s): %v", svc.Namespace, svc.Name, err)
+		logger.Errorf(err, "Error retrieving ServiceExport for Service (%s/%s)", svc.Namespace, svc.Name)
 		return nil, true
 	}
 
 	if !found {
 		// Service Export not created yet
 		return nil, false
+	}
+
+	if op == syncer.Update {
+		return a.serviceExportToServiceImport(obj, numRequeues, op)
 	}
 
 	svcExport := obj.(*mcsv1a1.ServiceExport)
@@ -422,13 +436,13 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 func (a *Controller) updateExportedServiceStatus(name, namespace string, condType mcsv1a1.ServiceExportConditionType,
 	status corev1.ConditionStatus, reason, msg string,
 ) {
-	klog.V(log.DEBUG).Infof("updateExportedServiceStatus for (%s/%s) - Type: %q, Status: %q, Reason: %q, Message: %q",
+	logger.V(log.DEBUG).Infof("updateExportedServiceStatus for (%s/%s) - Type: %q, Status: %q, Reason: %q, Message: %q",
 		namespace, name, condType, status, reason, msg)
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		toUpdate, err := a.getServiceExport(name, namespace)
 		if apierrors.IsNotFound(err) {
-			klog.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
+			logger.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
 		} else if err != nil {
 			return err
@@ -443,11 +457,11 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 			Message:            &msg,
 		}
 
-		prevCond := findServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
+		prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
 		if prevCond == nil {
 			toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, newCondition)
 		} else if serviceExportConditionEqual(prevCond, &newCondition) {
-			klog.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
+			logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 				namespace, name, toUpdate.Status.Conditions[0])
 			return nil
 		} else {
@@ -465,7 +479,7 @@ func (a *Controller) updateExportedServiceStatus(name, namespace string, condTyp
 	})
 
 	if retryErr != nil {
-		klog.Errorf("Error updating status for ServiceExport (%s/%s): %+v", namespace, name, retryErr)
+		logger.Errorf(retryErr, "Error updating status for ServiceExport (%s/%s)", namespace, name)
 	}
 }
 
@@ -499,13 +513,13 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 		ObjectMeta: metav1.ObjectMeta{
 			Name: a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{
-				lhconstants.OriginName:      name,
-				lhconstants.OriginNamespace: namespace,
+				constants.OriginName:      name,
+				constants.OriginNamespace: namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LighthouseLabelSourceName:    name,
-				lhconstants.LabelSourceNamespace:         namespace,
-				lhconstants.LighthouseLabelSourceCluster: a.clusterID,
+				constants.LighthouseLabelSourceName:    name,
+				constants.LabelSourceNamespace:         namespace,
+				constants.LighthouseLabelSourceCluster: a.clusterID,
 			},
 		},
 	}
@@ -531,7 +545,7 @@ func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 
 func (a *Controller) remoteEndpointSliceToLocal(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[lhconstants.LabelSourceNamespace]
+	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
 
 	return endpointSlice, false
 }
@@ -540,7 +554,7 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	labels := endpointSlice.GetObjectMeta().GetLabels()
 
-	if labels[discovery.LabelManagedBy] != lhconstants.LabelValueManagedBy {
+	if labels[discovery.LabelManagedBy] != constants.LabelValueManagedBy {
 		return nil, false
 	}
 

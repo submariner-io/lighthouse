@@ -23,8 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -143,7 +143,7 @@ func testLifecycleNotifications() {
 	})
 }
 
-// nolint:unparam // `name` always receives `service1'.
+//nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
@@ -154,7 +154,7 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.Ser
 				"origin-namespace": namespace,
 			},
 			Labels: map[string]string{
-				lhconstants.LighthouseLabelSourceCluster: clusterID,
+				constants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{

@@ -23,8 +23,8 @@ import (
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,11 +128,12 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		retryErr := retry.OnError(retry.DefaultBackoff, func(err error) bool {
 			return !apierrors.IsNotFound(err)
 		}, func() error {
-			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: labels.Set(map[string]string{
-					constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
-				}).String(),
-			})
+			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
+				metav1.ListOptions{
+					LabelSelector: labels.Set(map[string]string{
+						constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
+					}).String(),
+				})
 			if err != nil {
 				return err
 			}
@@ -147,7 +148,8 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 			return nil
 		})
 		if retryErr != nil {
-			klog.Errorf("Error finding local endpoint slice for service (%s/%s): %+v", es.Labels[constants.LabelSourceNamespace], es.Labels[constants.MCSLabelServiceName], retryErr)
+			klog.Errorf("Error finding local endpoint slice for service (%s/%s): %+v", es.Labels[constants.LabelSourceNamespace],
+				es.Labels[constants.MCSLabelServiceName], retryErr)
 			return
 		}
 		if localSlice == nil {

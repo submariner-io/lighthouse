@@ -40,7 +40,7 @@ var _ = Describe("ServiceImport syncing", func() {
 	})
 
 	When("a ServiceExport is created", func() {
-		When("the Service already exists", func() {
+		Context("and the Service already exists", func() {
 			It("should correctly sync a ServiceImport and update the ServiceExport status", func() {
 				t.createService()
 				t.createServiceExport()
@@ -48,7 +48,7 @@ var _ = Describe("ServiceImport syncing", func() {
 			})
 		})
 
-		When("the Service doesn't initially exist", func() {
+		Context("and the Service doesn't initially exist", func() {
 			It("should initially update the ServiceExport status to Initialized and eventually sync a ServiceImport", func() {
 				t.createServiceExport()
 				t.awaitServiceUnavailableStatus()
@@ -86,6 +86,21 @@ var _ = Describe("ServiceImport syncing", func() {
 		})
 	})
 
+	When("the type of an exported Service is updated to an unsupported type", func() {
+		It("should delete the ServiceImport and update the ServiceExport status", func() {
+			t.createService()
+			t.createServiceExport()
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
+
+			t.service.Spec.Type = corev1.ServiceTypeNodePort
+			t.updateService()
+
+			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+			t.awaitServiceUnexported()
+			t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+		})
+	})
+
 	When("the ServiceImport sync initially fails", func() {
 		BeforeEach(func() {
 			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("mock create error")
@@ -103,17 +118,31 @@ var _ = Describe("ServiceImport syncing", func() {
 		})
 	})
 
-	When("a ServiceExport is created for a Service whose type is other than ServiceTypeClusterIP", func() {
+	When("a ServiceExport is created for a Service whose type is unsupported", func() {
 		BeforeEach(func() {
 			t.service.Spec.Type = corev1.ServiceTypeNodePort
 		})
 
-		It("should update the ServiceExport status and not sync a ServiceImport", func() {
+		JustBeforeEach(func() {
 			t.createService()
 			t.createServiceExport()
+		})
 
+		It("should update the ServiceExport status appropriately and not sync a ServiceImport", func() {
 			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
 			t.awaitNoServiceImport(t.brokerServiceImportClient)
+			t.ensureNoServiceExportCondition(constants.ServiceExportSynced)
+		})
+
+		Context("and is subsequently updated to a supported type", func() {
+			It("should eventually sync a ServiceImport and update the ServiceExport status appropriately", func() {
+				t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+
+				t.service.Spec.Type = corev1.ServiceTypeClusterIP
+				t.updateService()
+
+				t.awaitServiceExported(t.service.Spec.ClusterIP)
+			})
 		})
 	})
 

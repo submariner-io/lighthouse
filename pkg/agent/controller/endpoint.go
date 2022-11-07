@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	lhconstants "github.com/submariner-io/lighthouse/pkg/constants"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -46,7 +45,7 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	serviceImport *mcsv1a1.ServiceImport, serviceImportNameSpace, serviceName, clusterID string,
 	globalIngressIPCache *globalIngressIPCache,
 ) (*EndpointController, error) {
-	klog.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
+	logger.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
 
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
 
@@ -105,27 +104,27 @@ func (e *EndpointController) cleanup() {
 	// MCS-compliant labels
 	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
-			lhconstants.MCSLabelSourceCluster: e.clusterID,
-			lhconstants.MCSLabelServiceName:   e.serviceName,
+			constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+			constants.MCSLabelSourceCluster: e.clusterID,
+			constants.MCSLabelServiceName:   e.serviceName,
 		}).String(),
 	})
 
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
+		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
 	}
 
 	// Lighthouse-proprietary labels
 	err = resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			lhconstants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
-			lhconstants.LighthouseLabelSourceCluster: e.clusterID,
-			lhconstants.LighthouseLabelSourceName:    e.serviceName,
+			constants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
+			constants.LighthouseLabelSourceCluster: e.clusterID,
+			constants.LighthouseLabelSourceName:    e.serviceName,
 		}).String(),
 	})
 
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting the EndpointSlices associated with serviceImport %q: %v", e.serviceImportName, err)
+		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
 	}
 }
 
@@ -135,7 +134,7 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 	endpointSliceName := endPoints.Name + "-" + e.clusterID
 
 	if op == syncer.Delete {
-		klog.V(log.DEBUG).Infof("Endpoints %s/%s deleted", endPoints.Namespace, endPoints.Name)
+		logger.V(log.DEBUG).Infof("Endpoints %s/%s deleted", endPoints.Namespace, endPoints.Name)
 
 		return &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -146,9 +145,9 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 	}
 
 	if op == syncer.Create {
-		klog.V(log.DEBUG).Infof("Endpoints %s/%s created", endPoints.Namespace, endPoints.Name)
+		logger.V(log.DEBUG).Infof("Endpoints %s/%s created", endPoints.Namespace, endPoints.Name)
 	} else {
-		klog.V(log.TRACE).Infof("Endpoints %s/%s updated", endPoints.Namespace, endPoints.Name)
+		logger.V(log.TRACE).Infof("Endpoints %s/%s updated", endPoints.Namespace, endPoints.Name)
 	}
 
 	return e.endpointSliceFromEndpoints(endPoints, op)
@@ -161,10 +160,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 
 	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
 	endpointSlice.Labels = map[string]string{
-		discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
-		lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
-		lhconstants.MCSLabelSourceCluster: e.clusterID,
-		lhconstants.MCSLabelServiceName:   e.serviceName,
+		discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+		constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+		constants.MCSLabelSourceCluster: e.clusterID,
+		constants.MCSLabelServiceName:   e.serviceName,
 	}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4
@@ -200,9 +199,9 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	}
 
 	if op == syncer.Create {
-		klog.V(log.DEBUG).Infof("Returning EndpointSlice: %#v", endpointSlice)
+		logger.V(log.DEBUG).Infof("Returning EndpointSlice: %#v", endpointSlice)
 	} else {
-		klog.V(log.TRACE).Infof("Returning EndpointSlice: %#v", endpointSlice)
+		logger.V(log.TRACE).Infof("Returning EndpointSlice: %#v", endpointSlice)
 	}
 
 	return endpointSlice, false
@@ -283,7 +282,7 @@ func (e *EndpointController) getIP(address *corev1.EndpointAddress) string {
 		}
 
 		if ip == "" {
-			klog.Infof("GlobalIP for EndpointAddress %q is not allocated yet", address.TargetRef.Name)
+			logger.Infof("GlobalIP for EndpointAddress %q is not allocated yet", address.TargetRef.Name)
 		}
 
 		return ip
