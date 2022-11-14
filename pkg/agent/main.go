@@ -90,7 +90,7 @@ func main() {
 	// we want at least the verbosity level to match what was requested
 	klogFlags := flag.NewFlagSet("klog", flag.ExitOnError)
 	klog.InitFlags(klogFlags)
-	// nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
+	//nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
 	klogFlags.Parse(os.Args[1:])
 
 	logger.Infof("Arguments: %v", os.Args)
