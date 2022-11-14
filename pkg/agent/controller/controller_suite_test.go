@@ -75,7 +75,7 @@ func init() {
 	// set logging verbosity of agent in unit test to DEBUG
 	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
 	kzerolog.AddFlags(flags)
-	// nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
+	//nolint:errcheck // Ignore errors; CommandLine is set for ExitOnError.
 	flags.Parse([]string{"-v=2"})
 	kzerolog.InitK8sLogging()
 
