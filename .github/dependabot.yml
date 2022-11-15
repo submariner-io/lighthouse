@@ -26,9 +26,6 @@ updates:
       interval: daily
     open-pull-requests-limit: 10
     ignore:
-      # K8s dependencies must be handled manually
-      - dependency-name: k8s.io/*
-      - dependency-name: sigs.k8s.io/*
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
   - package-ecosystem: gomod
@@ -37,8 +34,5 @@ updates:
       interval: daily
     open-pull-requests-limit: 10
     ignore:
-      # K8s dependencies must be handled manually
-      - dependency-name: k8s.io/*
-      - dependency-name: sigs.k8s.io/*
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
