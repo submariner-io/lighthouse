@@ -439,7 +439,7 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
 	service *corev1.Service, namespace string, globalIPs []string,
 ) *discovery.EndpointSlice {
-	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+clusterID1)
+	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+endpoints.Namespace+"-"+clusterID1)
 
 	endpointSlice := &discovery.EndpointSlice{}
 	Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
@@ -499,7 +499,7 @@ func (c *cluster) awaitEndpointSlice(t *testDriver) *discovery.EndpointSlice {
 }
 
 func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints, expectedIPs []string) {
-	name := endpoints.Name + "-" + clusterID1
+	name := endpoints.Name + "-" + endpoints.Namespace + "-" + clusterID1
 
 	sort.Strings(expectedIPs)
 
