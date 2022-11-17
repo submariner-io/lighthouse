@@ -132,14 +132,12 @@ func (e *EndpointController) cleanup() {
 func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	endPoints := obj.(*corev1.Endpoints)
 
-	endpointSliceName := endPoints.Name + "-" + e.clusterID
-
 	if op == syncer.Delete {
 		klog.V(log.DEBUG).Infof("Endpoints %s/%s deleted", endPoints.Namespace, endPoints.Name)
 
 		return &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      endpointSliceName,
+				Name:      e.endpointSliceNameFrom(endPoints),
 				Namespace: endPoints.Namespace,
 			},
 		}, false
@@ -159,7 +157,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 ) {
 	endpointSlice := &discovery.EndpointSlice{}
 
-	endpointSlice.Name = endpoints.Name + "-" + e.clusterID
+	endpointSlice.Name = e.endpointSliceNameFrom(endpoints)
 	endpointSlice.Labels = map[string]string{
 		discovery.LabelManagedBy:          lhconstants.LabelValueManagedBy,
 		lhconstants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
@@ -206,6 +204,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	}
 
 	return endpointSlice, false
+}
+
+func (e *EndpointController) endpointSliceNameFrom(endpoints *corev1.Endpoints) string {
+	return endpoints.Name + "-" + endpoints.Namespace + "-" + e.clusterID
 }
 
 func (e *EndpointController) getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType,

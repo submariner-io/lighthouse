@@ -21,7 +21,10 @@ package controller_test
 import (
 	. "github.com/onsi/ginkgo"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -153,6 +156,34 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster2.start(t, *t.syncerConfig)
 
 			t.awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient)
+		})
+	})
+
+	When("a local EndpointSlice with the old naming convention sans namespace exists on startup", func() {
+		epsName := "nginx-" + clusterID1
+
+		JustBeforeEach(func() {
+			eps := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      epsName,
+					Namespace: serviceNamespace,
+					Labels: map[string]string{
+						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+						constants.MCSLabelSourceCluster: clusterID1,
+						constants.MCSLabelServiceName:   "nginx",
+					},
+				},
+			}
+
+			test.CreateResource(t.cluster1.localEndpointSliceClient, eps)
+
+			eps.Namespace = test.RemoteNamespace
+			test.CreateResource(t.brokerEndpointSliceClient, test.SetClusterIDLabel(eps, clusterID1))
+		})
+
+		It("should delete it", func() {
+			test.AwaitNoResource(t.cluster1.localEndpointSliceClient, epsName)
+			test.AwaitNoResource(t.brokerEndpointSliceClient, epsName)
 		})
 	})
 })
