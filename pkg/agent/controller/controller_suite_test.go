@@ -361,16 +361,33 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	}
 }
 
+func findServiceImport(client dynamic.ResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
+	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	Expect(err).To(Succeed())
+
+	for i := range list.Items {
+		if list.Items[i].GetAnnotations()[constants.OriginName] == name &&
+			list.Items[i].GetAnnotations()[constants.OriginNamespace] == namespace {
+			serviceImport := &mcsv1a1.ServiceImport{}
+			Expect(scheme.Scheme.Convert(&list.Items[i], serviceImport, nil)).To(Succeed())
+
+			return serviceImport
+		}
+	}
+
+	return nil
+}
+
 func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Service, sType mcsv1a1.ServiceImportType,
 	serviceIP string,
 ) *mcsv1a1.ServiceImport {
-	obj := test.AwaitResource(client, service.Name+"-"+service.Namespace+"-"+clusterID1)
+	var serviceImport *mcsv1a1.ServiceImport
 
-	serviceImport := &mcsv1a1.ServiceImport{}
-	Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+	Eventually(func() *mcsv1a1.ServiceImport {
+		serviceImport = findServiceImport(client, service.Namespace, service.Name)
+		return serviceImport
+	}, 5*time.Second).ShouldNot(BeNil(), "ServiceImport not found")
 
-	Expect(serviceImport.GetAnnotations()["origin-name"]).To(Equal(service.Name))
-	Expect(serviceImport.GetAnnotations()["origin-namespace"]).To(Equal(service.Namespace))
 	Expect(serviceImport.Spec.Type).To(Equal(sType))
 
 	Expect(serviceImport.Status.Clusters).To(HaveLen(1))
@@ -403,16 +420,11 @@ func (c *cluster) awaitServiceImport(service *corev1.Service, sType mcsv1a1.Serv
 }
 
 func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1.Service, serviceIP string) {
-	name := service.Name + "-" + service.Namespace + "-" + clusterID1
-
 	var serviceImport *mcsv1a1.ServiceImport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		serviceImport = &mcsv1a1.ServiceImport{}
-		Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+		serviceImport = findServiceImport(client, service.Namespace, service.Name)
+		Expect(serviceImport).ToNot(BeNil())
 
 		if serviceIP == "" {
 			return len(serviceImport.Spec.IPs) == 0, nil
@@ -436,20 +448,44 @@ func (c *cluster) awaitUpdatedServiceImport(service *corev1.Service, serviceIP s
 	awaitUpdatedServiceImport(c.localServiceImportClient, service, serviceIP)
 }
 
-func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
-	service *corev1.Service, namespace string, globalIPs []string,
-) *discovery.EndpointSlice {
-	obj := test.AwaitResource(endpointSliceClient, endpoints.Name+"-"+endpoints.Namespace+"-"+clusterID1)
+func findEndpointSlice(client dynamic.ResourceInterface, namespace, name string) *discovery.EndpointSlice {
+	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	Expect(err).To(Succeed())
 
-	endpointSlice := &discovery.EndpointSlice{}
-	Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
+	for i := range list.Items {
+		if list.Items[i].GetLabels()[constants.MCSLabelServiceName] == name &&
+			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace {
+			endpointSlice := &discovery.EndpointSlice{}
+			Expect(scheme.Scheme.Convert(&list.Items[i], endpointSlice, nil)).To(Succeed())
+
+			return endpointSlice
+		}
+	}
+
+	return nil
+}
+
+func awaitEndpointSlice(client dynamic.ResourceInterface, namespace, name string) *discovery.EndpointSlice {
+	var endpointSlice *discovery.EndpointSlice
+
+	Eventually(func() *discovery.EndpointSlice {
+		endpointSlice = findEndpointSlice(client, namespace, name)
+		return endpointSlice
+	}, 5*time.Second).ShouldNot(BeNil(), "EndpointSlice not found")
+
+	return endpointSlice
+}
+
+func awaitAndVerifyEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints,
+	namespace string, globalIPs []string,
+) *discovery.EndpointSlice {
+	endpointSlice := awaitEndpointSlice(endpointSliceClient, endpoints.Namespace, endpoints.Name)
+
 	Expect(endpointSlice.Namespace).To(Equal(namespace))
 
 	labels := endpointSlice.GetLabels()
 	Expect(labels).To(HaveKeyWithValue(discovery.LabelManagedBy, constants.LabelValueManagedBy))
-	Expect(labels).To(HaveKeyWithValue(constants.LabelSourceNamespace, service.Namespace))
 	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelSourceCluster, clusterID1))
-	Expect(labels).To(HaveKeyWithValue(constants.MCSLabelServiceName, service.Name))
 
 	Expect(endpointSlice.AddressType).To(Equal(discovery.AddressTypeIPv4))
 
@@ -495,22 +531,17 @@ func awaitEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints
 }
 
 func (c *cluster) awaitEndpointSlice(t *testDriver) *discovery.EndpointSlice {
-	return awaitEndpointSlice(c.localEndpointSliceClient, t.endpoints, t.service, t.service.Namespace, t.endpointGlobalIPs)
+	return awaitAndVerifyEndpointSlice(c.localEndpointSliceClient, t.endpoints, t.service.Namespace, t.endpointGlobalIPs)
 }
 
 func awaitUpdatedEndpointSlice(endpointSliceClient dynamic.ResourceInterface, endpoints *corev1.Endpoints, expectedIPs []string) {
-	name := endpoints.Name + "-" + endpoints.Namespace + "-" + clusterID1
-
 	sort.Strings(expectedIPs)
 
 	var actualIPs []string
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := endpointSliceClient.Get(context.TODO(), name, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		endpointSlice := &discovery.EndpointSlice{}
-		Expect(scheme.Scheme.Convert(obj, endpointSlice, nil)).To(Succeed())
+		endpointSlice := findEndpointSlice(endpointSliceClient, endpoints.Namespace, endpoints.Name)
+		Expect(endpointSlice).ToNot(BeNil())
 
 		actualIPs = nil
 		for _, ep := range endpointSlice.Endpoints {
@@ -542,7 +573,7 @@ func (t *testDriver) awaitBrokerServiceImport(sType mcsv1a1.ServiceImportType, s
 }
 
 func (t *testDriver) awaitBrokerEndpointSlice() *discovery.EndpointSlice {
-	return awaitEndpointSlice(t.brokerEndpointSliceClient, t.endpoints, t.service, test.RemoteNamespace, t.endpointGlobalIPs)
+	return awaitAndVerifyEndpointSlice(t.brokerEndpointSliceClient, t.endpoints, test.RemoteNamespace, t.endpointGlobalIPs)
 }
 
 func (t *testDriver) awaitUpdatedServiceImport(serviceIP string) {
@@ -592,7 +623,23 @@ func (t *testDriver) updateEndpoints() {
 }
 
 func (t *testDriver) dynamicEndpointsClient() dynamic.ResourceInterface {
-	return t.cluster1.localDynClient.Resource(schema.GroupVersionResource{Version: "v1", Resource: "endpoints"}).Namespace(t.service.Namespace)
+	return dynamicEndpointsClient(t.cluster1.localDynClient, t.service.Namespace)
+}
+
+func dynamicEndpointsClient(client dynamic.Interface, namespace string) dynamic.ResourceInterface {
+	return client.Resource(corev1.SchemeGroupVersion.WithResource("endpoints")).Namespace(namespace)
+}
+
+func serviceExportClient(client dynamic.Interface, namespace string) dynamic.ResourceInterface {
+	return client.Resource(schema.GroupVersionResource{
+		Group:    mcsv1a1.GroupVersion.Group,
+		Version:  mcsv1a1.GroupVersion.Version,
+		Resource: "serviceexports",
+	}).Namespace(namespace)
+}
+
+func endpointSliceClient(client dynamic.Interface, namespace string) dynamic.ResourceInterface {
+	return client.Resource(discovery.SchemeGroupVersion.WithResource("endpointslices")).Namespace(namespace)
 }
 
 func (t *testDriver) createServiceExport() {
