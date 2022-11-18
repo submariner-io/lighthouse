@@ -20,7 +20,9 @@ package controller_test
 
 import (
 	. "github.com/onsi/ginkgo"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -142,6 +144,57 @@ var _ = Describe("ServiceImport syncing", func() {
 			t.createService()
 			t.createServiceExport()
 			t.awaitServiceExported(t.service.Spec.ClusterIP)
+		})
+	})
+
+	When("two Services with the same name in different namespaces are exported", func() {
+		It("should sync ServiceImport and EndpointSlice resources for each", func() {
+			t.createEndpoints()
+			t.createService()
+			t.createServiceExport()
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.awaitEndpointSlice()
+
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      t.service.Name,
+					Namespace: "other-service-ns",
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.253.9.2",
+				},
+			}
+
+			serviceExport := &mcsv1a1.ServiceExport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service.Name,
+					Namespace: service.Namespace,
+				},
+			}
+
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service.Name,
+					Namespace: service.Namespace,
+				},
+			}
+
+			test.CreateResource(dynamicEndpointsClient(t.cluster1.localDynClient, endpoints.Namespace), endpoints)
+			test.CreateResource(t.cluster1.dynamicServiceClient().Namespace(service.Namespace), service)
+			test.CreateResource(serviceExportClient(t.cluster1.localDynClient, service.Namespace), serviceExport)
+
+			t.cluster1.awaitServiceImport(service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
+			awaitServiceImport(t.brokerServiceImportClient, service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
+			t.cluster2.awaitServiceImport(service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
+
+			awaitEndpointSlice(endpointSliceClient(t.cluster1.localDynClient, service.Namespace), endpoints.Namespace, endpoints.Name)
+			awaitEndpointSlice(t.brokerEndpointSliceClient, endpoints.Namespace, endpoints.Name)
+			awaitEndpointSlice(endpointSliceClient(t.cluster2.localDynClient, service.Namespace), endpoints.Namespace, endpoints.Name)
+
+			// Ensure the resources for the first Service weren't overwritten
+			t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+			t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+			t.awaitEndpointSlice()
 		})
 	})
 })

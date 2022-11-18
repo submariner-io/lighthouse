@@ -504,14 +504,14 @@ func (a *Controller) filterLocalEndpointSlices(obj runtime.Object, numRequeues i
 		return nil, false
 	}
 
-	oldName := labels[constants.MCSLabelServiceName] + "-" + labels[constants.MCSLabelSourceCluster]
+	oldName := labels[lhconstants.MCSLabelServiceName] + "-" + labels[lhconstants.MCSLabelSourceCluster]
 	if op != syncer.Delete && endpointSlice.Name == oldName {
-		logger.Infof("EndpointSlice %s/%s has the old naming convention sans namespace - deleting it",
+		klog.Infof("EndpointSlice %s/%s has the old naming convention sans namespace - deleting it",
 			endpointSlice.Namespace, endpointSlice.Name)
 
 		err := a.endpointSliceSyncer.GetLocalFederator().Delete(endpointSlice)
 		if err != nil {
-			logger.Errorf(err, "Error deleting local EndpointSlice %s/%s", endpointSlice.Namespace, endpointSlice.Name)
+			klog.Errorf("Error deleting local EndpointSlice %s/%s: %v", endpointSlice.Namespace, endpointSlice.Name, err)
 		}
 
 		return nil, false
