@@ -527,7 +527,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 	ports := service.Spec.Ports
 	for i := range domains {
 		for _, port := range ports {
-			cmd := []string{"dig", "+short", "SRV"}
+			cmd := []string{"dig", "+short", "+timeout=20", "SRV"}
 
 			clusterDNSName := service.Name + "." + f.Namespace + ".svc." + domains[i]
 
@@ -592,7 +592,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, serviceName string, serviceIPList []string,
 	targetPod *corev1.PodList, domains []string,
 ) {
-	cmd := []string{"dig", "+short"}
+	cmd := []string{"dig", "+short", "+timeout=20"}
 
 	for i := range domains {
 		cmd = append(cmd, serviceName+"."+f.Namespace+".svc."+domains[i])

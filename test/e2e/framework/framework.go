@@ -570,7 +570,7 @@ func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.C
 func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	domains []string, clusterName, serviceIP string, shouldContain bool,
 ) {
-	cmd := []string{"dig", "+short"}
+	cmd := []string{"dig", "+short", "+timeout=20"}
 
 	var clusterDNSName string
 	if clusterName != "" {
@@ -619,7 +619,7 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool,
 ) {
-	cmd := []string{"dig", "+short"}
+	cmd := []string{"dig", "+short", "+timeout=20"}
 
 	var clusterDNSName string
 	if clusterName != "" {
