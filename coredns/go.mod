@@ -11,14 +11,13 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
-	github.com/submariner-io/admiral v0.13.1
+	github.com/submariner-io/admiral v0.13.2
 	github.com/submariner-io/lighthouse v0.13.0
 	golang.org/x/text v0.3.9-0.20221014173359-1bdb400fb39a // indirect
 	k8s.io/api v0.21.11
 	k8s.io/apimachinery v0.21.11
 	k8s.io/client-go v0.21.11
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	sigs.k8s.io/mcs-api v0.1.0
 )
 
