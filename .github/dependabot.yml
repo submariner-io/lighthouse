@@ -23,16 +23,14 @@ updates:
   - package-ecosystem: gomod
     directory: "/"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 10
+      interval: weekly
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
   - package-ecosystem: gomod
     directory: "/coredns"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 10
+      interval: weekly
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
