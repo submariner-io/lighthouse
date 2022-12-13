@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.24.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/submariner-io/admiral v0.14.0-m2.0.20221205165210-aed71a242c58
+	github.com/submariner-io/admiral v0.15.0-m0
 	github.com/submariner-io/shipyard v0.15.0-m0
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.26.0
@@ -71,7 +71,7 @@ require (
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
-	golang.org/x/time v0.2.0 // indirect
+	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
