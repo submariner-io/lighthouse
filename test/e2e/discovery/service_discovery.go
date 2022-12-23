@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
