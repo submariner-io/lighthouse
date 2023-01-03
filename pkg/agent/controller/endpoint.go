@@ -51,7 +51,6 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 
 	controller := &EndpointController{
 		clusterID:                    clusterID,
-		serviceImportUID:             serviceImport.UID,
 		serviceImportName:            serviceImport.Name,
 		serviceImportSourceNameSpace: serviceImportNameSpace,
 		serviceName:                  serviceName,
