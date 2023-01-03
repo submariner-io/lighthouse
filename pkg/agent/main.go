@@ -35,7 +35,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -106,9 +105,6 @@ func main() {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	exitOnError(err, "Error building kubeconfig")
 
-	kubeClientSet, err := kubernetes.NewForConfig(cfg)
-	exitOnError(err, "Error building clientset")
-
 	restMapper, err := util.BuildRestMapper(cfg)
 	exitOnError(err, "Error building rest mapper")
 
@@ -125,11 +121,10 @@ func main() {
 		LocalClient:     localClient,
 		RestMapper:      restMapper,
 		Scheme:          scheme.Scheme,
-	}, kubeClientSet,
-		controller.AgentConfig{
-			ServiceImportCounterName: "submariner_service_import",
-			ServiceExportCounterName: "submariner_service_export",
-		})
+	}, controller.AgentConfig{
+		ServiceImportCounterName: "submariner_service_import",
+		ServiceExportCounterName: "submariner_service_export",
+	})
 	exitOnError(err, "Failed to create lighthouse agent")
 
 	if agentSpec.Uninstall {

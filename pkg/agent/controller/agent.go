@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -59,9 +58,7 @@ type AgentConfig struct {
 var logger = log.Logger{Logger: logf.Log.WithName("agent")}
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet kubernetes.Interface,
-	syncerMetricNames AgentConfig,
-) (*Controller, error) {
+func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricNames AgentConfig) (*Controller, error) {
 	if errs := validations.IsDNS1123Label(spec.ClusterID); len(errs) > 0 {
 		return nil, errors.Errorf("%s is not a valid ClusterID %v", spec.ClusterID, errs)
 	}
@@ -70,7 +67,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, kubeClientSet
 		clusterID:        spec.ClusterID,
 		namespace:        spec.Namespace,
 		globalnetEnabled: spec.GlobalnetEnabled,
-		kubeClientSet:    kubeClientSet,
 	}
 
 	_, gvr, err := util.ToUnstructuredResource(&mcsv1a1.ServiceExport{}, syncerConf.RestMapper)
