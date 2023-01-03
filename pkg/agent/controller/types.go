@@ -28,14 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 type Controller struct {
 	clusterID               string
 	globalnetEnabled        bool
 	namespace               string
-	kubeClientSet           kubernetes.Interface
 	serviceExportClient     dynamic.NamespaceableResourceInterface
 	serviceExportSyncer     syncer.Interface
 	serviceImportSyncer     *broker.Syncer
