@@ -149,11 +149,9 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.Ser
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name + "-" + namespace + "-" + clusterID,
 			Namespace: namespace,
-			Annotations: map[string]string{
-				"origin-name":      name,
-				"origin-namespace": namespace,
-			},
 			Labels: map[string]string{
+				constants.LighthouseLabelSourceName:    name,
+				constants.LabelSourceNamespace:         namespace,
 				constants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},

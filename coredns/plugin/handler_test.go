@@ -1045,11 +1045,9 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Annotations: map[string]string{
-				"origin-name":      name,
-				"origin-namespace": namespace,
-			},
 			Labels: map[string]string{
+				constants.LighthouseLabelSourceName:    name,
+				constants.LabelSourceNamespace:         namespace,
 				constants.LighthouseLabelSourceCluster: clusterID,
 			},
 		},
