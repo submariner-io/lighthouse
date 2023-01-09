@@ -132,8 +132,8 @@ func NewMap(localClusterID string) *Map {
 }
 
 func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Annotations["origin-name"]; ok {
-		namespace := serviceImport.Annotations["origin-namespace"]
+	if name, ok := serviceImport.Labels[constants.LighthouseLabelSourceName]; ok {
+		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
 		key := keyFunc(namespace, name)
 
 		m.mutex.Lock()
@@ -175,8 +175,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Annotations["origin-name"]; ok {
-		namespace := serviceImport.Annotations["origin-namespace"]
+	if name, ok := serviceImport.Labels[constants.LighthouseLabelSourceName]; ok {
+		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
 		key := keyFunc(namespace, name)
 
 		m.mutex.Lock()

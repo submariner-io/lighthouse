@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	OriginName                   = "origin-name"
-	OriginNamespace              = "origin-namespace"
 	LighthouseLabelSourceName    = "lighthouse.submariner.io/sourceName"
 	LabelSourceNamespace         = "lighthouse.submariner.io/sourceNamespace"
 	LighthouseLabelSourceCluster = "lighthouse.submariner.io/sourceCluster"

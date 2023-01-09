@@ -106,9 +106,8 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 		return false
 	}
 
-	annotations := serviceImport.ObjectMeta.Annotations
-	serviceNameSpace := annotations[constants.OriginNamespace]
-	serviceName := annotations[constants.OriginName]
+	serviceNameSpace := serviceImport.Labels[constants.LabelSourceNamespace]
+	serviceName := serviceImport.Labels[constants.LighthouseLabelSourceName]
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
 		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)

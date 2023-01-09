@@ -358,8 +358,8 @@ func findServiceImport(client dynamic.ResourceInterface, namespace, name string)
 	Expect(err).To(Succeed())
 
 	for i := range list.Items {
-		if list.Items[i].GetAnnotations()[constants.OriginName] == name &&
-			list.Items[i].GetAnnotations()[constants.OriginNamespace] == namespace {
+		if list.Items[i].GetLabels()[constants.LighthouseLabelSourceName] == name &&
+			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace {
 			serviceImport := &mcsv1a1.ServiceImport{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], serviceImport, nil)).To(Succeed())
 
