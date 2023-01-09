@@ -113,19 +113,6 @@ func (e *EndpointController) cleanup() {
 	if err != nil && !apierrors.IsNotFound(err) {
 		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
 	}
-
-	// Lighthouse-proprietary labels
-	err = resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			constants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
-			constants.LighthouseLabelSourceCluster: e.clusterID,
-			constants.LighthouseLabelSourceName:    e.serviceName,
-		}).String(),
-	})
-
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
-	}
 }
 
 func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
