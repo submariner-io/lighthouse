@@ -112,11 +112,6 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 
 	cluster, ok := es.Labels[constants.MCSLabelSourceCluster]
 
-	// Remove this after 0.12 (this handles old map entries with pre-MCS labels)
-	if !ok {
-		cluster, ok = es.Labels[constants.LighthouseLabelSourceCluster]
-	}
-
 	if !ok {
 		klog.Warningf("Cluster label missing on %#v", es.ObjectMeta)
 		return
@@ -229,11 +224,6 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 	key, ok := getKey(es)
 	if ok {
 		cluster, ok := es.Labels[constants.MCSLabelSourceCluster]
-
-		// Remove this after 0.12 (this handles old map entries with pre-MCS labels)
-		if !ok {
-			cluster, ok = es.Labels[constants.LighthouseLabelSourceCluster]
-		}
 
 		if !ok {
 			return
