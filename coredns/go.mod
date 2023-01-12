@@ -21,6 +21,10 @@ require (
 // Until coredns is updated for client-go 0.26.0
 replace k8s.io/client-go => k8s.io/client-go v0.25.4
 
+// Until dependencies update to at least v0.3.1 to fix CVE-2022-48195
+// To test if this is needed: remove the replace, run `go mod tidy`, and see if v0.3.1 remains
+replace mellium.im/sasl => mellium.im/sasl v0.3.1
+
 require (
 	cloud.google.com/go/compute v1.7.0 // indirect
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.0.0-20211129110424-6491aa3bf583 // indirect
