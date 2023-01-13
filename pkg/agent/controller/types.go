@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -67,7 +66,6 @@ type ServiceImportController struct {
 // It will create an endpoint slice corresponding to an endpoint object and set the owner references
 // to ServiceImport. The app label from the endpoint will be added to endpoint slice as well.
 type EndpointController struct {
-	serviceImportUID             types.UID
 	clusterID                    string
 	serviceImportName            string
 	serviceName                  string

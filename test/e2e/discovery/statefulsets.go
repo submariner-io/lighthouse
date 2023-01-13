@@ -21,7 +21,7 @@ package discovery
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"

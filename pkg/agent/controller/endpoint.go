@@ -51,7 +51,6 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 
 	controller := &EndpointController{
 		clusterID:                    clusterID,
-		serviceImportUID:             serviceImport.UID,
 		serviceImportName:            serviceImport.Name,
 		serviceImportSourceNameSpace: serviceImportNameSpace,
 		serviceName:                  serviceName,
@@ -107,19 +106,6 @@ func (e *EndpointController) cleanup() {
 			constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
 			constants.MCSLabelSourceCluster: e.clusterID,
 			constants.MCSLabelServiceName:   e.serviceName,
-		}).String(),
-	})
-
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
-	}
-
-	// Lighthouse-proprietary labels
-	err = resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			constants.LabelSourceNamespace:         e.serviceImportSourceNameSpace,
-			constants.LighthouseLabelSourceCluster: e.clusterID,
-			constants.LighthouseLabelSourceName:    e.serviceName,
 		}).String(),
 	})
 
