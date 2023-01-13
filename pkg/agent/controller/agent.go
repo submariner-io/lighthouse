@@ -259,7 +259,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionFalse,
 			serviceUnavailable, "Service to be exported doesn't exist")
 
-		return nil, true
+		return nil, false
 	}
 
 	svc := obj.(*corev1.Service)
@@ -395,11 +395,6 @@ func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 }
 
 func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
-	if op == syncer.Create {
-		// Ignore create
-		return nil, false
-	}
-
 	svc := obj.(*corev1.Service)
 
 	obj, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
@@ -414,7 +409,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
-	if op == syncer.Update {
+	if op == syncer.Create || op == syncer.Update {
 		return a.serviceExportToServiceImport(obj, numRequeues, op)
 	}
 
