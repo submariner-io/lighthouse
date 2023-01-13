@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
@@ -53,12 +53,15 @@ var _ = Describe("EndpointSlice controller", func() {
 	t := newEndpointSliceTestDiver()
 
 	When("a service has a valid endpoint", func() {
+		BeforeEach(func() {
+			esName := testName1 + remoteClusterID1
+			endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []discovery.Endpoint{endPoint1})
+			t.createEndpointSlice(testNS1, endpointSlice)
+		})
+
 		When("IsHealthy is called for the service with a valid cluster", func() {
 			It("should return true", func() {
-				esName := testName1 + remoteClusterID1
-				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
-				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []discovery.Endpoint{endPoint1})
-				t.createEndpointSlice(testNS1, endpointSlice)
 				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
 			})
 		})
@@ -71,27 +74,32 @@ var _ = Describe("EndpointSlice controller", func() {
 	})
 
 	When("IsHealthy is called for a service with no endpoints", func() {
-		It("should return false", func() {
+		BeforeEach(func() {
 			esName := testName1 + remoteClusterID1
 			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName, testNS1, []discovery.Endpoint{})
 			t.createEndpointSlice(testNS1, endpointSlice)
+		})
+
+		It("should return false", func() {
 			t.awaitNotIsHealthy(testService1, testNS1, remoteClusterID1)
 		})
 	})
 
 	When("a service exists in multiple clusters with valid endpoints", func() {
+		BeforeEach(func() {
+			esName1 := testName1 + remoteClusterID1
+			endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
+			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []discovery.Endpoint{endPoint1})
+			t.createEndpointSlice(testNS1, endpointSlice)
+
+			esName2 := testName2 + remoteClusterID2
+			endPoint2 := t.newEndpoint(cluster2HostNamePod1, cluster2EndPointIP1)
+			endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []discovery.Endpoint{endPoint2})
+			t.createEndpointSlice(testNS2, endpointSlice2)
+		})
+
 		When("IsHealthy is called for each cluster", func() {
 			It("should return true", func() {
-				esName1 := testName1 + remoteClusterID1
-				endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
-				endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []discovery.Endpoint{endPoint1})
-				t.createEndpointSlice(testNS1, endpointSlice)
-
-				esName2 := testName2 + remoteClusterID2
-				endPoint2 := t.newEndpoint(cluster2HostNamePod1, cluster2EndPointIP1)
-				endpointSlice2 := t.newEndpointSliceFromEndpoint(testService2, remoteClusterID2, esName2, testNS2, []discovery.Endpoint{endPoint2})
-				t.createEndpointSlice(testNS2, endpointSlice2)
-
 				t.awaitIsHealthy(testService1, testNS1, remoteClusterID1)
 				t.awaitIsHealthy(testService2, testNS2, remoteClusterID2)
 			})
@@ -99,12 +107,14 @@ var _ = Describe("EndpointSlice controller", func() {
 	})
 
 	When("IsHealthy is called for a non-existent cluster", func() {
-		It("should return false", func() {
+		BeforeEach(func() {
 			esName1 := testName1 + remoteClusterID1
 			endPoint1 := t.newEndpoint(cluster1HostNamePod1, cluster1EndPointIP1)
 			endpointSlice := t.newEndpointSliceFromEndpoint(testService1, remoteClusterID1, esName1, testNS1, []discovery.Endpoint{endPoint1})
 			t.createEndpointSlice(testNS1, endpointSlice)
+		})
 
+		It("should return false", func() {
 			t.awaitNotIsHealthy(testService1, testNS1, "randomcluster")
 		})
 	})
@@ -126,7 +136,9 @@ func newEndpointSliceTestDiver() *endpointSliceTestDriver {
 		t.controller.NewClientset = func(c *rest.Config) (kubernetes.Interface, error) {
 			return t.kubeClient, nil
 		}
+	})
 
+	JustBeforeEach(func() {
 		Expect(t.controller.Start(&rest.Config{})).To(Succeed())
 	})
 
