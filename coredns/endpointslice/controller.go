@@ -22,6 +22,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +32,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("EndpointSlice")}
 
 type NewClientsetFunc func(kubeConfig *rest.Config) (kubernetes.Interface, error)
 
@@ -67,7 +70,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
-	klog.Infof("Starting EndpointSlice Controller")
+	logger.Infof("Starting EndpointSlice Controller")
 
 	clientSet, err := c.NewClientset(kubeConfig)
 	if err != nil {
@@ -107,14 +110,14 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 				if endpointSlice, ok = obj.(*discovery.EndpointSlice); !ok {
 					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 					if !ok {
-						klog.Errorf("Failed to get deleted endpointSlice object %v", obj)
+						logger.Errorf(nil, "Failed to get deleted endpointSlice object %v", obj)
 						return
 					}
 
 					endpointSlice, ok = tombstone.Obj.(*discovery.EndpointSlice)
 
 					if !ok {
-						klog.Errorf("Failed to convert deleted tombstone object %v  to endpointSlice", tombstone.Obj)
+						logger.Errorf(nil, "Failed to convert deleted tombstone object %v  to endpointSlice", tombstone.Obj)
 						return
 					}
 				}
@@ -131,7 +134,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 func (c *Controller) Stop() {
 	close(c.stopCh)
 
-	klog.Infof("EndpointSlice Controller stopped")
+	logger.Infof("EndpointSlice Controller stopped")
 }
 
 func (c *Controller) IsHealthy(name, namespace, clusterID string) bool {

@@ -21,9 +21,14 @@ package lighthouse_test
 import (
 	"testing"
 
+	"github.com/coredns/coredns/plugin/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func init() {
+	log.D.Set()
+}
 
 func TestPlugin(t *testing.T) {
 	RegisterFailHandler(Fail)
