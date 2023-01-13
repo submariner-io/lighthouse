@@ -19,7 +19,7 @@ limitations under the License.
 package controller_test
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 )
 

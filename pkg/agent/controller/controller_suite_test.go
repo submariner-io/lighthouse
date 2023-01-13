@@ -31,7 +31,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
@@ -48,8 +48,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -97,8 +95,6 @@ type cluster struct {
 	localServiceImportClient *fake.DynamicResourceClient
 	localIngressIPClient     *fake.DynamicResourceClient
 	localEndpointSliceClient dynamic.ResourceInterface
-	localKubeClient          kubernetes.Interface
-	endpointsReactor         *fake.FailingReactor
 	agentController          *controller.Controller
 	chanByCondType           map[mcsv1a1.ServiceExportConditionType]chan mcsv1a1.ServiceExportCondition
 }
@@ -280,10 +276,6 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.localIngressIPClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		controller.GetGlobalIngressIPObj())).Namespace(serviceNamespace).(*fake.DynamicResourceClient)
 
-	fakeCS := fakeKubeClient.NewSimpleClientset()
-	c.endpointsReactor = fake.NewFailingReactorForResource(&fakeCS.Fake, "endpoints")
-	c.localKubeClient = fakeCS
-
 	c.chanByCondType = map[mcsv1a1.ServiceExportConditionType]chan mcsv1a1.ServiceExportCondition{}
 	c.chanByCondType[mcsv1a1.ServiceExportValid] = make(chan mcsv1a1.ServiceExportCondition, 100)
 	c.chanByCondType[constants.ServiceExportSynced] = make(chan mcsv1a1.ServiceExportCondition, 100)
@@ -348,7 +340,7 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 
 	serviceExportCounterName := "submariner_service_export" + bigint.String()
 
-	c.agentController, err = controller.New(&c.agentSpec, syncerConfig, c.localKubeClient,
+	c.agentController, err = controller.New(&c.agentSpec, syncerConfig,
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
 			ServiceExportCounterName: serviceExportCounterName,
@@ -595,30 +587,18 @@ func (t *testDriver) awaitUpdatedEndpointSlice(expectedIPs []string) {
 }
 
 func (t *testDriver) createService() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Create(context.TODO(), t.service, metav1.CreateOptions{})
-	Expect(err).To(Succeed())
-
 	test.CreateResource(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace), t.service)
 }
 
 func (t *testDriver) updateService() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Update(context.TODO(), t.service, metav1.UpdateOptions{})
-	Expect(err).To(Succeed())
-
 	test.UpdateResource(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace), t.service)
 }
 
 func (t *testDriver) createEndpoints() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Create(context.TODO(), t.endpoints, metav1.CreateOptions{})
-	Expect(err).To(Succeed())
-
 	test.CreateResource(t.dynamicEndpointsClient(), t.endpoints)
 }
 
 func (t *testDriver) updateEndpoints() {
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(context.TODO(), t.endpoints, metav1.UpdateOptions{})
-	Expect(err).To(Succeed())
-
 	test.UpdateResource(t.dynamicEndpointsClient(), t.endpoints)
 }
 
@@ -652,9 +632,6 @@ func (t *testDriver) deleteServiceExport() {
 
 func (t *testDriver) deleteService() {
 	Expect(t.cluster1.dynamicServiceClient().Namespace(t.service.Namespace).Delete(context.TODO(), t.service.Name,
-		metav1.DeleteOptions{})).To(Succeed())
-
-	Expect(t.cluster1.localKubeClient.CoreV1().Services(t.service.Namespace).Delete(context.TODO(), t.service.Name,
 		metav1.DeleteOptions{})).To(Succeed())
 }
 
@@ -791,11 +768,10 @@ func (t *testDriver) awaitHeadlessServiceUnexported() {
 	t.awaitNoEndpointSlice(t.brokerEndpointSliceClient)
 	t.awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient)
 
-	// Ensure the service's Endpoints are no longer being watched by updating the Endpoints and verifyjng the
+	// Ensure the service's Endpoints are no longer being watched by updating the Endpoints and verifying the
 	// EndpointSlice isn't recreated.
 	t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.10"})
-	_, err := t.cluster1.localKubeClient.CoreV1().Endpoints(t.endpoints.Namespace).Update(context.TODO(), t.endpoints, metav1.UpdateOptions{})
-	Expect(err).To(Succeed())
+	t.updateEndpoints()
 
 	time.Sleep(200 * time.Millisecond)
 	t.awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient)
