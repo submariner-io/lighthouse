@@ -24,8 +24,10 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
+	"github.com/go-logr/logr"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -66,3 +68,7 @@ type EndpointsStatus interface {
 }
 
 var _ plugin.Handler = &Lighthouse{}
+
+func init() {
+	logf.SetLogger(logr.New(&corednsLogSink{log: log}))
+}
