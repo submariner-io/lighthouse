@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -106,14 +105,14 @@ func NewMap(localClusterID string, kubeClient kubernetes.Interface) *Map {
 func (m *Map) Put(es *discovery.EndpointSlice) {
 	key, ok := getKey(es)
 	if !ok {
-		klog.Warningf("Failed to get key labels from %#v", es.ObjectMeta)
+		logger.Warningf("Failed to get key labels from %#v", es.ObjectMeta)
 		return
 	}
 
 	cluster, ok := es.Labels[constants.MCSLabelSourceCluster]
 
 	if !ok {
-		klog.Warningf("Cluster label missing on %#v", es.ObjectMeta)
+		logger.Warningf("Cluster label missing on %#v", es.ObjectMeta)
 		return
 	}
 
@@ -143,8 +142,8 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 			return nil
 		})
 		if retryErr != nil {
-			klog.Errorf("Error finding local endpoint slice for service (%s/%s): %+v", es.Labels[constants.LabelSourceNamespace],
-				es.Labels[constants.MCSLabelServiceName], retryErr)
+			logger.Errorf(retryErr, "Error finding local endpoint slice for service (%s/%s)", es.Labels[constants.LabelSourceNamespace],
+				es.Labels[constants.MCSLabelServiceName])
 			return
 		}
 		if localSlice == nil {
@@ -215,7 +214,7 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		epInfo.clusterInfo[cluster].recordList = append(epInfo.clusterInfo[cluster].recordList, records...)
 	}
 
-	klog.V(log.DEBUG).Infof("Adding clusterInfo %#v for EndpointSlice %q in %q", epInfo.clusterInfo[cluster], es.Name, cluster)
+	logger.V(log.DEBUG).Infof("Adding clusterInfo %#v for EndpointSlice %q in %q", epInfo.clusterInfo[cluster], es.Name, cluster)
 
 	m.epMap[key] = epInfo
 }
@@ -237,7 +236,7 @@ func (m *Map) Remove(es *discovery.EndpointSlice) {
 			return
 		}
 
-		klog.V(log.DEBUG).Infof("Adding endpointInfo %#v for %s in %s", epInfo.clusterInfo[cluster], es.Name, cluster)
+		logger.V(log.DEBUG).Infof("Adding endpointInfo %#v for %s in %s", epInfo.clusterInfo[cluster], es.Name, cluster)
 		delete(epInfo.clusterInfo, cluster)
 	}
 }

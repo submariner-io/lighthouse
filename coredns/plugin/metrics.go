@@ -20,7 +20,6 @@ package lighthouse
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -36,7 +35,7 @@ const (
 var dnsQueryCounter *prometheus.GaugeVec
 
 func init() {
-	klog.Infof("Initializing dns query counter")
+	log.Infof("Initializing dns query counter")
 
 	dnsQueryCounter = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

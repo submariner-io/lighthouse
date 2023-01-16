@@ -24,7 +24,6 @@ import (
 
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -54,7 +53,7 @@ func (si *serviceInfo) resetLoadBalancing() {
 	for _, info := range si.records {
 		err := si.balancer.Add(info.name, info.weight)
 		if err != nil {
-			klog.Error(err)
+			logger.Error(err, "Error adding load balancer info")
 		}
 	}
 }
@@ -207,7 +206,7 @@ func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int6
 			return f
 		}
 
-		klog.Errorf("Error: %v parsing the %q annotation from ServiceImport %q", err, weightKey, si.Name)
+		logger.Errorf(err, "Error parsing the %q annotation from ServiceImport %q", weightKey, si.Name)
 	}
 
 	return 1 // Zero will cause no selection
