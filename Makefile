@@ -30,21 +30,21 @@ export LIGHTHOUSE = true
 
 build: $(ARCH_BINARIES)
 
-bin/%/lighthouse-agent: vendor/modules.txt $(shell find pkg/agent)
+bin/%/lighthouse-agent: $(shell find pkg/agent)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/agent
 
-bin/%/lighthouse-coredns: coredns/vendor/modules.txt $(shell find coredns)
+bin/%/lighthouse-coredns: $(shell find coredns)
 	mkdir -p $(@D)
 	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 	mv coredns/$@ $@
 
-e2e: vendor/modules.txt
+e2e:
 
 licensecheck: export BUILD_UPX = false
 licensecheck: $(ARCH_BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
 
-bin/lichen: vendor/modules.txt
+bin/lichen:
 	mkdir -p $(@D)
 	go build -o $@ github.com/uw-labs/lichen
 
@@ -61,7 +61,7 @@ check-nginx:
 	KUBECONFIG=output/kubeconfigs/kind-config-cluster1 kubectl get serviceexports.multicluster.x-k8s.io -n default nginx-upgrade
 	KUBECONFIG=output/kubeconfigs/kind-config-cluster2 kubectl get serviceimports.multicluster.x-k8s.io -n submariner-operator nginx-upgrade-default-cluster1
 
-$(TARGETS): vendor/modules.txt
+$(TARGETS):
 	./scripts/$@
 
 .PHONY: $(TARGETS)
