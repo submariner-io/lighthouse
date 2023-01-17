@@ -150,9 +150,9 @@ func newServiceImport(namespace, name, serviceIP, clusterID string) *mcsv1a1.Ser
 			Name:      name + "-" + namespace + "-" + clusterID,
 			Namespace: namespace,
 			Labels: map[string]string{
-				constants.LighthouseLabelSourceName:    name,
-				constants.LabelSourceNamespace:         namespace,
-				constants.LighthouseLabelSourceCluster: clusterID,
+				mcsv1a1.LabelServiceName:        name,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{

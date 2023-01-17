@@ -253,10 +253,6 @@ func getKey(es *discovery.EndpointSlice) (string, bool) {
 	name, ok := es.Labels[mcsv1a1.LabelServiceName]
 
 	if !ok {
-		name, ok = es.Labels[constants.LighthouseLabelSourceName]
-	}
-
-	if !ok {
 		return "", false
 	}
 

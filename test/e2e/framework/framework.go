@@ -43,12 +43,10 @@ import (
 )
 
 const (
-	labelSourceName      = "lighthouse.submariner.io/sourceName"
-	labelSourceNamespace = "lighthouse.submariner.io/sourceNamespace"
-	anyCount             = -1
-	statefulServiceName  = "nginx-ss"
-	statefulSetName      = "web"
-	not                  = " not"
+	anyCount            = -1
+	statefulServiceName = "nginx-ss"
+	statefulSetName     = "web"
+	not                 = " not"
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -236,8 +234,8 @@ func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterInde
 
 func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex, name, namespace string, count int) {
 	labelMap := map[string]string{
-		labelSourceName:      name,
-		labelSourceNamespace: namespace,
+		mcsv1a1.LabelServiceName:       name,
+		constants.LabelSourceNamespace: namespace,
 	}
 	siListOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelMap).String(),

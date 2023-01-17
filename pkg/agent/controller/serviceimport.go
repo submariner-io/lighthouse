@@ -102,12 +102,13 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 		return false
 	}
 
-	if serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster] != c.clusterID {
+	sourceCluster := serviceImport.Labels[constants.MCSLabelSourceCluster]
+	if sourceCluster == "" || sourceCluster != c.clusterID {
 		return false
 	}
 
 	serviceNameSpace := serviceImport.Labels[constants.LabelSourceNamespace]
-	serviceName := serviceImport.Labels[constants.LighthouseLabelSourceName]
+	serviceName := serviceImport.Labels[mcsv1a1.LabelServiceName]
 
 	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
 		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)
@@ -121,11 +122,7 @@ func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *m
 	return false
 }
 
-func (c *ServiceImportController) serviceImportDeleted(serviceImport *mcsv1a1.ServiceImport, key string) {
-	if serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster] != c.clusterID {
-		return
-	}
-
+func (c *ServiceImportController) serviceImportDeleted(key string) {
 	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
 		endpointController := obj.(*EndpointController)
 		endpointController.stop()
@@ -144,7 +141,7 @@ func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.
 		return nil, c.serviceImportCreatedOrUpdated(serviceImport, key)
 	}
 
-	c.serviceImportDeleted(serviceImport, key)
+	c.serviceImportDeleted(key)
 
 	return nil, false
 }

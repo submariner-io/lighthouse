@@ -353,12 +353,12 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	}
 }
 
-func findServiceImport(client dynamic.ResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
+func findServiceImport(client dynamic.ResourceInterface, namespace, name, sourceLabel string) *mcsv1a1.ServiceImport {
 	list, err := client.List(context.TODO(), metav1.ListOptions{})
 	Expect(err).To(Succeed())
 
 	for i := range list.Items {
-		if list.Items[i].GetLabels()[constants.LighthouseLabelSourceName] == name &&
+		if list.Items[i].GetLabels()[sourceLabel] == name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace {
 			serviceImport := &mcsv1a1.ServiceImport{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], serviceImport, nil)).To(Succeed())
@@ -376,7 +376,7 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 	var serviceImport *mcsv1a1.ServiceImport
 
 	Eventually(func() *mcsv1a1.ServiceImport {
-		serviceImport = findServiceImport(client, service.Namespace, service.Name)
+		serviceImport = findServiceImport(client, service.Namespace, service.Name, mcsv1a1.LabelServiceName)
 		return serviceImport
 	}, 5*time.Second).ShouldNot(BeNil(), "ServiceImport not found")
 
@@ -401,8 +401,8 @@ func awaitServiceImport(client dynamic.ResourceInterface, service *corev1.Servic
 
 	labels := serviceImport.GetObjectMeta().GetLabels()
 	Expect(labels[constants.LabelSourceNamespace]).To(Equal(service.GetNamespace()))
-	Expect(labels[constants.LighthouseLabelSourceName]).To(Equal(service.GetName()))
-	Expect(labels[constants.LighthouseLabelSourceCluster]).To(Equal(clusterID1))
+	Expect(labels[mcsv1a1.LabelServiceName]).To(Equal(service.GetName()))
+	Expect(labels[constants.MCSLabelSourceCluster]).To(Equal(clusterID1))
 
 	return serviceImport
 }
@@ -415,7 +415,7 @@ func awaitUpdatedServiceImport(client dynamic.ResourceInterface, service *corev1
 	var serviceImport *mcsv1a1.ServiceImport
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		serviceImport = findServiceImport(client, service.Namespace, service.Name)
+		serviceImport = findServiceImport(client, service.Namespace, service.Name, mcsv1a1.LabelServiceName)
 		Expect(serviceImport).ToNot(BeNil())
 
 		if serviceIP == "" {

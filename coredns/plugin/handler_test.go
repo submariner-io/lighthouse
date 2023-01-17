@@ -1046,9 +1046,9 @@ func newServiceImport(namespace, name, clusterID, serviceIP, portName string,
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				constants.LighthouseLabelSourceName:    name,
-				constants.LabelSourceNamespace:         namespace,
-				constants.LighthouseLabelSourceCluster: clusterID,
+				mcsv1a1.LabelServiceName:        name,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: clusterID,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{

@@ -61,7 +61,7 @@ func (a *Controller) Cleanup() error {
 	// Delete all local ServiceImports from the broker.
 	err = deleteResources(a.serviceImportSyncer.GetBrokerClient().Resource(serviceImportGVR), a.serviceImportSyncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
-			LabelSelector: labels.Set(map[string]string{constants.LighthouseLabelSourceCluster: a.clusterID}).String(),
+			LabelSelector: labels.Set(map[string]string{constants.MCSLabelSourceCluster: a.clusterID}).String(),
 		})
 	if err != nil {
 		return errors.Wrap(err, "error deleting remote ServiceImports")

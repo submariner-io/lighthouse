@@ -57,7 +57,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-" + serviceNamespace + "-" + clusterID1,
 				Labels: map[string]string{
-					constants.LighthouseLabelSourceCluster: clusterID1,
+					constants.MCSLabelSourceCluster: clusterID1,
 				},
 			},
 		}
@@ -72,7 +72,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "other-" + serviceNamespace + "-" + clusterID2,
 				Labels: map[string]string{
-					constants.LighthouseLabelSourceCluster: clusterID2,
+					constants.MCSLabelSourceCluster: clusterID2,
 				},
 			},
 		}
@@ -83,7 +83,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx2-" + serviceNamespace + "-" + clusterID2,
 				Labels: map[string]string{
-					constants.LighthouseLabelSourceCluster: clusterID2,
+					constants.MCSLabelSourceCluster: clusterID2,
 				},
 			},
 		}
