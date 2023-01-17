@@ -131,7 +131,7 @@ func NewMap(localClusterID string) *Map {
 }
 
 func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Labels[constants.LighthouseLabelSourceName]; ok {
+	if name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]; ok {
 		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
 		key := keyFunc(namespace, name)
 
@@ -150,7 +150,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			clusterName := serviceImport.GetLabels()[constants.LighthouseLabelSourceCluster]
+			clusterName := serviceImport.GetLabels()[constants.MCSLabelSourceCluster]
 
 			record := &DNSRecord{
 				IP:          serviceImport.Spec.IPs[0],
@@ -174,7 +174,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Labels[constants.LighthouseLabelSourceName]; ok {
+	if name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]; ok {
 		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
 		key := keyFunc(namespace, name)
 

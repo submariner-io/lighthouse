@@ -194,7 +194,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &mcsv1a1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetLabels()[constants.LighthouseLabelSourceName],
+					Name:      serviceImportSourceName(si),
 					Namespace: si.GetLabels()[constants.LabelSourceNamespace],
 				},
 			}
@@ -205,7 +205,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetLabels()[constants.LighthouseLabelSourceName],
+					Name:      serviceImportSourceName(si),
 					Namespace: si.GetLabels()[constants.LabelSourceNamespace],
 				},
 			}
@@ -345,14 +345,14 @@ func (a *Controller) onLocalServiceImport(obj runtime.Object, _ int, op syncer.O
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	if op == syncer.Delete {
-		a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
+		a.updateExportedServiceStatus(serviceImportSourceName(serviceImport),
 			serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 			"NoServiceImport", "ServiceImport was deleted")
 
 		return obj, false
 	}
 
-	a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
+	a.updateExportedServiceStatus(serviceImportSourceName(serviceImport),
 		serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 		"AwaitingSync", fmt.Sprintf("ServiceImport %sd - awaiting sync to the broker", op))
 
@@ -366,7 +366,7 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
+	a.updateExportedServiceStatus(serviceImportSourceName(serviceImport),
 		serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionTrue, "",
 		"ServiceImport was successfully synced to the broker")
 }
@@ -505,9 +505,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 			Name:        a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{},
 			Labels: map[string]string{
-				constants.LighthouseLabelSourceName:    name,
-				constants.LabelSourceNamespace:         namespace,
-				constants.LighthouseLabelSourceCluster: a.clusterID,
+				mcsv1a1.LabelServiceName:        name,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: a.clusterID,
 			},
 		},
 	}
@@ -582,4 +582,14 @@ func (a *Controller) getIngressIP(name, namespace string) (*IngressIP, bool) {
 	}
 
 	return parseIngressIP(obj), true
+}
+
+func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
+	name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
+	if ok {
+		return name
+	}
+
+	// Check the legacy label for migration - this can be removed after 0.15.
+	return serviceImport.GetLabels()["lighthouse.submariner.io/sourceName"]
 }
