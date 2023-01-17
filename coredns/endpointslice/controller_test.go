@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const (
@@ -163,7 +164,7 @@ func (t *endpointSliceTestDriver) newEndpointSliceFromEndpoint(serviceName, remo
 			Namespace: esNs,
 			Labels: map[string]string{
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-				constants.MCSLabelServiceName:   serviceName,
+				mcsv1a1.LabelServiceName:        serviceName,
 				constants.MCSLabelSourceCluster: remoteCluster,
 				constants.LabelSourceNamespace:  esNs,
 			},

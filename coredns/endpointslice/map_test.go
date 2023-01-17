@@ -29,6 +29,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("EndpointSlice Map", func() {
@@ -153,7 +154,7 @@ func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace:  namespace,
 				constants.MCSLabelSourceCluster: clusterID,
-				constants.MCSLabelServiceName:   name,
+				mcsv1a1.LabelServiceName:        name,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

@@ -1094,7 +1094,7 @@ func newEndpointSlice(namespace, name, clusterID, portName string, hostName, end
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace:  namespace,
 				constants.MCSLabelSourceCluster: clusterID,
-				constants.MCSLabelServiceName:   name,
+				mcsv1a1.LabelServiceName:        name,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

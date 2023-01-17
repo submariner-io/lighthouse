@@ -445,7 +445,7 @@ func findEndpointSlice(client dynamic.ResourceInterface, namespace, name string)
 	Expect(err).To(Succeed())
 
 	for i := range list.Items {
-		if list.Items[i].GetLabels()[constants.MCSLabelServiceName] == name &&
+		if list.Items[i].GetLabels()[mcsv1a1.LabelServiceName] == name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace {
 			endpointSlice := &discovery.EndpointSlice{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], endpointSlice, nil)).To(Succeed())
