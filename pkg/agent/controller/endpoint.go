@@ -105,7 +105,7 @@ func (e *EndpointController) cleanup() {
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
 			constants.MCSLabelSourceCluster: e.clusterID,
-			constants.MCSLabelServiceName:   e.serviceName,
+			mcsv1a1.LabelServiceName:        e.serviceName,
 		}).String(),
 	})
 
@@ -147,7 +147,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 		constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
 		constants.MCSLabelSourceCluster: e.clusterID,
-		constants.MCSLabelServiceName:   e.serviceName,
+		mcsv1a1.LabelServiceName:        e.serviceName,
 	}
 
 	endpointSlice.AddressType = discovery.AddressTypeIPv4

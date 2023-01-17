@@ -171,7 +171,7 @@ var _ = Describe("Reconciliation", func() {
 					Labels: map[string]string{
 						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 						constants.MCSLabelSourceCluster: clusterID1,
-						constants.MCSLabelServiceName:   "nginx",
+						mcsv1a1.LabelServiceName:        "nginx",
 					},
 				},
 			}

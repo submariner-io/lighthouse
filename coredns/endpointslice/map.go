@@ -125,7 +125,7 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 			localSlices, err := m.kubeClient.DiscoveryV1().EndpointSlices(es.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
 				metav1.ListOptions{
 					LabelSelector: labels.Set(map[string]string{
-						constants.KubernetesServiceName: es.Labels[constants.MCSLabelServiceName],
+						constants.KubernetesServiceName: es.Labels[mcsv1a1.LabelServiceName],
 					}).String(),
 				})
 			if err != nil {
@@ -143,7 +143,7 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 		})
 		if retryErr != nil {
 			logger.Errorf(retryErr, "Error finding local endpoint slice for service (%s/%s)", es.Labels[constants.LabelSourceNamespace],
-				es.Labels[constants.MCSLabelServiceName])
+				es.Labels[mcsv1a1.LabelServiceName])
 			return
 		}
 		if localSlice == nil {
@@ -250,7 +250,7 @@ func (m *Map) get(key string) *endpointInfo {
 }
 
 func getKey(es *discovery.EndpointSlice) (string, bool) {
-	name, ok := es.Labels[constants.MCSLabelServiceName]
+	name, ok := es.Labels[mcsv1a1.LabelServiceName]
 
 	if !ok {
 		name, ok = es.Labels[constants.LighthouseLabelSourceName]

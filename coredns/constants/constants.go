@@ -25,6 +25,5 @@ const (
 	LabelSourceNamespace               = "lighthouse.submariner.io/sourceNamespace"
 	LighthouseLabelSourceCluster       = "lighthouse.submariner.io/sourceCluster"
 	LighthouseLabelSourceName          = "lighthouse.submariner.io/sourceName"
-	MCSLabelServiceName                = "multicluster.kubernetes.io/service-name"
 	MCSLabelSourceCluster              = "multicluster.kubernetes.io/source-cluster"
 )
