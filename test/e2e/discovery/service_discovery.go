@@ -189,8 +189,10 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
 
-	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList,
-		[]string{clusterADomain}, "", true)
+	if !framework.TestContext.GlobalnetEnabled {
+		f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList,
+			[]string{clusterADomain}, "", true)
+	}
 
 	f.DeleteService(framework.ClusterA, nginxServiceClusterA.Name)
 
@@ -345,15 +347,26 @@ func RunServicesPodAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	f.SetNginxReplicaSet(framework.ClusterC, 0)
 
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 1)
-	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
-		"", false)
+
+	if framework.TestContext.GlobalnetEnabled {
+		f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains, "", "1.2.3.4", false)
+	} else {
+		f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
+			"", false)
+	}
+
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", true)
-
 	f.SetNginxReplicaSet(framework.ClusterB, 0)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 0)
-	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
-		"", false)
+
+	if framework.TestContext.GlobalnetEnabled {
+		f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains, "", "1.2.3.4", false)
+	} else {
+		f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterC, netshootPodList, checkedDomains,
+			"", false)
+	}
+
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", false)
 }
