@@ -99,13 +99,8 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, sta
 func (lh *Lighthouse) getClusterIPForSvc(pReq *recordRequest) (*serviceimport.DNSRecord, bool) {
 	localClusterID := lh.ClusterStatus.LocalClusterID()
 
-	record, found, isLocal := lh.ServiceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.ClusterStatus.IsConnected,
+	record, found, _ := lh.ServiceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.ClusterStatus.IsConnected,
 		lh.EndpointsStatus.IsHealthy)
-
-	getLocal := isLocal || pReq.cluster != "" && pReq.cluster == localClusterID
-	if found && getLocal {
-		record, found = lh.LocalServices.GetIP(pReq.service, pReq.namespace)
-	}
 
 	return record, found
 }

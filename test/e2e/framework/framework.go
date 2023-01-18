@@ -671,7 +671,7 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service, isLocal bool) string {
 	Expect(service.Spec.Type).To(Equal(v1.ServiceTypeClusterIP))
 
-	if !framework.TestContext.GlobalnetEnabled || isLocal {
+	if !framework.TestContext.GlobalnetEnabled {
 		return service.Spec.ClusterIP
 	}
 
