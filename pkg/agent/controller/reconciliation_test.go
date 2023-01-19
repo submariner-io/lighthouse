@@ -196,9 +196,11 @@ var _ = Describe("Reconciliation", func() {
 		})
 	})
 
-	When("a local ServiceImport with the legacy source labels exists on startup", func() {
-		It("should update the ServiceImport and sync it", func() {
-			serviceImport := t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+	When("a local ServiceImport with the legacy source labels exists after restart", func() {
+		var serviceImport *mcsv1a1.ServiceImport
+
+		JustBeforeEach(func() {
+			serviceImport = t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
 
 			t.afterEach()
 			t = newTestDiver()
@@ -212,21 +214,30 @@ var _ = Describe("Reconciliation", func() {
 			t.createService()
 			t.createEndpoints()
 
+			By("Restarting controller")
+		})
+
+		It("should update the ServiceImport labels and sync it", func() {
 			t.cluster1.start(t, *t.syncerConfig)
 			t.cluster2.start(t, *t.syncerConfig)
 
-			By("Create the ServiceImport with the legacy labels and verify it gets synced")
+			By("Create the ServiceImport with the legacy labels")
+
+			// We want to verify the transition behavior during the small window where the ServiceImport labels
+			// haven't been migrated yet. This occurs when the ServiceExport is processed so to force the sequencing
+			// create the ServiceImport with the legacy labels first then create the ServiceExport.
 
 			test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
 
+			// The ServiceImport still has the legacy labels so shouldn't be synced to the broker yet.
 			Eventually(func() *mcsv1a1.ServiceImport {
 				return findServiceImport(t.brokerServiceImportClient, t.service.Namespace, t.service.Name, legacySourceNameLabel)
-			}, 5*time.Second).ShouldNot(BeNil(), "ServiceImport not found")
+			}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
 
-			// The EndpointSlice shouldn't be created since the constants.MCSLabelSourceCluster label isn't set yet.
+			// The EndpointSlice shouldn't be created yet since the ServiceImport still has the legacy source cluster label.
 			Consistently(func() *discovery.EndpointSlice {
 				return findEndpointSlice(t.cluster1.localEndpointSliceClient, t.endpoints.Namespace, t.endpoints.Name)
-			}).Should(BeNil(), "EndpointSlice found")
+			}).Should(BeNil(), "Unexpected EndpointSlice found")
 
 			By("Create the ServiceExport")
 
@@ -238,6 +249,27 @@ var _ = Describe("Reconciliation", func() {
 
 			t.awaitServiceExported(t.service.Spec.ClusterIP)
 			t.awaitEndpointSlice()
+		})
+
+		Context("and the ServiceExport no longer exists", func() {
+			It("should delete the ServiceImport on reconciliation", func() {
+				test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
+
+				brokerSI := serviceImport.DeepCopy()
+				brokerSI.Namespace = test.RemoteNamespace
+				test.CreateResource(t.brokerServiceImportClient, brokerSI)
+
+				t.cluster1.start(t, *t.syncerConfig)
+
+				Eventually(func() *mcsv1a1.ServiceImport {
+					return findServiceImport(t.cluster1.localServiceImportClient, t.service.Namespace, t.service.Name,
+						legacySourceNameLabel)
+				}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
+
+				Eventually(func() *mcsv1a1.ServiceImport {
+					return findServiceImport(t.brokerServiceImportClient, t.service.Namespace, t.service.Name, legacySourceNameLabel)
+				}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
+			})
 		})
 	})
 })

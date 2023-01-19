@@ -12,6 +12,6 @@ vendor
 .project
 .settings
 .shflags
-*.coverprofile
+*coverprofile*
 .shflags
 /Dockerfile.*
