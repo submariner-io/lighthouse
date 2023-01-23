@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/submariner-io/admiral v0.15.0-m1.0.20230110083924-1b2dce23936e
 	k8s.io/api v0.26.0
-	k8s.io/apimachinery v0.26.0
+	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.0
 	sigs.k8s.io/controller-runtime v0.14.1
 	sigs.k8s.io/mcs-api v0.1.0
