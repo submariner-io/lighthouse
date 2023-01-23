@@ -938,8 +938,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/submariner-io/admiral v0.15.0-m1.0.20230110083924-1b2dce23936e h1:P5AnaqFYd93k7Lu0zcPIMpluhJaRbIKwlrypSlxNsz4=
-github.com/submariner-io/admiral v0.15.0-m1.0.20230110083924-1b2dce23936e/go.mod h1:7M6AzC/PJaVDb/c5BuQIdgklmtyzKGIIxctkOtwLqtA=
+github.com/submariner-io/admiral v0.15.0-m2 h1:5xyFwjyd/1aCkAEd+E0sZIZdD9Z3L1uIkkLdZtu32ng=
+github.com/submariner-io/admiral v0.15.0-m2/go.mod h1:A939fnN3wDeKfrRSL+68mlUjRFvDj40bfGA+YQNlKSQ=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/tidwall/btree v0.3.0/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
 github.com/tidwall/btree v1.1.0/go.mod h1:TzIRzen6yHbibdSfK6t8QimqbUnoxUSrZfeW7Uob0q4=
