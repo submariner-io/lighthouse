@@ -19,9 +19,11 @@ limitations under the License.
 package serviceimport
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -45,6 +47,7 @@ type serviceInfo struct {
 	records    map[string]*clusterInfo
 	balancer   loadbalancer.Interface
 	isHeadless bool
+	ports      []mcsv1a1.ServicePort
 }
 
 func (si *serviceInfo) resetLoadBalancing() {
@@ -54,6 +57,27 @@ func (si *serviceInfo) resetLoadBalancing() {
 		err := si.balancer.Add(info.name, info.weight)
 		if err != nil {
 			logger.Error(err, "Error adding load balancer info")
+		}
+	}
+}
+
+func (si *serviceInfo) newRecordFrom(from *DNSRecord) *DNSRecord {
+	r := *from
+	r.Ports = si.ports
+
+	return &r
+}
+
+func (si *serviceInfo) mergePorts() {
+	si.ports = nil
+
+	for _, info := range si.records {
+		if si.ports == nil {
+			si.ports = info.record.Ports
+		} else {
+			si.ports = slices.Intersect(si.ports, info.record.Ports, func(p mcsv1a1.ServicePort) string {
+				return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
+			})
 		}
 	}
 }
@@ -109,7 +133,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	if localCluster != "" {
 		info, found := si.records[localCluster]
 		if found && info != nil && checkEndpoint(name, namespace, localCluster) {
-			return info.record, found, true
+			return si.newRecordFrom(info.record), found, true
 		}
 	}
 
@@ -117,7 +141,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	record = m.selectIP(si, name, namespace, checkCluster, checkEndpoint)
 
 	if record != nil {
-		return record, true, false
+		return si.newRecordFrom(record), true, false
 	}
 
 	return nil, true, false
@@ -169,6 +193,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 			remoteService.resetLoadBalancing()
 		}
 
+		remoteService.mergePorts()
+
 		m.svcMap[key] = remoteService
 	}
 }
@@ -195,6 +221,8 @@ func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
 		} else if !remoteService.isHeadless {
 			remoteService.resetLoadBalancing()
 		}
+
+		remoteService.mergePorts()
 	}
 }
 

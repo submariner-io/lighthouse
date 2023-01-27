@@ -459,13 +459,15 @@ func testClusterStatus() {
 		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
 			protocol1, mcsv1a1.ClusterSetIP))
 
-		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
-			portNumber2, protocol2, mcsv1a1.ClusterSetIP))
-
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
 	When("service is in two clusters and specific cluster is requested", func() {
+		JustBeforeEach(func() {
+			t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
+				portNumber2, protocol2, mcsv1a1.ClusterSetIP))
+		})
+
 		qname := fmt.Sprintf("%s.%s.%s.svc.clusterset.local.", clusterID2, service1, namespace1)
 		It("should succeed and write that cluster's IP as A record response", func() {
 			t.executeTestCase(rec, test.Case{
@@ -526,7 +528,10 @@ func testClusterStatus() {
 	When("service is in two clusters and only one is connected", func() {
 		JustBeforeEach(func() {
 			t.mockCs.clusterStatusMap[clusterID] = false
+			t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName1,
+				portNumber1, protocol1, mcsv1a1.ClusterSetIP))
 		})
+
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
 		It("should succeed and write an A record response", func() {
 			t.executeTestCase(rec, test.Case{
@@ -544,7 +549,7 @@ func testClusterStatus() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber2, qname)),
+					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber1, qname)),
 				},
 			})
 		})
@@ -554,6 +559,9 @@ func testClusterStatus() {
 		JustBeforeEach(func() {
 			t.mockCs.clusterStatusMap[clusterID] = false
 			t.mockCs.clusterStatusMap[clusterID2] = false
+
+			t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
+				portNumber2, protocol2, mcsv1a1.ClusterSetIP))
 		})
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
 		It("should return empty response (NODATA) for A record query", func() {
@@ -797,24 +805,26 @@ func testLocalService() {
 		t.mockEs.endpointStatusMap[clusterID] = true
 		t.mockEs.endpointStatusMap[clusterID2] = true
 		t.mockCs.localClusterID = clusterID
+
+		localSI := newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protocol1, mcsv1a1.ClusterSetIP)
+		localSI.Spec.Ports = append(localSI.Spec.Ports, mcsv1a1.ServicePort{
+			Name:     portName2,
+			Protocol: protocol2,
+			Port:     portNumber2,
+		})
+
 		t.mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
-			IP: serviceIP,
-			Ports: []mcsv1a1.ServicePort{
-				{
-					Name:        portName1,
-					Protocol:    protocol1,
-					AppProtocol: nil,
-					Port:        portNumber1,
-				},
-			},
+			IP:          serviceIP,
+			Ports:       localSI.Spec.Ports,
 			ClusterName: clusterID,
 		}
 
 		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
 			protocol1, mcsv1a1.ClusterSetIP))
 
-		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2, portNumber2,
-			protocol2, mcsv1a1.ClusterSetIP))
+		t.lh.ServiceImports.Put(localSI)
+		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName1, portNumber1,
+			protocol1, mcsv1a1.ClusterSetIP))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -871,7 +881,7 @@ func testLocalService() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber2, qname)),
+					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber1, qname)),
 				},
 			})
 		})
@@ -898,7 +908,7 @@ func testLocalService() {
 				Qtype: dns.TypeSRV,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber2, qname)),
+					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber1, qname)),
 				},
 			})
 		})
@@ -959,6 +969,7 @@ func testSRVMultiplePorts() {
 				},
 			})
 		})
+
 		It("with  DNS portname  should return UDP port", func() {
 			qname := fmt.Sprintf("%s.%s.%s.%s.svc.clusterset.local.", portName2, protocol2, service1, namespace1)
 			t.executeTestCase(rec, test.Case{
@@ -970,18 +981,27 @@ func testSRVMultiplePorts() {
 				},
 			})
 		})
-		It("with  cluster name should return all the ports from the cluster", func() {
-			qname := fmt.Sprintf("%s.%s.%s.svc.clusterset.local.", clusterID, service1, namespace1)
-			t.executeTestCase(rec, test.Case{
-				Qname: qname,
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeSuccess,
-				Answer: []dns.RR{
-					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber2, qname)),
-					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber1, qname)),
-				},
+
+		Context("with DNS cluster name", func() {
+			JustBeforeEach(func() {
+				t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName1, portNumber1,
+					protocol1, mcsv1a1.ClusterSetIP))
+			})
+
+			It("should return all the ports from the cluster", func() {
+				qname := fmt.Sprintf("%s.%s.%s.svc.clusterset.local.", clusterID, service1, namespace1)
+				t.executeTestCase(rec, test.Case{
+					Qname: qname,
+					Qtype: dns.TypeSRV,
+					Rcode: dns.RcodeSuccess,
+					Answer: []dns.RR{
+						test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber2, qname)),
+						test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, portNumber1, qname)),
+					},
+				})
 			})
 		})
+
 		It("with  HTTP portname  should return TCP port with underscore prefix", func() {
 			qname := fmt.Sprintf("_%s._%s.%s.%s.svc.clusterset.local.", portName1, protocol1, service1, namespace1)
 			t.executeTestCase(rec, test.Case{
