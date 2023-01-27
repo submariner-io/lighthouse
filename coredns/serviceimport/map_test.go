@@ -22,6 +22,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	corev1 "k8s.io/api/core/v1"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("ServiceImport Map", func() {
@@ -37,6 +39,18 @@ var _ = Describe("ServiceImport Map", func() {
 		clusterID2     = "clusterID2"
 		clusterID3     = "clusterID3"
 	)
+
+	port1 := mcsv1a1.ServicePort{
+		Name:     "http",
+		Protocol: corev1.ProtocolTCP,
+		Port:     8080,
+	}
+
+	port2 := mcsv1a1.ServicePort{
+		Name:     "voip",
+		Protocol: corev1.ProtocolUDP,
+		Port:     4567,
+	}
 
 	var (
 		clusterStatusMap  map[string]bool
@@ -63,12 +77,26 @@ var _ = Describe("ServiceImport Map", func() {
 		Expect(found).To(BeFalse())
 	}
 
-	getIPExpectFound := func(ns, name, cluster, localCluster string) string {
+	getDNSRecordExpectFound := func(ns, name, cluster, localCluster string) *serviceimport.DNSRecord {
 		dnsRecord, found, _ := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeTrue())
+
+		return dnsRecord
+	}
+
+	getDNSRecord := func(ns, name, cluster, localCluster string) *serviceimport.DNSRecord {
+		dnsRecord := getDNSRecordExpectFound(ns, name, cluster, localCluster)
+		Expect(dnsRecord).ToNot(BeNil())
+
+		return dnsRecord
+	}
+
+	getIPExpectFound := func(ns, name, cluster, localCluster string) string {
+		dnsRecord := getDNSRecordExpectFound(ns, name, cluster, localCluster)
 		if dnsRecord != nil {
 			return dnsRecord.IP
 		}
+
 		return ""
 	}
 
@@ -114,13 +142,17 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service is present in only one connected cluster", func() {
 		BeforeEach(func() {
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
 		})
 
 		It("should consistently return the IP of the connected cluster", func() {
 			for i := 0; i < 10; i++ {
 				Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
 			}
+		})
+
+		It("should return the service ports of the connected cluster", func() {
+			Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
 		})
 
 		When("any local cluster is specified", func() {
@@ -156,12 +188,16 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service is present in two connected clusters", func() {
 		BeforeEach(func() {
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2, port1))
 		})
 
 		It("should consistently return the IPs round-robin", func() {
 			testRoundRobin(namespace1, service1, "", "", []string{serviceIP1, serviceIP2})
+		})
+
+		It("should return the merged service ports", func() {
+			Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
 		})
 
 		When("an existent local cluster is specified", func() {
@@ -184,15 +220,24 @@ var _ = Describe("ServiceImport Map", func() {
 
 	When("a service is present in three connected clusters", func() {
 		JustBeforeEach(func() {
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1))
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP3, clusterID3))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2, port1, port2))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP3, clusterID3, port1))
 		})
 
 		When("no specific cluster is requested", func() {
 			It("should consistently return the IPs round-robin", func() {
 				ips := []string{serviceIP1, serviceIP2, serviceIP3}
 				testRoundRobin(namespace1, service1, "", "", ips)
+			})
+
+			It("should consistently return the merged service ports", func() {
+				for i := 0; i < 10; i++ {
+					Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
+				}
+
+				// Sanity check to ensure per-cluster ports are still preserved.
+				Expect(getDNSRecord(namespace1, service1, clusterID2, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1, port2}))
 			})
 		})
 
@@ -207,6 +252,12 @@ var _ = Describe("ServiceImport Map", func() {
 
 				thirdIP := getClusterIP(namespace1, service1, clusterID2)
 				Expect(thirdIP).To(Equal(firstIP))
+			})
+
+			It("should return that cluster's ports", func() {
+				Expect(getDNSRecord(namespace1, service1, clusterID1, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
+				Expect(getDNSRecord(namespace1, service1, clusterID2, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1, port2}))
+				Expect(getDNSRecord(namespace1, service1, clusterID3, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
 			})
 		})
 	})
@@ -289,16 +340,20 @@ var _ = Describe("ServiceImport Map", func() {
 	})
 
 	When("a service is present in two clusters and one is subsequently removed", func() {
-		It("should consistently return the IP of the remaining cluster", func() {
-			si1 := newServiceImport(namespace1, service1, serviceIP1, clusterID1)
+		It("should consistently return the IP and ports of the remaining cluster", func() {
+			si1 := newServiceImport(namespace1, service1, serviceIP1, clusterID1, port1)
 			serviceImportMap.Put(si1)
-			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2))
+			serviceImportMap.Put(newServiceImport(namespace1, service1, serviceIP2, clusterID2, port1, port2))
+
 			Expect(getIP(namespace1, service1)).To(Or(Equal(serviceIP1), Equal(serviceIP2)))
+			Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
 
 			serviceImportMap.Remove(si1)
 			for i := 0; i < 10; i++ {
 				Expect(getIP(namespace1, service1)).To(Equal(serviceIP2))
 			}
+
+			Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1, port2}))
 		})
 	})
 })
