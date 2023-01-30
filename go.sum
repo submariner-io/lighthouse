@@ -486,8 +486,8 @@ github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81P
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
-github.com/submariner-io/admiral v0.15.0-m1.0.20230110083924-1b2dce23936e h1:P5AnaqFYd93k7Lu0zcPIMpluhJaRbIKwlrypSlxNsz4=
-github.com/submariner-io/admiral v0.15.0-m1.0.20230110083924-1b2dce23936e/go.mod h1:7M6AzC/PJaVDb/c5BuQIdgklmtyzKGIIxctkOtwLqtA=
+github.com/submariner-io/admiral v0.15.0-m2 h1:5xyFwjyd/1aCkAEd+E0sZIZdD9Z3L1uIkkLdZtu32ng=
+github.com/submariner-io/admiral v0.15.0-m2/go.mod h1:A939fnN3wDeKfrRSL+68mlUjRFvDj40bfGA+YQNlKSQ=
 github.com/submariner-io/shipyard v0.15.0-m2 h1:hua4aZq9bVKXSQ1M94wHlj8fWe0gFp7VI1xE8F1hCYE=
 github.com/submariner-io/shipyard v0.15.0-m2/go.mod h1:T5VGOaZPGE4/vtCScEcnRDB1RaglrOGGt/5d4MlWFJ8=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=

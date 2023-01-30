@@ -81,7 +81,9 @@ func getNewClientsetFunc() NewClientsetFunc {
 		return NewClientset
 	}
 
-	return dynamic.NewForConfig
+	return func(c *rest.Config) (dynamic.Interface, error) {
+		return dynamic.NewForConfig(c)
+	}
 }
 
 func (c *Controller) Start(kubeConfig *rest.Config) error {
