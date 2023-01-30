@@ -109,23 +109,23 @@ func (m *Map) selectIP(si *serviceInfo, name, namespace string, checkCluster fun
 
 func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster func(string) bool,
 	checkEndpoint func(string, string, string) bool,
-) (record *DNSRecord, found, isLocal bool) {
+) (record *DNSRecord, found bool) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	si, ok := m.svcMap[keyFunc(namespace, name)]
 	if !ok || si.isHeadless {
-		return nil, false, false
+		return nil, false
 	}
 
 	// If a clusterID is specified, we supply it even if the service is not there
 	if cluster != "" {
 		info, found := si.records[cluster]
 		if !found {
-			return nil, found, cluster == localCluster
+			return nil, found
 		}
 
-		return info.record, found, cluster == localCluster
+		return info.record, found
 	}
 
 	// If we are aware of the local cluster
@@ -133,7 +133,7 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	if localCluster != "" {
 		info, found := si.records[localCluster]
 		if found && info != nil && checkEndpoint(name, namespace, localCluster) {
-			return si.newRecordFrom(info.record), found, true
+			return si.newRecordFrom(info.record), found
 		}
 	}
 
@@ -141,10 +141,10 @@ func (m *Map) GetIP(namespace, name, cluster, localCluster string, checkCluster 
 	record = m.selectIP(si, name, namespace, checkCluster, checkEndpoint)
 
 	if record != nil {
-		return si.newRecordFrom(record), true, false
+		return si.newRecordFrom(record), true
 	}
 
-	return nil, true, false
+	return nil, true
 }
 
 func NewMap(localClusterID string) *Map {

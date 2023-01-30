@@ -105,19 +105,6 @@ func (m *MockClusterStatus) LocalClusterID() string {
 	return m.localClusterID
 }
 
-type MockLocalServices struct {
-	LocalServicesMap map[string]*serviceimport.DNSRecord
-}
-
-func NewMockLocalServices() *MockLocalServices {
-	return &MockLocalServices{LocalServicesMap: make(map[string]*serviceimport.DNSRecord)}
-}
-
-func (m *MockLocalServices) GetIP(name, namespace string) (*serviceimport.DNSRecord, bool) {
-	record, found := m.LocalServicesMap[getKey(name, namespace)]
-	return record, found
-}
-
 func getKey(name, namespace string) string {
 	return namespace + "/" + name
 }
@@ -813,12 +800,6 @@ func testLocalService() {
 			Port:     portNumber2,
 		})
 
-		t.mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
-			IP:          serviceIP,
-			Ports:       localSI.Spec.Ports,
-			ClusterName: clusterID,
-		}
-
 		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
 			protocol1, mcsv1a1.ClusterSetIP))
 
@@ -936,12 +917,6 @@ func testSRVMultiplePorts() {
 
 		t.lh.ServiceImports.Put(localSI)
 
-		t.mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
-			IP:          serviceIP,
-			Ports:       localSI.Spec.Ports,
-			ClusterName: clusterID,
-		}
-
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
@@ -1019,7 +994,6 @@ func testSRVMultiplePorts() {
 type handlerTestDriver struct {
 	mockCs *MockClusterStatus
 	mockEs *MockEndpointStatus
-	mockLs *MockLocalServices
 	lh     *lighthouse.Lighthouse
 }
 
@@ -1027,7 +1001,6 @@ func newHandlerTestDriver() *handlerTestDriver {
 	t := &handlerTestDriver{
 		mockCs: NewMockClusterStatus(),
 		mockEs: NewMockEndpointStatus(),
-		mockLs: NewMockLocalServices(),
 	}
 
 	t.lh = &lighthouse.Lighthouse{
@@ -1035,7 +1008,6 @@ func newHandlerTestDriver() *handlerTestDriver {
 		EndpointSlices:  setupEndpointSliceMap(),
 		ClusterStatus:   t.mockCs,
 		EndpointsStatus: t.mockEs,
-		LocalServices:   t.mockLs,
 		TTL:             uint32(5),
 	}
 
