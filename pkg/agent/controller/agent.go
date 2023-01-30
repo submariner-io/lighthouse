@@ -190,11 +190,21 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return errors.Wrap(err, "error starting ServiceImport controller")
 	}
 
+	// This function also checks the legacy source name label for migration - this can be removed after 0.15.
+	serviceImportSourceName := func(serviceImport *mcsv1a1.ServiceImport) string {
+		name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
+		if ok {
+			return name
+		}
+
+		return serviceImport.GetLabels()["lighthouse.submariner.io/sourceName"]
+	}
+
 	a.serviceExportSyncer.Reconcile(func() []runtime.Object {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &mcsv1a1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetLabels()[constants.LighthouseLabelSourceName],
+					Name:      serviceImportSourceName(si),
 					Namespace: si.GetLabels()[constants.LabelSourceNamespace],
 				},
 			}
@@ -205,7 +215,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return a.serviceImportLister(func(si *mcsv1a1.ServiceImport) runtime.Object {
 			return &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      si.GetLabels()[constants.LighthouseLabelSourceName],
+					Name:      serviceImportSourceName(si),
 					Namespace: si.GetLabels()[constants.LabelSourceNamespace],
 				},
 			}
@@ -345,15 +355,24 @@ func (a *Controller) onLocalServiceImport(obj runtime.Object, _ int, op syncer.O
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	if op == syncer.Delete {
-		a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
-			serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
+		a.updateExportedServiceStatus(serviceImport.Labels[mcsv1a1.LabelServiceName],
+			serviceImport.Labels[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 			"NoServiceImport", "ServiceImport was deleted")
 
 		return obj, false
 	}
 
-	a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
-		serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
+	serviceName, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
+	if !ok {
+		// The label is missing - most likely b/c the ServiceImport hasn't yet been migrated from the legacy labels.
+		logger.Infof("Label %q missing from ServiceImport (%s/%s) - not syncing", mcsv1a1.LabelServiceName,
+			serviceImport.Namespace, serviceImport.Name)
+
+		return nil, false
+	}
+
+	a.updateExportedServiceStatus(serviceName,
+		serviceImport.Labels[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionFalse,
 		"AwaitingSync", fmt.Sprintf("ServiceImport %sd - awaiting sync to the broker", op))
 
 	return obj, false
@@ -366,8 +385,8 @@ func (a *Controller) onSuccessfulServiceImportSync(synced runtime.Object, op syn
 
 	serviceImport := synced.(*mcsv1a1.ServiceImport)
 
-	a.updateExportedServiceStatus(serviceImport.GetLabels()[constants.LighthouseLabelSourceName],
-		serviceImport.GetLabels()[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionTrue, "",
+	a.updateExportedServiceStatus(serviceImport.Labels[mcsv1a1.LabelServiceName],
+		serviceImport.Labels[constants.LabelSourceNamespace], constants.ServiceExportSynced, corev1.ConditionTrue, "",
 		"ServiceImport was successfully synced to the broker")
 }
 
@@ -505,9 +524,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 			Name:        a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{},
 			Labels: map[string]string{
-				constants.LighthouseLabelSourceName:    name,
-				constants.LabelSourceNamespace:         namespace,
-				constants.LighthouseLabelSourceCluster: a.clusterID,
+				mcsv1a1.LabelServiceName:        name,
+				constants.LabelSourceNamespace:  namespace,
+				constants.MCSLabelSourceCluster: a.clusterID,
 			},
 		},
 	}

@@ -19,13 +19,21 @@ limitations under the License.
 package controller_test
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+)
+
+const (
+	legacySourceNameLabel    = "lighthouse.submariner.io/sourceName"
+	legacySourceClusterLabel = "lighthouse.submariner.io/sourceCluster"
 )
 
 var _ = Describe("Reconciliation", func() {
@@ -185,6 +193,83 @@ var _ = Describe("Reconciliation", func() {
 		It("should delete it", func() {
 			test.AwaitNoResource(t.cluster1.localEndpointSliceClient, epsName)
 			test.AwaitNoResource(t.brokerEndpointSliceClient, epsName)
+		})
+	})
+
+	When("a local ServiceImport with the legacy source labels exists after restart", func() {
+		var serviceImport *mcsv1a1.ServiceImport
+
+		JustBeforeEach(func() {
+			serviceImport = t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+
+			t.afterEach()
+			t = newTestDiver()
+
+			serviceImport.Labels[legacySourceNameLabel] = serviceImport.Labels[mcsv1a1.LabelServiceName]
+			delete(serviceImport.Labels, mcsv1a1.LabelServiceName)
+
+			serviceImport.Labels[legacySourceClusterLabel] = serviceImport.Labels[constants.MCSLabelSourceCluster]
+			delete(serviceImport.Labels, constants.MCSLabelSourceCluster)
+
+			t.createService()
+			t.createEndpoints()
+
+			By("Restarting controller")
+		})
+
+		It("should update the ServiceImport labels and sync it", func() {
+			t.cluster1.start(t, *t.syncerConfig)
+			t.cluster2.start(t, *t.syncerConfig)
+
+			By("Create the ServiceImport with the legacy labels")
+
+			// We want to verify the transition behavior during the small window where the ServiceImport labels
+			// haven't been migrated yet. This occurs when the ServiceExport is processed so to force the sequencing
+			// create the ServiceImport with the legacy labels first then create the ServiceExport.
+
+			test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
+
+			// The ServiceImport still has the legacy labels so shouldn't be synced to the broker yet.
+			Eventually(func() *mcsv1a1.ServiceImport {
+				return findServiceImport(t.brokerServiceImportClient, t.service.Namespace, t.service.Name, legacySourceNameLabel)
+			}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
+
+			// The EndpointSlice shouldn't be created yet since the ServiceImport still has the legacy source cluster label.
+			Consistently(func() *discovery.EndpointSlice {
+				return findEndpointSlice(t.cluster1.localEndpointSliceClient, t.endpoints.Namespace, t.endpoints.Name)
+			}).Should(BeNil(), "Unexpected EndpointSlice found")
+
+			By("Create the ServiceExport")
+
+			t.createServiceExport()
+
+			serviceImport = t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
+			Expect(serviceImport.Labels).ToNot(HaveKey(legacySourceNameLabel))
+			Expect(serviceImport.Labels).ToNot(HaveKey(legacySourceClusterLabel))
+
+			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.awaitEndpointSlice()
+		})
+
+		Context("and the ServiceExport no longer exists", func() {
+			It("should delete the ServiceImport on reconciliation", func() {
+				test.CreateResource(t.cluster1.localServiceImportClient, serviceImport)
+
+				brokerSI := serviceImport.DeepCopy()
+				brokerSI.Namespace = test.RemoteNamespace
+				test.CreateResource(t.brokerServiceImportClient, brokerSI)
+
+				t.cluster1.start(t, *t.syncerConfig)
+
+				Eventually(func() *mcsv1a1.ServiceImport {
+					return findServiceImport(t.cluster1.localServiceImportClient, t.service.Namespace, t.service.Name,
+						legacySourceNameLabel)
+				}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
+
+				Eventually(func() *mcsv1a1.ServiceImport {
+					return findServiceImport(t.brokerServiceImportClient, t.service.Namespace, t.service.Name, legacySourceNameLabel)
+				}, 5*time.Second).Should(BeNil(), "Unexpected ServiceImport found")
+			})
 		})
 	})
 })
