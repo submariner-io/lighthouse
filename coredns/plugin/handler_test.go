@@ -137,6 +137,9 @@ func testWithoutFallback() {
 		t.mockCs.clusterStatusMap[clusterID] = true
 		t.mockEs.endpointStatusMap[clusterID] = true
 
+		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
+			protocol1, mcsv1a1.ClusterSetIP))
+
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
@@ -336,6 +339,9 @@ func testWithFallback() {
 			return dns.RcodeBadCookie, nil
 		})
 
+		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
+			protocol1, mcsv1a1.ClusterSetIP))
+
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
 
@@ -450,6 +456,9 @@ func testClusterStatus() {
 		t.mockEs.endpointStatusMap[clusterID] = true
 		t.mockEs.endpointStatusMap[clusterID2] = true
 
+		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
+			protocol1, mcsv1a1.ClusterSetIP))
+
 		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
 			portNumber2, protocol2, mcsv1a1.ClusterSetIP))
 
@@ -483,7 +492,11 @@ func testClusterStatus() {
 
 	When("service is in two connected clusters and one is not of type ClusterSetIP", func() {
 		JustBeforeEach(func() {
-			t.lh.ServiceImports = setupServiceImportMap()
+			t.initServiceImportMap()
+
+			t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
+				protocol1, mcsv1a1.ClusterSetIP))
+
 			t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2,
 				portNumber2, protocol2, ""))
 		})
@@ -565,7 +578,7 @@ func testClusterStatus() {
 		JustBeforeEach(func() {
 			t.mockCs.clusterStatusMap[clusterID] = false
 			delete(t.mockCs.clusterStatusMap, clusterID2)
-			t.lh.ServiceImports = setupServiceImportMap()
+			t.initServiceImportMap()
 		})
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
 		It("should return empty response (NODATA) for A record query", func() {
@@ -797,6 +810,9 @@ func testLocalService() {
 			ClusterName: clusterID,
 		}
 
+		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1,
+			protocol1, mcsv1a1.ClusterSetIP))
+
 		t.lh.ServiceImports.Put(newServiceImport(namespace1, service1, clusterID2, serviceIP2, portName2, portNumber2,
 			protocol2, mcsv1a1.ClusterSetIP))
 
@@ -900,22 +916,19 @@ func testSRVMultiplePorts() {
 		t.mockCs.clusterStatusMap[clusterID] = true
 		t.mockEs.endpointStatusMap[clusterID] = true
 		t.mockCs.localClusterID = clusterID
+
+		localSI := newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protocol1, mcsv1a1.ClusterSetIP)
+		localSI.Spec.Ports = append(localSI.Spec.Ports, mcsv1a1.ServicePort{
+			Name:     portName2,
+			Protocol: protocol2,
+			Port:     portNumber2,
+		})
+
+		t.lh.ServiceImports.Put(localSI)
+
 		t.mockLs.LocalServicesMap[getKey(service1, namespace1)] = &serviceimport.DNSRecord{
-			IP: serviceIP,
-			Ports: []mcsv1a1.ServicePort{
-				{
-					Name:        portName1,
-					Protocol:    protocol1,
-					AppProtocol: nil,
-					Port:        portNumber1,
-				},
-				{
-					Name:        portName2,
-					Protocol:    protocol2,
-					AppProtocol: nil,
-					Port:        portNumber2,
-				},
-			},
+			IP:          serviceIP,
+			Ports:       localSI.Spec.Ports,
 			ClusterName: clusterID,
 		}
 
@@ -999,13 +1012,14 @@ func newHandlerTestDriver() *handlerTestDriver {
 
 	t.lh = &lighthouse.Lighthouse{
 		Zones:           []string{"clusterset.local."},
-		ServiceImports:  setupServiceImportMap(),
 		EndpointSlices:  setupEndpointSliceMap(),
 		ClusterStatus:   t.mockCs,
 		EndpointsStatus: t.mockEs,
 		LocalServices:   t.mockLs,
 		TTL:             uint32(5),
 	}
+
+	t.initServiceImportMap()
 
 	return t
 }
@@ -1023,11 +1037,8 @@ func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case)
 	}
 }
 
-func setupServiceImportMap() *serviceimport.Map {
-	siMap := serviceimport.NewMap(localClusterID)
-	siMap.Put(newServiceImport(namespace1, service1, clusterID, serviceIP, portName1, portNumber1, protocol1, mcsv1a1.ClusterSetIP))
-
-	return siMap
+func (t *handlerTestDriver) initServiceImportMap() {
+	t.lh.ServiceImports = serviceimport.NewMap(localClusterID)
 }
 
 func setupEndpointSliceMap() *endpointslice.Map {
