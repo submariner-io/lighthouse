@@ -51,16 +51,11 @@ type Lighthouse struct {
 	EndpointSlices  *endpointslice.Map
 	ClusterStatus   ClusterStatus
 	EndpointsStatus EndpointsStatus
-	LocalServices   LocalServices
 }
 
 type ClusterStatus interface {
 	IsConnected(clusterID string) bool
 	LocalClusterID() string
-}
-
-type LocalServices interface {
-	GetIP(name, namespace string) (*serviceimport.DNSRecord, bool)
 }
 
 type EndpointsStatus interface {

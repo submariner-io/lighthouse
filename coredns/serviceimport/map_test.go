@@ -73,12 +73,12 @@ var _ = Describe("ServiceImport Map", func() {
 	}
 
 	expectIPsNotFound := func(ns, service, cluster, localCluster string) {
-		_, found, _ := serviceImportMap.GetIP(ns, service, cluster, localCluster, checkCluster, checkEndpoint)
+		_, found := serviceImportMap.GetIP(ns, service, cluster, localCluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeFalse())
 	}
 
 	getDNSRecordExpectFound := func(ns, name, cluster, localCluster string) *serviceimport.DNSRecord {
-		dnsRecord, found, _ := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
+		dnsRecord, found := serviceImportMap.GetIP(ns, name, cluster, localCluster, checkCluster, checkEndpoint)
 		Expect(found).To(BeTrue())
 
 		return dnsRecord

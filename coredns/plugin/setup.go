@@ -28,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/lighthouse/coredns/endpointslice"
 	"github.com/submariner-io/lighthouse/coredns/gateway"
-	"github.com/submariner-io/lighthouse/coredns/service"
 	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -99,24 +98,16 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
 	}
 
-	svcController := service.NewController(gwController.LocalClusterID())
-
-	err = svcController.Start(cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "error starting the Service controller")
-	}
-
 	c.OnShutdown(func() error {
 		siController.Stop()
 		epController.Stop()
 		gwController.Stop()
-		svcController.Stop()
 		return nil
 	})
 
 	lh := &Lighthouse{
 		TTL: defaultTTL, ServiceImports: siMap, ClusterStatus: gwController, EndpointSlices: epMap,
-		EndpointsStatus: epController, LocalServices: svcController,
+		EndpointsStatus: epController,
 	}
 
 	// Changed `for` to `if` to satisfy golint:
