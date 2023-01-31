@@ -27,6 +27,9 @@ updates:
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
+      # These are included by k8s.io/client-go
+      - dependency-name: k8s.io/api
+      - dependency-name: k8s.io/apimachinery
   - package-ecosystem: gomod
     directory: "/coredns"
     schedule:
@@ -34,3 +37,6 @@ updates:
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
+      # These are included by k8s.io/client-go
+      - dependency-name: k8s.io/api
+      - dependency-name: k8s.io/apimachinery
