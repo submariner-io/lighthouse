@@ -7,7 +7,7 @@ require (
 	github.com/coredns/coredns v1.10.1-0.20230123174928-d3e4fc78c3b8
 	github.com/go-logr/logr v1.2.3
 	github.com/miekg/dns v1.1.50
-	github.com/onsi/ginkgo/v2 v2.7.1
+	github.com/onsi/ginkgo/v2 v2.8.0
 	github.com/onsi/gomega v1.26.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
