@@ -60,9 +60,16 @@ var _ = Describe("Plugin setup", func() {
 			Resource: "gateways",
 		}
 
+		submarinersGVR := schema.GroupVersionResource{
+			Group:    "submariner.io",
+			Version:  "v1alpha1",
+			Resource: "submariners",
+		}
+
 		gateway.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
 			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-				gatewaysGVR: "GatewayList",
+				gatewaysGVR:    "GatewayList",
+				submarinersGVR: "SubmarinersList",
 			}), nil
 		}
 
