@@ -155,8 +155,8 @@ func NewMap(localClusterID string) *Map {
 }
 
 func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]; ok {
-		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
+	if name, ok := getSourceName(serviceImport); ok {
+		namespace := getSourceNamespace(serviceImport)
 		key := keyFunc(namespace, name)
 
 		m.mutex.Lock()
@@ -174,7 +174,7 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 		}
 
 		if serviceImport.Spec.Type == mcsv1a1.ClusterSetIP {
-			clusterName := serviceImport.GetLabels()[constants.MCSLabelSourceCluster]
+			clusterName := getSourceCluster(serviceImport)
 
 			record := &DNSRecord{
 				IP:          serviceImport.Spec.IPs[0],
@@ -200,8 +200,8 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 }
 
 func (m *Map) Remove(serviceImport *mcsv1a1.ServiceImport) {
-	if name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]; ok {
-		namespace := serviceImport.Labels[constants.LabelSourceNamespace]
+	if name, ok := getSourceName(serviceImport); ok {
+		namespace := getSourceNamespace(serviceImport)
 		key := keyFunc(namespace, name)
 
 		m.mutex.Lock()
@@ -242,4 +242,32 @@ func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int6
 
 func keyFunc(namespace, name string) string {
 	return namespace + "/" + name
+}
+
+func getSourceName(from *mcsv1a1.ServiceImport) (string, bool) {
+	name, ok := from.Labels[mcsv1a1.LabelServiceName]
+	if ok {
+		return name, true
+	}
+
+	name, ok = from.Annotations["origin-name"]
+	return name, ok
+}
+
+func getSourceNamespace(from *mcsv1a1.ServiceImport) string {
+	ns, ok := from.Labels[constants.LabelSourceNamespace]
+	if ok {
+		return ns
+	}
+
+	return from.Annotations["origin-namespace"]
+}
+
+func getSourceCluster(from *mcsv1a1.ServiceImport) string {
+	c, ok := from.Labels[constants.MCSLabelSourceCluster]
+	if ok {
+		return c
+	}
+
+	return from.Labels["lighthouse.submariner.io/sourceCluster"]
 }

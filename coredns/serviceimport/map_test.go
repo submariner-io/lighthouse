@@ -356,4 +356,17 @@ var _ = Describe("ServiceImport Map", func() {
 			Expect(getDNSRecord(namespace1, service1, "", "").Ports).To(Equal([]mcsv1a1.ServicePort{port1, port2}))
 		})
 	})
+
+	When("a ServiceImport has the legacy annotations", func() {
+		BeforeEach(func() {
+			si := newServiceImport(namespace1, service1, serviceIP1, clusterID1, port1)
+			si.Labels = map[string]string{"lighthouse.submariner.io/sourceCluster": clusterID1}
+			si.Annotations = map[string]string{"origin-name": service1, "origin-namespace": namespace1}
+			serviceImportMap.Put(si)
+		})
+
+		It("should still add it", func() {
+			Expect(getIP(namespace1, service1)).To(Equal(serviceIP1))
+		})
+	})
 })
