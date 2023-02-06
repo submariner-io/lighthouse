@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,7 +86,7 @@ func getNewClientsetFunc() NewClientsetFunc {
 func (c *Controller) Start(kubeConfig *rest.Config) error {
 	gwClientset, err := c.getCheckedClientset(kubeConfig)
 	if apierrors.IsNotFound(err) {
-		klog.Infof("Gateway resource not found, disabling Gateway status controller")
+		klog.Infof("Connectivity component is not installed, disabling Gateway status controller")
 
 		c.gatewayAvailable = false
 
@@ -265,11 +266,30 @@ func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.Resou
 		return nil, errors.Wrap(err, "error creating client set")
 	}
 
-	gvr, _ := schema.ParseResourceArg("gateways.v1.submariner.io")
+	// First check if the Submariner resource is present.
+	gvr, _ := schema.ParseResourceArg("submariners.v1alpha1.submariner.io")
+	list, err := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) || (err == nil && len(list.Items) == 0) {
+		return nil, apierrors.NewNotFound(gvr.GroupResource(), "")
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error listing Submariner resources")
+	}
+
+	gvr, _ = schema.ParseResourceArg("gateways.v1.submariner.io")
 	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
 	_, err = gwClient.List(context.TODO(), metav1.ListOptions{})
 
-	return gwClient, errors.Wrap(err, "error listing resources")
+	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+		return nil, apierrors.NewNotFound(gvr.GroupResource(), "")
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error listing Gateway resources")
+	}
+
+	return gwClient, nil
 }
 
 func copyMap(src map[string]bool) map[string]bool {

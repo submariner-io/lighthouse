@@ -141,9 +141,22 @@ var _ = Describe("Gateway controller", func() {
 		})
 	})
 
-	When("the Gateway resource doesn't exist", func() {
+	When("the Gateway CRD doesn't exist", func() {
 		BeforeEach(func() {
 			t.gatewayReactor.SetFailOnList(errors.NewNotFound(schema.GroupResource{}, ""))
+		})
+
+		When("IsConnected is called", func() {
+			It("should return true", func() {
+				t.awaitIsConnected(localClusterID)
+				t.awaitIsConnected(remoteClusterID1)
+			})
+		})
+	})
+
+	When("the Submariner resource doesn't exist", func() {
+		BeforeEach(func() {
+			t.submarinerObj = nil
 		})
 
 		When("IsConnected is called", func() {
@@ -161,9 +174,16 @@ type testDriver struct {
 	gatewayClient  dynamic.ResourceInterface
 	gatewayReactor *fake.FailingReactor
 	gatewayObj     *unstructured.Unstructured
+	submarinerObj  *unstructured.Unstructured
 }
 
 func newTestDiver() *testDriver {
+	submarinersGVR := schema.GroupVersionResource{
+		Group:    "submariner.io",
+		Version:  "v1alpha1",
+		Resource: "submariners",
+	}
+
 	t := &testDriver{}
 
 	BeforeEach(func() {
@@ -174,19 +194,29 @@ func newTestDiver() *testDriver {
 		}
 
 		t.dynClient = fakeClient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-			gatewaysGVR: "GatewayList",
+			gatewaysGVR:    "GatewayList",
+			submarinersGVR: "SubmarinersList",
 		})
 
 		t.gatewayClient = t.dynClient.Resource(gatewaysGVR).Namespace(corev1.NamespaceAll)
 
 		t.gatewayReactor = fake.NewFailingReactorForResource(&t.dynClient.Fake, "gateways")
 		t.gatewayObj = newGateway()
+
+		t.submarinerObj = &unstructured.Unstructured{}
+		t.submarinerObj.SetName("submariner")
 	})
 
 	JustBeforeEach(func() {
 		t.controller = gateway.NewController()
 		t.controller.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
 			return t.dynClient, nil
+		}
+
+		if t.submarinerObj != nil {
+			_, err := t.dynClient.Resource(submarinersGVR).Namespace("submariner-operator").Create(context.TODO(), t.submarinerObj,
+				metav1.CreateOptions{})
+			Expect(err).To(Succeed())
 		}
 
 		Expect(t.controller.Start(&rest.Config{})).To(Succeed())
