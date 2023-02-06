@@ -47,7 +47,6 @@ import (
 const (
 	serviceUnavailable = "ServiceUnavailable"
 	invalidServiceType = "UnsupportedServiceType"
-	clusterIP          = "cluster-ip"
 )
 
 type AgentConfig struct {
@@ -326,10 +325,6 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		}
 
 		serviceImport.Spec.Ports = a.getPortsForService(svc)
-		/* We also store the clusterIP in an annotation as an optimization to recover it in case the IPs are
-		cleared out when here's no backing Endpoint pods.
-		*/
-		serviceImport.Annotations[clusterIP] = serviceImport.Spec.IPs[0]
 	}
 
 	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, mcsv1a1.ServiceExportValid, corev1.ConditionTrue, "", "")
