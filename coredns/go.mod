@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/coredns/caddy v1.1.1
-	github.com/coredns/coredns v1.10.1-0.20230123174928-d3e4fc78c3b8
+	github.com/coredns/coredns v1.10.1
 	github.com/go-logr/logr v1.2.3
 	github.com/miekg/dns v1.1.50
 	github.com/onsi/ginkgo/v2 v2.8.0
@@ -15,7 +15,7 @@ require (
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
-	sigs.k8s.io/controller-runtime v0.14.2
+	sigs.k8s.io/controller-runtime v0.14.4
 	sigs.k8s.io/mcs-api v0.1.0
 )
 
@@ -28,7 +28,7 @@ require (
 	github.com/DataDog/sketches-go v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.180 // indirect
+	github.com/aws/aws-sdk-go v1.44.194 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -97,15 +97,15 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221227171554-f9683d7f8bef // indirect
-	google.golang.org/grpc v1.52.0 // indirect
+	google.golang.org/grpc v1.52.3 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	gopkg.in/DataDog/dd-trace-go.v1 v1.46.1 // indirect
+	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20220617031823-097006376321 // indirect
 	k8s.io/klog v1.0.0 // indirect
-	k8s.io/klog/v2 v2.80.1 // indirect
+	k8s.io/klog/v2 v2.90.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
