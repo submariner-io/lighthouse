@@ -43,7 +43,6 @@ type clusterInfo struct {
 }
 
 type serviceInfo struct {
-	key        string
 	records    map[string]*clusterInfo
 	balancer   loadbalancer.Interface
 	isHeadless bool
@@ -166,7 +165,6 @@ func (m *Map) Put(serviceImport *mcsv1a1.ServiceImport) {
 
 		if !ok {
 			remoteService = &serviceInfo{
-				key:        key,
 				records:    make(map[string]*clusterInfo),
 				balancer:   loadbalancer.NewSmoothWeightedRR(),
 				isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,

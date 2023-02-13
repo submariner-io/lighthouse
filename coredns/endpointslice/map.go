@@ -36,7 +36,6 @@ import (
 )
 
 type endpointInfo struct {
-	key         string
 	clusterInfo map[string]*clusterInfo
 }
 
@@ -157,7 +156,6 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	epInfo, ok := m.epMap[key]
 	if !ok {
 		epInfo = &endpointInfo{
-			key:         key,
 			clusterInfo: make(map[string]*clusterInfo),
 		}
 	}
