@@ -120,11 +120,12 @@ func nextSmoothWeightedItem(items []*weightedItem) (best *weightedItem) {
 
 	for _, item := range items {
 		item.currentWeight += item.effectiveWeight
-		total += item.effectiveWeight
 
 		if item.effectiveWeight < item.weight {
 			item.effectiveWeight++
 		}
+
+		total += item.effectiveWeight
 
 		if best == nil || item.currentWeight > best.currentWeight {
 			best = item
