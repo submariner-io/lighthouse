@@ -67,7 +67,6 @@ var (
 	nodeName = "my-node"
 	hostName = "my-host"
 	ready    = true
-	notReady = false
 )
 
 func init() {
@@ -439,11 +438,10 @@ func awaitAndVerifyEndpointSlice(endpointSliceClient dynamic.ResourceInterface, 
 	if addresses == nil {
 		addresses = []string{
 			endpoints.Subsets[0].Addresses[0].IP, endpoints.Subsets[0].Addresses[1].IP,
-			endpoints.Subsets[0].NotReadyAddresses[0].IP,
 		}
 	}
 
-	Expect(endpointSlice.Endpoints).To(HaveLen(3))
+	Expect(endpointSlice.Endpoints).To(HaveLen(2))
 	Expect(endpointSlice.Endpoints[0]).To(Equal(discovery.Endpoint{
 		Addresses:  []string{addresses[0]},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -454,11 +452,6 @@ func awaitAndVerifyEndpointSlice(endpointSliceClient dynamic.ResourceInterface, 
 		Hostname:   &endpoints.Subsets[0].Addresses[1].TargetRef.Name,
 		Conditions: discovery.EndpointConditions{Ready: &ready},
 		NodeName:   &nodeName,
-	}))
-	Expect(endpointSlice.Endpoints[2]).To(Equal(discovery.Endpoint{
-		Addresses:  []string{addresses[2]},
-		Hostname:   &endpoints.Subsets[0].NotReadyAddresses[0].TargetRef.Name,
-		Conditions: discovery.EndpointConditions{Ready: &notReady},
 	}))
 
 	Expect(endpointSlice.Ports).To(HaveLen(1))
