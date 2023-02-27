@@ -162,20 +162,12 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 			})
 		}
 
-		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
+		if allAddressesIPv6(subset.Addresses) {
 			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
 
 		newEndpoints, retry := e.getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)
 		if retry {
-			return nil, true
-		}
-
-		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
-
-		newEndpoints, retry = e.getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)
-		if retry {
-			// TODO: We may not want unready endpoints at all
 			return nil, true
 		}
 
