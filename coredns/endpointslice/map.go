@@ -186,6 +186,12 @@ func (m *Map) Put(es *discovery.EndpointSlice) {
 	}
 
 	for _, endpoint := range es.Endpoints {
+		// Skip if not ready. Note: we're treating nil as ready to be on the safe side as the EndpointConditions doc
+		// states "In most cases consumers should interpret this unknown state (ie nil) as ready".
+		if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+			continue
+		}
+
 		var records []serviceimport.DNSRecord
 
 		addresses := endpoint.Addresses
