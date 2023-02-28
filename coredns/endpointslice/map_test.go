@@ -29,6 +29,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -161,6 +162,12 @@ func newEndpointSlice(namespace, name, clusterID string, endpointIPs []string) *
 		Endpoints: []discovery.Endpoint{
 			{
 				Addresses: endpointIPs,
+			},
+			{
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready: pointer.Bool(false),
+				},
 			},
 		},
 	}
