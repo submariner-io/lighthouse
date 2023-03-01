@@ -25,8 +25,7 @@ import (
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/go-logr/logr"
-	"github.com/submariner-io/lighthouse/coredns/endpointslice"
-	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	"github.com/submariner-io/lighthouse/coredns/resolver"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -43,23 +42,12 @@ var errInvalidRequest = errors.New("invalid query name")
 var log = clog.NewWithPlugin(PluginName)
 
 type Lighthouse struct {
-	Next            plugin.Handler
-	Fall            fall.F
-	Zones           []string
-	TTL             uint32
-	ServiceImports  *serviceimport.Map
-	EndpointSlices  *endpointslice.Map
-	ClusterStatus   ClusterStatus
-	EndpointsStatus EndpointsStatus
-}
-
-type ClusterStatus interface {
-	IsConnected(clusterID string) bool
-	LocalClusterID() string
-}
-
-type EndpointsStatus interface {
-	IsHealthy(name, namespace, clusterID string) bool
+	Next          plugin.Handler
+	Fall          fall.F
+	Zones         []string
+	TTL           uint32
+	ClusterStatus resolver.ClusterStatus
+	Resolver      *resolver.Interface
 }
 
 var _ plugin.Handler = &Lighthouse{}

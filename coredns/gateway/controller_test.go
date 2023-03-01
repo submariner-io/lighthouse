@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -209,9 +208,6 @@ func newTestDiver() *testDriver {
 
 	JustBeforeEach(func() {
 		t.controller = gateway.NewController()
-		t.controller.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
-			return t.dynClient, nil
-		}
 
 		if t.submarinerObj != nil {
 			_, err := t.dynClient.Resource(submarinersGVR).Namespace("submariner-operator").Create(context.TODO(), t.submarinerObj,
@@ -219,7 +215,7 @@ func newTestDiver() *testDriver {
 			Expect(err).To(Succeed())
 		}
 
-		Expect(t.controller.Start(&rest.Config{})).To(Succeed())
+		Expect(t.controller.Start(t.dynClient)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -259,7 +255,7 @@ func (t *testDriver) localClusterIDUpdateValidationTest(originalLocalClusterID, 
 
 func (t *testDriver) awaitValidLocalClusterID(clusterID string) {
 	Eventually(func() string {
-		return t.controller.LocalClusterID()
+		return t.controller.GetLocalClusterID()
 	}, 5).Should(Equal(clusterID))
 }
 

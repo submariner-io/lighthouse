@@ -26,11 +26,17 @@ import (
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/lighthouse/coredns/endpointslice"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/lighthouse/coredns/gateway"
-	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	"k8s.io/client-go/kubernetes"
+	"github.com/submariner-io/lighthouse/coredns/resolver"
+	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var (
@@ -38,12 +44,23 @@ var (
 	kubeconfig string
 )
 
-// Hook for unit tests.
-var buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
+// Hooks for unit tests.
+var (
+	buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
+
+	newDynamicClient = func(c *rest.Config) (dynamic.Interface, error) {
+		return dynamic.NewForConfig(c)
+	}
+
+	restMapper meta.RESTMapper
+)
 
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
 func init() {
+	utilruntime.Must(mcsv1a1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(discovery.AddToScheme(scheme.Scheme))
+
 	caddy.RegisterPlugin(PluginName, caddy.Plugin{
 		ServerType: "dns",
 		Action:     setupLighthouse,
@@ -76,39 +93,38 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	gwController := gateway.NewController()
 
-	err = gwController.Start(cfg)
+	localClient, err := newDynamicClient(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating local client")
+	}
+
+	lh := &Lighthouse{
+		TTL:           defaultTTL,
+		ClusterStatus: gwController,
+		Resolver:      resolver.New(gwController, localClient),
+	}
+
+	err = gwController.Start(localClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
 
-	siMap := serviceimport.NewMap(gwController.LocalClusterID())
-	siController := serviceimport.NewController(siMap)
+	resolverController := resolver.NewController(lh.Resolver)
 
-	err = siController.Start(cfg)
+	err = resolverController.Start(watcher.Config{
+		RestConfig: cfg,
+		Client:     localClient,
+		RestMapper: restMapper,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error starting the ServiceImport controller")
-	}
-
-	kubeClient := kubernetes.NewForConfigOrDie(cfg)
-	epMap := endpointslice.NewMap(gwController.LocalClusterID(), kubeClient)
-	epController := endpointslice.NewController(epMap)
-
-	err = epController.Start(cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "error starting the EndpointSlice controller")
+		return nil, errors.Wrap(err, "error starting the resolver controller")
 	}
 
 	c.OnShutdown(func() error {
-		siController.Stop()
-		epController.Stop()
 		gwController.Stop()
+		resolverController.Stop()
 		return nil
 	})
-
-	lh := &Lighthouse{
-		TTL: defaultTTL, ServiceImports: siMap, ClusterStatus: gwController, EndpointSlices: epMap,
-		EndpointsStatus: epController,
-	}
 
 	// Changed `for` to `if` to satisfy golint:
 	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)

@@ -24,11 +24,11 @@ import (
 
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	"github.com/submariner-io/lighthouse/coredns/serviceimport"
+	"github.com/submariner-io/lighthouse/coredns/resolver"
 	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state *request.Request) []dns.RR {
+func (lh *Lighthouse) createARecords(dnsrecords []resolver.DNSRecord, state *request.Request) []dns.RR {
 	records := make([]dns.RR, 0)
 
 	for _, record := range dnsrecords {
@@ -42,7 +42,7 @@ func (lh *Lighthouse) createARecords(dnsrecords []serviceimport.DNSRecord, state
 	return records
 }
 
-func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, state *request.Request, pReq *recordRequest, zone string,
+func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *request.Request, pReq *recordRequest, zone string,
 	isHeadless bool,
 ) []dns.RR {
 	var records []dns.RR
@@ -94,11 +94,4 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []serviceimport.DNSRecord, sta
 	}
 
 	return records
-}
-
-func (lh *Lighthouse) getClusterIPForSvc(pReq *recordRequest) (*serviceimport.DNSRecord, bool) {
-	localClusterID := lh.ClusterStatus.LocalClusterID()
-
-	return lh.ServiceImports.GetIP(pReq.namespace, pReq.service, pReq.cluster, localClusterID, lh.ClusterStatus.IsConnected,
-		lh.EndpointsStatus.IsHealthy)
 }

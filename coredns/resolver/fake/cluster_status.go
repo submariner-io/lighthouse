@@ -69,3 +69,10 @@ func (c *ClusterStatus) DisconnectClusterID(clusterID string) {
 
 	c.connectedClusterIDs.Delete(clusterID)
 }
+
+func (c *ClusterStatus) ConnectClusterID(clusterID string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.connectedClusterIDs.Insert(clusterID)
+}
