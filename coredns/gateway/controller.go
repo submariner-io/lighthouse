@@ -36,20 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Gateway")}
 
-type NewClientsetFunc func(c *rest.Config) (dynamic.Interface, error)
-
-// NewClientset is an indirection hook for unit tests to supply fake client sets.
-var NewClientset NewClientsetFunc
-
 type Controller struct {
-	NewClientset     NewClientsetFunc
 	informer         cache.Controller
 	store            cache.Store
 	queue            workqueue.Interface
@@ -61,7 +54,6 @@ type Controller struct {
 
 func NewController() *Controller {
 	controller := &Controller{
-		NewClientset:     getNewClientsetFunc(),
 		queue:            workqueue.New("Gateway Controller"),
 		stopCh:           make(chan struct{}),
 		gatewayAvailable: true,
@@ -77,18 +69,8 @@ func NewController() *Controller {
 	return controller
 }
 
-func getNewClientsetFunc() NewClientsetFunc {
-	if NewClientset != nil {
-		return NewClientset
-	}
-
-	return func(c *rest.Config) (dynamic.Interface, error) {
-		return dynamic.NewForConfig(c)
-	}
-}
-
-func (c *Controller) Start(kubeConfig *rest.Config) error {
-	gwClientset, err := c.getCheckedClientset(kubeConfig)
+func (c *Controller) Start(client dynamic.Interface) error {
+	gwClientset, err := c.getCheckedClientset(client)
 	if apierrors.IsNotFound(err) {
 		logger.Infof("Connectivity component is not installed, disabling Gateway status controller")
 
@@ -100,7 +82,7 @@ func (c *Controller) Start(kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
-	
+
 	logger.Infof("Starting Gateway status Controller")
 
 	//nolint:wrapcheck // Let the caller wrap these errors.
@@ -211,7 +193,7 @@ func (c *Controller) updateClusterStatusMap(connections []interface{}) {
 }
 
 func (c *Controller) updateLocalClusterIDIfNeeded(clusterID string) {
-	updateNeeded := clusterID != "" && clusterID != c.LocalClusterID()
+	updateNeeded := clusterID != "" && clusterID != c.GetLocalClusterID()
 	if updateNeeded {
 		logger.Infof("Updating the gateway localClusterID %q ", clusterID)
 		c.localClusterID.Store(clusterID)
@@ -264,15 +246,10 @@ func (c *Controller) getClusterStatusMap() map[string]bool {
 	return c.clusterStatusMap.Load().(map[string]bool)
 }
 
-func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.ResourceInterface, error) {
-	clientSet, err := c.NewClientset(kubeConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating client set")
-	}
-
+func (c *Controller) getCheckedClientset(client dynamic.Interface) (dynamic.ResourceInterface, error) {
 	// First check if the Submariner resource is present.
 	gvr, _ := schema.ParseResourceArg("submariners.v1alpha1.submariner.io")
-	list, err := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := client.Resource(*gvr).Namespace(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) || (err == nil && len(list.Items) == 0) {
 		return nil, apierrors.NewNotFound(gvr.GroupResource(), "")
 	}
@@ -282,7 +259,7 @@ func (c *Controller) getCheckedClientset(kubeConfig *rest.Config) (dynamic.Resou
 	}
 
 	gvr, _ = schema.ParseResourceArg("gateways.v1.submariner.io")
-	gwClient := clientSet.Resource(*gvr).Namespace(v1.NamespaceAll)
+	gwClient := client.Resource(*gvr).Namespace(v1.NamespaceAll)
 	_, err = gwClient.List(context.TODO(), metav1.ListOptions{})
 
 	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
@@ -310,6 +287,6 @@ func (c *Controller) IsConnected(clusterID string) bool {
 	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
 }
 
-func (c *Controller) LocalClusterID() string {
+func (c *Controller) GetLocalClusterID() string {
 	return c.localClusterID.Load().(string)
 }
