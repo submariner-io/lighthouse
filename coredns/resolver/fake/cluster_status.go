@@ -19,29 +19,53 @@ limitations under the License.
 package fake
 
 import (
+	"sync"
 	"sync/atomic"
 
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type ClusterStatus struct {
-	ConnectedClusterIDs stringset.Interface
-	LocalClusterID      atomic.Value
+	mutex               sync.Mutex
+	connectedClusterIDs sets.Set[string]
+	localClusterID      atomic.Value
 }
 
 func NewClusterStatus(localClusterID string, isConnected ...string) *ClusterStatus {
 	c := &ClusterStatus{
-		ConnectedClusterIDs: stringset.NewSynchronized(isConnected...),
+		connectedClusterIDs: sets.New(isConnected...),
 	}
 
-	c.LocalClusterID.Store(localClusterID)
+	c.localClusterID.Store(localClusterID)
+
 	return c
 }
 
 func (c *ClusterStatus) IsConnected(clusterID string) bool {
-	return c.ConnectedClusterIDs.Contains(clusterID)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return c.connectedClusterIDs.Has(clusterID)
+}
+
+func (c *ClusterStatus) SetLocalClusterID(clusterID string) {
+	c.localClusterID.Store(clusterID)
 }
 
 func (c *ClusterStatus) GetLocalClusterID() string {
-	return c.LocalClusterID.Load().(string)
+	return c.localClusterID.Load().(string)
+}
+
+func (c *ClusterStatus) DisconnectAll() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.connectedClusterIDs.Delete(c.connectedClusterIDs.UnsortedList()...)
+}
+
+func (c *ClusterStatus) DisconnectClusterID(clusterID string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.connectedClusterIDs.Delete(clusterID)
 }

@@ -69,7 +69,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and it becomes disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.RemoveAll()
+			t.clusterStatus.DisconnectAll()
 		})
 
 		It("should return no DNS records", func() {
@@ -139,7 +139,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("and one is the local cluster", func() {
 		BeforeEach(func() {
-			t.clusterStatus.LocalClusterID.Store(clusterID1)
+			t.clusterStatus.SetLocalClusterID(clusterID1)
 		})
 
 		It("should consistently return its DNS record", func() {
@@ -157,7 +157,7 @@ func testClusterIPServiceInTwoClusters() {
 		}
 
 		BeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.Remove(clusterID1)
+			t.clusterStatus.DisconnectClusterID(clusterID1)
 		})
 
 		Context("and no specific cluster is requested", func() {
@@ -187,7 +187,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("and both become disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.RemoveAll()
+			t.clusterStatus.DisconnectAll()
 		})
 
 		It("should return no DNS records", func() {
@@ -251,7 +251,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("and a non-existent local cluster is specified", func() {
 		BeforeEach(func() {
-			t.clusterStatus.LocalClusterID.Store("non-existent")
+			t.clusterStatus.SetLocalClusterID("non-existent")
 		})
 
 		It("should consistently return the DNS records round-robin", func() {
@@ -301,7 +301,7 @@ func testClusterIPServiceInThreeClusters() {
 
 	Context("and one becomes disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.Remove(clusterID3)
+			t.clusterStatus.DisconnectClusterID(clusterID3)
 		})
 
 		It("should consistently return the connected clusters' DNS records round-robin", func() {
@@ -333,7 +333,7 @@ func testClusterIPServiceInThreeClusters() {
 
 	Context("and one becomes disconnected and one becomes unhealthy", func() {
 		BeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.Remove(clusterID2)
+			t.clusterStatus.DisconnectClusterID(clusterID2)
 			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, false))
 		})
 

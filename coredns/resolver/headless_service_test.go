@@ -137,7 +137,7 @@ func testHeadlessServiceInMultipleClusters() {
 
 	Context("and one is on the local cluster", func() {
 		BeforeEach(func() {
-			t.clusterStatus.LocalClusterID.Store(clusterID3)
+			t.clusterStatus.SetLocalClusterID(clusterID3)
 
 			// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
 			// return true to requeue.
@@ -183,7 +183,7 @@ func testHeadlessServiceInMultipleClusters() {
 
 	Context("and one becomes disconnected", func() {
 		JustBeforeEach(func() {
-			t.clusterStatus.ConnectedClusterIDs.Remove(clusterID3)
+			t.clusterStatus.DisconnectClusterID(clusterID3)
 		})
 
 		Context("and no specific cluster is requested", func() {
