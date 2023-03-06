@@ -28,18 +28,14 @@ import (
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/coredns/endpointslice"
-	"github.com/submariner-io/lighthouse/coredns/gateway"
-	"github.com/submariner-io/lighthouse/coredns/serviceimport"
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	fakeKubeClient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
-	fakeMCSClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned/fake"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 type fakeHandler struct{}
@@ -66,24 +62,18 @@ var _ = Describe("Plugin setup", func() {
 			Resource: "submariners",
 		}
 
-		gateway.NewClientset = func(c *rest.Config) (dynamic.Interface, error) {
-			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+		newDynamicClient = func(c *rest.Config) (dynamic.Interface, error) {
+			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
 				gatewaysGVR:    "GatewayList",
 				submarinersGVR: "SubmarinersList",
 			}), nil
 		}
 
-		serviceimport.NewClientset = func(kubeConfig *rest.Config) (mcsClientset.Interface, error) {
-			return fakeMCSClientset.NewSimpleClientset(), nil
-		}
-
-		endpointslice.NewClientset = func(kubeConfig *rest.Config) (kubernetes.Interface, error) {
-			return fakeKubeClient.NewSimpleClientset(), nil
-		}
+		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1a1.ServiceImport{})
 	})
 
 	AfterEach(func() {
-		gateway.NewClientset = nil
+		newDynamicClient = nil
 	})
 
 	Context("Parsing correct configurations", testCorrectConfig)

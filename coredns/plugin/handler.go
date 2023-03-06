@@ -26,7 +26,6 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	"github.com/submariner-io/lighthouse/coredns/serviceimport"
 )
 
 const PluginName = "lighthouse"
@@ -70,25 +69,10 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
 	r *dns.Msg, pReq *recordRequest,
 ) (int, error) {
-	var isHeadless bool
-	var (
-		dnsRecords []serviceimport.DNSRecord
-		found      bool
-		record     *serviceimport.DNSRecord
-	)
-
-	record, found = lh.getClusterIPForSvc(pReq)
+	dnsRecords, isHeadless, found := lh.Resolver.GetDNSRecords(pReq.namespace, pReq.service, pReq.cluster, pReq.hostname)
 	if !found {
-		dnsRecords, found = lh.EndpointSlices.GetDNSRecords(pReq.hostname, pReq.cluster, pReq.namespace,
-			pReq.service, lh.ClusterStatus.IsConnected)
-		if !found {
-			log.Debugf("No record found for %q", state.QName())
-			return lh.nextOrFailure(ctx, state, r, dns.RcodeNameError)
-		}
-
-		isHeadless = true
-	} else if record != nil && record.IP != "" {
-		dnsRecords = append(dnsRecords, *record)
+		log.Debugf("No record found for %q", state.QName())
+		return lh.nextOrFailure(ctx, state, r, dns.RcodeNameError)
 	}
 
 	if len(dnsRecords) == 0 {
@@ -102,7 +86,7 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 	}
 
 	// Count records
-	localClusterID := lh.ClusterStatus.LocalClusterID()
+	localClusterID := lh.ClusterStatus.GetLocalClusterID()
 	for _, record := range dnsRecords {
 		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace, record.IP)
 	}
