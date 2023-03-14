@@ -8,10 +8,10 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/miekg/dns v1.1.52
 	github.com/onsi/ginkgo/v2 v2.9.1
-	github.com/onsi/gomega v1.27.3
+	github.com/onsi/gomega v1.27.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/submariner-io/admiral v0.15.0-m3
+	github.com/submariner-io/admiral v0.15.0-m4
 	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
 	k8s.io/client-go v0.26.2
