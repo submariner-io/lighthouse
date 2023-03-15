@@ -20,18 +20,28 @@ package controller_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("ServiceImport syncing", func() {
+var _ = Describe("ClusterIP Service export", func() {
+	Describe("Single cluster", testClusterIPServiceInOneCluster)
+})
+
+func testClusterIPServiceInOneCluster() {
 	var t *testDriver
 
 	BeforeEach(func() {
 		t = newTestDiver()
+
+		t.cluster1.createEndpoints()
 	})
 
 	JustBeforeEach(func() {
@@ -44,145 +54,118 @@ var _ = Describe("ServiceImport syncing", func() {
 
 	When("a ServiceExport is created", func() {
 		Context("and the Service already exists", func() {
-			It("should correctly sync a ServiceImport and update the ServiceExport status", func() {
-				t.createService()
-				t.createServiceExport()
-				t.awaitServiceExported(t.service.Spec.ClusterIP)
+			It("should export the service and update the ServiceExport status", func() {
+				t.cluster1.createService()
+				t.cluster1.createServiceExport()
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
 		})
 
 		Context("and the Service doesn't initially exist", func() {
-			It("should initially update the ServiceExport status to Initialized and eventually sync a ServiceImport", func() {
-				t.createServiceExport()
-				t.awaitServiceUnavailableStatus()
+			It("should eventually export the service", func() {
+				t.cluster1.createServiceExport()
+				t.cluster1.awaitServiceUnavailableStatus()
 
-				t.createService()
-				t.awaitServiceExported(t.service.Spec.ClusterIP)
+				t.cluster1.createService()
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
 		})
 	})
 
-	When("a ServiceExport is deleted after a ServiceImport is synced", func() {
-		It("should delete the ServiceImport", func() {
-			t.createService()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+	When("a ServiceExport is deleted after the service is exported", func() {
+		It("should unexport the service", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 
-			t.deleteServiceExport()
-			t.awaitServiceUnexported()
+			t.cluster1.deleteServiceExport()
+			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
 
 	When("an exported Service is deleted and recreated while the ServiceExport still exists", func() {
-		It("should delete and recreate the ServiceImport", func() {
-			t.createService()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+		It("should unexport and re-export the service", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+			t.cluster1.localDynClient.Fake.ClearActions()
 
-			t.deleteService()
-			t.awaitServiceUnexported()
-			t.awaitServiceUnavailableStatus()
-			t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.deleteService()
+			t.cluster1.awaitServiceUnavailableStatus()
+			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+			t.awaitServiceUnexported(&t.cluster1)
 
-			t.createService()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.cluster1.createService()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
 	})
 
 	When("the type of an exported Service is updated to an unsupported type", func() {
-		It("should delete the ServiceImport and update the ServiceExport status", func() {
-			t.createService()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+		It("should unexport the ServiceImport and update the ServiceExport status appropriately", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 
-			t.service.Spec.Type = corev1.ServiceTypeNodePort
-			t.updateService()
+			t.cluster1.service.Spec.Type = corev1.ServiceTypeNodePort
+			t.cluster1.updateService()
 
-			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
-			t.awaitServiceUnexported()
-			t.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
-		})
-	})
-
-	When("the ServiceImport sync initially fails", func() {
-		BeforeEach(func() {
-			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("mock create error")
-		})
-
-		It("should eventually update the ServiceExport status to successfully synced", func() {
-			t.createService()
-			t.createServiceExport()
-
-			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-			t.ensureNoServiceExportCondition(constants.ServiceExportSynced)
-
-			t.cluster1.localServiceImportClient.PersistentFailOnCreate.Store("")
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
 
 	When("a ServiceExport is created for a Service whose type is unsupported", func() {
 		BeforeEach(func() {
-			t.service.Spec.Type = corev1.ServiceTypeNodePort
+			t.cluster1.service.Spec.Type = corev1.ServiceTypeNodePort
 		})
 
 		JustBeforeEach(func() {
-			t.createService()
-			t.createServiceExport()
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
 		})
 
-		It("should update the ServiceExport status appropriately and not sync a ServiceImport", func() {
-			t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
-			t.awaitNoServiceImport(t.brokerServiceImportClient)
-			t.ensureNoServiceExportCondition(constants.ServiceExportSynced)
+		It("should update the ServiceExport status appropriately and not export the serviceImport", func() {
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportSynced)
 		})
 
 		Context("and is subsequently updated to a supported type", func() {
-			It("should eventually sync a ServiceImport and update the ServiceExport status appropriately", func() {
-				t.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
+			It("should eventually export the service and update the ServiceExport status appropriately", func() {
+				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
 
-				t.service.Spec.Type = corev1.ServiceTypeClusterIP
-				t.updateService()
+				t.cluster1.service.Spec.Type = corev1.ServiceTypeClusterIP
+				t.cluster1.updateService()
 
-				t.awaitServiceExported(t.service.Spec.ClusterIP)
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
 		})
 	})
 
-	When("a Service has port information", func() {
-		BeforeEach(func() {
-			t.service.Spec.Ports = []corev1.ServicePort{
-				{
-					Name:     "eth0",
-					Protocol: corev1.ProtocolTCP,
-					Port:     123,
-				},
-				{
-					Name:     "eth1",
-					Protocol: corev1.ProtocolTCP,
-					Port:     1234,
-				},
-			}
+	When("the backend Endpoints has no ready addresses", func() {
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
 
-		It("should set the appropriate port information in the ServiceImport", func() {
-			t.createService()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
+		Specify("the EndpointSlice's service IP address should indicate not ready", func() {
+			t.cluster1.endpoints.Subsets[0].Addresses = nil
+
+			t.cluster1.updateEndpoints()
+			t.awaitEndpointSlice(&t.cluster1)
 		})
 	})
 
 	When("two Services with the same name in different namespaces are exported", func() {
-		It("should sync ServiceImport and EndpointSlice resources for each", func() {
-			t.createEndpoints()
-			t.createService()
-			t.createServiceExport()
-			t.awaitServiceExported(t.service.Spec.ClusterIP)
-			t.awaitEndpointSlice()
+		It("should correctly export both services", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      t.service.Name,
+					Name:      t.cluster1.service.Name,
 					Namespace: "other-service-ns",
 				},
 				Spec: corev1.ServiceSpec{
@@ -204,22 +187,63 @@ var _ = Describe("ServiceImport syncing", func() {
 				},
 			}
 
-			test.CreateResource(dynamicEndpointsClient(t.cluster1.localDynClient, endpoints.Namespace), endpoints)
-			test.CreateResource(t.cluster1.dynamicServiceClient().Namespace(service.Namespace), service)
-			test.CreateResource(serviceExportClient(t.cluster1.localDynClient, service.Namespace), serviceExport)
+			expServiceImport := &mcsv1a1.ServiceImport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service.Name,
+					Namespace: service.Namespace,
+				},
+				Spec: mcsv1a1.ServiceImportSpec{
+					Type:  mcsv1a1.ClusterSetIP,
+					Ports: []mcsv1a1.ServicePort{},
+				},
+				Status: mcsv1a1.ServiceImportStatus{
+					Clusters: []mcsv1a1.ClusterStatus{
+						{
+							Cluster: t.cluster1.clusterID,
+						},
+					},
+				},
+			}
 
-			t.cluster1.awaitServiceImport(service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
-			awaitServiceImport(t.brokerServiceImportClient, service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
-			t.cluster2.awaitServiceImport(service, mcsv1a1.ClusterSetIP, service.Spec.ClusterIP)
+			expEndpointSlice := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service.Name,
+					Namespace: service.Namespace,
+					Labels: map[string]string{
+						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+						constants.MCSLabelSourceCluster: t.cluster1.clusterID,
+						mcsv1a1.LabelServiceName:        service.Name,
+						constants.LabelSourceNamespace:  service.Namespace,
+					},
+				},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses:  []string{service.Spec.ClusterIP},
+						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+					},
+				},
+			}
 
-			awaitEndpointSlice(endpointSliceClient(t.cluster1.localDynClient, service.Namespace), endpoints.Namespace, endpoints.Name)
-			awaitEndpointSlice(t.brokerEndpointSliceClient, endpoints.Namespace, endpoints.Name)
-			awaitEndpointSlice(endpointSliceClient(t.cluster2.localDynClient, service.Namespace), endpoints.Namespace, endpoints.Name)
+			test.CreateResource(endpointsClientFor(t.cluster1.localDynClient, endpoints.Namespace), endpoints)
+			test.CreateResource(t.cluster1.dynamicServiceClientFor().Namespace(service.Namespace), service)
+			test.CreateResource(serviceExportClientFor(t.cluster1.localDynClient, service.Namespace), serviceExport)
+
+			awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport)
+			awaitEndpointSlice(endpointSliceClientFor(t.cluster2.localDynClient, endpoints.Namespace), expEndpointSlice)
 
 			// Ensure the resources for the first Service weren't overwritten
-			t.cluster1.awaitServiceImport(t.service, mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
-			t.awaitBrokerServiceImport(mcsv1a1.ClusterSetIP, t.service.Spec.ClusterIP)
-			t.awaitEndpointSlice()
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
 		})
 	})
-})
+
+	Specify("an EndpointSlice not managed by Lighthouse should not be synced to the broker", func() {
+		test.CreateResource(endpointSliceClientFor(t.cluster1.localDynClient, t.cluster1.service.Namespace),
+			&discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Name:   "other-eps",
+				Labels: map[string]string{discovery.LabelManagedBy: "other"},
+			}})
+
+		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient, test.RemoteNamespace)), "other-eps")
+	})
+}

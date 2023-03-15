@@ -20,11 +20,14 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -38,27 +41,29 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 func startEndpointController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
-	serviceImport *mcsv1a1.ServiceImport, serviceImportNameSpace, serviceName, clusterID string,
-	globalIngressIPCache *globalIngressIPCache,
+	serviceImport *mcsv1a1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
 ) (*EndpointController, error) {
-	logger.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceImportNameSpace, serviceName)
+	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
+	serviceName := serviceImport.Labels[mcsv1a1.LabelServiceName]
+
+	logger.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceNamespace, serviceName)
 
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
 
 	controller := &EndpointController{
-		clusterID:                    clusterID,
-		serviceImportName:            serviceImport.Name,
-		serviceImportSourceNameSpace: serviceImportNameSpace,
-		serviceName:                  serviceName,
-		stopCh:                       make(chan struct{}),
-		isHeadless:                   serviceImport.Spec.Type == mcsv1a1.Headless,
-		globalIngressIPCache:         globalIngressIPCache,
-		localClient:                  localClient,
-		ingressIPClient:              localClient.Resource(*globalIngressIPGVR),
+		clusterID:            clusterID,
+		serviceNamespace:     serviceNamespace,
+		serviceName:          serviceName,
+		serviceImportSpec:    &serviceImport.Spec,
+		stopCh:               make(chan struct{}),
+		globalIngressIPCache: globalIngressIPCache,
+		localClient:          localClient,
+		ingressIPClient:      localClient.Resource(*globalIngressIPGVR),
 	}
 
 	nameSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
@@ -66,11 +71,10 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	epsSyncer, err := syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Endpoints -> EndpointSlice",
 		SourceClient:        localClient,
-		SourceNamespace:     serviceImportNameSpace,
+		SourceNamespace:     serviceNamespace,
 		SourceFieldSelector: nameSelector.String(),
-		Direction:           syncer.LocalToRemote,
 		RestMapper:          restMapper,
-		Federator:           broker.NewFederator(localClient, restMapper, serviceImportNameSpace, "", "ownerReferences"),
+		Federator:           federate.NewCreateOrUpdateFederator(localClient, restMapper, serviceNamespace, "", "ownerReferences"),
 		ResourceType:        &corev1.Endpoints{},
 		Transform:           controller.endpointsToEndpointSlice,
 		Scheme:              scheme,
@@ -89,29 +93,43 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 func (e *EndpointController) stop() {
 	e.stopOnce.Do(func() {
 		close(e.stopCh)
-		e.cleanup()
 	})
 }
 
-func (e *EndpointController) cleanup() {
+func (e *EndpointController) cleanup() (bool, error) {
 	resourceClient := e.localClient.Resource(schema.GroupVersionResource{
 		Group:    discovery.SchemeGroupVersion.Group,
 		Version:  discovery.SchemeGroupVersion.Version,
 		Resource: "endpointslices",
-	}).Namespace(e.serviceImportSourceNameSpace)
+	}).Namespace(e.serviceNamespace)
 
-	// MCS-compliant labels
-	err := resourceClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
+			discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+			constants.LabelSourceNamespace:  e.serviceNamespace,
 			constants.MCSLabelSourceCluster: e.clusterID,
 			mcsv1a1.LabelServiceName:        e.serviceName,
 		}).String(),
-	})
+	}
+
+	list, err := resourceClient.List(context.Background(), listOptions)
+	if err != nil {
+		return false, errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
+			e.serviceNamespace, e.serviceName)
+	}
+
+	if len(list.Items) == 0 {
+		return false, nil
+	}
+
+	err = resourceClient.DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions)
 
 	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the EndpointSlices associated with ServiceImport %q", e.serviceImportName)
+		return false, errors.Wrapf(err, "error deleting the EndpointSlices associated with service %s/%s",
+			e.serviceNamespace, e.serviceName)
 	}
+
+	return true, nil
 }
 
 func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
@@ -140,26 +158,31 @@ func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numReq
 func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoints, op syncer.Operation) (
 	runtime.Object, bool,
 ) {
-	endpointSlice := &discovery.EndpointSlice{}
-
-	endpointSlice.Name = e.endpointSliceNameFrom(endpoints)
-	endpointSlice.Labels = map[string]string{
-		discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-		constants.LabelSourceNamespace:  e.serviceImportSourceNameSpace,
-		constants.MCSLabelSourceCluster: e.clusterID,
-		mcsv1a1.LabelServiceName:        e.serviceName,
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e.endpointSliceNameFrom(endpoints),
+			Labels: map[string]string{
+				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+				constants.LabelSourceNamespace:  e.serviceNamespace,
+				constants.MCSLabelSourceCluster: e.clusterID,
+				mcsv1a1.LabelServiceName:        e.serviceName,
+				constants.LabelIsHeadless:       strconv.FormatBool(e.isHeadless()),
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
 	}
-
-	endpointSlice.AddressType = discovery.AddressTypeIPv4
 
 	if len(endpoints.Subsets) > 0 {
 		subset := endpoints.Subsets[0]
-		for i := range subset.Ports {
-			endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-				Port:     &subset.Ports[i].Port,
-				Name:     &subset.Ports[i].Name,
-				Protocol: &subset.Ports[i].Protocol,
-			})
+
+		if e.isHeadless() {
+			for i := range subset.Ports {
+				endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
+					Port:     &subset.Ports[i].Port,
+					Name:     &subset.Ports[i].Name,
+					Protocol: &subset.Ports[i].Protocol,
+				})
+			}
 		}
 
 		if allAddressesIPv6(subset.Addresses) {
@@ -174,10 +197,27 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
 	}
 
+	if !e.isHeadless() {
+		endpointSlice.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{e.serviceImportSpec.IPs[0]},
+			Conditions: discovery.EndpointConditions{
+				Ready: pointer.Bool(len(endpointSlice.Endpoints) > 0),
+			},
+		}}
+
+		for i := range e.serviceImportSpec.Ports {
+			endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
+				Port:     &e.serviceImportSpec.Ports[i].Port,
+				Name:     &e.serviceImportSpec.Ports[i].Name,
+				Protocol: &e.serviceImportSpec.Ports[i].Protocol,
+			})
+		}
+	}
+
 	if op == syncer.Create {
-		logger.V(log.DEBUG).Infof("Returning EndpointSlice: %#v", endpointSlice)
+		logger.V(log.DEBUG).Infof("Returning EndpointSlice: %s", endpointSliceStringer{endpointSlice})
 	} else {
-		logger.V(log.TRACE).Infof("Returning EndpointSlice: %#v", endpointSlice)
+		logger.V(log.TRACE).Infof("Returning EndpointSlice: %s", endpointSliceStringer{endpointSlice})
 	}
 
 	return endpointSlice, false
@@ -253,8 +293,8 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 }
 
 func (e *EndpointController) getIP(address *corev1.EndpointAddress) string {
-	if e.isHeadless && e.globalIngressIPCache != nil {
-		obj, found := e.globalIngressIPCache.getForPod(e.serviceImportSourceNameSpace, address.TargetRef.Name)
+	if e.isHeadless() && e.globalIngressIPCache != nil {
+		obj, found := e.globalIngressIPCache.getForPod(e.serviceNamespace, address.TargetRef.Name)
 
 		var ip string
 		if found {
@@ -269,4 +309,19 @@ func (e *EndpointController) getIP(address *corev1.EndpointAddress) string {
 	}
 
 	return address.IP
+}
+
+func (e *EndpointController) isHeadless() bool {
+	return e.serviceImportSpec.Type == mcsv1a1.Headless
+}
+
+type endpointSliceStringer struct {
+	*discovery.EndpointSlice
+}
+
+func (s endpointSliceStringer) String() string {
+	ports, _ := json.MarshalIndent(&s.Ports, "", "  ")
+	endpoints, _ := json.MarshalIndent(&s.Endpoints, "", "  ")
+
+	return fmt.Sprintf("endpoints: %s\nports: %s", endpoints, ports)
 }

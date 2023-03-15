@@ -21,24 +21,34 @@ package controller
 import (
 	"sync"
 
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
+const exportFailedReason = "ExportFailed"
+
+type updateExportedServiceStatusFn func(name, namespace string, condition ...mcsv1a1.ServiceExportCondition)
+
+type converter struct {
+	scheme *runtime.Scheme
+}
+
 type Controller struct {
-	clusterID               string
-	globalnetEnabled        bool
-	namespace               string
-	serviceExportClient     dynamic.NamespaceableResourceInterface
-	serviceExportSyncer     syncer.Interface
-	serviceImportSyncer     *broker.Syncer
-	endpointSliceSyncer     *broker.Syncer
-	serviceSyncer           syncer.Interface
-	serviceImportController *ServiceImportController
+	clusterID                   string
+	globalnetEnabled            bool
+	namespace                   string
+	serviceExportClient         dynamic.NamespaceableResourceInterface
+	serviceExportSyncer         syncer.Interface
+	endpointSliceController     *EndpointSliceController
+	serviceSyncer               syncer.Interface
+	serviceImportController     *ServiceImportController
+	localServiceImportFederator federate.Federator
 }
 
 type AgentSpecification struct {
@@ -48,34 +58,51 @@ type AgentSpecification struct {
 	Uninstall        bool
 }
 
-// The ServiceImportController listens for ServiceImport resources created in the target namespace
-// and creates an EndpointController in response. The EndpointController will use the app label as filter
-// to listen only for the endpoints event related to ServiceImport created.
+type ServiceImportAggregator struct {
+	clusterID       string
+	converter       converter
+	brokerClient    dynamic.Interface
+	brokerNamespace string
+}
+
+// The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports
+// from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
+// aggregated ServiceImports from the broker to the local service namespace. It also creates an EndpointController.
 type ServiceImportController struct {
-	serviceSyncer        syncer.Interface
-	localClient          dynamic.Interface
-	restMapper           meta.RESTMapper
-	serviceImportSyncer  syncer.Interface
-	endpointControllers  sync.Map
+	localClient                 dynamic.Interface
+	restMapper                  meta.RESTMapper
+	serviceImportAggregator     *ServiceImportAggregator
+	updateExportedServiceStatus updateExportedServiceStatusFn
+	localSyncer                 syncer.Interface
+	remoteSyncer                syncer.Interface
+	endpointControllers         sync.Map
+	clusterID                   string
+	localNamespace              string
+	converter                   converter
+	globalIngressIPCache        *globalIngressIPCache
+}
+
+// Each EndpointController watches for the Endpoints that backs a Service and have a ServiceImport by using a filter
+// that listen only for the Service's endpoints. It creates an EndpointSlice corresponding to an Endpoints object that is
+// distributed to other clusters.
+type EndpointController struct {
 	clusterID            string
-	scheme               *runtime.Scheme
+	serviceName          string
+	serviceNamespace     string
+	serviceImportSpec    *mcsv1a1.ServiceImportSpec
+	stopCh               chan struct{}
+	stopOnce             sync.Once
+	localClient          dynamic.Interface
+	ingressIPClient      dynamic.NamespaceableResourceInterface
 	globalIngressIPCache *globalIngressIPCache
 }
 
-// Each EndpointController listens for the endpoints that backs a service and have a ServiceImport
-// It will create an endpoint slice corresponding to an endpoint object and set the owner references
-// to ServiceImport. The app label from the endpoint will be added to endpoint slice as well.
-type EndpointController struct {
-	clusterID                    string
-	serviceImportName            string
-	serviceName                  string
-	serviceImportSourceNameSpace string
-	stopCh                       chan struct{}
-	stopOnce                     sync.Once
-	isHeadless                   bool
-	localClient                  dynamic.Interface
-	ingressIPClient              dynamic.NamespaceableResourceInterface
-	globalIngressIPCache         *globalIngressIPCache
+// EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
+type EndpointSliceController struct {
+	clusterID                   string
+	syncer                      *broker.Syncer
+	serviceImportAggregator     *ServiceImportAggregator
+	updateExportedServiceStatus updateExportedServiceStatusFn
 }
 
 type globalIngressIPCache struct {
