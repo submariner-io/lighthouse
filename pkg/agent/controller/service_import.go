@@ -19,42 +19,82 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/lighthouse/pkg/constants"
-	"k8s.io/apimachinery/pkg/api/meta"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.Interface, restMapper meta.RESTMapper,
-	localClient dynamic.Interface, scheme *runtime.Scheme,
+//nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
+func newServiceImportController(spec *AgentSpecification, syncerMetricNames AgentConfig, syncerConfig broker.SyncerConfig,
+	brokerClient dynamic.Interface, brokerNamespace string, updateExportedServiceStatus updateExportedServiceStatusFn,
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		serviceSyncer: serviceSyncer,
-		localClient:   localClient,
-		restMapper:    restMapper,
-		clusterID:     spec.ClusterID,
-		scheme:        scheme,
+		localClient:                 syncerConfig.LocalClient,
+		restMapper:                  syncerConfig.RestMapper,
+		clusterID:                   spec.ClusterID,
+		localNamespace:              spec.Namespace,
+		converter:                   converter{scheme: syncerConfig.Scheme},
+		serviceImportAggregator:     newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
+		updateExportedServiceStatus: updateExportedServiceStatus,
 	}
+
+	syncCounter := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: syncerMetricNames.ServiceImportCounterName,
+			Help: "Count of imported services",
+		},
+		[]string{
+			syncer.DirectionLabel,
+			syncer.OperationLabel,
+			syncer.SyncerNameLabel,
+		},
+	)
+	prometheus.MustRegister(syncCounter)
 
 	var err error
 
-	controller.serviceImportSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:            "ServiceImport watcher",
-		SourceClient:    localClient,
-		SourceNamespace: spec.Namespace,
+	controller.localSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:            "Local ServiceImport",
+		SourceClient:    syncerConfig.LocalClient,
+		SourceNamespace: controller.localNamespace,
 		Direction:       syncer.LocalToRemote,
-		RestMapper:      restMapper,
-		Federator:       federate.NewNoopFederator(),
+		RestMapper:      syncerConfig.RestMapper,
+		Federator:       controller,
 		ResourceType:    &mcsv1a1.ServiceImport{},
-		Transform:       controller.serviceImportToEndpointController,
-		Scheme:          scheme,
+		Transform:       controller.onLocalServiceImport,
+		Scheme:          syncerConfig.Scheme,
+		SyncCounter:     syncCounter,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating local ServiceImport syncer")
+	}
+
+	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+		Name:            "Remote ServiceImport",
+		SourceClient:    brokerClient,
+		SourceNamespace: brokerNamespace,
+		RestMapper:      syncerConfig.RestMapper,
+		Federator:       federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
+		ResourceType:    &mcsv1a1.ServiceImport{},
+		Transform:       controller.onRemoteServiceImport,
+		Scheme:          syncerConfig.Scheme,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceImport watcher")
@@ -62,9 +102,9 @@ func newServiceImportController(spec *AgentSpecification, serviceSyncer syncer.I
 
 	if spec.GlobalnetEnabled {
 		controller.globalIngressIPCache, err = newGlobalIngressIPCache(watcher.Config{
-			RestMapper: restMapper,
-			Client:     localClient,
-			Scheme:     scheme,
+			RestMapper: syncerConfig.RestMapper,
+			Client:     syncerConfig.LocalClient,
+			Scheme:     syncerConfig.Scheme,
 		})
 	}
 
@@ -89,59 +129,282 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		logger.Info("ServiceImport Controller stopped")
 	}()
 
-	if err := c.serviceImportSyncer.Start(stopCh); err != nil {
-		return errors.Wrap(err, "error starting ServiceImport watcher")
+	if err := c.localSyncer.Start(stopCh); err != nil {
+		return errors.Wrap(err, "error starting local ServiceImport syncer")
 	}
+
+	if err := c.remoteSyncer.Start(stopCh); err != nil {
+		return errors.Wrap(err, "error starting remote ServiceImport syncer")
+	}
+
+	c.reconcileLocalAggregatedServiceImports()
+	c.reconcileRemoteAggregatedServiceImports()
 
 	return nil
 }
 
-func (c *ServiceImportController) serviceImportCreatedOrUpdated(serviceImport *mcsv1a1.ServiceImport, key string) bool {
-	if _, found := c.endpointControllers.Load(key); found {
-		logger.V(log.DEBUG).Infof("The endpoint controller is already running for %q", key)
-		return false
+func (c *ServiceImportController) reconcileRemoteAggregatedServiceImports() {
+	c.localSyncer.Reconcile(func() []runtime.Object {
+		siList, err := c.remoteSyncer.ListResources()
+		if err != nil {
+			logger.Error(err, "Error listing serviceImports")
+			return nil
+		}
+
+		retList := make([]runtime.Object, 0, len(siList))
+		for i := range siList {
+			si := c.converter.toServiceImport(siList[i])
+
+			serviceName, ok := si.Annotations[mcsv1a1.LabelServiceName]
+			if !ok {
+				// This is not an aggregated ServiceImport.
+				continue
+			}
+
+			if slices.IndexOf(si.Status.Clusters, c.clusterID, clusterStatusKey) < 0 {
+				continue
+			}
+
+			si.Name = serviceName + "-" + si.Annotations[constants.LabelSourceNamespace] + "-" + c.clusterID
+			si.Namespace = c.localNamespace
+			si.Labels = map[string]string{
+				mcsv1a1.LabelServiceName:       serviceName,
+				constants.LabelSourceNamespace: si.Annotations[constants.LabelSourceNamespace],
+			}
+
+			retList = append(retList, si)
+		}
+
+		return retList
+	})
+}
+
+func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
+	c.remoteSyncer.Reconcile(func() []runtime.Object {
+		siList, err := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			logger.Error(err, "Error listing ServiceImports")
+			return nil
+		}
+
+		retList := make([]runtime.Object, 0, len(siList.Items))
+		for i := range siList.Items {
+			si := c.converter.toServiceImport(&siList.Items[i])
+
+			_, ok := si.Labels[mcsv1a1.LabelServiceName]
+			if ok {
+				// This is not an aggregated ServiceImport.
+				continue
+			}
+
+			si.Annotations = map[string]string{
+				mcsv1a1.LabelServiceName:       si.Name,
+				constants.LabelSourceNamespace: si.Namespace,
+			}
+
+			si.Name = fmt.Sprintf("%s-%s", si.Name, si.Namespace)
+			si.Namespace = c.serviceImportAggregator.brokerNamespace
+
+			retList = append(retList, si)
+		}
+
+		return retList
+	})
+}
+
+func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a1.ServiceImport) error {
+	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
+
+	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
+		logger.V(log.DEBUG).Infof("Stopping previous endpoints controller for %q", key)
+		obj.(*EndpointController).stop()
 	}
 
-	sourceCluster := serviceImport.Labels[constants.MCSLabelSourceCluster]
-	if sourceCluster == "" || sourceCluster != c.clusterID {
-		return false
-	}
-
-	serviceNameSpace := serviceImport.Labels[constants.LabelSourceNamespace]
-	serviceName := serviceImport.Labels[mcsv1a1.LabelServiceName]
-
-	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.scheme,
-		serviceImport, serviceNameSpace, serviceName, c.clusterID, c.globalIngressIPCache)
+	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.converter.scheme,
+		serviceImport, c.clusterID, c.globalIngressIPCache)
 	if err != nil {
-		logger.Error(err, "Failed to start endpoint controller")
-		return true
+		return errors.Wrapf(err, "failed to start endpoints controller for %q", key)
 	}
 
 	c.endpointControllers.Store(key, endpointController)
 
-	return false
+	return nil
 }
 
-func (c *ServiceImportController) serviceImportDeleted(key string) {
-	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
+func (c *ServiceImportController) stopEndpointsController(key string) (bool, error) {
+	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*EndpointController)
 		endpointController.stop()
+
+		found, err := endpointController.cleanup()
+		if err == nil {
+			c.endpointControllers.Delete(key)
+		}
+
+		return found, err
 	}
+
+	return false, nil
 }
 
-func (c *ServiceImportController) serviceImportToEndpointController(obj runtime.Object, numRequeues int,
-	op syncer.Operation,
-) (runtime.Object, bool) {
+func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 
-	logger.V(log.DEBUG).Infof("ServiceImport %s %sd", key, op)
+	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
 
-	if op == syncer.Create || op == syncer.Update {
-		return nil, c.serviceImportCreatedOrUpdated(serviceImport, key)
+	if op == syncer.Delete {
+		c.updateExportedServiceStatus(serviceImport.Labels[mcsv1a1.LabelServiceName],
+			serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
+
+		return obj, false
 	}
 
-	c.serviceImportDeleted(key)
+	sourceCluster := serviceImport.Labels[constants.MCSLabelSourceCluster]
+	if sourceCluster == "" || sourceCluster != c.clusterID {
+		// TODO - handle migration of legacy per-cluster ServiceImports
+		return nil, false
+	}
+
+	serviceName, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
+	if !ok {
+		// The label is missing - most likely b/c the ServiceImport hasn't yet been migrated from the legacy labels.
+		logger.Infof("Label %q missing from ServiceImport (%s/%s) - not syncing", mcsv1a1.LabelServiceName,
+			serviceImport.Namespace, serviceImport.Name)
+
+		return nil, false
+	}
+
+	c.updateExportedServiceStatus(serviceName,
+		serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+			corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
+
+	return obj, false
+}
+
+func (c *ServiceImportController) Distribute(obj runtime.Object) error {
+	localServiceImport := c.converter.toServiceImport(obj)
+	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
+
+	logger.V(log.DEBUG).Infof("Distribute for local ServiceImport %q", key)
+
+	serviceName := serviceImportSourceName(localServiceImport)
+	aggregate := &mcsv1a1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", serviceName,
+				localServiceImport.Labels[constants.LabelSourceNamespace]),
+			Annotations: map[string]string{
+				mcsv1a1.LabelServiceName:       serviceName,
+				constants.LabelSourceNamespace: localServiceImport.Labels[constants.LabelSourceNamespace],
+			},
+		},
+		Spec: mcsv1a1.ServiceImportSpec{
+			Type:  localServiceImport.Spec.Type,
+			Ports: []mcsv1a1.ServicePort{},
+		},
+	}
+
+	// Here we just create the aggregated ServiceImport on the broker. We don't merge the local service info until we've
+	// successfully synced our local EndpointSlice to the broker. This is mainly done b/c the aggregated port information
+	// is determined from the constituent clusters' EndpointSlices, thus each cluster must have a consistent view of all
+	// the EndpointSlices in order for the aggregated port information to be eventually consistent.
+
+	result, err := util.CreateOrUpdate(context.Background(), resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
+		c.converter.toUnstructured(aggregate),
+		func(obj runtime.Object) (runtime.Object, error) {
+			// TODO - check for service type conflict.
+
+			return obj, nil
+		})
+	if err == nil {
+		err = c.startEndpointsController(localServiceImport)
+	}
+
+	if err != nil {
+		c.updateExportedServiceStatus(localServiceImport.Labels[mcsv1a1.LabelServiceName],
+			localServiceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
+	}
+
+	if result == util.OperationResultCreated {
+		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %q", aggregate.Name)
+	}
+
+	return err
+}
+
+func (c *ServiceImportController) Delete(obj runtime.Object) error {
+	localServiceImport := c.converter.toServiceImport(obj)
+	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
+
+	logger.V(log.DEBUG).Infof("Delete for local ServiceImport %q", key)
+
+	// For consistency, we let the EndpointSlice controller handle removing the local service info from the aggregated
+	// ServiceImport on the broker after we delete the local EndpointSlice here. However, if the Endpoints controller
+	// was never started or if there are no local EndpointSlices, which can happen during reconciliation on startup or
+	// during clean up on uninstall, then we handle removal here.
+
+	found, err := c.stopEndpointsController(key)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		err = c.serviceImportAggregator.updateOnDelete(serviceImportSourceName(localServiceImport),
+			localServiceImport.Labels[constants.LabelSourceNamespace])
+	}
+
+	return err
+}
+
+func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+	serviceImport := obj.(*mcsv1a1.ServiceImport)
+
+	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
+	if ok {
+		// This is an aggregated ServiceImport - sync it to the local service namespace.
+		serviceImport.Name = serviceName
+		serviceImport.Namespace = serviceImport.Annotations[constants.LabelSourceNamespace]
+
+		delete(serviceImport.Annotations, mcsv1a1.LabelServiceName)
+		delete(serviceImport.Annotations, constants.LabelSourceNamespace)
+
+		return serviceImport, false
+	}
 
 	return nil, false
+}
+
+func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
+	siList, err := c.localSyncer.ListResources()
+	if err != nil {
+		logger.Error(err, "Error listing serviceImports")
+		return nil
+	}
+
+	// This function also checks the legacy source name label for migration - this can be removed after 0.15.
+	sourceClusterName := func(serviceImport *mcsv1a1.ServiceImport) string {
+		name, ok := serviceImport.Labels[constants.MCSLabelSourceCluster]
+		if ok {
+			return name
+		}
+
+		return serviceImport.Labels["lighthouse.submariner.io/sourceCluster"]
+	}
+
+	retList := make([]runtime.Object, 0, len(siList))
+
+	for _, obj := range siList {
+		si := obj.(*mcsv1a1.ServiceImport)
+
+		clusterID := sourceClusterName(si)
+		if clusterID != c.clusterID {
+			continue
+		}
+
+		retList = append(retList, transform(si))
+	}
+
+	return retList
 }

@@ -21,19 +21,22 @@ package controller_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/utils/pointer"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("Headless service syncing", func() {
+var _ = Describe("Headless Service export", func() {
 	var t *testDriver
 
 	BeforeEach(func() {
 		t = newTestDiver()
-		t.service.Spec.ClusterIP = corev1.ClusterIPNone
+		t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
 	})
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
-		t.createService()
+		t.cluster1.createService()
 	})
 
 	AfterEach(func() {
@@ -41,52 +44,51 @@ var _ = Describe("Headless service syncing", func() {
 	})
 
 	When("a ServiceExport is created", func() {
-		When("the Endpoints already exists", func() {
-			It("should correctly sync a ServiceImport and EndpointSlice", func() {
-				t.createEndpoints()
-				t.createServiceExport()
+		Context("and the Service already exists", func() {
+			It("should export the service", func() {
+				t.cluster1.createEndpoints()
+				t.cluster1.createServiceExport()
 
-				t.awaitHeadlessServiceImport()
-				t.awaitEndpointSlice()
+				t.awaitHeadlessServiceExported(&t.cluster1)
 			})
 		})
 
-		When("the Endpoints doesn't initially exist", func() {
-			It("should eventually sync a correct ServiceImport and EndpointSlice", func() {
-				t.createServiceExport()
-				t.awaitHeadlessServiceImport()
+		Context("and the Endpoints doesn't initially exist", func() {
+			It("should eventually export the EndpointSlice", func() {
+				t.cluster1.createServiceExport()
+				t.awaitAggregatedServiceImport(mcsv1a1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace)
 
-				t.createEndpoints()
-				t.awaitUpdatedServiceImport("")
-				t.awaitEndpointSlice()
+				t.cluster1.createEndpoints()
+				t.awaitEndpointSlice(&t.cluster1)
 			})
 		})
 	})
 
 	When("the Endpoints for a service are updated", func() {
-		It("should update the ServiceImport and EndpointSlice", func() {
-			t.createEndpoints()
-			t.createServiceExport()
+		It("should update the exported EndpointSlice", func() {
+			t.cluster1.createEndpoints()
+			t.cluster1.createServiceExport()
+			t.awaitHeadlessServiceExported(&t.cluster1)
 
-			t.awaitHeadlessServiceImport()
-			t.awaitEndpointSlice()
+			t.cluster1.endpoints.Subsets[0].Addresses = append(t.cluster1.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
+			t.cluster1.endpointSliceAddresses = append(t.cluster1.endpointSliceAddresses, discovery.Endpoint{
+				Addresses:  []string{"192.168.5.3"},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			})
 
-			t.endpoints.Subsets[0].Addresses = append(t.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
-			t.updateEndpoints()
-			t.awaitUpdatedServiceImport("")
-			t.awaitUpdatedEndpointSlice(t.endpointIPs())
+			t.cluster1.updateEndpoints()
+			t.awaitEndpointSlice(&t.cluster1)
 		})
 	})
 
 	When("a ServiceExport is deleted", func() {
-		It("should delete the ServiceImport and EndpointSlice", func() {
-			t.createEndpoints()
-			t.createServiceExport()
-			t.awaitHeadlessServiceImport()
-			t.awaitEndpointSlice()
+		It("should unexport the service", func() {
+			t.cluster1.createEndpoints()
+			t.cluster1.createServiceExport()
+			t.awaitHeadlessServiceExported(&t.cluster1)
 
-			t.deleteServiceExport()
-			t.awaitHeadlessServiceUnexported()
+			t.cluster1.deleteServiceExport()
+			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
 })
