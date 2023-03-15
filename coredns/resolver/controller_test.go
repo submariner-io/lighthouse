@@ -23,9 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -38,46 +40,22 @@ var _ = Describe("Controller", func() {
 		ClusterName: clusterID1,
 	}
 
-	When("a ServiceImport is created", func() {
-		var serviceImport *mcsv1a1.ServiceImport
-
-		BeforeEach(func() {
-			serviceImport = newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1)
-			t.createServiceImport(serviceImport)
-		})
-
-		Specify("GetDNSRecords should return the cluster's DNS record when requested", func() {
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
-		})
-
-		Context("and is subsequently deleted", func() {
-			Specify("GetDNSRecords should eventually return no DNS record found", func() {
-				t.awaitDNSRecords(namespace1, service1, clusterID1, "", true)
-
-				err := t.serviceImports.Namespace(serviceImport.Namespace).Delete(context.TODO(), serviceImport.Name, metav1.DeleteOptions{})
-				Expect(err).To(Succeed())
-
-				t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
-			})
-		})
-	})
-
 	When("an EndpointSlice is created", func() {
 		var endpointSlice *discovery.EndpointSlice
 
 		JustBeforeEach(func() {
-			endpointSlice = newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true)
+			endpointSlice = newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1)
 			t.createEndpointSlice(endpointSlice)
 		})
 
-		Context("before a ServiceImport", func() {
-			Specify("GetDNSRecords should eventually deem the cluster healthy and return its DNS record", func() {
+		Context("before the ServiceImport", func() {
+			Specify("GetDNSRecords should eventually return its DNS record", func() {
 				Consistently(func() bool {
 					_, _, found := t.resolver.GetDNSRecords(namespace1, service1, "", "")
 					return found
 				}).Should(BeFalse())
 
-				t.createServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
+				t.createServiceImport(newAggregatedServiceImport(namespace1, service1))
 
 				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
 			})
@@ -85,11 +63,11 @@ var _ = Describe("Controller", func() {
 
 		Context("after a ServiceImport", func() {
 			BeforeEach(func() {
-				t.createServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
+				t.createServiceImport(newAggregatedServiceImport(namespace1, service1))
 			})
 
-			Context("and then deleted", func() {
-				Specify("GetDNSRecords should eventually deem the cluster unhealthy and return no DNS record", func() {
+			Context("and then the EndpointSlice is deleted", func() {
+				Specify("GetDNSRecords should eventually return no DNS record", func() {
 					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
 
 					err := t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
@@ -99,12 +77,23 @@ var _ = Describe("Controller", func() {
 				})
 			})
 
-			Context("and then updated to unhealthy", func() {
+			Context("and then the ServiceImport is deleted", func() {
+				Specify("GetDNSRecords should eventually return not found", func() {
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+
+					err := t.serviceImports.Namespace(namespace1).Delete(context.TODO(), service1, metav1.DeleteOptions{})
+					Expect(err).To(Succeed())
+
+					t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
+				})
+			})
+
+			Context("and then the EndpointSlice is updated to unhealthy", func() {
 				Specify("GetDNSRecords should eventually return no DNS record", func() {
 					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
 
-					err := t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
-					Expect(err).To(Succeed())
+					endpointSlice.Endpoints[0].Conditions.Ready = pointer.Bool(false)
+					test.UpdateResource(t.endpointSlices.Namespace(namespace1), endpointSlice)
 
 					t.awaitDNSRecordsFound(namespace1, service1, "", "", false)
 				})

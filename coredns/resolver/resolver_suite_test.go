@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -256,39 +257,20 @@ func (t *testDriver) putEndpointSlice(es *discovery.EndpointSlice) {
 	Expect(t.resolver.PutEndpointSlice(es)).To(BeFalse())
 }
 
-func newClusterServiceImport(namespace, name, serviceIP, clusterID string, ports ...mcsv1a1.ServicePort) *mcsv1a1.ServiceImport {
-	var ips []string
-	if serviceIP != "" {
-		ips = []string{serviceIP}
-	}
-
+func newAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name + "-" + namespace + "-" + clusterID,
-			Namespace: submarinerNamespace,
-			Labels: map[string]string{
-				mcsv1a1.LabelServiceName:        name,
-				constants.LabelSourceNamespace:  namespace,
-				constants.MCSLabelSourceCluster: clusterID,
-			},
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  mcsv1a1.ClusterSetIP,
-			IPs:   ips,
-			Ports: ports,
-		},
-		Status: mcsv1a1.ServiceImportStatus{
-			Clusters: []mcsv1a1.ClusterStatus{
-				{
-					Cluster: clusterID,
-				},
-			},
+			Type: mcsv1a1.ClusterSetIP,
 		},
 	}
 }
 
-func newClusterHeadlessServiceImport(namespace, name, clusterID string) *mcsv1a1.ServiceImport {
-	si := newClusterServiceImport(namespace, name, "", clusterID)
+func newHeadlessAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
+	si := newAggregatedServiceImport(namespace, name)
 	si.Spec.Type = mcsv1a1.Headless
 
 	return si
@@ -296,13 +278,14 @@ func newClusterHeadlessServiceImport(namespace, name, clusterID string) *mcsv1a1
 
 func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isHealthy bool,
 	ports ...mcsv1a1.ServicePort) *discovery.EndpointSlice {
-	if isHealthy {
-		return newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
-			Addresses: []string{clusterIP},
-		})
-	}
+	eps := newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
+		Addresses:  []string{clusterIP},
+		Conditions: discovery.EndpointConditions{Ready: pointer.Bool(isHealthy)},
+	})
 
-	return newEndpointSlice(namespace, name, clusterID, ports)
+	eps.Labels[constants.LabelIsHeadless] = "false"
+
+	return eps
 }
 
 func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort,
@@ -326,6 +309,7 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 				constants.LabelSourceNamespace:  namespace,
 				constants.MCSLabelSourceCluster: clusterID,
 				mcsv1a1.LabelServiceName:        name,
+				constants.LabelIsHeadless:       "true",
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

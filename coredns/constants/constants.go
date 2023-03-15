@@ -19,9 +19,9 @@ limitations under the License.
 package constants
 
 const (
-	LoadBalancerWeightAnnotationPrefix = "lighthouse-lb-weight.submariner.io"
-	KubernetesServiceName              = "kubernetes.io/service-name"
-	LabelValueManagedBy                = "lighthouse-agent.submariner.io"
-	LabelSourceNamespace               = "lighthouse.submariner.io/sourceNamespace"
-	MCSLabelSourceCluster              = "multicluster.kubernetes.io/source-cluster"
+	KubernetesServiceName = "kubernetes.io/service-name"
+	LabelValueManagedBy   = "lighthouse-agent.submariner.io"
+	LabelSourceNamespace  = "lighthouse.submariner.io/sourceNamespace"
+	MCSLabelSourceCluster = "multicluster.kubernetes.io/source-cluster"
+	LabelIsHeadless       = "lighthouse.submariner.io/is-headless"
 )

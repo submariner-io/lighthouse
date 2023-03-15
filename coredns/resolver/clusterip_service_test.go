@@ -21,7 +21,9 @@ package resolver_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -45,10 +47,10 @@ func testClusterIPServiceInOneCluster() {
 	}
 
 	BeforeEach(func() {
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, expDNSRecord.IP, expDNSRecord.ClusterName,
-			expDNSRecord.Ports...))
+		t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, expDNSRecord.ClusterName, expDNSRecord.IP, true))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, expDNSRecord.ClusterName, expDNSRecord.IP,
+			true, expDNSRecord.Ports...))
 	})
 
 	Context("and no specific cluster is requested", func() {
@@ -85,7 +87,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and it becomes unhealthy", func() {
 		BeforeEach(func() {
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, false))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, false, expDNSRecord.Ports...))
 		})
 
 		It("should return no DNS records", func() {
@@ -101,7 +103,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and the service information is updated", func() {
 		BeforeEach(func() {
-			t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP2, clusterID1, port2))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP2, true, port2))
 		})
 
 		It("should return the correct DNS record information", func() {
@@ -124,11 +126,10 @@ func testClusterIPServiceInTwoClusters() {
 	t := newTestDriver()
 
 	BeforeEach(func() {
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP2, clusterID2, port1))
+		t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1))
 	})
 
 	Context("and no specific cluster is requested", func() {
@@ -203,7 +204,7 @@ func testClusterIPServiceInTwoClusters() {
 		}
 
 		BeforeEach(func() {
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, false))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, false, port1))
 		})
 
 		Context("and no specific cluster is requested", func() {
@@ -239,7 +240,7 @@ func testClusterIPServiceInTwoClusters() {
 		}
 
 		BeforeEach(func() {
-			t.resolver.RemoveServiceImport(newClusterServiceImport(namespace1, service1, serviceIP2, clusterID2))
+			t.resolver.RemoveEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1))
 		})
 
 		It("should consistently return the DNS record of the remaining cluster", func() {
@@ -264,13 +265,11 @@ func testClusterIPServiceInThreeClusters() {
 	t := newTestDriver()
 
 	BeforeEach(func() {
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1))
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP2, clusterID2, port1, port2))
-		t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP3, clusterID3, port1))
+		t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true))
-		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, true))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1, port2))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, true, port1))
 	})
 
 	Context("and no specific cluster is requested", func() {
@@ -311,7 +310,7 @@ func testClusterIPServiceInThreeClusters() {
 
 	Context("and one becomes unhealthy", func() {
 		BeforeEach(func() {
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, false))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, false, port1, port2))
 		})
 
 		It("should consistently return the healthy clusters' DNS records round-robin", func() {
@@ -324,7 +323,7 @@ func testClusterIPServiceInThreeClusters() {
 					Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").IP).To(Or(Equal(serviceIP1), Equal(serviceIP3)))
 				}
 
-				t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true))
+				t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1, port2))
 
 				t.testRoundRobin(namespace1, service1, serviceIP1, serviceIP2, serviceIP3)
 			})
@@ -334,7 +333,7 @@ func testClusterIPServiceInThreeClusters() {
 	Context("and one becomes disconnected and one becomes unhealthy", func() {
 		BeforeEach(func() {
 			t.clusterStatus.DisconnectClusterID(clusterID2)
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, false))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, false, port1))
 		})
 
 		It("should consistently return the remaining cluster's DNS record round-robin", func() {
@@ -348,56 +347,97 @@ func testClusterIPServiceMisc() {
 
 	When("a service exists in two namespaces", func() {
 		BeforeEach(func() {
-			t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1))
-			t.resolver.PutServiceImport(newClusterServiceImport(namespace2, service1, serviceIP2, clusterID1))
+			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))
+
+			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace2, service1))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace2, service1, clusterID1, serviceIP2, true))
 		})
 
 		It("should return the correct DNS record for each namespace", func() {
 			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
 				IP:          serviceIP1,
+				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 
 			t.assertDNSRecordsFound(namespace2, service1, clusterID1, "", false, resolver.DNSRecord{
 				IP:          serviceIP2,
+				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 		})
 	})
 
-	When("a per-cluster ServiceImport has the legacy annotations", func() {
-		BeforeEach(func() {
-			si := newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1, port1)
-			si.Labels = map[string]string{"lighthouse.submariner.io/sourceCluster": clusterID1}
-			si.Annotations = map[string]string{"origin-name": service1, "origin-namespace": namespace1}
-			t.resolver.PutServiceImport(si)
-		})
-
-		It("should correctly process it and return its DNS record", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
-				IP:          serviceIP1,
-				Ports:       []mcsv1a1.ServicePort{port1},
-				ClusterName: clusterID1,
-			})
-		})
-	})
-
-	When("a cluster's EndpointSlice is created before its ServiceImport", func() {
-		It("should correctly process them and return its DNS record", func() {
-			t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP2, clusterID2))
-
+	When("a cluster's EndpointSlice is initially created before the ServiceImport", func() {
+		It("should eventually process them and return its DNS record", func() {
 			es := newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true)
 			Expect(t.resolver.PutEndpointSlice(es)).To(BeTrue())
 
 			t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
 
-			t.resolver.PutServiceImport(newClusterServiceImport(namespace1, service1, serviceIP1, clusterID1))
+			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 			t.putEndpointSlice(es)
 
 			t.assertDNSRecordsFound(namespace1, service1, "", "", false, resolver.DNSRecord{
 				IP:          serviceIP1,
+				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
 			})
+		})
+	})
+
+	When("a local cluster ServiceImport is created", func() {
+		It("should ignore it", func() {
+			serviceImport := &mcsv1a1.ServiceImport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service1 + "-" + namespace1 + "-" + clusterID1,
+					Namespace: submarinerNamespace,
+					Labels: map[string]string{
+						mcsv1a1.LabelServiceName: service1,
+					},
+				},
+				Spec: mcsv1a1.ServiceImportSpec{
+					Type: mcsv1a1.ClusterSetIP,
+					IPs:  []string{serviceIP1},
+				},
+				Status: mcsv1a1.ServiceImportStatus{
+					Clusters: []mcsv1a1.ClusterStatus{
+						{
+							Cluster: clusterID1,
+						},
+					},
+				},
+			}
+
+			t.resolver.PutServiceImport(serviceImport)
+
+			Expect(t.resolver.PutEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
+
+			t.resolver.RemoveServiceImport(serviceImport)
+		})
+	})
+
+	When("an aggregated ServiceImport on the broker is created", func() {
+		It("should ignore it", func() {
+			serviceImport := &mcsv1a1.ServiceImport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      service1 + "-" + namespace1,
+					Namespace: test.RemoteNamespace,
+					Annotations: map[string]string{
+						mcsv1a1.LabelServiceName: service1,
+					},
+				},
+				Spec: mcsv1a1.ServiceImportSpec{
+					Type: mcsv1a1.ClusterSetIP,
+				},
+			}
+
+			t.resolver.PutServiceImport(serviceImport)
+
+			Expect(t.resolver.PutEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
+
+			t.resolver.RemoveServiceImport(serviceImport)
 		})
 	})
 }

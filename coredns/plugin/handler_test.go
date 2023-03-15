@@ -43,18 +43,17 @@ import (
 )
 
 const (
-	service1       = "service1"
-	namespace1     = "namespace1"
-	namespace2     = "namespace2"
-	serviceIP      = "100.96.156.101"
-	serviceIP2     = "100.96.156.102"
-	localClusterID = "local"
-	clusterID      = "cluster1"
-	clusterID2     = "cluster2"
-	endpointIP     = "100.96.157.101"
-	endpointIP2    = "100.96.157.102"
-	hostName1      = "hostName1"
-	hostName2      = "hostName2"
+	service1    = "service1"
+	namespace1  = "namespace1"
+	namespace2  = "namespace2"
+	serviceIP   = "100.96.156.101"
+	serviceIP2  = "100.96.156.102"
+	clusterID   = "cluster1"
+	clusterID2  = "cluster2"
+	endpointIP  = "100.96.157.101"
+	endpointIP2 = "100.96.157.102"
+	hostName1   = "hostName1"
+	hostName2   = "hostName2"
 )
 
 var (
@@ -99,7 +98,7 @@ func testWithoutFallback() {
 		t = newHandlerTestDriver()
 		t.mockCs.ConnectClusterID(clusterID)
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
@@ -163,7 +162,7 @@ func testWithoutFallback() {
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace2)
 
 		BeforeEach(func() {
-			t.lh.Resolver.PutServiceImport(newServiceImport(namespace2, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1))
+			t.lh.Resolver.PutServiceImport(newServiceImport(namespace2, service1, mcsv1a1.ClusterSetIP))
 
 			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace2, service1, clusterID, []mcsv1a1.ServicePort{port1},
 				newEndpoint(serviceIP, "", true)))
@@ -321,7 +320,7 @@ func testWithFallback() {
 			return dns.RcodeBadCookie, nil
 		})
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
@@ -442,14 +441,12 @@ func testClusterStatus() {
 		t.mockCs.ConnectClusterID(clusterID)
 		t.mockCs.ConnectClusterID(clusterID2)
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP, port1, port2))
-
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port2},
+		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(serviceIP2, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -482,7 +479,7 @@ func testClusterStatus() {
 		})
 	})
 
-	When("service is in two clusters and only one is connected", func() {
+	When("a service is in two clusters and only one is connected", func() {
 		JustBeforeEach(func() {
 			t.mockCs.DisconnectClusterID(clusterID)
 		})
@@ -512,7 +509,7 @@ func testClusterStatus() {
 		})
 	})
 
-	When("service is present in two clusters and both are disconnected", func() {
+	When("a service is present in two clusters and both are disconnected", func() {
 		JustBeforeEach(func() {
 			t.mockCs.DisconnectAll()
 		})
@@ -538,11 +535,11 @@ func testClusterStatus() {
 		})
 	})
 
-	When("service is present in one cluster and it is disconnected", func() {
+	When("a service is present in one cluster and it is disconnected", func() {
 		JustBeforeEach(func() {
 			t.mockCs.DisconnectClusterID(clusterID)
 
-			t.lh.Resolver.RemoveServiceImport(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP))
+			t.lh.Resolver.RemoveEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{}))
 		})
 
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
@@ -581,7 +578,7 @@ func testHeadlessService() {
 
 		t.mockCs.ConnectClusterID(clusterID)
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.Headless, port1))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.Headless))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
 	})
@@ -721,7 +718,7 @@ func testHeadlessService() {
 
 	When("headless service is present in two clusters", func() {
 		BeforeEach(func() {
-			t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID2, serviceIP, mcsv1a1.Headless, port1))
+			t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.Headless))
 
 			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1},
 				newEndpoint(endpointIP2, hostName2, true)))
@@ -775,12 +772,12 @@ func testLocalService() {
 		t.mockCs.ConnectClusterID(clusterID)
 		t.mockCs.ConnectClusterID(clusterID2)
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID2, serviceIP2, mcsv1a1.ClusterSetIP, port1, port2))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(serviceIP2, "", true)))
@@ -856,7 +853,8 @@ func testLocalService() {
 
 	When("service is in local and remote clusters and local has no active endpoints", func() {
 		BeforeEach(func() {
-			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1}))
+			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+				newEndpoint(serviceIP, "", false)))
 		})
 
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
@@ -884,7 +882,7 @@ func testSRVMultiplePorts() {
 		t = newHandlerTestDriver()
 		t.mockCs.ConnectClusterID(clusterID)
 
-		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, clusterID, serviceIP, mcsv1a1.ClusterSetIP, port1, port2))
+		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
 		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(endpointIP, "", true)))
@@ -994,29 +992,14 @@ func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case)
 }
 
 //nolint:unparam // `name` always receives `service1'.
-func newServiceImport(namespace, name, clusterID, serviceIP string, siType mcsv1a1.ServiceImportType,
-	ports ...mcsv1a1.ServicePort) *mcsv1a1.ServiceImport {
+func newServiceImport(namespace, name string, siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels: map[string]string{
-				mcsv1a1.LabelServiceName:        name,
-				constants.LabelSourceNamespace:  namespace,
-				constants.MCSLabelSourceCluster: clusterID,
-			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  siType,
-			IPs:   []string{serviceIP},
-			Ports: ports,
-		},
-		Status: mcsv1a1.ServiceImportStatus{
-			Clusters: []mcsv1a1.ClusterStatus{
-				{
-					Cluster: clusterID,
-				},
-			},
+			Type: siType,
 		},
 	}
 }
@@ -1043,6 +1026,7 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 				constants.LabelSourceNamespace:  namespace,
 				constants.MCSLabelSourceCluster: clusterID,
 				mcsv1a1.LabelServiceName:        name,
+				constants.LabelIsHeadless:       "false",
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
