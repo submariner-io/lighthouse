@@ -56,6 +56,7 @@ func (si *serviceInfo) ensureClusterInfo(name string) *clusterInfo {
 	if !ok {
 		info = &clusterInfo{
 			endpointRecordsByHost: make(map[string][]DNSRecord),
+			weight:                1,
 		}
 
 		si.clusters[name] = info

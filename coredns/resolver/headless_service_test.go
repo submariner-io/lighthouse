@@ -77,11 +77,11 @@ func testHeadlessServiceInMultipleClusters() {
 		HostName:    hostName2,
 	}
 
-	JustBeforeEach(func() {
-		t.resolver.PutServiceImport(newClusterHeadlessServiceImport(namespace1, service1, clusterID1))
-		t.resolver.PutServiceImport(newClusterHeadlessServiceImport(namespace1, service1, clusterID2))
-		t.resolver.PutServiceImport(newClusterHeadlessServiceImport(namespace1, service1, clusterID3))
+	BeforeEach(func() {
+		t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+	})
 
+	JustBeforeEach(func() {
 		t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1}, discovery.Endpoint{
 			Addresses: []string{endpointIP1},
 		}))
@@ -141,7 +141,6 @@ func testHeadlessServiceInMultipleClusters() {
 
 			// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
 			// return true to requeue.
-			t.resolver.PutServiceImport(newClusterHeadlessServiceImport(namespace1, service1, clusterID3))
 			Expect(t.resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID3, nil))).To(BeTrue())
 
 			t.createEndpointSlice(&discovery.EndpointSlice{

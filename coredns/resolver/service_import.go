@@ -19,22 +19,18 @@ limitations under the License.
 package resolver
 
 import (
-	"strconv"
-
-	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
-	logger.Infof("Put %#v", serviceImport)
-
-	name, ok := getSourceName(serviceImport)
-	if !ok {
+	if ignoreServiceImport(serviceImport) {
 		return
 	}
 
-	key := keyFunc(getSourceNamespace(serviceImport), name)
+	key, isLegacy := getServiceImportKey(serviceImport)
+
+	logger.Infof("Put ServiceImport %q", key)
 
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -51,96 +47,56 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 		i.serviceMap[key] = svcInfo
 	}
 
-	if !svcInfo.isHeadless {
-		clusterName := getSourceCluster(serviceImport)
-
-		clusterInfo := svcInfo.ensureClusterInfo(clusterName)
-		clusterInfo.weight = getServiceWeightFrom(serviceImport, i.clusterStatus.GetLocalClusterID())
-		clusterInfo.endpointRecords = []DNSRecord{{
-			IP:          serviceImport.Spec.IPs[0],
-			Ports:       serviceImport.Spec.Ports,
-			ClusterName: clusterName,
-		}}
-
-		svcInfo.resetLoadBalancing()
-		svcInfo.mergePorts()
-
+	if svcInfo.isHeadless || !isLegacy {
 		return
 	}
+
+	// This is a legacy pre-0.15 remote cluster ServiceImport - initialize the cluster info to maintain backwards compatibility
+	// while roling upgrade is in progress.
+
+	clusterName := serviceImport.Labels["lighthouse.submariner.io/sourceCluster"]
+
+	clusterInfo := svcInfo.ensureClusterInfo(clusterName)
+	clusterInfo.endpointRecords = []DNSRecord{{
+		IP:          serviceImport.Spec.IPs[0],
+		Ports:       serviceImport.Spec.Ports,
+		ClusterName: clusterName,
+	}}
+
+	svcInfo.mergePorts()
+	svcInfo.resetLoadBalancing()
 }
 
 func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
-	logger.Infof("Remove %#v", serviceImport)
-
-	name, found := getSourceName(serviceImport)
-	if !found {
+	if ignoreServiceImport(serviceImport) {
 		return
 	}
 
-	key := keyFunc(getSourceNamespace(serviceImport), name)
+	key, isLegacy := getServiceImportKey(serviceImport)
+	if isLegacy {
+		return
+	}
+
+	logger.Infof("Remove ServiceImport %q", key)
 
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	serviceInfo, found := i.serviceMap[key]
-	if !found {
-		return
-	}
-
-	for _, info := range serviceImport.Status.Clusters {
-		delete(serviceInfo.clusters, info.Cluster)
-	}
-
-	if len(serviceInfo.clusters) == 0 {
-		delete(i.serviceMap, key)
-		return
-	}
-
-	if !serviceInfo.isHeadless {
-		serviceInfo.resetLoadBalancing()
-	}
-
-	serviceInfo.mergePorts()
+	delete(i.serviceMap, key)
 }
 
-func getSourceName(from *mcsv1a1.ServiceImport) (string, bool) {
-	name, ok := from.Labels[mcsv1a1.LabelServiceName]
+func getServiceImportKey(from *mcsv1a1.ServiceImport) (string, bool) {
+	name, ok := from.Annotations["origin-name"]
 	if ok {
-		return name, true
+		return keyFunc(from.Annotations["origin-namespace"], name), true
 	}
 
-	name, ok = from.Annotations["origin-name"]
-	return name, ok
+	return keyFunc(from.Namespace, from.Name), false
 }
 
-func getSourceNamespace(from *mcsv1a1.ServiceImport) string {
-	ns, ok := from.Labels[constants.LabelSourceNamespace]
-	if ok {
-		return ns
-	}
+func ignoreServiceImport(serviceImport *mcsv1a1.ServiceImport) bool {
+	_, isLocal := serviceImport.Labels[mcsv1a1.LabelServiceName]
+	_, isOnBroker := serviceImport.Annotations[mcsv1a1.LabelServiceName]
 
-	return from.Annotations["origin-namespace"]
-}
-
-func getSourceCluster(from *mcsv1a1.ServiceImport) string {
-	c, ok := from.Labels[constants.MCSLabelSourceCluster]
-	if ok {
-		return c
-	}
-
-	return from.Labels["lighthouse.submariner.io/sourceCluster"]
-}
-
-func getServiceWeightFrom(si *mcsv1a1.ServiceImport, forClusterName string) int64 {
-	weightKey := constants.LoadBalancerWeightAnnotationPrefix + "/" + forClusterName
-	if val, ok := si.Annotations[weightKey]; ok {
-		f, err := strconv.ParseInt(val, 0, 64)
-		if err != nil {
-			return f
-		}
-
-		logger.Errorf(err, "Error parsing the %q annotation from ServiceImport %q", weightKey, si.Name)
-	}
-
-	return 1 // Zero will cause no selection
+	return isLocal || isOnBroker
 }

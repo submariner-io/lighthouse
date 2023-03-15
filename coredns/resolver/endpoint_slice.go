@@ -33,12 +33,16 @@ import (
 )
 
 func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
-	logger.Infof("Put EndpointSlice: %#v", endpointSlice.ObjectMeta)
-
 	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
 	if !ok {
 		return false
 	}
+
+	if ignoreEndpointSlice(endpointSlice) {
+		return false
+	}
+
+	logger.Infof("Put EndpointSlice %q on cluster %q", key, clusterID)
 
 	var localEndpointSliceErr error
 	var localEndpointSlice *discovery.EndpointSlice
@@ -78,14 +82,42 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 }
 
 func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo) bool {
-	clusterInfo, found := serviceInfo.clusters[clusterID]
+	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
 	if !found {
-		logger.Infof("Cluster %q not found for EndpointSlice %q - requeuing", clusterID, key)
-		return true
+		// This is a legacy pre-0.15 EndpointSlice.
+		clusterInfo, found := serviceInfo.clusters[clusterID]
+		if !found {
+			logger.Infof("Cluster %q not found for EndpointSlice %q - requeuing", clusterID, key)
+			return true
+		}
+
+		// For a ClusterIPService we really only care if there are any backing endpoints.
+		clusterInfo.endpointsHealthy = len(endpointSlice.Endpoints) > 0
+
+		return false
 	}
 
-	// For a ClusterIPService we really only care if there are any backing endpoints.
-	clusterInfo.endpointsHealthy = len(endpointSlice.Endpoints) > 0
+	if len(endpointSlice.Endpoints) == 0 {
+		// This shouldn't happen - we expect the service IP endpoint to always be present.
+		logger.Errorf(nil, "Missing service IP endpoint in EndpointSlice %q", key)
+
+		return false
+	}
+
+	clusterInfo := serviceInfo.ensureClusterInfo(clusterID)
+	clusterInfo.endpointRecords = []DNSRecord{{
+		IP:          endpointSlice.Endpoints[0].Addresses[0],
+		Ports:       mcsServicePortsFrom(endpointSlice.Ports),
+		ClusterName: clusterID,
+	}}
+
+	clusterInfo.endpointsHealthy = endpointSlice.Endpoints[0].Conditions.Ready == nil || *endpointSlice.Endpoints[0].Conditions.Ready
+
+	serviceInfo.mergePorts()
+	serviceInfo.resetLoadBalancing()
+
+	logger.Infof("Added DNSRecord with service IP %q for EndpointSlice %q on cluster %q, endpointsHealthy: %v, ports: %#v",
+		clusterInfo.endpointRecords[0].IP, key, clusterID, clusterInfo.endpointsHealthy, clusterInfo.endpointRecords[0].Ports)
 
 	return false
 }
@@ -98,15 +130,7 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 
 	serviceInfo.clusters[clusterID] = clusterInfo
 
-	mcsPorts := make([]mcsv1a1.ServicePort, len(endpointSlice.Ports))
-	for i, port := range endpointSlice.Ports {
-		mcsPorts[i] = mcsv1a1.ServicePort{
-			Name:        *port.Name,
-			Protocol:    *port.Protocol,
-			AppProtocol: port.AppProtocol,
-			Port:        *port.Port,
-		}
-	}
+	mcsPorts := mcsServicePortsFrom(endpointSlice.Ports)
 
 	for i := range endpointSlice.Endpoints {
 		endpoint := &endpointSlice.Endpoints[i]
@@ -184,12 +208,16 @@ func (i *Interface) getLocalEndpointSlice(from *discovery.EndpointSlice) (*disco
 }
 
 func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) {
-	logger.Infof("Remove EndpointSlice: %#v", endpointSlice.ObjectMeta)
-
 	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
 	if !ok {
 		return
 	}
+
+	if ignoreEndpointSlice(endpointSlice) {
+		return
+	}
+
+	logger.Infof("Remove EndpointSlice %q on cluster %q", key, clusterID)
 
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -199,17 +227,12 @@ func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) 
 		return
 	}
 
-	clusterInfo, found := serviceInfo.clusters[clusterID]
-	if !found {
-		return
-	}
+	delete(serviceInfo.clusters, clusterID)
 
 	if !serviceInfo.isHeadless {
-		clusterInfo.endpointsHealthy = false
-		return
+		serviceInfo.mergePorts()
+		serviceInfo.resetLoadBalancing()
 	}
-
-	delete(serviceInfo.clusters, clusterID)
 }
 
 func getKeyInfoFrom(es *discovery.EndpointSlice) (string, string, bool) {
@@ -232,4 +255,23 @@ func getKeyInfoFrom(es *discovery.EndpointSlice) (string, string, bool) {
 	}
 
 	return keyFunc(namespace, name), clusterID, true
+}
+
+func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1a1.ServicePort {
+	mcsPorts := make([]mcsv1a1.ServicePort, len(ports))
+	for i, port := range ports {
+		mcsPorts[i] = mcsv1a1.ServicePort{
+			Name:        *port.Name,
+			Protocol:    *port.Protocol,
+			AppProtocol: port.AppProtocol,
+			Port:        *port.Port,
+		}
+	}
+
+	return mcsPorts
+}
+
+func ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
+	isOnBroker := eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
+	return isOnBroker
 }

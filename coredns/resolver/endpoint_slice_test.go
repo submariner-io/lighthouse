@@ -20,6 +20,7 @@ package resolver_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,22 @@ var _ = Describe("PutEndpointSlice", func() {
 			})
 		})
 	})
+
+	When("the EndpointSlice is on the broker", func() {
+		It("should not process it", func() {
+			t.putEndpointSlice(&discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: test.RemoteNamespace,
+					Labels: map[string]string{
+						constants.MCSLabelSourceCluster: "test",
+						mcsv1a1.LabelServiceName:        "test",
+						constants.LabelSourceNamespace:  namespace1,
+					},
+				},
+			})
+		})
+	})
 })
 
 var _ = Describe("RemoveEndpointSlice", func() {
@@ -92,9 +109,25 @@ var _ = Describe("RemoveEndpointSlice", func() {
 
 	When("the cluster information doesn't exist", func() {
 		It("should not process it", func() {
-			t.resolver.PutServiceImport(newClusterHeadlessServiceImport(namespace1, service1, clusterID1))
+			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 
 			t.resolver.RemoveEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, nil))
+		})
+	})
+
+	When("the EndpointSlice is on the broker", func() {
+		It("should not process it", func() {
+			t.resolver.RemoveEndpointSlice(&discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: test.RemoteNamespace,
+					Labels: map[string]string{
+						constants.MCSLabelSourceCluster: "test",
+						mcsv1a1.LabelServiceName:        "test",
+						constants.LabelSourceNamespace:  namespace1,
+					},
+				},
+			})
 		})
 	})
 })
