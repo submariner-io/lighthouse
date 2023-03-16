@@ -78,7 +78,7 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, true, clusterAName)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
 
 	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, false, clusterAName)
@@ -124,7 +124,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 2, true, clusterAName)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 
 	verifyCount := 0
 
@@ -142,7 +142,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	Expect(verifyCount).To(Equal(2), "Mismatch in count of IPs to be validated with dig")
 
 	f.DeleteServiceExport(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
 }
 
@@ -186,7 +186,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	}
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 }
 
 //nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.

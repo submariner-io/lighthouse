@@ -137,7 +137,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
@@ -150,7 +150,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 		false, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
@@ -200,7 +200,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
@@ -208,7 +208,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 
 	f.DeleteService(framework.ClusterB, nginxServiceClusterB.Name)
 
@@ -236,7 +236,7 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
@@ -244,7 +244,7 @@ func RunServiceExportTest(f *lhframework.Framework) {
 		"", true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceImportDelete(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 
 	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "", "", true)
 }
@@ -271,7 +271,7 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
@@ -329,14 +329,14 @@ func RunServicesPodAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterC = svc
-	f.AwaitServiceImportIP(framework.ClusterC, framework.ClusterC, nginxServiceClusterC)
+	f.AwaitAggregatedServiceImport(framework.ClusterC, nginxServiceClusterC, 2)
 	f.AwaitEndpointSlices(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 2)
 
 	svc, err = f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterB, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterB, nginxServiceClusterB, 2)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
@@ -403,7 +403,7 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterA = svc
-	f.AwaitServiceImportIP(framework.ClusterA, framework.ClusterA, nginxServiceClusterA)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterA, 2)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace, 2, 2)
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterA, nginxServiceClusterA, netshootPodList, checkedDomains,
@@ -415,7 +415,7 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 2)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, checkedDomains,
@@ -462,14 +462,14 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterC = svc
-	f.AwaitServiceImportIP(framework.ClusterC, framework.ClusterC, nginxServiceClusterC)
+	f.AwaitAggregatedServiceImport(framework.ClusterC, nginxServiceClusterC, 2)
 	f.AwaitEndpointSlices(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 2)
 
 	svc, err = f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterB, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterB, nginxServiceClusterB, 2)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
 	var serviceIPList []string
@@ -507,7 +507,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	f.AwaitServiceImportIP(framework.ClusterB, framework.ClusterA, nginxServiceClusterB)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
@@ -525,7 +525,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterC = svc
-	f.AwaitServiceImportIP(framework.ClusterC, framework.ClusterA, nginxServiceClusterC)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterC, 2)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace, 2, 2)
 
 	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList,

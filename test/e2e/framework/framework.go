@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -160,7 +161,10 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 			}
 		}
 
-		return false, fmt.Sprintf("ServiceExport %s condition status not found", constants.ServiceExportSynced), nil
+		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
+
+		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
+			constants.ServiceExportSynced, out), nil
 	})
 }
 
@@ -177,76 +181,37 @@ func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace s
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (f *Framework) AwaitServiceImportIP(srcCluster, targetCluster framework.ClusterIndex, svc *v1.Service) *mcsv1a1.ServiceImport {
-	serviceIP := f.GetServiceIP(srcCluster, svc, false)
+func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.ClusterIndex, svc *v1.Service, clusterCount int) {
+	By(fmt.Sprintf("Retrieving ServiceImport for %q in ns %q on %q", svc.Name, svc.Namespace,
+		framework.TestContext.ClusterIDs[targetCluster]))
 
-	return f.AwaitServiceImportWithIP(targetCluster, svc, serviceIP)
-}
+	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(svc.Namespace)
 
-func (f *Framework) AwaitServiceImportWithIP(targetCluster framework.ClusterIndex, svc *v1.Service,
-	serviceIP string,
-) *mcsv1a1.ServiceImport {
-	var retServiceImport *mcsv1a1.ServiceImport
-
-	siNamePrefix := svc.Name + "-" + svc.Namespace + "-"
-	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
-	By(fmt.Sprintf("Retrieving ServiceImport for %s on %q", siNamePrefix, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(context.TODO(), metav1.ListOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*mcsv1a1.ServiceImportList)
-		if len(siList.Items) < 1 {
-			return false, fmt.Sprintf("ServiceImport with name prefix %s not found", siNamePrefix), nil
+		obj, err := si.Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil //nolint:nilnil // Intentional
 		}
-		for i := range siList.Items {
-			si := &siList.Items[i]
-			if strings.HasPrefix(si.Name, siNamePrefix) {
-				if si.Spec.IPs[0] == serviceIP {
-					retServiceImport = &siList.Items[i]
-					return true, "", nil
-				}
+
+		return obj, err
+	}, func(result interface{}) (bool, string, error) {
+		if clusterCount == 0 {
+			if result != nil {
+				return false, "ServiceImport still exists", nil
 			}
+
+			return true, "", nil
 		}
 
-		return false, fmt.Sprintf("Failed to find ServiceImport with IP %s", serviceIP), nil
-	})
-
-	return retServiceImport
-}
-
-func (f *Framework) AwaitServiceImportDelete(targetCluster framework.ClusterIndex, name, namespace string) {
-	siNamePrefix := name + "-" + namespace
-	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
-	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(context.TODO(), metav1.ListOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*mcsv1a1.ServiceImportList)
-		for i := range siList.Items {
-			si := &siList.Items[i]
-			if strings.HasPrefix(si.Name, siNamePrefix) {
-				return false, fmt.Sprintf("ServiceImport with name prefix %s still exists", siNamePrefix), nil
-			}
+		if result == nil {
+			return false, "ServiceImport not found", nil
 		}
 
-		return true, "", nil
-	})
-}
+		si := result.(*mcsv1a1.ServiceImport)
 
-func (f *Framework) AwaitServiceImportCount(targetCluster framework.ClusterIndex, name, namespace string, count int) {
-	labelMap := map[string]string{
-		mcsv1a1.LabelServiceName:       name,
-		constants.LabelSourceNamespace: namespace,
-	}
-	siListOptions := metav1.ListOptions{
-		LabelSelector: labels.Set(labelMap).String(),
-	}
-	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(framework.TestContext.SubmarinerNamespace)
-	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		return si.List(context.TODO(), siListOptions)
-	}, func(result interface{}) (bool, string, error) {
-		siList := result.(*mcsv1a1.ServiceImportList)
-		if len(siList.Items) != count {
-			return false, fmt.Sprintf("ServiceImport count was %v instead of %v", len(siList.Items), count), nil
+		if len(si.Status.Clusters) != clusterCount {
+			return false, fmt.Sprintf("Actual cluster count %d does not match expected %d",
+				len(si.Status.Clusters), clusterCount), nil
 		}
 
 		return true, "", nil
@@ -438,7 +403,7 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 }
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
-	expSliceCount, expEpCount int,
+	expSliceCount, expReadyCount int,
 ) (endpointSliceList *discovery.EndpointSliceList) {
 	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
@@ -455,22 +420,27 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 	}, func(result interface{}) (bool, string, error) {
 		endpointSliceList = result.(*discovery.EndpointSliceList)
 		sliceCount := 0
-		epCount := 0
+		readyCount := 0
 
 		for i := range endpointSliceList.Items {
 			es := &endpointSliceList.Items[i]
-			if name == "" || strings.HasPrefix(es.Name, name) {
+			if name == "" || es.Labels[mcsv1a1.LabelServiceName] == name {
 				sliceCount++
-				epCount += len(es.Endpoints)
+
+				for j := range es.Endpoints {
+					if es.Endpoints[j].Conditions.Ready == nil || *es.Endpoints[j].Conditions.Ready {
+						readyCount++
+					}
+				}
 			}
 		}
 
 		if expSliceCount != anyCount && sliceCount != expSliceCount {
-			return false, fmt.Sprintf("%d EndpointSlices found when expected %d", len(endpointSliceList.Items), expSliceCount), nil
+			return false, fmt.Sprintf("%d EndpointSlices found when expected %d", sliceCount, expSliceCount), nil
 		}
 
-		if expEpCount != anyCount && epCount != expEpCount {
-			return false, fmt.Sprintf("%d total Endpoints found when expected %d", epCount, expEpCount), nil
+		if expReadyCount != anyCount && readyCount != expReadyCount {
+			return false, fmt.Sprintf("%d ready Endpoints found when expected %d", readyCount, expReadyCount), nil
 		}
 
 		return true, "", nil

@@ -97,7 +97,7 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 		clusterBName, false, false, true)
 
 	f.DeleteServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 0)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterB, 0)
 
 	f.VerifyIPsWithDig(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
 		"", false)
@@ -117,6 +117,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterB, 1)
 
 	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
@@ -126,6 +127,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 
 	f.NewServiceExport(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterA, 2)
 
 	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
@@ -146,7 +148,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListA, checkedDomains,
 		clusterAName, true, false, true)
 	f.DeleteServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
-	f.AwaitServiceImportCount(framework.ClusterA, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 1)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterB, 1)
 
 	f.VerifyIPsWithDig(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipListB, checkedDomains,
 		"", false)
