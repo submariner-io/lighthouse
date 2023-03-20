@@ -60,7 +60,7 @@ func (c *ClusterStatus) DisconnectAll() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.connectedClusterIDs.Delete(c.connectedClusterIDs.UnsortedList()...)
+	c.connectedClusterIDs = sets.New[string]()
 }
 
 func (c *ClusterStatus) DisconnectClusterID(clusterID string) {
