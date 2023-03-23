@@ -33,8 +33,6 @@ import (
 
 const exportFailedReason = "ExportFailed"
 
-type updateExportedServiceStatusFn func(name, namespace string, condition ...mcsv1a1.ServiceExportCondition)
-
 type converter struct {
 	scheme *runtime.Scheme
 }
@@ -43,7 +41,7 @@ type Controller struct {
 	clusterID                   string
 	globalnetEnabled            bool
 	namespace                   string
-	serviceExportClient         dynamic.NamespaceableResourceInterface
+	serviceExportClient         *ServiceExportClient
 	serviceExportSyncer         syncer.Interface
 	endpointSliceController     *EndpointSliceController
 	serviceSyncer               syncer.Interface
@@ -69,17 +67,17 @@ type ServiceImportAggregator struct {
 // from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
 // aggregated ServiceImports from the broker to the local service namespace. It also creates an EndpointController.
 type ServiceImportController struct {
-	localClient                 dynamic.Interface
-	restMapper                  meta.RESTMapper
-	serviceImportAggregator     *ServiceImportAggregator
-	updateExportedServiceStatus updateExportedServiceStatusFn
-	localSyncer                 syncer.Interface
-	remoteSyncer                syncer.Interface
-	endpointControllers         sync.Map
-	clusterID                   string
-	localNamespace              string
-	converter                   converter
-	globalIngressIPCache        *globalIngressIPCache
+	localClient             dynamic.Interface
+	restMapper              meta.RESTMapper
+	serviceImportAggregator *ServiceImportAggregator
+	serviceExportClient     *ServiceExportClient
+	localSyncer             syncer.Interface
+	remoteSyncer            syncer.Interface
+	endpointControllers     sync.Map
+	clusterID               string
+	localNamespace          string
+	converter               converter
+	globalIngressIPCache    *globalIngressIPCache
 }
 
 // Each EndpointController watches for the Endpoints that backs a Service and have a ServiceImport by using a filter
@@ -99,10 +97,15 @@ type EndpointController struct {
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
 type EndpointSliceController struct {
-	clusterID                   string
-	syncer                      *broker.Syncer
-	serviceImportAggregator     *ServiceImportAggregator
-	updateExportedServiceStatus updateExportedServiceStatusFn
+	clusterID               string
+	syncer                  *broker.Syncer
+	serviceImportAggregator *ServiceImportAggregator
+	serviceExportClient     *ServiceExportClient
+}
+
+type ServiceExportClient struct {
+	dynamic.NamespaceableResourceInterface
+	converter
 }
 
 type globalIngressIPCache struct {

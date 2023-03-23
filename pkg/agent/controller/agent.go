@@ -19,7 +19,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -39,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/util/retry"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -73,9 +71,12 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	agentController.serviceExportClient = syncerConf.LocalClient.Resource(*gvr)
+	agentController.serviceExportClient = &ServiceExportClient{
+		NamespaceableResourceInterface: syncerConf.LocalClient.Resource(*gvr),
+		converter:                      converter{scheme: syncerConf.Scheme},
+	}
 
-	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.updateExportedServiceStatus)
+	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 
 	agentController.serviceImportController, err = newServiceImportController(spec, syncerMetricNames, syncerConf,
 		agentController.endpointSliceController.syncer.GetBrokerClient(),
-		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.updateExportedServiceStatus)
+		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.serviceExportClient)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +186,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+		a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 			corev1.ConditionUnknown, "ServiceRetrievalFailed", fmt.Sprintf("Error retrieving the Service: %v", err)))
 		logger.Errorf(err, "Error retrieving Service %s/%s", svcExport.Namespace, svcExport.Name)
 
@@ -194,7 +195,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 
 	if !found {
 		logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+		a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist"))
 
 		return nil, false
@@ -205,7 +206,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	svcType, ok := getServiceImportType(svc)
 
 	if !ok {
-		a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+		a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 			corev1.ConditionFalse, invalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type)))
 		logger.Errorf(nil, "Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
 
@@ -242,8 +243,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 				logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
 					svcExport.Namespace, svcExport.Name)
 				// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
-				a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
-					corev1.ConditionFalse, reason, msg))
+				a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace,
+					newServiceExportCondition(mcsv1a1.ServiceExportValid, corev1.ConditionFalse, reason, msg))
 
 				return nil, true
 			}
@@ -256,7 +257,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 		serviceImport.Spec.Ports = a.getPortsForService(svc)
 	}
 
-	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+	a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 		corev1.ConditionTrue, "", ""))
 
 	logger.V(log.DEBUG).Infof("Returning ServiceImport: %s", serviceImportStringer{serviceImport})
@@ -323,62 +324,10 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 
 	// Update the status and requeue
-	a.updateExportedServiceStatus(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+	a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 		corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist"))
 
 	return serviceImport, false
-}
-
-func (a *Controller) updateExportedServiceStatus(name, namespace string, conditions ...mcsv1a1.ServiceExportCondition) {
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		obj, err := a.serviceExportClient.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			logger.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
-			return nil
-		} else if err != nil {
-			return errors.Wrap(err, "error retrieving ServiceExport")
-		}
-
-		toUpdate := a.toServiceExport(obj)
-
-		updated := false
-
-		for i := range conditions {
-			condition := &conditions[i]
-
-			logger.V(log.DEBUG).Infof("updateExportedServiceStatus for (%s/%s) - Type: %q, Status: %q, Reason: %q, Message: %q",
-				namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
-
-			prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condition.Type)
-			if prevCond == nil {
-				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
-				updated = true
-			} else if serviceExportConditionEqual(prevCond, condition) {
-				logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
-					namespace, name, prevCond)
-			} else {
-				*prevCond = *condition
-				updated = true
-			}
-		}
-
-		if !updated {
-			return nil
-		}
-
-		_, err = a.serviceExportClient.Namespace(toUpdate.Namespace).UpdateStatus(context.TODO(),
-			a.serviceImportController.converter.toUnstructured(toUpdate), metav1.UpdateOptions{})
-
-		return errors.Wrap(err, "error from UpdateStatus")
-	})
-	if err != nil {
-		logger.Errorf(err, "Error updating status for ServiceExport (%s/%s)", namespace, name)
-	}
-}
-
-func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
-	return c1.Type == c2.Type && c1.Status == c2.Status && reflect.DeepEqual(c1.Reason, c2.Reason) &&
-		reflect.DeepEqual(c1.Message, c2.Message)
 }
 
 func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceImport {

@@ -36,11 +36,11 @@ import (
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
-	updateExportedServiceStatus updateExportedServiceStatusFn,
+	serviceExportClient *ServiceExportClient,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
-		clusterID:                   spec.ClusterID,
-		updateExportedServiceStatus: updateExportedServiceStatus,
+		clusterID:           spec.ClusterID,
+		serviceExportClient: serviceExportClient,
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -122,10 +122,10 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	} else {
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(serviceName, serviceNamespace)
 		if err != nil {
-			c.updateExportedServiceStatus(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
+			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 		} else {
-			c.updateExportedServiceStatus(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
+			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionTrue, "", "Service was successfully exported to the broker"))
 		}
 	}

@@ -43,16 +43,16 @@ import (
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newServiceImportController(spec *AgentSpecification, syncerMetricNames AgentConfig, syncerConfig broker.SyncerConfig,
-	brokerClient dynamic.Interface, brokerNamespace string, updateExportedServiceStatus updateExportedServiceStatusFn,
+	brokerClient dynamic.Interface, brokerNamespace string, serviceExportClient *ServiceExportClient,
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		localClient:                 syncerConfig.LocalClient,
-		restMapper:                  syncerConfig.RestMapper,
-		clusterID:                   spec.ClusterID,
-		localNamespace:              spec.Namespace,
-		converter:                   converter{scheme: syncerConfig.Scheme},
-		serviceImportAggregator:     newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
-		updateExportedServiceStatus: updateExportedServiceStatus,
+		localClient:             syncerConfig.LocalClient,
+		restMapper:              syncerConfig.RestMapper,
+		clusterID:               spec.ClusterID,
+		localNamespace:          spec.Namespace,
+		converter:               converter{scheme: syncerConfig.Scheme},
+		serviceImportAggregator: newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
+		serviceExportClient:     serviceExportClient,
 	}
 
 	syncCounter := prometheus.NewGaugeVec(
@@ -254,7 +254,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
 
 	if op == syncer.Delete {
-		c.updateExportedServiceStatus(serviceImport.Labels[mcsv1a1.LabelServiceName],
+		c.serviceExportClient.updateStatusConditions(serviceImport.Labels[mcsv1a1.LabelServiceName],
 			serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
@@ -276,7 +276,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 		return nil, false
 	}
 
-	c.updateExportedServiceStatus(serviceName,
+	c.serviceExportClient.updateStatusConditions(serviceName,
 		serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
 			corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 
@@ -322,7 +322,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	}
 
 	if err != nil {
-		c.updateExportedServiceStatus(localServiceImport.Labels[mcsv1a1.LabelServiceName],
+		c.serviceExportClient.updateStatusConditions(localServiceImport.Labels[mcsv1a1.LabelServiceName],
 			localServiceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 	}
