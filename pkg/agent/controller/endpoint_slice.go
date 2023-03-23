@@ -19,12 +19,16 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -39,8 +43,9 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 	serviceExportClient *ServiceExportClient,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
-		clusterID:           spec.ClusterID,
-		serviceExportClient: serviceExportClient,
+		clusterID:              spec.ClusterID,
+		serviceExportClient:    serviceExportClient,
+		conflictCheckWorkQueue: workqueue.New("ConflictChecker"),
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -56,6 +61,10 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 			LocalOnSuccessfulSync: c.onLocalEndpointSliceSynced,
 			BrokerResourceType:    &discovery.EndpointSlice{},
 			BrokerTransform:       c.onRemoteEndpointSlice,
+			BrokerOnSuccessfulSync: func(obj runtime.Object, _ syncer.Operation) bool {
+				c.enqueueForConflictCheck(obj.(*discovery.EndpointSlice))
+				return false
+			},
 		},
 	}
 
@@ -76,6 +85,13 @@ func (c *EndpointSliceController) start(stopCh <-chan struct{}) error {
 	if err := c.syncer.Start(stopCh); err != nil {
 		return errors.Wrap(err, "error starting EndpointSlice syncer")
 	}
+
+	c.conflictCheckWorkQueue.Run(stopCh, c.checkForConflicts)
+
+	go func() {
+		<-stopCh
+		c.conflictCheckWorkQueue.ShutDown()
+	}()
 
 	return nil
 }
@@ -127,6 +143,8 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 		} else {
 			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionTrue, "", "Service was successfully exported to the broker"))
+
+			c.enqueueForConflictCheck(endpointSlice)
 		}
 	}
 
@@ -135,4 +153,71 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	}
 
 	return err != nil
+}
+
+func (c *EndpointSliceController) checkForConflicts(key, name, namespace string) (bool, error) {
+	epsList, err := c.syncer.GetLocalClient().Resource(endpointSliceGVR).Namespace(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
+			discovery.LabelManagedBy: constants.LabelValueManagedBy,
+			mcsv1a1.LabelServiceName: name,
+		}).String(),
+	})
+	if err != nil {
+		return true, errors.Wrapf(err, "error during conflict check for %q", key)
+	}
+
+	var prevServicePorts []mcsv1a1.ServicePort
+	var intersectedServicePorts []mcsv1a1.ServicePort
+	clusterNames := make([]string, 0, len(epsList.Items))
+	conflict := false
+
+	for i := range epsList.Items {
+		eps := c.serviceExportClient.toEndpointSlice(&epsList.Items[i])
+
+		servicePorts := c.serviceExportClient.toServicePorts(eps.Ports)
+		if prevServicePorts == nil {
+			prevServicePorts = servicePorts
+			intersectedServicePorts = servicePorts
+		} else if !slices.Equivalent(prevServicePorts, servicePorts, servicePortKey) {
+			conflict = true
+		}
+
+		intersectedServicePorts = slices.Intersect(intersectedServicePorts, servicePorts, servicePortKey)
+
+		clusterNames = append(clusterNames, eps.Labels[constants.MCSLabelSourceCluster])
+	}
+
+	if conflict {
+		c.serviceExportClient.updateStatusConditions(name, namespace, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, portConflictReason,
+			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
+				"The service will expose the intersection of all the ports: %s",
+				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
+	} else {
+		c.serviceExportClient.removeStatusCondition(name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
+	}
+
+	return false, nil
+}
+
+func (c *EndpointSliceController) enqueueForConflictCheck(eps *discovery.EndpointSlice) {
+	if eps.Labels[constants.LabelIsHeadless] != "false" {
+		return
+	}
+
+	c.conflictCheckWorkQueue.Enqueue(&discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      eps.Labels[mcsv1a1.LabelServiceName],
+			Namespace: eps.Labels[constants.LabelSourceNamespace],
+		},
+	})
+}
+
+func servicePortsToString(p []mcsv1a1.ServicePort) string {
+	s := make([]string, len(p))
+	for i := range p {
+		s[i] = fmt.Sprintf("[name: %s, protocol: %s, port: %v]", p[i].Name, p[i].Protocol, p[i].Port)
+	}
+
+	return strings.Join(s, ", ")
 }

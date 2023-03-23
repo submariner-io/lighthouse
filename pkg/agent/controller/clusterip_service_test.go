@@ -59,6 +59,7 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.createService()
 				t.cluster1.createServiceExport()
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
+				t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})
 
@@ -290,6 +291,8 @@ func testClusterIPServiceInTwoClusters() {
 
 	It("should export the service in both clusters", func() {
 		t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 	})
 
 	Context("with differing ports", func() {
@@ -298,18 +301,39 @@ func testClusterIPServiceInTwoClusters() {
 			t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
 		})
 
-		It("should correctly set the ports in the aggregated ServiceImport", func() {
+		It("should correctly set the ports in the aggregated ServiceImport and set the Conflict status condition", func() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+
+			condition := newServiceExportConflictCondition(corev1.ConditionTrue, "ConflictingPorts")
+			t.cluster1.awaitServiceExportCondition(condition)
+			t.cluster2.awaitServiceExportCondition(condition)
 		})
 
-		Context("after unexporting from one cluster", func() {
-			It("should correctly set the ports in the aggregated ServiceImport", func() {
+		Context("and after unexporting from one cluster", func() {
+			It("should correctly update the ports in the aggregated ServiceImport and clear the Conflict status condition", func() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
 
 				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port3}
 				t.cluster1.deleteServiceExport()
+
 				t.awaitNoEndpointSlice(&t.cluster1)
 				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster2.service.Name, t.cluster2.service.Namespace, &t.cluster2)
+				t.cluster2.awaitNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			})
+		})
+
+		Context("initially and after updating the ports to match", func() {
+			It("should correctly update the ports in the aggregated ServiceImport and clear the Conflict status condition", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+				t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(corev1.ConditionTrue, "ConflictingPorts"))
+
+				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2}
+				t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port2)}
+				t.cluster2.updateService()
+
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+				t.cluster1.awaitNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+				t.cluster2.awaitNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})
 	})
