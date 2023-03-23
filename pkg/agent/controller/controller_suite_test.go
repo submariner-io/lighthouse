@@ -496,6 +496,12 @@ func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportC
 	}).Should(BeNil(), "Unexpected ServiceExport status condition")
 }
 
+func (c *cluster) awaitNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) {
+	Eventually(func() interface{} {
+		return c.retrieveServiceExportCondition(condType)
+	}).Should(BeNil(), "Unexpected ServiceExport status condition")
+}
+
 func (c *cluster) awaitServiceUnavailableStatus() {
 	c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceUnavailable"))
 }
@@ -796,6 +802,14 @@ func newServiceExportValidCondition(status corev1.ConditionStatus, reason string
 func newServiceExportSyncedCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
 	return &mcsv1a1.ServiceExportCondition{
 		Type:   constants.ServiceExportSynced,
+		Status: status,
+		Reason: &reason,
+	}
+}
+
+func newServiceExportConflictCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+	return &mcsv1a1.ServiceExportCondition{
+		Type:   mcsv1a1.ServiceExportConflict,
 		Status: status,
 		Reason: &reason,
 	}

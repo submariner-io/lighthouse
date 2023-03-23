@@ -24,24 +24,34 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (c *ServiceExportClient) updateStatusConditions(name, namespace string, conditions ...mcsv1a1.ServiceExportCondition) {
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		obj, err := c.Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			logger.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
-			return nil
-		} else if err != nil {
-			return errors.Wrap(err, "error retrieving ServiceExport")
+func (c *ServiceExportClient) removeStatusCondition(name, namespace string, condType mcsv1a1.ServiceExportConditionType, reason string) {
+	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
+		condition := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
+		if condition != nil && reflect.DeepEqual(condition.Reason, &reason) {
+			logger.V(log.DEBUG).Infof("Removing status condition (Type: %q, Reason: %q) from ServiceExport (%s/%s)",
+				condType, reason, namespace, name)
+
+			toUpdate.Status.Conditions, _ = slices.Remove(toUpdate.Status.Conditions, *condition,
+				func(c mcsv1a1.ServiceExportCondition) mcsv1a1.ServiceExportConditionType {
+					return c.Type
+				})
+
+			return true
 		}
 
-		toUpdate := c.toServiceExport(obj)
+		return false
+	})
+}
 
+func (c *ServiceExportClient) updateStatusConditions(name, namespace string, conditions ...mcsv1a1.ServiceExportCondition) {
+	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
@@ -63,6 +73,23 @@ func (c *ServiceExportClient) updateStatusConditions(name, namespace string, con
 			}
 		}
 
+		return updated
+	})
+}
+
+func (c *ServiceExportClient) doUpdate(name, namespace string, update func(toUpdate *mcsv1a1.ServiceExport) bool) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		obj, err := c.Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			logger.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
+			return nil
+		} else if err != nil {
+			return errors.Wrap(err, "error retrieving ServiceExport")
+		}
+
+		toUpdate := c.toServiceExport(obj)
+
+		updated := update(toUpdate)
 		if !updated {
 			return nil
 		}

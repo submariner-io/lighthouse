@@ -91,4 +91,28 @@ var _ = Describe("Headless Service export", func() {
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
+
+	Describe("Two clusters", func() {
+		BeforeEach(func() {
+			t.cluster2.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createEndpoints()
+			t.cluster1.createServiceExport()
+		})
+
+		It("should export the service in both clusters", func() {
+			t.awaitHeadlessServiceExported(&t.cluster1)
+
+			t.cluster2.createEndpoints()
+			t.cluster2.createService()
+			t.cluster2.createServiceExport()
+
+			t.awaitHeadlessServiceExported(&t.cluster1, &t.cluster2)
+
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+	})
 })

@@ -25,13 +25,17 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-const exportFailedReason = "ExportFailed"
+const (
+	exportFailedReason = "ExportFailed"
+	portConflictReason = "ConflictingPorts"
+)
 
 type converter struct {
 	scheme *runtime.Scheme
@@ -101,6 +105,7 @@ type EndpointSliceController struct {
 	syncer                  *broker.Syncer
 	serviceImportAggregator *ServiceImportAggregator
 	serviceExportClient     *ServiceExportClient
+	conflictCheckWorkQueue  workqueue.Interface
 }
 
 type ServiceExportClient struct {

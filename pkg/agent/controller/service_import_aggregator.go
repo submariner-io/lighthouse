@@ -89,9 +89,7 @@ func (a *ServiceImportAggregator) setServicePorts(si *mcsv1a1.ServiceImport) err
 
 	for i := range list.Items {
 		eps := a.converter.toEndpointSlice(&list.Items[i])
-		si.Spec.Ports = slices.Union(si.Spec.Ports, a.converter.toServicePorts(eps.Ports), func(p mcsv1a1.ServicePort) string {
-			return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
-		})
+		si.Spec.Ports = slices.Union(si.Spec.Ports, a.converter.toServicePorts(eps.Ports), servicePortKey)
 	}
 
 	logger.V(log.DEBUG).Infof("Calculated ports for aggregated ServiceImport %q: %#v", si.Name, si.Spec.Ports)
@@ -158,4 +156,8 @@ func (a *ServiceImportAggregator) brokerServiceImportClient() dynamic.ResourceIn
 
 func clusterStatusKey(c mcsv1a1.ClusterStatus) string {
 	return c.Cluster
+}
+
+func servicePortKey(p mcsv1a1.ServicePort) string {
+	return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
 }
