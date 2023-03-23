@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
@@ -212,6 +213,24 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 		if len(si.Status.Clusters) != clusterCount {
 			return false, fmt.Sprintf("Actual cluster count %d does not match expected %d",
 				len(si.Status.Clusters), clusterCount), nil
+		}
+
+		expPorts := make([]mcsv1a1.ServicePort, len(svc.Spec.Ports))
+		for i := range svc.Spec.Ports {
+			expPorts[i] = mcsv1a1.ServicePort{
+				Name:     svc.Spec.Ports[i].Name,
+				Protocol: svc.Spec.Ports[i].Protocol,
+				Port:     svc.Spec.Ports[i].Port,
+			}
+		}
+
+		if svc.Spec.ClusterIP != v1.ClusterIPNone && !slices.Equivalent(expPorts, si.Spec.Ports, func(p mcsv1a1.ServicePort) string {
+			return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
+		}) {
+			s1, _ := json.MarshalIndent(expPorts, "", "  ")
+			s2, _ := json.MarshalIndent(si.Spec.Ports, "", "  ")
+
+			return false, fmt.Sprintf("ServiceImport ports do not match. Expected: %s, Actual: %s", s1, s2), nil
 		}
 
 		return true, "", nil

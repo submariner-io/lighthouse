@@ -129,6 +129,7 @@ type testDriver struct {
 	cluster2                   cluster
 	brokerServiceImportClient  dynamic.NamespaceableResourceInterface
 	brokerEndpointSliceClient  dynamic.ResourceInterface
+	brokerEndpointSliceReactor *fake.FailingReactor
 	stopCh                     chan struct{}
 	syncerConfig               *broker.SyncerConfig
 	doStart                    bool
@@ -152,7 +153,7 @@ func newTestDiver() *testDriver {
 	fake.AddFilteringListReactor(&brokerClient.Fake)
 
 	t := &testDriver{
-		aggregatedServicePorts: []mcsv1a1.ServicePort{},
+		aggregatedServicePorts: []mcsv1a1.ServicePort{port1, port2},
 		cluster1: cluster{
 			clusterID: clusterID1,
 			agentSpec: controller.AgentSpecification{
@@ -240,6 +241,13 @@ func newTestDiver() *testDriver {
 				Spec: corev1.ServiceSpec{
 					ClusterIP: "10.253.10.1",
 					Selector:  map[string]string{"app": "test"},
+					Ports:     []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
+				},
+			},
+			serviceExport: &mcsv1a1.ServiceExport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: serviceNamespace,
 				},
 			},
 			endpoints: &corev1.Endpoints{
@@ -272,6 +280,7 @@ func newTestDiver() *testDriver {
 	}
 
 	t.brokerServiceImportReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, "serviceimports")
+	t.brokerEndpointSliceReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, "endpointslices")
 
 	t.cluster1.endpointSliceAddresses = []discovery.Endpoint{
 		{
@@ -731,22 +740,24 @@ func toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
 	return se
 }
 
-func (t *testDriver) awaitNonHeadlessServiceExported(c *cluster) {
-	t.awaitServiceExported(mcsv1a1.ClusterSetIP, c)
+func (t *testDriver) awaitNonHeadlessServiceExported(clusters ...*cluster) {
+	t.awaitServiceExported(mcsv1a1.ClusterSetIP, clusters...)
 }
 
-func (t *testDriver) awaitHeadlessServiceExported(c *cluster) {
-	t.awaitServiceExported(mcsv1a1.Headless, c)
+func (t *testDriver) awaitHeadlessServiceExported(clusters ...*cluster) {
+	t.awaitServiceExported(mcsv1a1.Headless, clusters...)
 }
 
-func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, c *cluster) {
-	t.awaitAggregatedServiceImport(sType, c.service.Name, c.service.Namespace, c)
+func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clusters ...*cluster) {
+	t.awaitAggregatedServiceImport(sType, t.cluster1.service.Name, t.cluster1.service.Namespace, clusters...)
 
-	t.awaitEndpointSlice(c)
+	for _, c := range clusters {
+		t.awaitEndpointSlice(c)
 
-	c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-	c.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingExport"),
-		newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingExport"),
+			newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+	}
 }
 
 func (t *testDriver) awaitServiceUnexported(c *cluster) {
