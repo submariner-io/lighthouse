@@ -33,6 +33,7 @@ import (
 
 var _ = Describe("ClusterIP Service export", func() {
 	Describe("Single cluster", testClusterIPServiceInOneCluster)
+	Describe("Two clusters", testClusterIPServiceInTwoClusters)
 })
 
 func testClusterIPServiceInOneCluster() {
@@ -157,6 +158,22 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	When("the ports for an exported service are updated", func() {
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
+
+		It("should re-export the service with the updated ports", func() {
+			t.cluster1.service.Spec.Ports = append(t.cluster1.service.Spec.Ports, toServicePort(port3))
+			t.aggregatedServicePorts = append(t.aggregatedServicePorts, port3)
+
+			t.cluster1.updateService()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
+	})
+
 	When("two Services with the same name in different namespaces are exported", func() {
 		It("should correctly export both services", func() {
 			t.cluster1.createService()
@@ -245,5 +262,55 @@ func testClusterIPServiceInOneCluster() {
 			}})
 
 		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient, test.RemoteNamespace)), "other-eps")
+	})
+}
+
+func testClusterIPServiceInTwoClusters() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		t.cluster1.createEndpoints()
+		t.cluster1.createService()
+		t.cluster1.createServiceExport()
+
+		t.cluster2.createEndpoints()
+		t.cluster2.createService()
+		t.cluster2.createServiceExport()
+
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
+
+	It("should export the service in both clusters", func() {
+		t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+	})
+
+	Context("with differing ports", func() {
+		BeforeEach(func() {
+			t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port3)}
+			t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
+		})
+
+		It("should correctly set the ports in the aggregated ServiceImport", func() {
+			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+		})
+
+		Context("after unexporting from one cluster", func() {
+			It("should correctly set the ports in the aggregated ServiceImport", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+
+				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port3}
+				t.cluster1.deleteServiceExport()
+				t.awaitNoEndpointSlice(&t.cluster1)
+				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster2.service.Name, t.cluster2.service.Namespace, &t.cluster2)
+			})
+		})
 	})
 }

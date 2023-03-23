@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -479,6 +480,26 @@ func (c converter) toUnstructured(obj runtime.Object) *unstructured.Unstructured
 func (c converter) toServiceExport(obj runtime.Object) *mcsv1a1.ServiceExport {
 	to := &mcsv1a1.ServiceExport{}
 	utilruntime.Must(c.scheme.Convert(obj, to, nil))
+
+	return to
+}
+
+func (c converter) toEndpointSlice(obj runtime.Object) *discovery.EndpointSlice {
+	to := &discovery.EndpointSlice{}
+	utilruntime.Must(c.scheme.Convert(obj, to, nil))
+
+	return to
+}
+
+func (c converter) toServicePorts(from []discovery.EndpointPort) []mcsv1a1.ServicePort {
+	to := make([]mcsv1a1.ServicePort, len(from))
+	for i := range from {
+		to[i] = mcsv1a1.ServicePort{
+			Name:     *from[i].Name,
+			Protocol: *from[i].Protocol,
+			Port:     *from[i].Port,
+		}
+	}
 
 	return to
 }

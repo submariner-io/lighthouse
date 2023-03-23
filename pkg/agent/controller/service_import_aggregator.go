@@ -27,8 +27,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/lighthouse/pkg/constants"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
@@ -46,7 +49,7 @@ func newServiceImportAggregator(brokerClient dynamic.Interface, brokerNamespace,
 }
 
 func (a *ServiceImportAggregator) updateOnCreateOrUpdate(name, namespace string) error {
-	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) {
+	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) error {
 		var added bool
 
 		existing.Status.Clusters, added = slices.AppendIfNotPresent(existing.Status.Clusters,
@@ -57,28 +60,63 @@ func (a *ServiceImportAggregator) updateOnCreateOrUpdate(name, namespace string)
 				a.clusterID, existing.Name, existing.Status.Clusters)
 		}
 
-		// TODO - merge port info
+		return a.setServicePorts(existing)
 	})
 }
 
+func (a *ServiceImportAggregator) setServicePorts(si *mcsv1a1.ServiceImport) error {
+	// We don't set the port info for headless services.
+	if si.Spec.Type != mcsv1a1.ClusterSetIP {
+		return nil
+	}
+
+	serviceName := si.Annotations[mcsv1a1.LabelServiceName]
+	serviceNamespace := si.Annotations[constants.LabelSourceNamespace]
+
+	list, err := a.brokerClient.Resource(endpointSliceGVR).Namespace(a.brokerNamespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+			constants.LabelSourceNamespace: serviceNamespace,
+			mcsv1a1.LabelServiceName:       serviceName,
+		}).String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
+			serviceNamespace, serviceName)
+	}
+
+	si.Spec.Ports = make([]mcsv1a1.ServicePort, 0)
+
+	for i := range list.Items {
+		eps := a.converter.toEndpointSlice(&list.Items[i])
+		si.Spec.Ports = slices.Union(si.Spec.Ports, a.converter.toServicePorts(eps.Ports), func(p mcsv1a1.ServicePort) string {
+			return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
+		})
+	}
+
+	logger.V(log.DEBUG).Infof("Calculated ports for aggregated ServiceImport %q: %#v", si.Name, si.Spec.Ports)
+
+	return nil
+}
+
 func (a *ServiceImportAggregator) updateOnDelete(name, namespace string) error {
-	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) {
+	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) error {
 		var removed bool
 
 		existing.Status.Clusters, removed = slices.Remove(existing.Status.Clusters, mcsv1a1.ClusterStatus{Cluster: a.clusterID},
 			clusterStatusKey)
 		if !removed {
-			return
+			return nil
 		}
 
 		logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
 			a.clusterID, existing.Name, existing.Status.Clusters)
 
-		// TODO - remove port info
+		return a.setServicePorts(existing)
 	})
 }
 
-func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mcsv1a1.ServiceImport)) error {
+func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mcsv1a1.ServiceImport) error) error {
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", name, namespace),
@@ -90,7 +128,10 @@ func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mc
 		func(obj runtime.Object) (runtime.Object, error) {
 			existing := a.converter.toServiceImport(obj)
 
-			mutate(existing)
+			err := mutate(existing)
+			if err != nil {
+				return nil, err
+			}
 
 			if len(existing.Status.Clusters) == 0 {
 				logger.V(log.DEBUG).Infof("Deleting aggregated ServiceImport %q", existing.Name)
