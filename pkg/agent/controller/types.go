@@ -34,6 +34,7 @@ import (
 
 const (
 	exportFailedReason = "ExportFailed"
+	typeConflictReason = "ConflictingType"
 	portConflictReason = "ConflictingPorts"
 )
 
