@@ -527,6 +527,12 @@ func (c *cluster) findLocalEndpointSlice() *discovery.EndpointSlice {
 	return findEndpointSlice(c.localEndpointSliceClient, c.endpoints.Namespace, c.endpoints.Name, c.clusterID)
 }
 
+func (c *cluster) ensureNoEndpointSlice() {
+	Consistently(func() interface{} {
+		return findEndpointSlice(c.localEndpointSliceClient, c.endpoints.Namespace, c.endpoints.Name, c.clusterID)
+	}, 300*time.Millisecond).Should(BeNil(), "Unexpected EndpointSlice")
+}
+
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport) {
 	var serviceImport *mcsv1a1.ServiceImport
 
@@ -807,10 +813,10 @@ func newServiceExportSyncedCondition(status corev1.ConditionStatus, reason strin
 	}
 }
 
-func newServiceExportConflictCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+func newServiceExportConflictCondition(reason string) *mcsv1a1.ServiceExportCondition {
 	return &mcsv1a1.ServiceExportCondition{
 		Type:   mcsv1a1.ServiceExportConflict,
-		Status: status,
+		Status: corev1.ConditionTrue,
 		Reason: &reason,
 	}
 }

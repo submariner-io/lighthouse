@@ -278,11 +278,11 @@ func testClusterIPServiceInTwoClusters() {
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
+		t.justBeforeEach()
+
 		t.cluster2.createEndpoints()
 		t.cluster2.createService()
 		t.cluster2.createServiceExport()
-
-		t.justBeforeEach()
 	})
 
 	AfterEach(func() {
@@ -304,7 +304,7 @@ func testClusterIPServiceInTwoClusters() {
 		It("should correctly set the ports in the aggregated ServiceImport and set the Conflict status condition", func() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
 
-			condition := newServiceExportConflictCondition(corev1.ConditionTrue, "ConflictingPorts")
+			condition := newServiceExportConflictCondition("ConflictingPorts")
 			t.cluster1.awaitServiceExportCondition(condition)
 			t.cluster2.awaitServiceExportCondition(condition)
 		})
@@ -325,7 +325,7 @@ func testClusterIPServiceInTwoClusters() {
 		Context("initially and after updating the ports to match", func() {
 			It("should correctly update the ports in the aggregated ServiceImport and clear the Conflict status condition", func() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
-				t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(corev1.ConditionTrue, "ConflictingPorts"))
+				t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition("ConflictingPorts"))
 
 				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2}
 				t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port2)}
@@ -334,6 +334,33 @@ func testClusterIPServiceInTwoClusters() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
 				t.cluster1.awaitNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 				t.cluster2.awaitNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			})
+		})
+	})
+
+	Context("with differing service types", func() {
+		BeforeEach(func() {
+			t.cluster2.service.Spec.ClusterIP = corev1.ClusterIPNone
+		})
+
+		It("should set the Conflict status condition on the second cluster and not export it", func() {
+			t.cluster2.ensureNoEndpointSlice()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition("ConflictingType"))
+			t.cluster2.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "ExportFailed"))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+
+		Context("initially and after updating the service types to match", func() {
+			It("should export the service in both clusters", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition("ConflictingType"))
+
+				t.cluster2.service.Spec.ClusterIP = t.cluster2.serviceIP
+				t.cluster2.updateService()
+
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+				t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})
 	})

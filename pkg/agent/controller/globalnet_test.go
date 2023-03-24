@@ -20,7 +20,6 @@ package controller_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,17 +136,11 @@ var _ = Describe("Globalnet enabled", func() {
 
 		Context("and it initially does not have a global IP for all endpoint addresses", func() {
 			It("should eventually export the service with the global IPs", func() {
-				Consistently(func() interface{} {
-					return findEndpointSlice(t.cluster1.localEndpointSliceClient, t.cluster1.endpoints.Namespace,
-						t.cluster1.endpoints.Name, t.cluster1.clusterID)
-				}).Should(BeNil(), "Unexpected EndpointSlice")
+				t.cluster1.ensureNoEndpointSlice()
 
 				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("one", globalIP1))
 
-				Consistently(func() interface{} {
-					return findEndpointSlice(t.cluster1.localEndpointSliceClient, t.cluster1.endpoints.Namespace,
-						t.cluster1.endpoints.Name, t.cluster1.clusterID)
-				}).Should(BeNil(), "Unexpected EndpointSlice")
+				t.cluster1.ensureNoEndpointSlice()
 
 				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("two", globalIP2))
 

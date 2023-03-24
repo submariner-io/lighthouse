@@ -289,14 +289,15 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 
 	logger.V(log.DEBUG).Infof("Distribute for local ServiceImport %q", key)
 
-	serviceName := serviceImportSourceName(localServiceImport)
+	serviceName := localServiceImport.Labels[mcsv1a1.LabelServiceName]
+	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
+
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s", serviceName,
-				localServiceImport.Labels[constants.LabelSourceNamespace]),
+			Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
 			Annotations: map[string]string{
 				mcsv1a1.LabelServiceName:       serviceName,
-				constants.LabelSourceNamespace: localServiceImport.Labels[constants.LabelSourceNamespace],
+				constants.LabelSourceNamespace: serviceNamespace,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
@@ -304,6 +305,8 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 			Ports: []mcsv1a1.ServicePort{},
 		},
 	}
+
+	conflict := false
 
 	// Here we just create the aggregated ServiceImport on the broker. We don't merge the local service info until we've
 	// successfully synced our local EndpointSlice to the broker. This is mainly done b/c the aggregated port information
@@ -313,17 +316,31 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	result, err := util.CreateOrUpdate(context.Background(), resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
 		c.converter.toUnstructured(aggregate),
 		func(obj runtime.Object) (runtime.Object, error) {
-			// TODO - check for service type conflict.
+			existing := c.converter.toServiceImport(obj)
+
+			if localServiceImport.Spec.Type != existing.Spec.Type {
+				conflict = true
+				conflictCondition := newServiceExportCondition(
+					mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, typeConflictReason,
+					fmt.Sprintf("The service type %q does not match the type (%q) of the existing service export",
+						localServiceImport.Spec.Type, existing.Spec.Type))
+
+				c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, conflictCondition,
+					newServiceExportCondition(constants.ServiceExportSynced,
+						corev1.ConditionFalse, exportFailedReason, "Unable to export due to an irresolvable conflict"))
+			} else {
+				c.serviceExportClient.removeStatusCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, typeConflictReason)
+			}
 
 			return obj, nil
 		})
-	if err == nil {
+	if err == nil && !conflict {
 		err = c.startEndpointsController(localServiceImport)
 	}
 
 	if err != nil {
-		c.serviceExportClient.updateStatusConditions(localServiceImport.Labels[mcsv1a1.LabelServiceName],
-			localServiceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+		c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace,
+			newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 	}
 
