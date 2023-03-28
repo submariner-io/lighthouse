@@ -400,9 +400,10 @@ func (a *Controller) getPortsForService(service *corev1.Service) []mcsv1a1.Servi
 
 	for _, port := range service.Spec.Ports {
 		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
-			Name:     port.Name,
-			Protocol: port.Protocol,
-			Port:     port.Port,
+			Name:        port.Name,
+			Protocol:    port.Protocol,
+			Port:        port.Port,
+			AppProtocol: port.AppProtocol,
 		})
 	}
 
@@ -495,9 +496,10 @@ func (c converter) toServicePorts(from []discovery.EndpointPort) []mcsv1a1.Servi
 	to := make([]mcsv1a1.ServicePort, len(from))
 	for i := range from {
 		to[i] = mcsv1a1.ServicePort{
-			Name:     *from[i].Name,
-			Protocol: *from[i].Protocol,
-			Port:     *from[i].Port,
+			Name:        *from[i].Name,
+			Protocol:    *from[i].Protocol,
+			Port:        *from[i].Port,
+			AppProtocol: from[i].AppProtocol,
 		}
 	}
 

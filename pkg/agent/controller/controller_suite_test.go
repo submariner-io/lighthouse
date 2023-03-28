@@ -82,9 +82,10 @@ var (
 	}
 
 	port3 = mcsv1a1.ServicePort{
-		Name:     "POP3",
-		Protocol: corev1.ProtocolUDP,
-		Port:     110,
+		Name:        "POP3",
+		Protocol:    corev1.ProtocolUDP,
+		Port:        110,
+		AppProtocol: pointer.String("smtp"),
 	}
 )
 
@@ -670,9 +671,10 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 
 		for i := range c.endpoints.Subsets[0].Ports {
 			expected.Ports = append(expected.Ports, discovery.EndpointPort{
-				Name:     &c.endpoints.Subsets[0].Ports[i].Name,
-				Protocol: &c.endpoints.Subsets[0].Ports[i].Protocol,
-				Port:     &c.endpoints.Subsets[0].Ports[i].Port,
+				Name:        &c.endpoints.Subsets[0].Ports[i].Name,
+				Protocol:    &c.endpoints.Subsets[0].Ports[i].Protocol,
+				Port:        &c.endpoints.Subsets[0].Ports[i].Port,
+				AppProtocol: c.endpoints.Subsets[0].Ports[i].AppProtocol,
 			})
 		}
 	} else {
@@ -685,9 +687,10 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 
 		for i := range c.service.Spec.Ports {
 			expected.Ports = append(expected.Ports, discovery.EndpointPort{
-				Name:     &c.service.Spec.Ports[i].Name,
-				Protocol: &c.service.Spec.Ports[i].Protocol,
-				Port:     &c.service.Spec.Ports[i].Port,
+				Name:        &c.service.Spec.Ports[i].Name,
+				Protocol:    &c.service.Spec.Ports[i].Protocol,
+				Port:        &c.service.Spec.Ports[i].Port,
+				AppProtocol: c.service.Spec.Ports[i].AppProtocol,
 			})
 		}
 	}
@@ -816,8 +819,9 @@ func setIngressAllocatedIP(ingressIP *unstructured.Unstructured, ip string) {
 
 func toServicePort(port mcsv1a1.ServicePort) corev1.ServicePort {
 	return corev1.ServicePort{
-		Name:     port.Name,
-		Protocol: port.Protocol,
-		Port:     port.Port,
+		Name:        port.Name,
+		Protocol:    port.Protocol,
+		Port:        port.Port,
+		AppProtocol: port.AppProtocol,
 	}
 }

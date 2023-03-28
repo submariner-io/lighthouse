@@ -178,9 +178,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		if e.isHeadless() {
 			for i := range subset.Ports {
 				endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-					Port:     &subset.Ports[i].Port,
-					Name:     &subset.Ports[i].Name,
-					Protocol: &subset.Ports[i].Protocol,
+					Port:        &subset.Ports[i].Port,
+					Name:        &subset.Ports[i].Name,
+					Protocol:    &subset.Ports[i].Protocol,
+					AppProtocol: subset.Ports[i].AppProtocol,
 				})
 			}
 		}
@@ -207,9 +208,10 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 
 		for i := range e.serviceImportSpec.Ports {
 			endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-				Port:     &e.serviceImportSpec.Ports[i].Port,
-				Name:     &e.serviceImportSpec.Ports[i].Name,
-				Protocol: &e.serviceImportSpec.Ports[i].Protocol,
+				Port:        &e.serviceImportSpec.Ports[i].Port,
+				Name:        &e.serviceImportSpec.Ports[i].Name,
+				Protocol:    &e.serviceImportSpec.Ports[i].Protocol,
+				AppProtocol: e.serviceImportSpec.Ports[i].AppProtocol,
 			})
 		}
 	}
