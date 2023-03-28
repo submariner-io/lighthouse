@@ -108,6 +108,9 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+
+	Expect(discovery.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(mcsv1a1.AddToScheme(scheme.Scheme)).To(Succeed())
 })
 
 func TestResolver(t *testing.T) {
@@ -127,9 +130,6 @@ func newTestDriver() *testDriver {
 
 	BeforeEach(func() {
 		t.clusterStatus = fake.NewClusterStatus("", clusterID1, clusterID2, clusterID3)
-
-		Expect(discovery.AddToScheme(scheme.Scheme)).To(Succeed())
-		Expect(mcsv1a1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 		client := fakeClient.NewSimpleDynamicClient(scheme.Scheme)
 
