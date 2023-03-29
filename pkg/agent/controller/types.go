@@ -75,6 +75,7 @@ type ServiceImportController struct {
 	localClient             dynamic.Interface
 	restMapper              meta.RESTMapper
 	serviceImportAggregator *ServiceImportAggregator
+	serviceImportMigrator   *ServiceImportMigrator
 	serviceExportClient     *ServiceExportClient
 	localSyncer             syncer.Interface
 	remoteSyncer            syncer.Interface
