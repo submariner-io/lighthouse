@@ -403,16 +403,6 @@ func newServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, stat
 	}
 }
 
-// This function also checks the legacy source name label for migration - this can be removed after 0.15.
-func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
-	name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
-	if ok {
-		return name
-	}
-
-	return serviceImport.GetLabels()["lighthouse.submariner.io/sourceName"]
-}
-
 func (c converter) toServiceImport(obj runtime.Object) *mcsv1a1.ServiceImport {
 	to := &mcsv1a1.ServiceImport{}
 	utilruntime.Must(c.scheme.Convert(obj, to, nil))
