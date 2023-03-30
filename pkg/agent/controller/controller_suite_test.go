@@ -21,7 +21,6 @@ package controller_test
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,6 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
@@ -453,7 +453,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 	lastIndex := -1
 
 	for i := range expected {
-		expStr, _ := json.MarshalIndent(expected[i], "", "  ")
+		expStr := resource.ToJSON(expected[i])
 		j := lastIndex + 1
 
 		Eventually(func() interface{} {
@@ -483,11 +483,35 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 	for i := range expected {
 		assertEquivalentConditions(actual[i], expected[i])
 	}
+}
 
-	time.Sleep(time.Millisecond * 100)
+func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExportCondition) {
+	indexOfLastCondition := func() int {
+		actions := c.localDynClient.Fake.Actions()
+		for i := len(actions) - 1; i >= 0; i-- {
+			if !actions[i].Matches("update", "serviceexports") {
+				continue
+			}
 
-	lastCond := expected[len(expected)-1]
-	assertEquivalentConditions(c.retrieveServiceExportCondition(lastCond.Type), lastCond)
+			actual := controller.FindServiceExportStatusCondition(
+				toServiceExport(actions[i].(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected.Type)
+
+			if actual != nil {
+				assertEquivalentConditions(actual, expected)
+				return i
+			}
+		}
+
+		Fail(fmt.Sprintf("ServiceExport condition not found. Expected: %s", resource.ToJSON(expected)))
+
+		return -1
+	}
+
+	initialIndex := indexOfLastCondition()
+	Consistently(func() int {
+		return indexOfLastCondition()
+	}).Should(Equal(initialIndex), fmt.Sprintf("Expected ServiceExport condition to not change: %s",
+		resource.ToJSON(expected)))
 }
 
 func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) {
@@ -735,7 +759,7 @@ func endpointSliceClientFor(client dynamic.Interface, namespace string) dynamic.
 }
 
 func assertEquivalentConditions(actual, expected *mcsv1a1.ServiceExportCondition) {
-	out, _ := json.MarshalIndent(actual, "", "  ")
+	out := resource.ToJSON(actual)
 
 	Expect(actual.Status).To(Equal(expected.Status), "Actual: %s", out)
 	Expect(actual.LastTransitionTime).To(Not(BeNil()), "Actual: %s", out)
