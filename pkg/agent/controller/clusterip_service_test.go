@@ -291,6 +291,8 @@ func testClusterIPServiceInTwoClusters() {
 
 	It("should export the service in both clusters", func() {
 		t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+		t.cluster1.ensureLastServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+		t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
 		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 	})
