@@ -49,7 +49,7 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	serviceImport *mcsv1a1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
 ) (*EndpointController, error) {
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
-	serviceName := serviceImport.Labels[mcsv1a1.LabelServiceName]
+	serviceName := serviceImportSourceName(serviceImport)
 
 	logger.V(log.DEBUG).Infof("Starting Endpoints controller for service %s/%s", serviceNamespace, serviceName)
 

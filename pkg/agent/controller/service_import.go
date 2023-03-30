@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -86,15 +87,25 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		return nil, errors.Wrap(err, "error creating local ServiceImport syncer")
 	}
 
+	controller.serviceImportMigrator = &ServiceImportMigrator{
+		clusterID:                          spec.ClusterID,
+		localNamespace:                     spec.Namespace,
+		brokerClient:                       brokerClient.Resource(serviceImportGVR).Namespace(brokerNamespace),
+		listLocalServiceImports:            controller.localSyncer.ListResources,
+		converter:                          converter{scheme: syncerConfig.Scheme},
+		deletedLocalServiceImportsOnBroker: sets.New[string](),
+	}
+
 	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:            "Remote ServiceImport",
-		SourceClient:    brokerClient,
-		SourceNamespace: brokerNamespace,
-		RestMapper:      syncerConfig.RestMapper,
-		Federator:       federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
-		ResourceType:    &mcsv1a1.ServiceImport{},
-		Transform:       controller.onRemoteServiceImport,
-		Scheme:          syncerConfig.Scheme,
+		Name:             "Remote ServiceImport",
+		SourceClient:     brokerClient,
+		SourceNamespace:  brokerNamespace,
+		RestMapper:       syncerConfig.RestMapper,
+		Federator:        federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
+		ResourceType:     &mcsv1a1.ServiceImport{},
+		Transform:        controller.onRemoteServiceImport,
+		OnSuccessfulSync: controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
+		Scheme:           syncerConfig.Scheme,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceImport watcher")
@@ -191,8 +202,7 @@ func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
 		for i := range siList.Items {
 			si := c.converter.toServiceImport(&siList.Items[i])
 
-			_, ok := si.Labels[mcsv1a1.LabelServiceName]
-			if ok {
+			if serviceImportSourceName(si) != "" {
 				// This is not an aggregated ServiceImport.
 				continue
 			}
@@ -251,33 +261,25 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 
+	serviceName := serviceImportSourceName(serviceImport)
+
+	sourceCluster := sourceClusterName(serviceImport)
+	if sourceCluster != c.clusterID {
+		return nil, false
+	}
+
 	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
 
 	if op == syncer.Delete {
-		c.serviceExportClient.updateStatusConditions(serviceImport.Labels[mcsv1a1.LabelServiceName],
-			serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+		c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+			newServiceExportCondition(constants.ServiceExportSynced,
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
 		return obj, false
 	}
 
-	sourceCluster := serviceImport.Labels[constants.MCSLabelSourceCluster]
-	if sourceCluster == "" || sourceCluster != c.clusterID {
-		// TODO - handle migration of legacy per-cluster ServiceImports
-		return nil, false
-	}
-
-	serviceName, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
-	if !ok {
-		// The label is missing - most likely b/c the ServiceImport hasn't yet been migrated from the legacy labels.
-		logger.Infof("Label %q missing from ServiceImport (%s/%s) - not syncing", mcsv1a1.LabelServiceName,
-			serviceImport.Namespace, serviceImport.Name)
-
-		return nil, false
-	}
-
-	c.serviceExportClient.updateStatusConditions(serviceName,
-		serviceImport.Labels[constants.LabelSourceNamespace], newServiceExportCondition(constants.ServiceExportSynced,
+	c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+		newServiceExportCondition(constants.ServiceExportSynced,
 			corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 
 	return obj, false
@@ -289,7 +291,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 
 	logger.V(log.DEBUG).Infof("Distribute for local ServiceImport %q", key)
 
-	serviceName := localServiceImport.Labels[mcsv1a1.LabelServiceName]
+	serviceName := serviceImportSourceName(localServiceImport)
 	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
 
 	aggregate := &mcsv1a1.ServiceImport{
@@ -375,7 +377,7 @@ func (c *ServiceImportController) Delete(obj runtime.Object) error {
 	return err
 }
 
-func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
@@ -390,7 +392,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 		return serviceImport, false
 	}
 
-	return nil, false
+	return c.serviceImportMigrator.onRemoteServiceImport(serviceImport)
 }
 
 func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
@@ -398,16 +400,6 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 	if err != nil {
 		logger.Error(err, "Error listing serviceImports")
 		return nil
-	}
-
-	// This function also checks the legacy source name label for migration - this can be removed after 0.15.
-	sourceClusterName := func(serviceImport *mcsv1a1.ServiceImport) string {
-		name, ok := serviceImport.Labels[constants.MCSLabelSourceCluster]
-		if ok {
-			return name
-		}
-
-		return serviceImport.Labels["lighthouse.submariner.io/sourceCluster"]
 	}
 
 	retList := make([]runtime.Object, 0, len(siList))
