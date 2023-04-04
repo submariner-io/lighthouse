@@ -99,6 +99,7 @@ type EndpointController struct {
 	localClient          dynamic.Interface
 	ingressIPClient      dynamic.NamespaceableResourceInterface
 	globalIngressIPCache *globalIngressIPCache
+	epsSyncer            syncer.Interface
 }
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
