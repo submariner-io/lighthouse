@@ -474,11 +474,11 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	var serviceIPList []string
 
-	serviceIPClusterB := f.GetServiceIP(framework.ClusterB, nginxServiceClusterB, false)
+	serviceIPClusterB := f.GetServiceIP(framework.ClusterB, nginxServiceClusterB)
 
 	serviceIPList = append(serviceIPList, serviceIPClusterB)
 
-	serviceIPClusterC := f.GetServiceIP(framework.ClusterC, nginxServiceClusterB, false)
+	serviceIPClusterC := f.GetServiceIP(framework.ClusterC, nginxServiceClusterB)
 
 	serviceIPList = append(serviceIPList, serviceIPClusterC)
 

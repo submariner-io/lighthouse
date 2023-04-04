@@ -550,7 +550,7 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	domains []string, clusterName string, shouldContain bool,
 ) {
-	serviceIP := f.GetServiceIP(targetCluster, service, srcCluster == targetCluster)
+	serviceIP := f.GetServiceIP(targetCluster, service)
 	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
 }
 
@@ -657,7 +657,7 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 	})
 }
 
-func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service, isLocal bool) string {
+func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service) string {
 	Expect(service.Spec.Type).To(Equal(v1.ServiceTypeClusterIP))
 
 	if !framework.TestContext.GlobalnetEnabled {
