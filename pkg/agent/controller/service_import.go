@@ -381,7 +381,7 @@ func (c *ServiceImportController) Delete(obj runtime.Object) error {
 	return c.serviceImportMigrator.onLocalServiceImportDeleted(localServiceImport)
 }
 
-func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
 	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]

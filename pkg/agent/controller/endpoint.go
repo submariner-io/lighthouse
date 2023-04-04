@@ -135,7 +135,7 @@ func (e *EndpointController) cleanup() (bool, error) {
 	return true, nil
 }
 
-func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (e *EndpointController) endpointsToEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endPoints := obj.(*corev1.Endpoints)
 
 	if op == syncer.Delete {
