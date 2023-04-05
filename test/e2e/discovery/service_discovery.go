@@ -109,7 +109,9 @@ var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 		})
 
 		AfterEach(func() {
-			f.SetHealthCheckIP(framework.ClusterC, healthCheckIP, endpointName)
+			if endpointName != "" {
+				f.SetHealthCheckIP(framework.ClusterC, healthCheckIP, endpointName)
+			}
 		})
 	})
 })

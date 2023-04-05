@@ -374,7 +374,11 @@ func (c *ServiceImportController) Delete(obj runtime.Object) error {
 			localServiceImport.Labels[constants.LabelSourceNamespace])
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	return c.serviceImportMigrator.onLocalServiceImportDeleted(localServiceImport)
 }
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {

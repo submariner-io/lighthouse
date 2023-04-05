@@ -68,7 +68,9 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 
 	nameSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
 
-	epsSyncer, err := syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
+	var err error
+
+	controller.epsSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Endpoints -> EndpointSlice",
 		SourceClient:        localClient,
 		SourceNamespace:     serviceNamespace,
@@ -83,7 +85,7 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 		return nil, errors.Wrap(err, "error creating Endpoints syncer")
 	}
 
-	if err := epsSyncer.Start(controller.stopCh); err != nil {
+	if err := controller.epsSyncer.Start(controller.stopCh); err != nil {
 		return nil, errors.Wrap(err, "error starting Endpoints syncer")
 	}
 
@@ -93,6 +95,7 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 func (e *EndpointController) stop() {
 	e.stopOnce.Do(func() {
 		close(e.stopCh)
+		e.epsSyncer.AwaitStopped()
 	})
 }
 
