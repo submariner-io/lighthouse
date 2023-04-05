@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.27.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/submariner-io/admiral v0.15.0-rc0
+	github.com/submariner-io/admiral v0.15.0-rc0.0.20230405171430-d7538d802f79
 	github.com/submariner-io/shipyard v0.15.0-rc0
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.26.3
