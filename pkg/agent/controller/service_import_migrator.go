@@ -126,6 +126,21 @@ func (c *ServiceImportMigrator) onSuccessfulSyncFromBroker(obj runtime.Object, o
 	return false
 }
 
+func (c *ServiceImportMigrator) onLocalServiceImportDeleted(serviceImport *mcsv1a1.ServiceImport) error {
+	if serviceImport.Labels[LegacySourceClusterLabel] != c.clusterID {
+		return nil
+	}
+
+	logger.Infof("Legacy local ServiceImport %q deleted - removing from the broker", serviceImport.Name)
+
+	err := c.brokerClient.Delete(context.Background(), serviceImport.Name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		err = nil
+	}
+
+	return err
+}
+
 func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
 	// This function also checks the legacy source name label for migration.
 	name, ok := serviceImport.Labels[mcsv1a1.LabelServiceName]
