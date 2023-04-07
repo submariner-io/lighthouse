@@ -37,6 +37,7 @@ jobs:
 
   e2e-full:
     name: E2E
+    needs: images
     if: contains(github.event.pull_request.labels.*.name, 'ready-to-test')
     timeout-minutes: 60
     runs-on: ubuntu-latest
