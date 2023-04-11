@@ -653,7 +653,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 		"verifying the difference between them is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
 		serviceIPList[1], serviceIPMap[serviceIPList[1]]))
 
-	Expect(int(math.Abs(float64(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]]))) < 3).To(BeTrue(),
+	Expect(int(math.Abs(float64(serviceIPMap[serviceIPList[0]]-serviceIPMap[serviceIPList[1]])))).To(BeNumerically("<", 3),
 		"Service IPs were not returned in proper round-robin fashion: Expected IPs: %v,"+
 			" Returned IPs: %v, IP Counts: %v", serviceIPList, retIPs, serviceIPMap)
 }
