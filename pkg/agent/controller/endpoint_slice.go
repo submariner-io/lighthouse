@@ -56,12 +56,12 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 			LocalSourceLabelSelector: k8slabels.SelectorFromSet(map[string]string{
 				discovery.LabelManagedBy: constants.LabelValueManagedBy,
 			}).String(),
-			LocalResourceType:     &discovery.EndpointSlice{},
-			LocalTransform:        c.onLocalEndpointSlice,
-			LocalOnSuccessfulSync: c.onLocalEndpointSliceSynced,
-			BrokerResourceType:    &discovery.EndpointSlice{},
-			BrokerTransform:       c.onRemoteEndpointSlice,
-			BrokerOnSuccessfulSync: func(obj runtime.Object, _ syncer.Operation) bool {
+			LocalResourceType:        &discovery.EndpointSlice{},
+			TransformLocalToBroker:   c.onLocalEndpointSlice,
+			OnSuccessfulSyncToBroker: c.onLocalEndpointSliceSynced,
+			BrokerResourceType:       &discovery.EndpointSlice{},
+			TransformBrokerToLocal:   c.onRemoteEndpointSlice,
+			OnSuccessfulSyncFromBroker: func(obj runtime.Object, _ syncer.Operation) bool {
 				c.enqueueForConflictCheck(obj.(*discovery.EndpointSlice))
 				return false
 			},
