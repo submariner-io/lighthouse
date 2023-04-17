@@ -21,7 +21,6 @@ package controller_test
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"flag"
 	"fmt"
 	"math/big"
@@ -560,19 +559,20 @@ func (c *cluster) ensureNoEndpointSlice() {
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport) {
 	var serviceImport *mcsv1a1.ServiceImport
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Namespace(expected.Namespace).Get(context.TODO(), expected.Name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			obj, err := client.Namespace(expected.Namespace).Get(ctx, expected.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
 
-		serviceImport = &mcsv1a1.ServiceImport{}
-		Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+			serviceImport = &mcsv1a1.ServiceImport{}
+			Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
 
-		return reflect.DeepEqual(&expected.Spec, &serviceImport.Spec) && reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
-	})
+			return reflect.DeepEqual(&expected.Spec, &serviceImport.Spec) && reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
+		})
 
-	if !errors.Is(err, wait.ErrWaitTimeout) {
+	if !wait.Interrupted(err) {
 		Expect(err).To(Succeed())
 	}
 
@@ -607,7 +607,8 @@ func findEndpointSlice(client dynamic.ResourceInterface, namespace, name, cluste
 func awaitEndpointSlice(client dynamic.ResourceInterface, expected *discovery.EndpointSlice) {
 	var endpointSlice *discovery.EndpointSlice
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+		//nolint:contextcheck // Ignore Function `findEndpointSlice` should pass the context parameter
 		endpointSlice = findEndpointSlice(client, expected.Namespace, expected.Name, expected.Labels[constants.MCSLabelSourceCluster])
 		if endpointSlice == nil {
 			return false, nil
@@ -617,7 +618,7 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, expected *discovery.En
 			reflect.DeepEqual(expected.Ports, endpointSlice.Ports), nil
 	})
 
-	if !errors.Is(err, wait.ErrWaitTimeout) {
+	if !wait.Interrupted(err) {
 		Expect(err).To(Succeed())
 	}
 
