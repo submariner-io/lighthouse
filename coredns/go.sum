@@ -458,8 +458,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.1 h1:w7B6lhMri9wdJUVmEZPGGhZzrYTPvgJArz7wNPgYKsk=
-github.com/submariner-io/admiral v0.15.0-rc1 h1:IgIRVsGDQ6MGhBxiybCz6GKhgQ6J9ciiAjC6Lxbaa8k=
-github.com/submariner-io/admiral v0.15.0-rc1/go.mod h1:5VvO9n+XNz3d7eVt40mRsc9L+gjS501lxKCiTrDOj10=
+github.com/submariner-io/admiral v0.15.0 h1:74OqO37YB6VmLfZNwZg1+c26+2X+s3ygHRNqY+tkRxo=
+github.com/submariner-io/admiral v0.15.0/go.mod h1:LXoLiD88KM5+0eF50TsvNQaZax3Gd1IzRiHkA31in/Y=
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tinylib/msgp v1.1.6 h1:i+SbKraHhnrf9M5MYmvQhFnbLhAXSDWF8WWsuyRdocw=
