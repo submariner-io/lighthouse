@@ -276,11 +276,11 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
 		return obj, false
+	} else if op == syncer.Create {
+		c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+			newServiceExportCondition(constants.ServiceExportSynced,
+				corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
-
-	c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
-		newServiceExportCondition(constants.ServiceExportSynced,
-			corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 
 	return obj, false
 }
