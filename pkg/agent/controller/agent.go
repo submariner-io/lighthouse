@@ -260,7 +260,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 		corev1.ConditionTrue, "", ""))
 
-	logger.V(log.DEBUG).Infof("Returning ServiceImport: %s", serviceImportStringer{serviceImport})
+	logger.V(log.DEBUG).Infof("Returning ServiceImport %s/%s: %s", svcExport.Namespace, svcExport.Name,
+		serviceImportStringer{serviceImport})
 
 	return serviceImport, false
 }
