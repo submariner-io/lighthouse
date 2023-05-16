@@ -220,9 +220,11 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 	}
 
 	if op == syncer.Create {
-		logger.V(log.DEBUG).Infof("Returning EndpointSlice: %s", endpointSliceStringer{endpointSlice})
+		logger.V(log.DEBUG).Infof("Returning EndpointSlice %s/%s: %s", endpoints.Namespace, endpoints.Name,
+			endpointSliceStringer{endpointSlice})
 	} else {
-		logger.V(log.TRACE).Infof("Returning EndpointSlice: %s", endpointSliceStringer{endpointSlice})
+		logger.V(log.TRACE).Infof("Returning EndpointSlice %s/%s: %s", endpoints.Namespace, endpoints.Name,
+			endpointSliceStringer{endpointSlice})
 	}
 
 	return endpointSlice, false
