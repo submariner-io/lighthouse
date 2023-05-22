@@ -71,10 +71,14 @@ var _ = Describe("Headless Service export", func() {
 			t.awaitHeadlessServiceExported(&t.cluster1)
 
 			t.cluster1.endpoints.Subsets[0].Addresses = append(t.cluster1.endpoints.Subsets[0].Addresses, corev1.EndpointAddress{IP: "192.168.5.3"})
-			t.cluster1.endpointSliceAddresses = append(t.cluster1.endpointSliceAddresses, discovery.Endpoint{
+
+			index := 2
+			t.cluster1.endpointSliceAddresses = append(t.cluster1.endpointSliceAddresses[:index+1],
+				t.cluster1.endpointSliceAddresses[index:]...)
+			t.cluster1.endpointSliceAddresses[index] = discovery.Endpoint{
 				Addresses:  []string{"192.168.5.3"},
 				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			})
+			}
 
 			t.cluster1.updateEndpoints()
 			t.awaitEndpointSlice(&t.cluster1)

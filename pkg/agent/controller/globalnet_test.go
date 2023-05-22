@@ -121,12 +121,14 @@ var _ = Describe("Globalnet enabled", func() {
 
 			t.cluster1.endpointSliceAddresses[0].Addresses = []string{globalIP1}
 			t.cluster1.endpointSliceAddresses[1].Addresses = []string{globalIP2}
+			t.cluster1.endpointSliceAddresses[2].Addresses = []string{globalIP3}
 		})
 
 		Context("and it has global IPs for all endpoint addresses", func() {
 			BeforeEach(func() {
 				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("one", globalIP1))
 				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("not-ready", globalIP3))
 			})
 
 			It("should export the service with the global IPs", func() {
@@ -143,6 +145,7 @@ var _ = Describe("Globalnet enabled", func() {
 				t.cluster1.ensureNoEndpointSlice()
 
 				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIP("not-ready", globalIP3))
 
 				t.awaitEndpointSlice(&t.cluster1)
 			})
