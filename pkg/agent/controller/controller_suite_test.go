@@ -63,6 +63,7 @@ const (
 	serviceNamespace = "service-ns"
 	globalIP1        = "242.254.1.1"
 	globalIP2        = "242.254.1.2"
+	globalIP3        = "242.254.1.3"
 )
 
 var (
@@ -294,6 +295,11 @@ func newTestDiver() *testDriver {
 			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			Hostname:   &t.cluster1.endpoints.Subsets[0].Addresses[1].TargetRef.Name,
 			NodeName:   t.cluster1.endpoints.Subsets[0].Addresses[1].NodeName,
+		},
+		{
+			Addresses:  []string{t.cluster1.endpoints.Subsets[0].NotReadyAddresses[0].IP},
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+			Hostname:   &t.cluster1.endpoints.Subsets[0].NotReadyAddresses[0].TargetRef.Name,
 		},
 	}
 

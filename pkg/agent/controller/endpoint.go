@@ -175,6 +175,8 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		AddressType: discovery.AddressTypeIPv4,
 	}
 
+	readyCount := 0
+
 	if len(endpoints.Subsets) > 0 {
 		subset := endpoints.Subsets[0]
 
@@ -189,11 +191,20 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 			}
 		}
 
-		if allAddressesIPv6(subset.Addresses) {
+		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
 			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
 
 		newEndpoints, retry := e.getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)
+		if retry {
+			return nil, true
+		}
+
+		readyCount = len(newEndpoints)
+
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, newEndpoints...)
+
+		newEndpoints, retry = e.getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)
 		if retry {
 			return nil, true
 		}
@@ -205,7 +216,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 		endpointSlice.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{e.serviceImportSpec.IPs[0]},
 			Conditions: discovery.EndpointConditions{
-				Ready: pointer.Bool(len(endpointSlice.Endpoints) > 0),
+				Ready: pointer.Bool(readyCount > 0),
 			},
 		}}
 
