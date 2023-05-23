@@ -90,16 +90,17 @@ type ServiceImportController struct {
 // that listen only for the Service's endpoints. It creates an EndpointSlice corresponding to an Endpoints object that is
 // distributed to other clusters.
 type EndpointController struct {
-	clusterID            string
-	serviceName          string
-	serviceNamespace     string
-	serviceImportSpec    *mcsv1a1.ServiceImportSpec
-	stopCh               chan struct{}
-	stopOnce             sync.Once
-	localClient          dynamic.Interface
-	ingressIPClient      dynamic.NamespaceableResourceInterface
-	globalIngressIPCache *globalIngressIPCache
-	epsSyncer            syncer.Interface
+	clusterID                string
+	serviceName              string
+	serviceNamespace         string
+	serviceImportSpec        *mcsv1a1.ServiceImportSpec
+	publishNotReadyAddresses string
+	stopCh                   chan struct{}
+	stopOnce                 sync.Once
+	localClient              dynamic.Interface
+	ingressIPClient          dynamic.NamespaceableResourceInterface
+	globalIngressIPCache     *globalIngressIPCache
+	epsSyncer                syncer.Interface
 }
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
