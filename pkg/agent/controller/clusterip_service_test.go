@@ -59,6 +59,8 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.createService()
 				t.cluster1.createServiceExport()
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
+				t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingExport"),
+					newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
 				t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})

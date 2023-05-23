@@ -458,8 +458,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 	actual := make([]*mcsv1a1.ServiceExportCondition, len(expected))
 	lastIndex := -1
 
-	for i := range expected {
-		expStr := resource.ToJSON(expected[i])
+	for i := 0; i < len(expected)-1; i++ {
 		j := lastIndex + 1
 
 		Eventually(func() interface{} {
@@ -483,8 +482,24 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 			}
 
 			return nil
-		}).ShouldNot(BeNil(), fmt.Sprintf("ServiceExport condition not received. Expected: %s", expStr))
+		}).ShouldNot(BeNil(), fmt.Sprintf("ServiceExport condition not received. Expected: %s", resource.ToJSON(expected[i])))
 	}
+
+	last := len(expected) - 1
+
+	Eventually(func() interface{} {
+		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+		se := toServiceExport(obj)
+
+		c := controller.FindServiceExportStatusCondition(se.Status.Conditions, expected[last].Type)
+		if conditionsEqual(c, expected[last]) {
+			actual[last] = c
+			return c
+		}
+
+		return nil
+	}).ShouldNot(BeNil(), fmt.Sprintf("ServiceExport condition not found. Expected: %s", resource.ToJSON(expected[last])))
 
 	for i := range expected {
 		assertEquivalentConditions(actual[i], expected[i])
@@ -807,8 +822,7 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 		t.awaitEndpointSlice(c)
 
 		c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-		c.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingExport"),
-			newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
 	}
 }
 
