@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -221,6 +222,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, numRequeue
 	}
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
+	serviceImport.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(svc.Spec.PublishNotReadyAddresses)
 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},

@@ -635,6 +635,10 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, expected *discovery.En
 		Expect(endpointSlice.Labels).To(HaveKeyWithValue(k, v))
 	}
 
+	for k, v := range expected.Annotations {
+		Expect(endpointSlice.Annotations).To(HaveKeyWithValue(k, v))
+	}
+
 	Expect(endpointSlice.AddressType).To(Equal(expected.AddressType))
 	Expect(endpointSlice.Endpoints).To(Equal(expected.Endpoints))
 	Expect(endpointSlice.Ports).To(Equal(expected.Ports))
@@ -704,6 +708,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 				constants.LabelSourceNamespace:  c.service.Namespace,
 				constants.LabelIsHeadless:       strconv.FormatBool(isHeadless),
 			},
+			Annotations: map[string]string{},
 		},
 		AddressType: discovery.AddressTypeIPv4,
 	}
@@ -719,6 +724,8 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 				AppProtocol: c.endpoints.Subsets[0].Ports[i].AppProtocol,
 			})
 		}
+
+		expected.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(c.service.Spec.PublishNotReadyAddresses)
 	} else {
 		expected.Endpoints = []discovery.Endpoint{
 			{
