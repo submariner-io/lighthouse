@@ -56,14 +56,15 @@ func startEndpointController(localClient dynamic.Interface, restMapper meta.REST
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
 
 	controller := &EndpointController{
-		clusterID:            clusterID,
-		serviceNamespace:     serviceNamespace,
-		serviceName:          serviceName,
-		serviceImportSpec:    &serviceImport.Spec,
-		stopCh:               make(chan struct{}),
-		globalIngressIPCache: globalIngressIPCache,
-		localClient:          localClient,
-		ingressIPClient:      localClient.Resource(*globalIngressIPGVR),
+		clusterID:                clusterID,
+		serviceNamespace:         serviceNamespace,
+		serviceName:              serviceName,
+		serviceImportSpec:        &serviceImport.Spec,
+		publishNotReadyAddresses: serviceImport.Annotations[constants.PublishNotReadyAddresses],
+		stopCh:                   make(chan struct{}),
+		globalIngressIPCache:     globalIngressIPCache,
+		localClient:              localClient,
+		ingressIPClient:          localClient.Resource(*globalIngressIPGVR),
 	}
 
 	nameSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
@@ -170,6 +171,9 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 				constants.MCSLabelSourceCluster: e.clusterID,
 				mcsv1a1.LabelServiceName:        e.serviceName,
 				constants.LabelIsHeadless:       strconv.FormatBool(e.isHeadless()),
+			},
+			Annotations: map[string]string{
+				constants.PublishNotReadyAddresses: e.publishNotReadyAddresses,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
