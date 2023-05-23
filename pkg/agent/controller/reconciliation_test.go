@@ -40,6 +40,7 @@ import (
 var _ = Describe("Reconciliation", func() {
 	var (
 		t                    *testDriver
+		serviceExport        *mcsv1a1.ServiceExport
 		localServiceImport   *mcsv1a1.ServiceImport
 		localEndpointSlice   *discovery.EndpointSlice
 		brokerServiceImports *unstructured.UnstructuredList
@@ -71,6 +72,10 @@ var _ = Describe("Reconciliation", func() {
 
 		localEndpointSlice = t.cluster1.findLocalEndpointSlice()
 		Expect(localEndpointSlice).ToNot(BeNil())
+
+		obj, err := t.cluster1.localServiceExportClient.Get(context.Background(), t.cluster1.serviceExport.Name, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+		serviceExport = toServiceExport(obj)
 	})
 
 	AfterEach(func() {
@@ -94,12 +99,12 @@ var _ = Describe("Reconciliation", func() {
 
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
+			test.CreateResource(t.cluster1.localServiceExportClient, serviceExport)
 
 			restoreBrokerResources()
 
 			t.cluster1.createEndpoints()
 			t.cluster1.createService()
-			t.cluster1.createServiceExport()
 
 			t.cluster1.start(t, *t.syncerConfig)
 			t.cluster2.start(t, *t.syncerConfig)
