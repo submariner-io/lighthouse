@@ -45,6 +45,10 @@ var _ = Describe("Headless Service export", func() {
 
 	When("a ServiceExport is created", func() {
 		Context("and the Service already exists", func() {
+			BeforeEach(func() {
+				t.cluster1.service.Spec.PublishNotReadyAddresses = true
+			})
+
 			It("should export the service", func() {
 				t.cluster1.createEndpoints()
 				t.cluster1.createServiceExport()
