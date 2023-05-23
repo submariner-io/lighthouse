@@ -51,23 +51,32 @@ func (c *ServiceExportClient) removeStatusCondition(name, namespace string, cond
 }
 
 func (c *ServiceExportClient) updateStatusConditions(name, namespace string, conditions ...mcsv1a1.ServiceExportCondition) {
+	c.tryUpdateStatusConditions(name, namespace, true, conditions...)
+}
+
+func (c *ServiceExportClient) tryUpdateStatusConditions(name, namespace string, canReplace bool,
+	conditions ...mcsv1a1.ServiceExportCondition,
+) {
 	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
 			condition := &conditions[i]
 
-			logger.V(log.DEBUG).Infof("Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
-				namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
-
 			prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condition.Type)
 			if prevCond == nil {
+				logger.V(log.DEBUG).Infof("Add status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+					namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
+
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
 				updated = true
 			} else if serviceExportConditionEqual(prevCond, condition) {
 				logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 					namespace, name, prevCond)
-			} else {
+			} else if canReplace {
+				logger.V(log.DEBUG).Infof("Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+					namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
+
 				*prevCond = *condition
 				updated = true
 			}
