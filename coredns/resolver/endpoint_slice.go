@@ -21,6 +21,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -132,12 +133,15 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 
 	mcsPorts := mcsServicePortsFrom(endpointSlice.Ports)
 
+	publishNotReadyAddresses := endpointSlice.Annotations[constants.PublishNotReadyAddresses] == strconv.FormatBool(true)
+
 	for i := range endpointSlice.Endpoints {
 		endpoint := &endpointSlice.Endpoints[i]
 
-		// Skip if not ready. Note: we're treating nil as ready to be on the safe side as the EndpointConditions doc
-		// states "In most cases consumers should interpret this unknown state (ie nil) as ready".
-		if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+		// Skip if not ready and the user does not want to publish not-ready addresses. Note: we're treating nil as ready
+		// to be on the safe side as the EndpointConditions doc states "In most cases consumers should interpret this
+		// unknown state (ie nil) as ready".
+		if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready && !publishNotReadyAddresses {
 			continue
 		}
 
