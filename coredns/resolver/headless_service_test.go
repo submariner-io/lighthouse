@@ -19,6 +19,8 @@ limitations under the License.
 package resolver_test
 
 import (
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -31,9 +33,119 @@ import (
 
 var _ = Describe("GetDNSRecords", func() {
 	Describe("Headless Service", func() {
+		testHeadlessService()
 		When("a service is present in multiple clusters", testHeadlessServiceInMultipleClusters)
 	})
 })
+
+func testHeadlessService() {
+	t := newTestDriver()
+
+	BeforeEach(func() {
+		t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+	})
+
+	When("a service has both ready and not-ready addresses", func() {
+		var annotations map[string]string
+
+		BeforeEach(func() {
+			annotations = nil
+		})
+
+		JustBeforeEach(func() {
+			eps := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP1},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP2},
+					Conditions: discovery.EndpointConditions{Ready: &notReady},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP3},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP4},
+					Conditions: discovery.EndpointConditions{Ready: &notReady},
+				},
+			)
+			eps.Annotations = annotations
+
+			t.putEndpointSlice(eps)
+		})
+
+		Context("and the publish-not-ready-addresses annotation is not present", func() {
+			It("should return DNS records for only the ready addresses", func() {
+				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+					resolver.DNSRecord{
+						IP:          endpointIP1,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP3,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+				)
+			})
+		})
+
+		Context("and the publish-not-ready-addresses annotation is set to false", func() {
+			BeforeEach(func() {
+				annotations = map[string]string{constants.PublishNotReadyAddresses: strconv.FormatBool(false)}
+			})
+
+			It("should return DNS records for only the ready addresses", func() {
+				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+					resolver.DNSRecord{
+						IP:          endpointIP1,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP3,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+				)
+			})
+		})
+
+		Context("and the publish-not-ready-addresses annotation is set to true", func() {
+			BeforeEach(func() {
+				annotations = map[string]string{constants.PublishNotReadyAddresses: strconv.FormatBool(true)}
+			})
+
+			It("should return all the DNS records", func() {
+				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+					resolver.DNSRecord{
+						IP:          endpointIP1,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP2,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP3,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP4,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+				)
+			})
+		})
+	})
+}
 
 func testHeadlessServiceInMultipleClusters() {
 	t := newTestDriver()
@@ -106,10 +218,7 @@ func testHeadlessServiceInMultipleClusters() {
 				Hostname:  &hostName2,
 				NodeName:  &nodeName3,
 			},
-			discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: &notReady},
-			}))
+		))
 	})
 
 	Context("and no specific cluster is requested", func() {
