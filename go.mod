@@ -9,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
 	github.com/submariner-io/admiral v0.15.0-m4.0.20230407150416-a578003622bf
-	github.com/submariner-io/shipyard v0.15.0-m4
+	github.com/submariner-io/shipyard v0.16.0-m0
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
