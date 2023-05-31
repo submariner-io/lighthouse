@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.27.7
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
-	github.com/submariner-io/admiral v0.15.0-m4.0.20230407150416-a578003622bf
+	github.com/submariner-io/admiral v0.16.0-m0
 	github.com/submariner-io/shipyard v0.16.0-m0
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.27.2
@@ -61,7 +61,7 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
-	github.com/rs/zerolog v1.29.0 // indirect
+	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
