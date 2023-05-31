@@ -125,7 +125,7 @@ func testClusterIPServiceInOneCluster() {
 func testClusterIPServiceInTwoClusters() {
 	t := newTestDriver()
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 
 		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
@@ -203,7 +203,7 @@ func testClusterIPServiceInTwoClusters() {
 			ClusterName: clusterID1,
 		}
 
-		BeforeEach(func() {
+		JustBeforeEach(func() {
 			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, false, port1))
 		})
 
@@ -239,7 +239,7 @@ func testClusterIPServiceInTwoClusters() {
 			ClusterName: clusterID1,
 		}
 
-		BeforeEach(func() {
+		JustBeforeEach(func() {
 			t.resolver.RemoveEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1))
 		})
 

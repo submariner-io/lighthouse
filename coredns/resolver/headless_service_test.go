@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
-	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -33,7 +32,7 @@ import (
 
 var _ = Describe("GetDNSRecords", func() {
 	Describe("Headless Service", func() {
-		testHeadlessService()
+		Describe("", testHeadlessService)
 		When("a service is present in multiple clusters", testHeadlessServiceInMultipleClusters)
 	})
 })
@@ -41,19 +40,25 @@ var _ = Describe("GetDNSRecords", func() {
 func testHeadlessService() {
 	t := newTestDriver()
 
+	var (
+		endpointSlice *discovery.EndpointSlice
+		annotations   map[string]string
+	)
+
 	BeforeEach(func() {
 		t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+		annotations = nil
+		endpointSlice = nil
+	})
+
+	JustBeforeEach(func() {
+		endpointSlice.Annotations = annotations
+		t.putEndpointSlice(endpointSlice)
 	})
 
 	When("a service has both ready and not-ready addresses", func() {
-		var annotations map[string]string
-
 		BeforeEach(func() {
-			annotations = nil
-		})
-
-		JustBeforeEach(func() {
-			eps := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -71,9 +76,6 @@ func testHeadlessService() {
 					Conditions: discovery.EndpointConditions{Ready: &notReady},
 				},
 			)
-			eps.Annotations = annotations
-
-			t.putEndpointSlice(eps)
 		})
 
 		Context("and the publish-not-ready-addresses annotation is not present", func() {
@@ -142,6 +144,73 @@ func testHeadlessService() {
 						ClusterName: clusterID1,
 					},
 				)
+			})
+		})
+	})
+
+	When("a service is on the local cluster", func() {
+		BeforeEach(func() {
+			t.clusterStatus.SetLocalClusterID(clusterID1)
+
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP1},
+					NodeName:   &nodeName1,
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+			)
+		})
+
+		Context("and globalnet is enabled", func() {
+			BeforeEach(func() {
+				annotations = map[string]string{constants.GlobalnetEnabled: strconv.FormatBool(true)}
+
+				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
+				// return true to requeue.
+				eps := newEndpointSlice(namespace1, service1, clusterID1, nil)
+				eps.Annotations = annotations
+				Expect(t.resolver.PutEndpointSlice(eps)).To(BeTrue())
+
+				t.createEndpointSlice(&discovery.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "local-" + service1,
+						Namespace: namespace1,
+						Labels: map[string]string{
+							constants.KubernetesServiceName: service1,
+						},
+					},
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses:  []string{endpointIP2},
+							NodeName:   &nodeName1,
+							Conditions: discovery.EndpointConditions{Ready: &ready},
+						},
+					},
+				})
+			})
+
+			It("should return the local DNS records", func() {
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
+					resolver.DNSRecord{
+						IP:          endpointIP2,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					})
+			})
+		})
+
+		Context("and globalnet is disabled", func() {
+			BeforeEach(func() {
+				annotations = map[string]string{constants.GlobalnetEnabled: strconv.FormatBool(false)}
+			})
+
+			It("should return the global DNS records", func() {
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
+					resolver.DNSRecord{
+						IP:          endpointIP1,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					})
 			})
 		})
 	})
@@ -241,51 +310,6 @@ func testHeadlessServiceInMultipleClusters() {
 				cluster3DNSRecord1, cluster3DNSRecord2)
 
 			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName2, true, cluster3DNSRecord4)
-		})
-	})
-
-	Context("and one is on the local cluster", func() {
-		BeforeEach(func() {
-			t.clusterStatus.SetLocalClusterID(clusterID3)
-
-			// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
-			// return true to requeue.
-			Expect(t.resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID3, nil))).To(BeTrue())
-
-			t.createEndpointSlice(&discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "local-" + service1,
-					Namespace: namespace1,
-					Labels: map[string]string{
-						constants.KubernetesServiceName: service1,
-					},
-				},
-				Endpoints: []discovery.Endpoint{
-					{
-						Addresses: []string{endpointIP3, endpointIP4},
-						NodeName:  &nodeName1,
-						TargetRef: &corev1.ObjectReference{
-							Name: hostName1,
-						},
-					},
-					{
-						Addresses: []string{endpointIP5},
-						NodeName:  &nodeName2,
-					},
-					{
-						Addresses: []string{endpointIP6},
-						NodeName:  &nodeName3,
-						TargetRef: &corev1.ObjectReference{
-							Name: hostName2,
-						},
-					},
-				},
-			})
-		})
-
-		It("should return all its DNS record", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", true,
-				cluster3DNSRecord1, cluster3DNSRecord2, cluster3DNSRecord3, cluster3DNSRecord4)
 		})
 	})
 

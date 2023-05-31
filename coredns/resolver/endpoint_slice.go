@@ -48,9 +48,11 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 	var localEndpointSliceErr error
 	var localEndpointSlice *discovery.EndpointSlice
 
+	globalnetEnabled := endpointSlice.Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
 	localClusterID := i.clusterStatus.GetLocalClusterID()
-	if localClusterID != "" && clusterID == localClusterID {
-		// The EndpointSlice is from the local cluster. If globalnet is enabled, the local global endpoint IPs aren't
+
+	if globalnetEnabled && localClusterID != "" && clusterID == localClusterID {
+		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
 		localEndpointSlice, localEndpointSliceErr = i.getLocalEndpointSlice(endpointSlice)
