@@ -742,6 +742,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		}
 
 		expected.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(c.service.Spec.PublishNotReadyAddresses)
+		expected.Annotations[constants.GlobalnetEnabled] = strconv.FormatBool(c.agentSpec.GlobalnetEnabled)
 	} else {
 		expected.Endpoints = []discovery.Endpoint{
 			{

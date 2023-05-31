@@ -174,6 +174,7 @@ func (e *EndpointController) endpointSliceFromEndpoints(endpoints *corev1.Endpoi
 			},
 			Annotations: map[string]string{
 				constants.PublishNotReadyAddresses: e.publishNotReadyAddresses,
+				constants.GlobalnetEnabled:         strconv.FormatBool(e.isHeadless() && e.globalIngressIPCache != nil),
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
