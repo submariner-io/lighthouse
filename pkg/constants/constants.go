@@ -28,6 +28,7 @@ const (
 	MCSLabelSourceCluster    = "multicluster.kubernetes.io/source-cluster"
 	LabelIsHeadless          = "lighthouse.submariner.io/is-headless"
 	PublishNotReadyAddresses = "lighthouse.submariner.io/publish-not-ready-addresses"
+	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"
 )
 
 const ServiceExportSynced v1alpha1.ServiceExportConditionType = "Synced"
