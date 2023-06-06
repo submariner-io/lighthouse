@@ -50,6 +50,12 @@ var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", 
 		})
 	})
 
+	When("a pod tries to resolve a headless service without selector in a remote cluster", func() {
+		It("should resolve the backing endpoint IPs from the remote cluster", func() {
+			RunHeadlessEndpointDiscoveryTest(f)
+		})
+	})
+
 	When("the number of active pods backing a service changes", func() {
 		It("should only resolve the IPs from the active pods", func() {
 			RunHeadlessPodsAvailabilityTest(f)
@@ -159,6 +165,45 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 		clusterBName, true, false, false)
 	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameListA, checkedDomains,
 		clusterAName, true, false, true)
+}
+
+func RunHeadlessEndpointDiscoveryTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	By(fmt.Sprintf("Creating a Headless Service without selector on %q", clusterBName))
+
+	headlessClusterB := f.NewHeadlessServiceEndpointIP(framework.ClusterB)
+
+	By("Creating an endpoint")
+	f.NewEndpointForHeadlessService(framework.ClusterB, headlessClusterB)
+
+	By("Exporting the service %q")
+	f.NewServiceExport(framework.ClusterB, headlessClusterB.Name, headlessClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, headlessClusterB.Name, headlessClusterB.Namespace)
+
+	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	ipList, hostNameList := f.GetEndpointIPs(framework.ClusterB, headlessClusterB)
+	f.VerifyIPsWithDig(framework.ClusterA, headlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
+	f.VerifyIPsWithDig(framework.ClusterA, headlessClusterB, netshootPodList, ipList, checkedDomains,
+		clusterBName, true)
+
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, headlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, false, false, true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, headlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, true, false, true)
+
+	f.DeleteServiceExport(framework.ClusterB, headlessClusterB.Name, headlessClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(framework.ClusterA, headlessClusterB, 0)
+
+	f.VerifyIPsWithDig(framework.ClusterA, headlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", false)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, headlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, false, false, false)
 }
 
 func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
@@ -318,10 +363,12 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 					doesContain := strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
 						strings.Contains(result.(string), hostDNS)
 					if doesContain && !shouldContain {
+						framework.Logf("expected execution result %q not to contain %q and %d", result, hostDNS, int(port.Port))
 						return false, fmt.Sprintf("expected execution result %q not to contain %q and %d", result, hostDNS, int(port.Port)), nil
 					}
 
 					if !doesContain && shouldContain {
+						framework.Logf("expected execution result %q to contain %q and %d", result, hostDNS, int(port.Port))
 						return false, fmt.Sprintf("expected execution result %q to contain %q and %d", result, hostDNS, int(port.Port)), nil
 					}
 				}

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
+
+const maxRecordsToLog = 5
 
 func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
@@ -181,8 +183,14 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 		clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, records...)
 	}
 
-	logger.V(log.DEBUG).Infof("Added records for headless EndpointSlice %q from cluster %q: %#v",
-		key, clusterID, clusterInfo.endpointRecords)
+	if len(clusterInfo.endpointRecords) <= maxRecordsToLog {
+		logger.Infof("Added records for headless EndpointSlice %q from cluster %q: %s",
+			key, clusterID, resource.ToJSON(clusterInfo.endpointRecords))
+	} else {
+		logger.Infof("Added records for headless EndpointSlice %q from cluster %q (showing %d/%d): %s",
+			key, clusterID, maxRecordsToLog, len(clusterInfo.endpointRecords),
+			resource.ToJSON(clusterInfo.endpointRecords[:maxRecordsToLog]))
+	}
 }
 
 func (i *Interface) getLocalEndpointSlice(from *discovery.EndpointSlice) (*discovery.EndpointSlice, error) {
