@@ -48,7 +48,6 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 	logger.Infof("Put EndpointSlice %q on cluster %q", key, clusterID)
 
 	var localEndpointSliceErr error
-	var localEndpointSlice *discovery.EndpointSlice
 
 	globalnetEnabled := endpointSlice.Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
 	localClusterID := i.clusterStatus.GetLocalClusterID()
@@ -57,7 +56,13 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
+		var localEndpointSlice *discovery.EndpointSlice
 		localEndpointSlice, localEndpointSliceErr = i.getLocalEndpointSlice(endpointSlice)
+
+		if localEndpointSliceErr == nil {
+			endpointSlice.Endpoints = localEndpointSlice.Endpoints
+			endpointSlice.Ports = localEndpointSlice.Ports
+		}
 	}
 
 	i.mutex.Lock()
@@ -81,7 +86,7 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 		return true
 	}
 
-	i.putHeadlessEndpointSlice(key, clusterID, endpointSlice, serviceInfo, localEndpointSlice)
+	i.putHeadlessEndpointSlice(key, clusterID, endpointSlice, serviceInfo)
 
 	return false
 }
@@ -127,8 +132,7 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 	return false
 }
 
-func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo,
-	localEndpointSlice *discovery.EndpointSlice) {
+func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo) {
 	clusterInfo := &clusterInfo{
 		endpointRecordsByHost: make(map[string][]DNSRecord),
 	}
@@ -151,17 +155,7 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 
 		var records []DNSRecord
 
-		addresses := endpoint.Addresses
-		if localEndpointSlice != nil {
-			for _, localEndpoint := range localEndpointSlice.Endpoints {
-				if localEndpoint.NodeName != nil && endpoint.NodeName != nil && *localEndpoint.NodeName == *endpoint.NodeName &&
-					(endpoint.Hostname == nil || localEndpoint.TargetRef.Name == *endpoint.Hostname) {
-					addresses = localEndpoint.Addresses
-				}
-			}
-		}
-
-		for _, address := range addresses {
+		for _, address := range endpoint.Addresses {
 
 			record := DNSRecord{
 				IP:          address,
