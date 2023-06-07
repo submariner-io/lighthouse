@@ -163,7 +163,10 @@ func testHeadlessService() {
 
 		Context("and globalnet is enabled", func() {
 			BeforeEach(func() {
-				annotations = map[string]string{constants.GlobalnetEnabled: strconv.FormatBool(true)}
+				annotations = map[string]string{
+					constants.GlobalnetEnabled:         strconv.FormatBool(true),
+					constants.PublishNotReadyAddresses: strconv.FormatBool(true),
+				}
 
 				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
 				// return true to requeue.
@@ -179,11 +182,17 @@ func testHeadlessService() {
 							constants.KubernetesServiceName: service1,
 						},
 					},
+					Ports: []discovery.EndpointPort{{
+						Name:        &port1.Name,
+						Protocol:    &port1.Protocol,
+						Port:        &port1.Port,
+						AppProtocol: port1.AppProtocol,
+					}},
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{endpointIP2},
 							NodeName:   &nodeName1,
-							Conditions: discovery.EndpointConditions{Ready: &ready},
+							Conditions: discovery.EndpointConditions{Ready: &notReady},
 						},
 					},
 				})
