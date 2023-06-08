@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -153,7 +154,17 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 			continue
 		}
 
-		var records []DNSRecord
+		var (
+			records  []DNSRecord
+			hostname string
+		)
+
+		switch {
+		case endpoint.Hostname != nil && *endpoint.Hostname != "":
+			hostname = *endpoint.Hostname
+		case endpoint.TargetRef != nil && strings.ToLower((*endpoint.TargetRef).Kind) == "pod":
+			hostname = (*endpoint.TargetRef).Name
+		}
 
 		for _, address := range endpoint.Addresses {
 
@@ -163,15 +174,13 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 				ClusterName: clusterID,
 			}
 
-			if endpoint.Hostname != nil {
-				record.HostName = *endpoint.Hostname
-			}
+			record.HostName = hostname
 
 			records = append(records, record)
 		}
 
-		if endpoint.Hostname != nil {
-			clusterInfo.endpointRecordsByHost[*endpoint.Hostname] = records
+		if hostname != "" {
+			clusterInfo.endpointRecordsByHost[hostname] = records
 		}
 
 		clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, records...)
