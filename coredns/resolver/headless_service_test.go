@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -293,8 +294,11 @@ func testHeadlessServiceInMultipleClusters() {
 			},
 			discovery.Endpoint{
 				Addresses: []string{endpointIP6},
-				Hostname:  &hostName2,
 				NodeName:  &nodeName3,
+				TargetRef: &corev1.ObjectReference{
+					Kind: "Pod",
+					Name: hostName2,
+				},
 			},
 		))
 	})
