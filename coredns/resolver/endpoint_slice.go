@@ -25,12 +25,14 @@ import (
 	"strings"
 
 	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -57,13 +59,7 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
-		var localEndpointSlice *discovery.EndpointSlice
-		localEndpointSlice, localEndpointSliceErr = i.getLocalEndpointSlice(endpointSlice)
-
-		if localEndpointSliceErr == nil {
-			endpointSlice.Endpoints = localEndpointSlice.Endpoints
-			endpointSlice.Ports = localEndpointSlice.Ports
-		}
+		localEndpointSliceErr = i.replaceWithLocalEndpointSlices(endpointSlice)
 	}
 
 	i.mutex.Lock()
@@ -196,32 +192,43 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 	}
 }
 
-func (i *Interface) getLocalEndpointSlice(from *discovery.EndpointSlice) (*discovery.EndpointSlice, error) {
+func (i *Interface) replaceWithLocalEndpointSlices(forEps *discovery.EndpointSlice) error {
 	epsGVR := schema.GroupVersionResource{
 		Group:    discovery.SchemeGroupVersion.Group,
 		Version:  discovery.SchemeGroupVersion.Version,
 		Resource: "endpointslices",
 	}
 
-	epSlices, err := i.client.Resource(epsGVR).Namespace(from.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
+	epSlices, err := i.client.Resource(epsGVR).Namespace(forEps.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
 		metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{
-				constants.KubernetesServiceName: from.Labels[mcsv1a1.LabelServiceName],
+				constants.KubernetesServiceName: forEps.Labels[mcsv1a1.LabelServiceName],
 			}).String(),
 		})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(epSlices.Items) == 0 {
-		return nil, fmt.Errorf("local EndpointSlice not found for %s/%s", from.Labels[constants.LabelSourceNamespace],
-			from.Labels[mcsv1a1.LabelServiceName])
+		return fmt.Errorf("local EndpointSlice not found for %s/%s", forEps.Labels[constants.LabelSourceNamespace],
+			forEps.Labels[mcsv1a1.LabelServiceName])
 	}
 
-	epSlice := &discovery.EndpointSlice{}
-	_ = runtime.DefaultUnstructuredConverter.FromUnstructured(epSlices.Items[0].Object, epSlice)
+	forEps.Endpoints = nil
+	forEps.Ports = nil
 
-	return epSlice, nil
+	for i := range epSlices.Items {
+		epSlice := &discovery.EndpointSlice{}
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(epSlices.Items[i].Object, epSlice)
+
+		forEps.Endpoints = append(forEps.Endpoints, epSlice.Endpoints...)
+		forEps.Ports = slices.Union(forEps.Ports, epSlice.Ports, func(p discovery.EndpointPort) string {
+			return fmt.Sprintf("n:%spr:%sp:%d", pointer.StringDeref(p.Name, ""),
+				pointer.StringDeref((*string)(p.Protocol), ""), pointer.Int32Deref(p.Port, 0))
+		})
+	}
+
+	return nil
 }
 
 func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) {
