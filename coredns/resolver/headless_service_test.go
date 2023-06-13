@@ -175,9 +175,9 @@ func testHeadlessService() {
 				eps.Annotations = annotations
 				Expect(t.resolver.PutEndpointSlice(eps)).To(BeTrue())
 
-				t.createEndpointSlice(&discovery.EndpointSlice{
+				eps1 := &discovery.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "local-" + service1,
+						Name:      service1 + "local-1",
 						Namespace: namespace1,
 						Labels: map[string]string{
 							constants.KubernetesServiceName: service1,
@@ -196,6 +196,23 @@ func testHeadlessService() {
 							Conditions: discovery.EndpointConditions{Ready: &notReady},
 						},
 					},
+				}
+				t.createEndpointSlice(eps1)
+
+				t.createEndpointSlice(&discovery.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      service1 + "local-2",
+						Namespace: eps1.Namespace,
+						Labels:    eps1.Labels,
+					},
+					Ports: eps1.Ports,
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses:  []string{endpointIP3},
+							NodeName:   &nodeName1,
+							Conditions: discovery.EndpointConditions{Ready: &ready},
+						},
+					},
 				})
 			})
 
@@ -203,6 +220,11 @@ func testHeadlessService() {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
 					resolver.DNSRecord{
 						IP:          endpointIP2,
+						Ports:       []mcsv1a1.ServicePort{port1},
+						ClusterName: clusterID1,
+					},
+					resolver.DNSRecord{
+						IP:          endpointIP3,
 						Ports:       []mcsv1a1.ServicePort{port1},
 						ClusterName: clusterID1,
 					})
