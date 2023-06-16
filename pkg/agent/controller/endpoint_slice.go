@@ -138,10 +138,10 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	} else {
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(serviceName, serviceNamespace)
 		if err != nil {
-			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
+			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 		} else {
-			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportSynced,
+			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionTrue, "", "Service was successfully exported to the broker"))
 
 			c.enqueueForConflictCheck(endpointSlice)

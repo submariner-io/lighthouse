@@ -54,7 +54,7 @@ var _ = Describe("Service export failures", func() {
 
 		It("should eventually export the service", func() {
 			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportSynced)
+			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -67,7 +67,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "ExportFailed"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "ExportFailed"))
 
 			t.brokerServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -80,7 +80,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "ExportFailed"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "ExportFailed"))
 
 			t.brokerServiceImportReactor.SetFailOnUpdate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -131,7 +131,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "ExportFailed"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "ExportFailed"))
 
 			t.brokerEndpointSliceReactor.SetFailOnList(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
