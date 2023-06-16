@@ -59,8 +59,8 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.createService()
 				t.cluster1.createServiceExport()
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
-				t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "AwaitingExport"),
-					newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "AwaitingExport"),
+					newServiceExportReadyCondition(corev1.ConditionTrue, ""))
 				t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})
@@ -96,7 +96,7 @@ func testClusterIPServiceInOneCluster() {
 
 			t.cluster1.deleteService()
 			t.cluster1.awaitServiceUnavailableStatus()
-			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "NoServiceImport"))
 			t.awaitServiceUnexported(&t.cluster1)
 
 			t.cluster1.createService()
@@ -114,7 +114,7 @@ func testClusterIPServiceInOneCluster() {
 			t.cluster1.updateService()
 
 			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
-			t.cluster1.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "NoServiceImport"))
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
@@ -131,7 +131,7 @@ func testClusterIPServiceInOneCluster() {
 
 		It("should update the ServiceExport status appropriately and not export the serviceImport", func() {
 			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "UnsupportedServiceType"))
-			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportSynced)
+			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
 		})
 
 		Context("and is subsequently updated to a supported type", func() {
@@ -266,6 +266,26 @@ func testClusterIPServiceInOneCluster() {
 
 		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient, test.RemoteNamespace)), "other-eps")
 	})
+
+	When("an existing ServiceExport has the legacy Synced status condition", func() {
+		BeforeEach(func() {
+			t.cluster1.serviceExport.Status.Conditions = []mcsv1a1.ServiceExportCondition{
+				{
+					Type:    "Synced",
+					Status:  corev1.ConditionTrue,
+					Reason:  pointer.String(""),
+					Message: pointer.String("Service was successfully exported to the broker"),
+				},
+			}
+		})
+
+		It("should be migrated to the Ready status condition", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+			t.cluster1.ensureNoServiceExportCondition("Synced")
+		})
+	})
 }
 
 func testClusterIPServiceInTwoClusters() {
@@ -293,7 +313,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	It("should export the service in both clusters", func() {
 		t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
-		t.cluster1.ensureLastServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+		t.cluster1.ensureLastServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionTrue, ""))
 		t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
 		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
@@ -352,7 +372,7 @@ func testClusterIPServiceInTwoClusters() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 
 			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition("ConflictingType"))
-			t.cluster2.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionFalse, "ExportFailed"))
+			t.cluster2.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "ExportFailed"))
 			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		})
 
