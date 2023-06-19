@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.10.0
 	github.com/onsi/gomega v1.27.8
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.15.1
+	github.com/prometheus/client_golang v1.16.0
 	github.com/submariner-io/admiral v0.16.0-m0
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
@@ -82,7 +82,7 @@ require (
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
