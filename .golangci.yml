@@ -44,7 +44,7 @@ linters:
     - bodyclose
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
-    - depguard
+    # - depguard # depguard now denies by default, it should only be enabled if we actually use it
     - dogsled
     - dupl
     - durationcheck
