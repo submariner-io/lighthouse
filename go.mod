@@ -11,9 +11,9 @@ require (
 	github.com/submariner-io/admiral v0.16.0-m0.0.20230602131053-613bd96ec5a2
 	github.com/submariner-io/shipyard v0.16.0-m0
 	github.com/uw-labs/lichen v0.1.7
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
+	k8s.io/client-go v0.27.3
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.15.0
