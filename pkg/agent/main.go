@@ -48,6 +48,7 @@ var (
 	kubeConfig string
 	help       = false
 	logger     = log.Logger{Logger: logf.Log.WithName("main")}
+	version    = "not-compiled-properly"
 )
 
 func init() {
@@ -111,7 +112,7 @@ func main() {
 	localClient, err := dynamic.NewForConfig(cfg)
 	exitOnError(err, "Error creating dynamic client")
 
-	logger.Info("Starting submariner-lighthouse-agent")
+	logger.Infof("submariner-lighthouse-agent version: %v", version)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
