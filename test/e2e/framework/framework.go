@@ -45,11 +45,14 @@ import (
 )
 
 const (
+	clustersetDomain    = "clusterset.local"
 	anyCount            = -1
 	statefulServiceName = "nginx-ss"
 	statefulSetName     = "web"
 	not                 = " not"
 )
+
+var CheckedDomains = []string{clustersetDomain}
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 type Framework struct {
@@ -649,7 +652,7 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
 		stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 			Command:       cmd,
-			Namespace:     f.Namespace,
+			Namespace:     targetPod.Items[0].Namespace,
 			PodName:       targetPod.Items[0].Name,
 			ContainerName: targetPod.Items[0].Spec.Containers[0].Name,
 			CaptureStdout: true,

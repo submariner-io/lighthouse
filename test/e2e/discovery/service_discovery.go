@@ -33,12 +33,10 @@ import (
 )
 
 const (
-	clustersetDomain = "clusterset.local"
-	not              = " not"
+	not = " not"
 )
 
-// Both domains need to be checked, until the operator is updated to use clusterset.
-var checkedDomains = []string{clustersetDomain}
+var checkedDomains = lhframework.CheckedDomains
 
 var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("discovery")
