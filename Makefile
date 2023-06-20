@@ -25,6 +25,7 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e deploy)
 override E2E_ARGS += cluster1 cluster2 cluster3
 override UNIT_TEST_ARGS += test/e2e
 export LIGHTHOUSE = true
+export LDFLAGS = -X main.version=$(VERSION)
 
 # Targets to make
 
