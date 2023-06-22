@@ -61,7 +61,7 @@ import (
 	_ "github.com/coredns/coredns/plugin/tls"
 	_ "github.com/coredns/coredns/plugin/trace"
 	_ "github.com/coredns/coredns/plugin/whoami"
-	_ "github.com/submariner-io/lighthouse/coredns/plugin"
+	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
 )
 
 var directives = []string{
@@ -105,7 +105,10 @@ var directives = []string{
 	"on",
 }
 
+var version = "not-compiled-properly"
+
 func init() {
+	lighthouse.Version = version
 	dnsserver.Directives = directives
 }
 
