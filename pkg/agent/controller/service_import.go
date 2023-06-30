@@ -106,6 +106,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Transform:        controller.onRemoteServiceImport,
 		OnSuccessfulSync: controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
 		Scheme:           syncerConfig.Scheme,
+		ResyncPeriod:     brokerResyncePeriod,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceImport watcher")
