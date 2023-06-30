@@ -20,6 +20,7 @@ package controller
 
 import (
 	"sync"
+	"time"
 
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -37,6 +38,8 @@ const (
 	typeConflictReason = "ConflictingType"
 	portConflictReason = "ConflictingPorts"
 )
+
+var brokerResyncePeriod = time.Minute * 2
 
 type converter struct {
 	scheme *runtime.Scheme
