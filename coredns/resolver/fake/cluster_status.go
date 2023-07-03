@@ -22,18 +22,18 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 type ClusterStatus struct {
 	mutex               sync.Mutex
-	connectedClusterIDs sets.Set[string]
+	connectedClusterIDs set.Set[string]
 	localClusterID      atomic.Value
 }
 
 func NewClusterStatus(localClusterID string, isConnected ...string) *ClusterStatus {
 	c := &ClusterStatus{
-		connectedClusterIDs: sets.New(isConnected...),
+		connectedClusterIDs: set.New(isConnected...),
 	}
 
 	c.localClusterID.Store(localClusterID)
@@ -60,7 +60,7 @@ func (c *ClusterStatus) DisconnectAll() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.connectedClusterIDs = sets.New[string]()
+	c.connectedClusterIDs = set.New[string]()
 }
 
 func (c *ClusterStatus) DisconnectClusterID(clusterID string) {

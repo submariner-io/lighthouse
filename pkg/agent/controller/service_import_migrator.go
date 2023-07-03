@@ -28,8 +28,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -45,7 +45,7 @@ type ServiceImportMigrator struct {
 	clusterID                          string
 	localNamespace                     string
 	converter                          converter
-	deletedLocalServiceImportsOnBroker sets.Set[string]
+	deletedLocalServiceImportsOnBroker set.Set[string]
 }
 
 func (c *ServiceImportMigrator) onRemoteServiceImport(serviceImport *mcsv1a1.ServiceImport) (runtime.Object, bool) {

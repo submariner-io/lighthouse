@@ -36,9 +36,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -93,7 +93,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		brokerClient:                       brokerClient.Resource(serviceImportGVR).Namespace(brokerNamespace),
 		listLocalServiceImports:            controller.localSyncer.ListResources,
 		converter:                          converter{scheme: syncerConfig.Scheme},
-		deletedLocalServiceImportsOnBroker: sets.New[string](),
+		deletedLocalServiceImportsOnBroker: set.New[string](),
 	}
 
 	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
