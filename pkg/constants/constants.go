@@ -31,4 +31,4 @@ const (
 	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"
 )
 
-const ServiceExportSynced v1alpha1.ServiceExportConditionType = "Synced"
+const ServiceExportReady v1alpha1.ServiceExportConditionType = "Ready"

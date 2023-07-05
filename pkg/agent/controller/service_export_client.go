@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/slices"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -57,13 +58,26 @@ func (c *ServiceExportClient) updateStatusConditions(name, namespace string, con
 func (c *ServiceExportClient) tryUpdateStatusConditions(name, namespace string, canReplace bool,
 	conditions ...mcsv1a1.ServiceExportCondition,
 ) {
+	findStatusCondition := func(conditions []mcsv1a1.ServiceExportCondition, condType mcsv1a1.ServiceExportConditionType,
+	) *mcsv1a1.ServiceExportCondition {
+		cond := FindServiceExportStatusCondition(conditions, condType)
+
+		// TODO - this handles migration of the Synced type to Ready which can be removed once we no longer support a version
+		// prior to the introduction of Ready.
+		if cond == nil && condType == constants.ServiceExportReady {
+			cond = FindServiceExportStatusCondition(conditions, "Synced")
+		}
+
+		return cond
+	}
+
 	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
 			condition := &conditions[i]
 
-			prevCond := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condition.Type)
+			prevCond := findStatusCondition(toUpdate.Status.Conditions, condition.Type)
 			if prevCond == nil {
 				logger.V(log.DEBUG).Infof("Add status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 					namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
