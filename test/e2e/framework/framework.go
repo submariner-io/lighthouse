@@ -152,10 +152,10 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 		se := result.(*mcsv1a1.ServiceExport)
 
 		for i := range se.Status.Conditions {
-			if se.Status.Conditions[i].Type == constants.ServiceExportSynced {
+			if se.Status.Conditions[i].Type == constants.ServiceExportReady {
 				if se.Status.Conditions[i].Status != v1.ConditionTrue {
 					out, _ := json.MarshalIndent(se.Status.Conditions[i], "", "  ")
-					return false, fmt.Sprintf("ServiceExport %s condition status is %s", constants.ServiceExportSynced, out), nil
+					return false, fmt.Sprintf("ServiceExport %s condition status is %s", constants.ServiceExportReady, out), nil
 				}
 
 				return true, "", nil
@@ -165,7 +165,7 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
 
 		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
-			constants.ServiceExportSynced, out), nil
+			constants.ServiceExportReady, out), nil
 	})
 }
 

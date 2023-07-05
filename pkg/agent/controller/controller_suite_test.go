@@ -844,7 +844,7 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 		t.awaitEndpointSlice(c)
 
 		c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-		c.awaitServiceExportCondition(newServiceExportSyncedCondition(corev1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionTrue, ""))
 	}
 }
 
@@ -878,9 +878,9 @@ func newServiceExportValidCondition(status corev1.ConditionStatus, reason string
 	}
 }
 
-func newServiceExportSyncedCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+func newServiceExportReadyCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
 	return &mcsv1a1.ServiceExportCondition{
-		Type:   constants.ServiceExportSynced,
+		Type:   constants.ServiceExportReady,
 		Status: status,
 		Reason: &reason,
 	}

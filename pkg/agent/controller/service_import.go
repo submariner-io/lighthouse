@@ -272,13 +272,13 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 
 	if op == syncer.Delete {
 		c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
-			newServiceExportCondition(constants.ServiceExportSynced,
+			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
 		return obj, false
 	} else if op == syncer.Create {
 		c.serviceExportClient.tryUpdateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
-			false, newServiceExportCondition(constants.ServiceExportSynced,
+			false, newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
 
@@ -328,7 +328,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 						localServiceImport.Spec.Type, existing.Spec.Type))
 
 				c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, conflictCondition,
-					newServiceExportCondition(constants.ServiceExportSynced,
+					newServiceExportCondition(constants.ServiceExportReady,
 						corev1.ConditionFalse, exportFailedReason, "Unable to export due to an irresolvable conflict"))
 			} else {
 				c.serviceExportClient.removeStatusCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, typeConflictReason)
@@ -342,7 +342,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 
 	if err != nil {
 		c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace,
-			newServiceExportCondition(constants.ServiceExportSynced,
+			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 	}
 
