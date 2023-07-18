@@ -133,7 +133,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		<-stopCh
 
 		c.endpointControllers.Range(func(key, value interface{}) bool {
-			value.(*EndpointController).stop()
+			value.(*ServiceEndpointSliceController).stop()
 			return true
 		})
 
@@ -223,10 +223,10 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 
 	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
 		logger.V(log.DEBUG).Infof("Stopping previous endpoints controller for %q", key)
-		obj.(*EndpointController).stop()
+		obj.(*ServiceEndpointSliceController).stop()
 	}
 
-	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.converter.scheme,
+	endpointController, err := startEndpointSliceController(c.localClient, c.restMapper, c.converter.scheme,
 		serviceImport, c.clusterID, c.globalIngressIPCache)
 	if err != nil {
 		return errors.Wrapf(err, "failed to start endpoints controller for %q", key)
@@ -239,7 +239,7 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 
 func (c *ServiceImportController) stopEndpointsController(key string) (bool, error) {
 	if obj, found := c.endpointControllers.Load(key); found {
-		endpointController := obj.(*EndpointController)
+		endpointController := obj.(*ServiceEndpointSliceController)
 		endpointController.stop()
 
 		found, err := endpointController.cleanup()

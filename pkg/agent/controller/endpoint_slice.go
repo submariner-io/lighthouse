@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -134,7 +135,9 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	var err error
 
 	if op == syncer.Delete {
-		err = c.serviceImportAggregator.updateOnDelete(serviceName, serviceNamespace)
+		if c.hasNoRemainingEndpointSlices(endpointSlice) {
+			err = c.serviceImportAggregator.updateOnDelete(serviceName, serviceNamespace)
+		}
 	} else {
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(serviceName, serviceNamespace)
 		if err != nil {
@@ -153,6 +156,31 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	}
 
 	return err != nil
+}
+
+func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *discovery.EndpointSlice) bool {
+	if endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
+		serviceNS := endpointSlice.Labels[constants.LabelSourceNamespace]
+
+		list := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
+			constants.LabelSourceNamespace:  serviceNS,
+			mcsv1a1.LabelServiceName:        endpointSlice.Labels[mcsv1a1.LabelServiceName],
+			constants.MCSLabelSourceCluster: endpointSlice.Labels[constants.MCSLabelSourceCluster],
+		}))
+
+		count := 0
+
+		for _, eps := range list {
+			// Make sure we don't count ones in the broker namespace is co-located on the same cluster.
+			if eps.(*discovery.EndpointSlice).Namespace == serviceNS {
+				count++
+			}
+		}
+
+		return count == 0
+	}
+
+	return true
 }
 
 func (c *EndpointSliceController) checkForConflicts(key, name, namespace string) (bool, error) {
