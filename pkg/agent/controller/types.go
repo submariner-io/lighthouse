@@ -70,7 +70,7 @@ type ServiceImportAggregator struct {
 
 // The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports
 // from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
-// aggregated ServiceImports from the broker to the local service namespace. It also creates an EndpointController.
+// aggregated ServiceImports from the broker to the local service namespace. It also creates a ServiceEndpointSliceController.
 type ServiceImportController struct {
 	localClient             dynamic.Interface
 	restMapper              meta.RESTMapper
@@ -86,10 +86,9 @@ type ServiceImportController struct {
 	globalIngressIPCache    *globalIngressIPCache
 }
 
-// Each EndpointController watches for the Endpoints that backs a Service and have a ServiceImport by using a filter
-// that listen only for the Service's endpoints. It creates an EndpointSlice corresponding to an Endpoints object that is
-// distributed to other clusters.
-type EndpointController struct {
+// Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
+// It creates LH EndpointSlices corresponding to service EndpointSlices that are distributed to other clusters.
+type ServiceEndpointSliceController struct {
 	clusterID                string
 	serviceName              string
 	serviceNamespace         string
@@ -101,6 +100,7 @@ type EndpointController struct {
 	ingressIPClient          dynamic.NamespaceableResourceInterface
 	globalIngressIPCache     *globalIngressIPCache
 	epsSyncer                syncer.Interface
+	federator                federate.Federator
 }
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.

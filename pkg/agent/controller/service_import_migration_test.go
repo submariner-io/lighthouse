@@ -49,7 +49,7 @@ func testServiceImportMigration() {
 	BeforeEach(func() {
 		t = newTestDiver()
 
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 
 		legacyServiceImport = t.newLegacyServiceImport(t.cluster1.clusterID)
@@ -70,7 +70,7 @@ func testServiceImportMigration() {
 				},
 			},
 			AddressType: discovery.AddressTypeIPv4,
-			Endpoints:   t.cluster1.endpointSliceAddresses,
+			Endpoints:   t.cluster1.headlessEndpointAddresses[0],
 			Ports: []discovery.EndpointPort{
 				{
 					Name:     &t.cluster1.service.Spec.Ports[0].Name,
