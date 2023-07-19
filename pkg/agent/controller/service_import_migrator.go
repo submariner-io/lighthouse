@@ -41,7 +41,7 @@ const (
 // ServiceImportMigrator handles migration from the legacy per-cluster ServiceImports to aggregated ServiceImports added in 0.15.
 type ServiceImportMigrator struct {
 	brokerClient                       dynamic.ResourceInterface
-	listLocalServiceImports            func() ([]runtime.Object, error)
+	listLocalServiceImports            func() []runtime.Object
 	clusterID                          string
 	localNamespace                     string
 	converter                          converter
@@ -79,11 +79,7 @@ func (c *ServiceImportMigrator) onSuccessfulSyncFromBroker(obj runtime.Object, o
 		return false
 	}
 
-	siList, err := c.listLocalServiceImports()
-	if err != nil {
-		logger.Error(err, "error listing legacy ServiceImports")
-		return true
-	}
+	siList := c.listLocalServiceImports()
 
 	totalRemoteClusters := 0
 	totalRemoteClustersUpgraded := 0
