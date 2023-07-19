@@ -20,6 +20,8 @@ package controller_test
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -229,6 +231,22 @@ var _ = Describe("Reconciliation", func() {
 				t.cluster1.service.Name, t.cluster1.clusterID)
 		})
 	})
+})
+
+var _ = Describe("EndpointSlice migration", func() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
 
 	When("a local EndpointSlice with the old naming convention sans namespace exists on startup", func() {
 		epsName := "nginx-" + clusterID1
@@ -242,6 +260,35 @@ var _ = Describe("Reconciliation", func() {
 						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 						constants.MCSLabelSourceCluster: clusterID1,
 						mcsv1a1.LabelServiceName:        "nginx",
+					},
+				},
+			}
+
+			test.CreateResource(t.cluster1.localEndpointSliceClient, eps)
+
+			eps.Namespace = test.RemoteNamespace
+			test.CreateResource(t.brokerEndpointSliceClient, test.SetClusterIDLabel(eps, clusterID1))
+		})
+
+		It("should delete it", func() {
+			test.AwaitNoResource(t.cluster1.localEndpointSliceClient, epsName)
+			test.AwaitNoResource(t.brokerEndpointSliceClient, epsName)
+		})
+	})
+
+	When("a legacy local EndpointSlice derived from Endpoints exists on startup", func() {
+		epsName := fmt.Sprintf("nginx-%s-%s", serviceNamespace, clusterID1)
+
+		JustBeforeEach(func() {
+			eps := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      epsName,
+					Namespace: serviceNamespace,
+					Labels: map[string]string{
+						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+						constants.MCSLabelSourceCluster: clusterID1,
+						mcsv1a1.LabelServiceName:        "nginx",
+						constants.LabelIsHeadless:       strconv.FormatBool(true),
 					},
 				},
 			}
