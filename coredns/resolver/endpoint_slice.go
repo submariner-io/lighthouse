@@ -38,7 +38,9 @@ import (
 
 const maxRecordsToLog = 5
 
-func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
+func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice) bool {
+	endpointSlice := endpointSlices[0]
+
 	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
 	if !ok {
 		return false

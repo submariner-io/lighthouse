@@ -27,7 +27,7 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("PutEndpointSlice", func() {
+var _ = Describe("PutEndpointSlices", func() {
 	t := newTestDriver()
 
 	When("the EndpointSlice is missing the required labels", func() {

@@ -372,7 +372,7 @@ func testClusterIPServiceMisc() {
 	When("a cluster's EndpointSlice is initially created before the ServiceImport", func() {
 		It("should eventually process them and return its DNS record", func() {
 			es := newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true)
-			Expect(t.resolver.PutEndpointSlice(es)).To(BeTrue())
+			Expect(t.resolver.PutEndpointSlices(es)).To(BeTrue())
 
 			t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
 
@@ -412,7 +412,7 @@ func testClusterIPServiceMisc() {
 
 			t.resolver.PutServiceImport(serviceImport)
 
-			Expect(t.resolver.PutEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
+			Expect(t.resolver.PutEndpointSlices(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
 
 			t.resolver.RemoveServiceImport(serviceImport)
 		})
@@ -435,7 +435,7 @@ func testClusterIPServiceMisc() {
 
 			t.resolver.PutServiceImport(serviceImport)
 
-			Expect(t.resolver.PutEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
+			Expect(t.resolver.PutEndpointSlices(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
 
 			t.resolver.RemoveServiceImport(serviceImport)
 		})
