@@ -100,7 +100,7 @@ func testWithoutFallback() {
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -164,7 +164,7 @@ func testWithoutFallback() {
 		BeforeEach(func() {
 			t.lh.Resolver.PutServiceImport(newServiceImport(namespace2, service1, mcsv1a1.ClusterSetIP))
 
-			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace2, service1, clusterID, []mcsv1a1.ServicePort{port1},
+			t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace2, service1, clusterID, []mcsv1a1.ServicePort{port1},
 				newEndpoint(serviceIP, "", true)))
 		})
 
@@ -322,7 +322,7 @@ func testWithFallback() {
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -443,10 +443,10 @@ func testClusterStatus() {
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(serviceIP2, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -584,7 +584,7 @@ func testHeadlessService() {
 	})
 
 	JustBeforeEach(func() {
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1}, endpoints...))
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1}, endpoints...))
 	})
 
 	When("a headless service has no endpoints", func() {
@@ -720,7 +720,7 @@ func testHeadlessService() {
 		BeforeEach(func() {
 			t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.Headless))
 
-			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1},
+			t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1},
 				newEndpoint(endpointIP2, hostName2, true)))
 
 			endpoints = append(endpoints, newEndpoint(endpointIP, hostName1, true))
@@ -774,12 +774,12 @@ func testLocalService() {
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 			newEndpoint(serviceIP, "", true)))
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(serviceIP2, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})
@@ -853,7 +853,7 @@ func testLocalService() {
 
 	When("service is in local and remote clusters and local has no active endpoints", func() {
 		BeforeEach(func() {
-			t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+			t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
 				newEndpoint(serviceIP, "", false)))
 		})
 
@@ -884,7 +884,7 @@ func testSRVMultiplePorts() {
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
-		t.lh.Resolver.PutEndpointSlice(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1, port2},
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1, port2},
 			newEndpoint(endpointIP, "", true)))
 
 		rec = dnstest.NewRecorder(&test.ResponseWriter{})

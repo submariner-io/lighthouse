@@ -92,7 +92,7 @@ func (c *controller) Stop() {
 }
 
 func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bool {
-	return c.resolver.PutEndpointSlice(obj.(*discovery.EndpointSlice))
+	return c.resolver.PutEndpointSlices(obj.(*discovery.EndpointSlice))
 }
 
 func (c *controller) onEndpointSliceDelete(obj runtime.Object, _ int) bool {

@@ -59,7 +59,7 @@ var _ = Describe("ServiceImport migration", func() {
 		}}
 
 		delete(legacyEndpointSlice.Labels, constants.LabelIsHeadless)
-		t.resolver.PutEndpointSlice(legacyEndpointSlice)
+		t.resolver.PutEndpointSlices(legacyEndpointSlice)
 	})
 
 	When("a legacy per-cluster ServiceImport and EndpointSlice are created", func() {

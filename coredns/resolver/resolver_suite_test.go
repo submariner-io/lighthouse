@@ -254,7 +254,7 @@ func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 }
 
 func (t *testDriver) putEndpointSlice(es *discovery.EndpointSlice) {
-	Expect(t.resolver.PutEndpointSlice(es)).To(BeFalse())
+	Expect(t.resolver.PutEndpointSlices(es)).To(BeFalse())
 }
 
 func newAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
