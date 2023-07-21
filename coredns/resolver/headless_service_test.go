@@ -167,6 +167,7 @@ func testHeadlessService() {
 				annotations = map[string]string{
 					constants.GlobalnetEnabled:         strconv.FormatBool(true),
 					constants.PublishNotReadyAddresses: strconv.FormatBool(true),
+					constants.LabelIsHeadless:          strconv.FormatBool(true),
 				}
 
 				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlices should
@@ -224,8 +225,8 @@ func testHeadlessService() {
 						ClusterName: clusterID1,
 					},
 					resolver.DNSRecord{
-						IP:          endpointIP3,
 						Ports:       []mcsv1a1.ServicePort{port1},
+						IP:          endpointIP3,
 						ClusterName: clusterID1,
 					})
 			})

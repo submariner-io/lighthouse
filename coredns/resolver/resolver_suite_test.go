@@ -37,6 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
@@ -302,7 +303,7 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name + "-" + namespace + "-" + clusterID,
+			Name:      fmt.Sprintf("%s-%s-%s-%s", name, utilrand.String(5), namespace, clusterID),
 			Namespace: namespace,
 			Labels: map[string]string{
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
