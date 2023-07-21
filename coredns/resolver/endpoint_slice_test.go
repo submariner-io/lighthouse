@@ -66,22 +66,6 @@ var _ = Describe("PutEndpointSlices", func() {
 			})
 		})
 	})
-
-	When("the EndpointSlice is on the broker", func() {
-		It("should not process it", func() {
-			t.putEndpointSlice(&discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: test.RemoteNamespace,
-					Labels: map[string]string{
-						constants.MCSLabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:        "test",
-						constants.LabelSourceNamespace:  namespace1,
-					},
-				},
-			})
-		})
-	})
 })
 
 var _ = Describe("RemoveEndpointSlice", func() {
