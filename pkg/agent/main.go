@@ -31,8 +31,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,15 +46,17 @@ import (
 )
 
 var (
-	masterURL  string
-	kubeConfig string
-	help       = false
-	logger     = log.Logger{Logger: logf.Log.WithName("main")}
-	version    = "not-compiled-properly"
+	masterURL   string
+	kubeConfig  string
+	help        = false
+	showVersion = false
+	logger      = log.Logger{Logger: logf.Log.WithName("main")}
+	version     = "not-compiled-properly"
 )
 
 func init() {
 	flag.BoolVar(&help, "help", help, "Print usage options")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 func exitOnError(err error, reason string) {
@@ -84,6 +88,12 @@ func main() {
 		return
 	}
 
+	admversion.Print(names.ServiceDiscoveryComponent, version)
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
 
 	// initialize klog as well, since some internal k8s packages still log with klog directly
@@ -111,8 +121,6 @@ func main() {
 
 	localClient, err := dynamic.NewForConfig(cfg)
 	exitOnError(err, "Error creating dynamic client")
-
-	logger.Infof("submariner-lighthouse-agent version: %v", version)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()

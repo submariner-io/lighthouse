@@ -42,7 +42,6 @@ import (
 var (
 	masterURL  string
 	kubeconfig string
-	Version    string
 )
 
 // Hooks for unit tests.
@@ -71,8 +70,6 @@ func init() {
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
 // for parsing any extra options the this plugin may have. The first token this function sees is "lighthouse".
 func setupLighthouse(c *caddy.Controller) error {
-	log.Infof("submariner-lighthouse-coredns version: %v", Version)
-
 	l, err := lighthouseParse(c)
 	if err != nil {
 		return plugin.Error(PluginName, err) //nolint:wrapcheck // No need to wrap this.
