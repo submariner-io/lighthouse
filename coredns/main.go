@@ -22,6 +22,8 @@ package main
 // https://coredns.io/2017/07/25/compile-time-enabling-or-disabling-plugins/#build-with-external-golang-source-code
 
 import (
+	"flag"
+
 	_ "github.com/coredns/caddy/onevent"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/coremain"
@@ -61,7 +63,9 @@ import (
 	_ "github.com/coredns/coredns/plugin/tls"
 	_ "github.com/coredns/coredns/plugin/trace"
 	_ "github.com/coredns/coredns/plugin/whoami"
-	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
+	"github.com/submariner-io/admiral/pkg/names"
+	admversion "github.com/submariner-io/admiral/pkg/version"
+	_ "github.com/submariner-io/lighthouse/coredns/plugin"
 )
 
 var directives = []string{
@@ -105,13 +109,23 @@ var directives = []string{
 	"on",
 }
 
-var version = "not-compiled-properly"
+var (
+	version     = "not-compiled-properly"
+	showVersion = false
+)
 
 func init() {
-	lighthouse.Version = version
+	flag.BoolVar(&showVersion, "subm-version", showVersion, "Show version")
 	dnsserver.Directives = directives
 }
 
 func main() {
+	flag.Parse()
+	admversion.Print(names.LighthouseCoreDNSComponent, version)
+
+	if showVersion {
+		return
+	}
+
 	coremain.Run()
 }
