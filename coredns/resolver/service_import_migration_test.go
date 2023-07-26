@@ -24,7 +24,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -55,7 +55,7 @@ var _ = Describe("ServiceImport migration", func() {
 		legacyEndpointSlice = newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1)
 		legacyEndpointSlice.Endpoints = []discovery.Endpoint{{
 			Addresses:  []string{"1.2.3.4"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 		}}
 
 		delete(legacyEndpointSlice.Labels, constants.LabelIsHeadless)

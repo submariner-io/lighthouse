@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -158,7 +158,7 @@ func testClusterIPServiceInOneCluster() {
 
 		Specify("the exported EndpointSlice's service IP address should indicate not ready", func() {
 			for i := range t.cluster1.serviceEndpointSlices[0].Endpoints {
-				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: pointer.Bool(false)}
+				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
 			}
 
 			t.cluster1.hasReadyEndpoints = false
@@ -248,7 +248,7 @@ func testClusterIPServiceInOneCluster() {
 				Endpoints: []discovery.Endpoint{
 					{
 						Addresses:  []string{service.Spec.ClusterIP},
-						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+						Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 					},
 				},
 			}
@@ -281,8 +281,8 @@ func testClusterIPServiceInOneCluster() {
 				{
 					Type:    "Synced",
 					Status:  corev1.ConditionTrue,
-					Reason:  pointer.String(""),
-					Message: pointer.String("Service was successfully exported to the broker"),
+					Reason:  ptr.To(""),
+					Message: ptr.To("Service was successfully exported to the broker"),
 				},
 			}
 		})
@@ -423,7 +423,7 @@ func testClusterIPServiceWithMultipleEPS() {
 		t.cluster1.serviceEndpointSlices[0].Endpoints = []discovery.Endpoint{
 			{
 				Addresses:  []string{epIP1},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 			},
 		}
 
@@ -442,7 +442,7 @@ func testClusterIPServiceWithMultipleEPS() {
 			Endpoints: []discovery.Endpoint{
 				{
 					Addresses:  []string{epIP2},
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				},
 			},
 		})

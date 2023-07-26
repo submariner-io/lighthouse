@@ -51,7 +51,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -91,7 +91,7 @@ var (
 		Name:        "POP3",
 		Protocol:    corev1.ProtocolUDP,
 		Port:        110,
-		AppProtocol: pointer.String("smtp"),
+		AppProtocol: ptr.To("smtp"),
 	}
 )
 
@@ -196,8 +196,8 @@ func newTestDiver() *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{epIP1},
-							Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-							Hostname:   pointer.String(hostName),
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+							Hostname:   ptr.To(hostName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "one",
@@ -205,8 +205,8 @@ func newTestDiver() *testDriver {
 						},
 						{
 							Addresses:  []string{epIP2},
-							Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-							NodeName:   pointer.String(nodeName),
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+							NodeName:   ptr.To(nodeName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "two",
@@ -214,7 +214,7 @@ func newTestDiver() *testDriver {
 						},
 						{
 							Addresses:  []string{epIP3},
-							Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "not-ready",
@@ -223,12 +223,12 @@ func newTestDiver() *testDriver {
 					},
 					Ports: []discovery.EndpointPort{
 						{
-							Name:     pointer.String(port1.Name),
+							Name:     ptr.To(port1.Name),
 							Protocol: &port1.Protocol,
 							Port:     &port1.Port,
 						},
 						{
-							Name:     pointer.String(port2.Name),
+							Name:     ptr.To(port2.Name),
 							Protocol: &port2.Protocol,
 							Port:     &port2.Port,
 						},
@@ -271,7 +271,7 @@ func newTestDiver() *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{"192.168.5.3"},
-							Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 							Hostname:   &hostName,
 						},
 					},
@@ -790,7 +790,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		epsTemplate.Endpoints = []discovery.Endpoint{
 			{
 				Addresses:  []string{c.serviceIP},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(c.hasReadyEndpoints)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(c.hasReadyEndpoints)},
 			},
 		}
 
