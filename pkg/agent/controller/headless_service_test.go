@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -80,7 +80,7 @@ var _ = Describe("Headless Service export", func() {
 			t.cluster1.serviceEndpointSlices[0].Endpoints = append(t.cluster1.serviceEndpointSlices[0].Endpoints,
 				discovery.Endpoint{
 					Addresses:  []string{"192.168.5.3"},
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				})
 			t.cluster1.headlessEndpointAddresses = [][]discovery.Endpoint{t.cluster1.serviceEndpointSlices[0].Endpoints}
 
@@ -143,7 +143,7 @@ var _ = Describe("Headless Service export", func() {
 				Endpoints: []discovery.Endpoint{
 					{
 						Addresses:  []string{epIP4},
-						Conditions: discovery.EndpointConditions{Serving: pointer.Bool(true)},
+						Conditions: discovery.EndpointConditions{Serving: ptr.To(true)},
 					},
 				},
 			})
