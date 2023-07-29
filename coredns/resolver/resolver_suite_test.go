@@ -22,6 +22,8 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -162,11 +164,21 @@ func (t *testDriver) createEndpointSlice(es *discovery.EndpointSlice) {
 }
 
 func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, expIsHeadless bool, expRecords ...resolver.DNSRecord) {
+	sortRecords := func(r []resolver.DNSRecord) {
+		sort.SliceStable(r, func(i, j int) bool {
+			return r[i].IP < r[j].IP
+		})
+	}
+
+	sortRecords(expRecords)
+
 	var records []resolver.DNSRecord
 	var found, isHeadless bool
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		records, isHeadless, found = t.resolver.GetDNSRecords(ns, name, cluster, hostname)
+		sortRecords(records)
+
 		return found && isHeadless == expIsHeadless && reflect.DeepEqual(records, expRecords), nil
 	})
 	if err == nil {
@@ -186,6 +198,13 @@ func (t *testDriver) assertDNSRecordsFound(ns, name, cluster, hostname string, e
 	Expect(isHeadless).To(Equal(expIsHeadless))
 
 	t.assertDNSRecords(records, expRecords...)
+}
+
+func (t *testDriver) ensureDNSRecordsFound(ns, name, cluster, hostname string, expIsHeadless bool, expRecords ...resolver.DNSRecord) {
+	Consistently(func() bool {
+		t.assertDNSRecordsFound(ns, name, cluster, hostname, expIsHeadless, expRecords...)
+		return true
+	}, time.Millisecond*200).Should(BeTrue())
 }
 
 func (t *testDriver) assertDNSRecords(records []resolver.DNSRecord, expRecords ...resolver.DNSRecord) {
@@ -278,19 +297,21 @@ func newHeadlessAggregatedServiceImport(namespace, name string) *mcsv1a1.Service
 }
 
 func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isHealthy bool,
-	ports ...mcsv1a1.ServicePort) *discovery.EndpointSlice {
+	ports ...mcsv1a1.ServicePort,
+) *discovery.EndpointSlice {
 	eps := newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
 		Addresses:  []string{clusterIP},
 		Conditions: discovery.EndpointConditions{Ready: ptr.To(isHealthy)},
 	})
 
-	eps.Labels[constants.LabelIsHeadless] = "false"
+	eps.Labels[constants.LabelIsHeadless] = strconv.FormatBool(false)
 
 	return eps
 }
 
 func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort,
-	endpoints ...discovery.Endpoint) *discovery.EndpointSlice {
+	endpoints ...discovery.Endpoint,
+) *discovery.EndpointSlice {
 	epPorts := make([]discovery.EndpointPort, len(ports))
 	for i := range ports {
 		epPorts[i] = discovery.EndpointPort{
@@ -303,14 +324,17 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-%s-%s", name, utilrand.String(5), namespace, clusterID),
+			Name:      fmt.Sprintf("%s-%s", name, utilrand.String(5)),
 			Namespace: namespace,
 			Labels: map[string]string{
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace:  namespace,
 				constants.MCSLabelSourceCluster: clusterID,
 				mcsv1a1.LabelServiceName:        name,
-				constants.LabelIsHeadless:       "true",
+				constants.LabelIsHeadless:       strconv.FormatBool(true),
+			},
+			Annotations: map[string]string{
+				constants.GlobalnetEnabled: strconv.FormatBool(false),
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,

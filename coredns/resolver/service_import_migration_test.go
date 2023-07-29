@@ -19,7 +19,11 @@ limitations under the License.
 package resolver_test
 
 import (
+	"context"
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
@@ -28,7 +32,12 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("ServiceImport migration", func() {
+var _ = Describe("Migration", func() {
+	Describe("for a ClusterIP Service", testClusterIPServiceMigration)
+	Describe("for a Headless Service", testHeadlessServiceMigration)
+})
+
+func testClusterIPServiceMigration() {
 	t := newTestDriver()
 
 	var (
@@ -50,25 +59,26 @@ var _ = Describe("ServiceImport migration", func() {
 
 	BeforeEach(func() {
 		legacyServiceImport = newLegacyServiceImport(namespace1, service1, serviceIP1, clusterID1, port1)
-		t.resolver.PutServiceImport(legacyServiceImport)
+		t.createServiceImport(legacyServiceImport)
 
 		legacyEndpointSlice = newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1)
+		legacyEndpointSlice.Name = fmt.Sprintf("%s-%s-%s", service1, namespace1, clusterID1)
 		legacyEndpointSlice.Endpoints = []discovery.Endpoint{{
 			Addresses:  []string{"1.2.3.4"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 		}}
 
 		delete(legacyEndpointSlice.Labels, constants.LabelIsHeadless)
-		t.resolver.PutEndpointSlices(legacyEndpointSlice)
+		t.createEndpointSlice(legacyEndpointSlice)
 	})
 
-	When("a legacy per-cluster ServiceImport and EndpointSlice are created", func() {
-		Specify("GetDNSRecords should return the cluster's DNS record when requested", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
+	Context("with a legacy per-cluster ServiceImport and EndpointSlice", func() {
+		Specify("should add its DNS records", func() {
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
 		})
 
-		Context("and subsequently deleted", func() {
-			Specify("GetDNSRecords should return not found after the EndpointSlice is deleted", func() {
+		Context("that are subsequently deleted", func() {
+			Specify("should remove the DNS records", func() {
 				t.awaitDNSRecords(namespace1, service1, clusterID1, "", true)
 
 				t.resolver.RemoveServiceImport(legacyServiceImport)
@@ -82,25 +92,250 @@ var _ = Describe("ServiceImport migration", func() {
 
 	Context("with a mix of upgraded and legacy cluster resources", func() {
 		BeforeEach(func() {
-			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
+			t.createServiceImport(newAggregatedServiceImport(namespace1, service1))
 
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1))
+			t.createEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port1))
 		})
 
-		Specify("GetDNSRecords should return the correct DNS records before and after the legacy cluster is upgraded", func() {
+		Specify("the DNS records should be correct before and after the legacy cluster is upgraded", func() {
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
 			t.testRoundRobin(namespace1, service1, serviceIP1, serviceIP2)
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
-			t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
 
 			t.resolver.RemoveServiceImport(legacyServiceImport)
-			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
+			t.createEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
 
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
 			t.testRoundRobin(namespace1, service1, serviceIP1, serviceIP2)
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
-			t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
 		})
 	})
-})
+}
+
+func testHeadlessServiceMigration() {
+	t := newTestDriver()
+
+	endpointIP1DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP1,
+		Ports:       []mcsv1a1.ServicePort{port1},
+		ClusterName: clusterID1,
+	}
+
+	endpointIP2DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP2,
+		Ports:       []mcsv1a1.ServicePort{port2},
+		ClusterName: clusterID1,
+	}
+
+	endpointIP3DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP3,
+		Ports:       []mcsv1a1.ServicePort{port3},
+		ClusterName: clusterID1,
+	}
+
+	var legacyEndpointSlice *discovery.EndpointSlice
+
+	BeforeEach(func() {
+		legacyEndpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			discovery.Endpoint{
+				Addresses:  []string{endpointIP1},
+				Conditions: discovery.EndpointConditions{Ready: &ready},
+			},
+		)
+		legacyEndpointSlice.Name = fmt.Sprintf("%s-%s-%s", service1, namespace1, clusterID1)
+		legacyEndpointSlice.Annotations = nil
+
+		t.createServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+
+		// Create K8s EndpointSlice.
+		t.createEndpointSlice(&discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      service1 + "-adcde",
+				Namespace: legacyEndpointSlice.Namespace,
+				Labels: map[string]string{
+					discovery.LabelServiceName: service1,
+				},
+			},
+			Ports: []discovery.EndpointPort{{
+				Name:     ptr.To(port2.Name),
+				Protocol: ptr.To(port2.Protocol),
+				Port:     ptr.To(port2.Port),
+			}},
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{endpointIP2},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+			},
+		})
+	})
+
+	Context("with a pre-0.15 version EndpointSlice", func() {
+		JustBeforeEach(func() {
+			delete(legacyEndpointSlice.Labels, constants.LabelIsHeadless)
+		})
+
+		Context("and no post-0.15 EndpointSlices", func() {
+			JustBeforeEach(func() {
+				t.createEndpointSlice(legacyEndpointSlice)
+			})
+
+			Specify("should add its DNS records", func() {
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+			})
+
+			Context("that is subsequently deleted", func() {
+				Specify("should remove its DNS records", func() {
+					t.awaitDNSRecords(namespace1, service1, clusterID1, "", true)
+					Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+						metav1.DeleteOptions{})).To(Succeed())
+					t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
+				})
+			})
+
+			Context("on the local cluster", func() {
+				BeforeEach(func() {
+					t.clusterStatus.SetLocalClusterID(clusterID1)
+				})
+
+				Specify("should add the local service DNS records", func() {
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP2DNSRecord)
+				})
+			})
+		})
+
+		Context("and an existing post-0.15 EndpointSlice", func() {
+			Specify("should ignore the pre-0.15 EndpointSlice", func() {
+				By("Creating post-0.15 EndpointSlice")
+
+				t.createEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
+					discovery.Endpoint{
+						Addresses:  []string{endpointIP3},
+						Conditions: discovery.EndpointConditions{Ready: &ready},
+					}))
+
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Creating pre-0.15 EndpointSlice")
+
+				t.createEndpointSlice(legacyEndpointSlice)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Deleting pre-0.15 EndpointSlice")
+
+				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+					metav1.DeleteOptions{})).To(Succeed())
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+			})
+		})
+
+		Context("and a post-0.15 EndpointSlice created after", func() {
+			Specify("should eventually add the post-0.15 DNS records", func() {
+				By("Creating pre-0.15 EndpointSlice")
+
+				t.createEndpointSlice(legacyEndpointSlice)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+
+				By("Creating post-0.15 EndpointSlice")
+
+				t.createEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
+					discovery.Endpoint{
+						Addresses:  []string{endpointIP3},
+						Conditions: discovery.EndpointConditions{Ready: &ready},
+					}))
+
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Deleting pre-0.15 EndpointSlice")
+
+				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+					metav1.DeleteOptions{})).To(Succeed())
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+			})
+		})
+	})
+
+	Context("with a 0.15 version EndpointSlice", func() {
+		Context("and no post-0.15 EndpointSlices", func() {
+			JustBeforeEach(func() {
+				t.createEndpointSlice(legacyEndpointSlice)
+			})
+
+			Specify("should add its DNS records", func() {
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+			})
+
+			Context("that is subsequently deleted", func() {
+				Specify("should remove its DNS records", func() {
+					t.awaitDNSRecords(namespace1, service1, clusterID1, "", true)
+					Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+						metav1.DeleteOptions{})).To(Succeed())
+					t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
+				})
+			})
+
+			Context("on the local cluster", func() {
+				BeforeEach(func() {
+					t.clusterStatus.SetLocalClusterID(clusterID1)
+				})
+
+				Specify("should add the local service endpoints", func() {
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP2DNSRecord)
+				})
+			})
+		})
+
+		Context("and an existing post-0.15 EndpointSlice", func() {
+			Specify("should ignore the 0.15 EndpointSlice", func() {
+				By("Creating post-0.15 EndpointSlice")
+
+				t.createEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
+					discovery.Endpoint{
+						Addresses:  []string{endpointIP3},
+						Conditions: discovery.EndpointConditions{Ready: &ready},
+					}))
+
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Creating 0.15 EndpointSlice")
+
+				t.createEndpointSlice(legacyEndpointSlice)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Deleting 0.15 EndpointSlice")
+
+				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+					metav1.DeleteOptions{})).To(Succeed())
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+			})
+		})
+
+		Context("and a post-0.15 EndpointSlice is created after", func() {
+			Specify("should eventually add the post-0.15 DNS records", func() {
+				By("Creating 0.15 EndpointSlice")
+
+				t.createEndpointSlice(legacyEndpointSlice)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+
+				By("Creating post-0.15 EndpointSlice")
+
+				t.createEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
+					discovery.Endpoint{
+						Addresses:  []string{endpointIP3},
+						Conditions: discovery.EndpointConditions{Ready: &ready},
+					}))
+
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+
+				By("Deleting 0.15 EndpointSlice")
+
+				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
+					metav1.DeleteOptions{})).To(Succeed())
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+			})
+		})
+	})
+}
 
 func newLegacyServiceImport(namespace, name, serviceIP, clusterID string, ports ...mcsv1a1.ServicePort) *mcsv1a1.ServiceImport {
 	var ips []string
