@@ -50,16 +50,18 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 
 	logger.Infof("Put EndpointSlices for %q on cluster %q", key, clusterID)
 
-	var localEndpointSliceErr error
-
-	globalnetEnabled := endpointSlices[0].Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
 	localClusterID := i.clusterStatus.GetLocalClusterID()
 
-	if isHeadless(endpointSlices[0]) && globalnetEnabled && localClusterID != "" && clusterID == localClusterID {
+	var (
+		localEndpointSliceErr error
+		localEndpointSlices   []*discovery.EndpointSlice
+	)
+
+	if localClusterID != "" && clusterID == localClusterID && shouldRetrieveLocalEndpointSlicesFor(endpointSlices[0]) {
 		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
-		endpointSlices, localEndpointSliceErr = i.getLocalEndpointSlices(endpointSlices[0])
+		localEndpointSlices, localEndpointSliceErr = i.getLocalEndpointSlices(endpointSlices[0])
 	}
 
 	i.mutex.Lock()
@@ -81,6 +83,10 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		logger.Error(localEndpointSliceErr, "unable to retrieve local EndpointSlice - requeuing")
 
 		return true
+	}
+
+	if localEndpointSlices != nil {
+		endpointSlices = localEndpointSlices
 	}
 
 	i.putHeadlessEndpointSlices(key, clusterID, endpointSlices, serviceInfo)
@@ -203,7 +209,7 @@ func (i *Interface) getLocalEndpointSlices(forEPS *discovery.EndpointSlice) ([]*
 	list, err := i.client.Resource(epsGVR).Namespace(forEPS.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
 		metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{
-				constants.KubernetesServiceName: forEPS.Labels[mcsv1a1.LabelServiceName],
+				discovery.LabelServiceName: forEPS.Labels[mcsv1a1.LabelServiceName],
 			}).String(),
 		})
 	if err != nil {
@@ -291,4 +297,20 @@ func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1a1.ServicePort {
 
 func isHeadless(endpointSlice *discovery.EndpointSlice) bool {
 	return endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true)
+}
+
+func shouldRetrieveLocalEndpointSlicesFor(endpointSlice *discovery.EndpointSlice) bool {
+	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
+	if !found {
+		// This is a legacy pre-0.15 EndpointSlice. We don't know if it's headless or if globalnet is enabled.
+		return true
+	}
+
+	globalnetEnabled, found := endpointSlice.Annotations[constants.GlobalnetEnabled]
+	if !found {
+		// This is a legacy 0.15 EndpointSlice. We don't know if globalnet is enabled.
+		return isHeadless(endpointSlice)
+	}
+
+	return isHeadless(endpointSlice) && globalnetEnabled == strconv.FormatBool(true)
 }

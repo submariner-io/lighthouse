@@ -19,6 +19,8 @@ limitations under the License.
 package resolver
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -97,11 +99,11 @@ func (c *controller) Stop() {
 
 func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bool {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	if ignoreEndpointSlice(endpointSlice) {
+	if c.ignoreEndpointSlice(endpointSlice) {
 		return false
 	}
 
-	if !isHeadless(endpointSlice) {
+	if !isHeadless(endpointSlice) || isLegacyEndpointSlice(endpointSlice) {
 		return c.resolver.PutEndpointSlices(endpointSlice)
 	}
 
@@ -115,9 +117,12 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 		constants.MCSLabelSourceCluster: forEPS.Labels[constants.MCSLabelSourceCluster],
 	}))
 
-	epSlices := make([]*discovery.EndpointSlice, len(list))
+	var epSlices []*discovery.EndpointSlice
 	for i := range list {
-		epSlices[i] = list[i].(*discovery.EndpointSlice)
+		eps := list[i].(*discovery.EndpointSlice)
+		if !isLegacyEndpointSlice(eps) {
+			epSlices = append(epSlices, eps)
+		}
 	}
 
 	return epSlices
@@ -125,7 +130,7 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 
 func (c *controller) onEndpointSliceDelete(obj runtime.Object, _ int) bool {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	if ignoreEndpointSlice(endpointSlice) {
+	if c.ignoreEndpointSlice(endpointSlice) {
 		return false
 	}
 
@@ -151,7 +156,12 @@ func (c *controller) onServiceImportDelete(obj runtime.Object, _ int) bool {
 	return false
 }
 
-func ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
+func (c *controller) ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
 	isOnBroker := eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
-	return isOnBroker
+	return isOnBroker || (isLegacyEndpointSlice(eps) && len(c.getAllEndpointSlices(eps)) > 0)
+}
+
+func isLegacyEndpointSlice(eps *discovery.EndpointSlice) bool {
+	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
+	return strings.HasSuffix(eps.Name, "-"+eps.Labels[constants.MCSLabelSourceCluster])
 }

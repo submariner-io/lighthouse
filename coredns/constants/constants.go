@@ -19,7 +19,6 @@ limitations under the License.
 package constants
 
 const (
-	KubernetesServiceName    = "kubernetes.io/service-name"
 	LabelValueManagedBy      = "lighthouse-agent.submariner.io"
 	LabelSourceNamespace     = "lighthouse.submariner.io/sourceNamespace"
 	MCSLabelSourceCluster    = "multicluster.kubernetes.io/source-cluster"
