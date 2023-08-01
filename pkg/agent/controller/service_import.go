@@ -134,7 +134,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		<-stopCh
 
 		c.endpointControllers.Range(func(key, value interface{}) bool {
-			value.(*EndpointController).stop()
+			value.(*ServiceEndpointSliceController).stop()
 			return true
 		})
 
@@ -157,11 +157,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 
 func (c *ServiceImportController) reconcileRemoteAggregatedServiceImports() {
 	c.localSyncer.Reconcile(func() []runtime.Object {
-		siList, err := c.remoteSyncer.ListResources()
-		if err != nil {
-			logger.Error(err, "Error listing serviceImports")
-			return nil
-		}
+		siList := c.remoteSyncer.ListResources()
 
 		retList := make([]runtime.Object, 0, len(siList))
 		for i := range siList {
@@ -228,10 +224,10 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 
 	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
 		logger.V(log.DEBUG).Infof("Stopping previous endpoints controller for %q", key)
-		obj.(*EndpointController).stop()
+		obj.(*ServiceEndpointSliceController).stop()
 	}
 
-	endpointController, err := startEndpointController(c.localClient, c.restMapper, c.converter.scheme,
+	endpointController, err := startEndpointSliceController(c.localClient, c.restMapper, c.converter.scheme,
 		serviceImport, c.clusterID, c.globalIngressIPCache)
 	if err != nil {
 		return errors.Wrapf(err, "failed to start endpoints controller for %q", key)
@@ -244,7 +240,7 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 
 func (c *ServiceImportController) stopEndpointsController(key string) (bool, error) {
 	if obj, found := c.endpointControllers.Load(key); found {
-		endpointController := obj.(*EndpointController)
+		endpointController := obj.(*ServiceEndpointSliceController)
 		endpointController.stop()
 
 		found, err := endpointController.cleanup()
@@ -401,11 +397,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 }
 
 func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
-	siList, err := c.localSyncer.ListResources()
-	if err != nil {
-		logger.Error(err, "Error listing serviceImports")
-		return nil
-	}
+	siList := c.localSyncer.ListResources()
 
 	retList := make([]runtime.Object, 0, len(siList))
 

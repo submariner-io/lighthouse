@@ -27,7 +27,7 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("PutEndpointSlice", func() {
+var _ = Describe("PutEndpointSlices", func() {
 	t := newTestDriver()
 
 	When("the EndpointSlice is missing the required labels", func() {
@@ -61,22 +61,6 @@ var _ = Describe("PutEndpointSlice", func() {
 					Labels: map[string]string{
 						constants.LabelSourceNamespace: "test",
 						mcsv1a1.LabelServiceName:       "test",
-					},
-				},
-			})
-		})
-	})
-
-	When("the EndpointSlice is on the broker", func() {
-		It("should not process it", func() {
-			t.putEndpointSlice(&discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: test.RemoteNamespace,
-					Labels: map[string]string{
-						constants.MCSLabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:        "test",
-						constants.LabelSourceNamespace:  namespace1,
 					},
 				},
 			})

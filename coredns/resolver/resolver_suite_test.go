@@ -37,11 +37,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -254,7 +255,7 @@ func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 }
 
 func (t *testDriver) putEndpointSlice(es *discovery.EndpointSlice) {
-	Expect(t.resolver.PutEndpointSlice(es)).To(BeFalse())
+	Expect(t.resolver.PutEndpointSlices(es)).To(BeFalse())
 }
 
 func newAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
@@ -280,7 +281,7 @@ func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isH
 	ports ...mcsv1a1.ServicePort) *discovery.EndpointSlice {
 	eps := newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
 		Addresses:  []string{clusterIP},
-		Conditions: discovery.EndpointConditions{Ready: pointer.Bool(isHealthy)},
+		Conditions: discovery.EndpointConditions{Ready: ptr.To(isHealthy)},
 	})
 
 	eps.Labels[constants.LabelIsHeadless] = "false"
@@ -302,7 +303,7 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name + "-" + namespace + "-" + clusterID,
+			Name:      fmt.Sprintf("%s-%s-%s-%s", name, utilrand.String(5), namespace, clusterID),
 			Namespace: namespace,
 			Labels: map[string]string{
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,

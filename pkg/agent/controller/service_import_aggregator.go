@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -136,7 +136,7 @@ func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mc
 
 				err := a.brokerServiceImportClient().Delete(context.Background(), existing.Name, metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{
-						ResourceVersion: pointer.String(existing.ResourceVersion),
+						ResourceVersion: ptr.To(existing.ResourceVersion),
 					},
 				})
 				if apierrors.IsNotFound(err) {

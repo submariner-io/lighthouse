@@ -19,6 +19,8 @@ limitations under the License.
 package controller_test
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
@@ -27,13 +29,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("ClusterIP Service export", func() {
-	Describe("Single cluster", testClusterIPServiceInOneCluster)
-	Describe("Two clusters", testClusterIPServiceInTwoClusters)
+	Describe("in single cluster", testClusterIPServiceInOneCluster)
+	Describe("in two clusters", testClusterIPServiceInTwoClusters)
+	Describe("with multiple service EndpointSlices", testClusterIPServiceWithMultipleEPS)
 })
 
 func testClusterIPServiceInOneCluster() {
@@ -42,7 +45,7 @@ func testClusterIPServiceInOneCluster() {
 	BeforeEach(func() {
 		t = newTestDiver()
 
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 	})
 
 	JustBeforeEach(func() {
@@ -146,18 +149,22 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
-	When("the backend Endpoints has no ready addresses", func() {
+	When("the backend service EndpointSlice has no ready addresses", func() {
 		JustBeforeEach(func() {
 			t.cluster1.createService()
 			t.cluster1.createServiceExport()
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
 
-		Specify("the EndpointSlice's service IP address should indicate not ready", func() {
-			t.cluster1.endpoints.Subsets[0].Addresses = nil
+		Specify("the exported EndpointSlice's service IP address should indicate not ready", func() {
+			for i := range t.cluster1.serviceEndpointSlices[0].Endpoints {
+				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+			}
 
-			t.cluster1.updateEndpoints()
-			t.awaitEndpointSlice(&t.cluster1)
+			t.cluster1.hasReadyEndpoints = false
+
+			t.cluster1.updateServiceEndpointSlices()
+			t.ensureEndpointSlice(&t.cluster1)
 		})
 	})
 
@@ -200,11 +207,12 @@ func testClusterIPServiceInOneCluster() {
 				},
 			}
 
-			endpoints := &corev1.Endpoints{
+			serviceEPS := &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      service.Name,
-					Namespace: service.Namespace,
+					Name:   service.Name + "-abcde",
+					Labels: map[string]string{discovery.LabelServiceName: serviceName},
 				},
+				AddressType: discovery.AddressTypeIPv4,
 			}
 
 			expServiceImport := &mcsv1a1.ServiceImport{
@@ -240,17 +248,17 @@ func testClusterIPServiceInOneCluster() {
 				Endpoints: []discovery.Endpoint{
 					{
 						Addresses:  []string{service.Spec.ClusterIP},
-						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+						Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 					},
 				},
 			}
 
-			test.CreateResource(endpointsClientFor(t.cluster1.localDynClient, endpoints.Namespace), endpoints)
+			test.CreateResource(endpointSliceClientFor(t.cluster1.localDynClient, service.Namespace), serviceEPS)
 			test.CreateResource(t.cluster1.dynamicServiceClientFor().Namespace(service.Namespace), service)
 			test.CreateResource(serviceExportClientFor(t.cluster1.localDynClient, service.Namespace), serviceExport)
 
 			awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport)
-			awaitEndpointSlice(endpointSliceClientFor(t.cluster2.localDynClient, endpoints.Namespace), expEndpointSlice)
+			awaitEndpointSlice(endpointSliceClientFor(t.cluster2.localDynClient, service.Namespace), service.Name, expEndpointSlice)
 
 			// Ensure the resources for the first Service weren't overwritten
 			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
@@ -273,8 +281,8 @@ func testClusterIPServiceInOneCluster() {
 				{
 					Type:    "Synced",
 					Status:  corev1.ConditionTrue,
-					Reason:  pointer.String(""),
-					Message: pointer.String("Service was successfully exported to the broker"),
+					Reason:  ptr.To(""),
+					Message: ptr.To("Service was successfully exported to the broker"),
 				},
 			}
 		})
@@ -296,13 +304,13 @@ func testClusterIPServiceInTwoClusters() {
 	})
 
 	JustBeforeEach(func() {
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
 		t.justBeforeEach()
 
-		t.cluster2.createEndpoints()
+		t.cluster2.createServiceEndpointSlices()
 		t.cluster2.createService()
 		t.cluster2.createServiceExport()
 	})
@@ -387,5 +395,68 @@ func testClusterIPServiceInTwoClusters() {
 				t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			})
 		})
+	})
+}
+
+func testClusterIPServiceWithMultipleEPS() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+
+		t.cluster1.createService()
+		t.cluster1.createServiceExport()
+	})
+
+	JustBeforeEach(func() {
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
+
+	Specify("the exported EndpointSlice should be correctly updated as backend service EndpointSlices are created/updated/deleted", func() {
+		By("Creating initial service EndpointSlice with no ready endpoints")
+
+		t.cluster1.hasReadyEndpoints = false
+		t.cluster1.serviceEndpointSlices[0].Endpoints = []discovery.Endpoint{
+			{
+				Addresses:  []string{epIP1},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
+			},
+		}
+
+		t.cluster1.createServiceEndpointSlices()
+		t.awaitNonHeadlessServiceExported(&t.cluster1)
+
+		By("Creating service EndpointSlice with ready endpoint")
+
+		t.cluster1.hasReadyEndpoints = true
+		t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   fmt.Sprintf("%s-%s2", serviceName, clusterID1),
+				Labels: map[string]string{discovery.LabelServiceName: serviceName},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{epIP2},
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+			},
+		})
+
+		t.cluster1.createServiceEndpointSlices()
+		t.ensureEndpointSlice(&t.cluster1)
+
+		By("Deleting service EndpointSlice with ready endpoint")
+
+		t.cluster1.deleteEndpointSlice(t.cluster1.serviceEndpointSlices[1].Name)
+
+		t.cluster1.hasReadyEndpoints = false
+		t.cluster1.serviceEndpointSlices = t.cluster1.serviceEndpointSlices[:1]
+
+		t.ensureEndpointSlice(&t.cluster1)
 	})
 }

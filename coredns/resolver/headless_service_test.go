@@ -167,13 +167,14 @@ func testHeadlessService() {
 				annotations = map[string]string{
 					constants.GlobalnetEnabled:         strconv.FormatBool(true),
 					constants.PublishNotReadyAddresses: strconv.FormatBool(true),
+					constants.LabelIsHeadless:          strconv.FormatBool(true),
 				}
 
-				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlice should
+				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlices should
 				// return true to requeue.
 				eps := newEndpointSlice(namespace1, service1, clusterID1, nil)
 				eps.Annotations = annotations
-				Expect(t.resolver.PutEndpointSlice(eps)).To(BeTrue())
+				Expect(t.resolver.PutEndpointSlices(eps)).To(BeTrue())
 
 				eps1 := &discovery.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
@@ -224,8 +225,8 @@ func testHeadlessService() {
 						ClusterName: clusterID1,
 					},
 					resolver.DNSRecord{
-						IP:          endpointIP3,
 						Ports:       []mcsv1a1.ServicePort{port1},
+						IP:          endpointIP3,
 						ClusterName: clusterID1,
 					})
 			})

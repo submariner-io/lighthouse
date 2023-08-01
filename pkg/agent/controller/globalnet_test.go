@@ -25,7 +25,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/utils/pointer"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -39,7 +38,7 @@ var _ = Describe("Globalnet enabled", func() {
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 	})
@@ -121,9 +120,9 @@ var _ = Describe("Globalnet enabled", func() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
 
-			t.cluster1.endpointSliceAddresses[0].Addresses = []string{globalIP1}
-			t.cluster1.endpointSliceAddresses[1].Addresses = []string{globalIP2}
-			t.cluster1.endpointSliceAddresses[2].Addresses = []string{globalIP3}
+			t.cluster1.headlessEndpointAddresses[0][0].Addresses = []string{globalIP1}
+			t.cluster1.headlessEndpointAddresses[0][1].Addresses = []string{globalIP2}
+			t.cluster1.headlessEndpointAddresses[0][2].Addresses = []string{globalIP3}
 		})
 
 		Context("and it has global IPs for all endpoint addresses", func() {
@@ -158,50 +157,33 @@ var _ = Describe("Globalnet enabled", func() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
 
-			t.cluster1.endpointSliceAddresses[0].Addresses = []string{globalIP1}
-			t.cluster1.endpointSliceAddresses[1].Addresses = []string{globalIP2}
-			t.cluster1.endpointSliceAddresses[2].Addresses = []string{globalIP3}
-
-			// subsets[*].adresses[*].TargetRef = nil for all Endpoints of headless Service without selector
-			// and Hostname must be set.
-			t.cluster1.endpoints.Subsets[0].Addresses = []corev1.EndpointAddress{
+			// TargetRef is nil for all Endpoints of headless Service without selector and Hostname must be set.
+			t.cluster1.serviceEndpointSlices[0].Endpoints = []discovery.Endpoint{
 				{
-					IP:       epIP1,
-					Hostname: host1,
+					Addresses: []string{epIP1},
+					Hostname:  &host1,
 				},
 				{
-					IP:       epIP2,
-					Hostname: host2,
-				},
-			}
-			t.cluster1.endpoints.Subsets[0].NotReadyAddresses = []corev1.EndpointAddress{
-				{
-					IP:       epIP3,
-					Hostname: host3,
+					Addresses: []string{epIP2},
+					Hostname:  &host2,
 				},
 			}
 
-			t.cluster1.endpointSliceAddresses = []discovery.Endpoint{
+			t.cluster1.headlessEndpointAddresses = [][]discovery.Endpoint{
 				{
-					Addresses:  []string{globalIP1},
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-					Hostname:   &t.cluster1.endpoints.Subsets[0].Addresses[0].Hostname,
-				},
-				{
-					Addresses:  []string{globalIP2},
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-					Hostname:   &t.cluster1.endpoints.Subsets[0].Addresses[1].Hostname,
-				},
-				{
-					Addresses:  []string{globalIP3},
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
-					Hostname:   &t.cluster1.endpoints.Subsets[0].NotReadyAddresses[0].Hostname,
+					{
+						Addresses: []string{globalIP1},
+						Hostname:  &host1,
+					},
+					{
+						Addresses: []string{globalIP2},
+						Hostname:  &host2,
+					},
 				},
 			}
 
 			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("one", globalIP1, epIP1))
 			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("two", globalIP2, epIP2))
-			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("not-ready", globalIP3, epIP3))
 		})
 
 		It("should export the service with the global IPs", func() {

@@ -26,6 +26,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -34,8 +35,9 @@ import (
 var logger = log.Logger{Logger: logf.Log.WithName("Resolver")}
 
 type controller struct {
-	resolver *Interface
-	stopCh   chan struct{}
+	resolver        *Interface
+	resourceWatcher watcher.Interface
+	stopCh          chan struct{}
 }
 
 func NewController(r *Interface) *controller {
@@ -72,12 +74,14 @@ func (c *controller) Start(config watcher.Config) error {
 		},
 	}
 
-	resourceWatcher, err := watcher.New(&config)
+	var err error
+
+	c.resourceWatcher, err = watcher.New(&config)
 	if err != nil {
 		return errors.Wrap(err, "error creating the resource watcher")
 	}
 
-	err = resourceWatcher.Start(c.stopCh)
+	err = c.resourceWatcher.Start(c.stopCh)
 	if err != nil {
 		return errors.Wrap(err, "error starting the resource watcher")
 	}
@@ -92,12 +96,49 @@ func (c *controller) Stop() {
 }
 
 func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bool {
-	return c.resolver.PutEndpointSlice(obj.(*discovery.EndpointSlice))
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	if ignoreEndpointSlice(endpointSlice) {
+		return false
+	}
+
+	if !isHeadless(endpointSlice) {
+		return c.resolver.PutEndpointSlices(endpointSlice)
+	}
+
+	return c.resolver.PutEndpointSlices(c.getAllEndpointSlices(endpointSlice)...)
+}
+
+func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*discovery.EndpointSlice {
+	list := c.resourceWatcher.ListResources(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
+		constants.LabelSourceNamespace:  forEPS.Labels[constants.LabelSourceNamespace],
+		mcsv1a1.LabelServiceName:        forEPS.Labels[mcsv1a1.LabelServiceName],
+		constants.MCSLabelSourceCluster: forEPS.Labels[constants.MCSLabelSourceCluster],
+	}))
+
+	epSlices := make([]*discovery.EndpointSlice, len(list))
+	for i := range list {
+		epSlices[i] = list[i].(*discovery.EndpointSlice)
+	}
+
+	return epSlices
 }
 
 func (c *controller) onEndpointSliceDelete(obj runtime.Object, _ int) bool {
-	c.resolver.RemoveEndpointSlice(obj.(*discovery.EndpointSlice))
-	return false
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	if ignoreEndpointSlice(endpointSlice) {
+		return false
+	}
+
+	if !isHeadless(endpointSlice) {
+		c.resolver.RemoveEndpointSlice(endpointSlice)
+	}
+
+	epSlices := c.getAllEndpointSlices(endpointSlice)
+	if len(epSlices) == 0 {
+		c.resolver.RemoveEndpointSlice(endpointSlice)
+	}
+
+	return c.resolver.PutEndpointSlices(epSlices...)
 }
 
 func (c *controller) onServiceImportCreateOrUpdate(obj runtime.Object, _ int) bool {
@@ -108,4 +149,9 @@ func (c *controller) onServiceImportCreateOrUpdate(obj runtime.Object, _ int) bo
 func (c *controller) onServiceImportDelete(obj runtime.Object, _ int) bool {
 	c.resolver.RemoveServiceImport(obj.(*mcsv1a1.ServiceImport))
 	return false
+}
+
+func ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
+	isOnBroker := eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
+	return isOnBroker
 }

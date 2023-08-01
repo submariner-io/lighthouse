@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -99,22 +100,36 @@ func (c *EndpointSliceController) start(stopCh <-chan struct{}) error {
 
 func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	labels := endpointSlice.GetObjectMeta().GetLabels()
 
-	oldName := labels[mcsv1a1.LabelServiceName] + "-" + labels[constants.MCSLabelSourceCluster]
-	if op != syncer.Delete && endpointSlice.Name == oldName {
-		logger.Infof("EndpointSlice %s/%s has the old naming convention sans namespace - deleting it",
+	if op != syncer.Delete && isLegacyEndpointSlice(endpointSlice) {
+		logger.Infof("Found legacy EndpointSlice %s/%s - deleting it",
 			endpointSlice.Namespace, endpointSlice.Name)
 
 		err := c.syncer.GetLocalFederator().Delete(endpointSlice)
 		if err != nil {
-			logger.Errorf(err, "Error deleting local EndpointSlice %s/%s", endpointSlice.Namespace, endpointSlice.Name)
+			logger.Errorf(err, "Error deleting legacy EndpointSlice %s/%s", endpointSlice.Namespace, endpointSlice.Name)
 		}
 
 		return nil, false
 	}
 
 	return obj, false
+}
+
+func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
+	// The original name sans namespace prior to 0.15.
+	origName := endpointSlice.Labels[mcsv1a1.LabelServiceName] + "-" + endpointSlice.Labels[constants.MCSLabelSourceCluster]
+	if endpointSlice.Name == origName {
+		return true
+	}
+
+	// Check for headless EndpointSlice derived from service Endpoints prior to 0.16.
+	if endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) &&
+		strings.HasPrefix(endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelServiceName]+"-"+endpointSlice.Namespace) {
+		return true
+	}
+
+	return false
 }
 
 func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
@@ -135,7 +150,9 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	var err error
 
 	if op == syncer.Delete {
-		err = c.serviceImportAggregator.updateOnDelete(serviceName, serviceNamespace)
+		if c.hasNoRemainingEndpointSlices(endpointSlice) {
+			err = c.serviceImportAggregator.updateOnDelete(serviceName, serviceNamespace)
+		}
 	} else {
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(serviceName, serviceNamespace)
 		if err != nil {
@@ -154,6 +171,31 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	}
 
 	return err != nil
+}
+
+func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *discovery.EndpointSlice) bool {
+	if endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
+		serviceNS := endpointSlice.Labels[constants.LabelSourceNamespace]
+
+		list := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
+			constants.LabelSourceNamespace:  serviceNS,
+			mcsv1a1.LabelServiceName:        endpointSlice.Labels[mcsv1a1.LabelServiceName],
+			constants.MCSLabelSourceCluster: endpointSlice.Labels[constants.MCSLabelSourceCluster],
+		}))
+
+		count := 0
+
+		for _, eps := range list {
+			// Make sure we don't count ones in the broker namespace is co-located on the same cluster.
+			if eps.(*discovery.EndpointSlice).Namespace == serviceNS {
+				count++
+			}
+		}
+
+		return count == 0
+	}
+
+	return true
 }
 
 func (c *EndpointSliceController) checkForConflicts(key, name, namespace string) (bool, error) {

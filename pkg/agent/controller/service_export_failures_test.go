@@ -39,7 +39,7 @@ var _ = Describe("Service export failures", func() {
 	JustBeforeEach(func() {
 		t.justBeforeEach()
 		t.cluster1.createService()
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createServiceExport()
 	})
 

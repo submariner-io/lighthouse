@@ -20,6 +20,8 @@ package controller_test
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -53,7 +55,7 @@ var _ = Describe("Reconciliation", func() {
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
-		t.cluster1.createEndpoints()
+		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
@@ -70,8 +72,9 @@ var _ = Describe("Reconciliation", func() {
 		localServiceImport = t.cluster1.findLocalServiceImport()
 		Expect(localServiceImport).ToNot(BeNil())
 
-		localEndpointSlice = t.cluster1.findLocalEndpointSlice()
-		Expect(localEndpointSlice).ToNot(BeNil())
+		endpointSlices := t.cluster1.findLocalEndpointSlices()
+		Expect(endpointSlices).To(HaveLen(1))
+		localEndpointSlice = endpointSlices[0]
 
 		obj, err := t.cluster1.localServiceExportClient.Get(context.Background(), t.cluster1.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
@@ -103,7 +106,7 @@ var _ = Describe("Reconciliation", func() {
 
 			restoreBrokerResources()
 
-			t.cluster1.createEndpoints()
+			t.cluster1.createServiceEndpointSlices()
 			t.cluster1.createService()
 
 			t.cluster1.start(t, *t.syncerConfig)
@@ -196,9 +199,10 @@ var _ = Describe("Reconciliation", func() {
 
 	When("a local EndpointSlice is stale in the broker datastore on startup", func() {
 		It("should delete it from the broker datastore on reconciliation", func() {
-			endpointSlice := findEndpointSlice(t.brokerEndpointSliceClient, t.cluster1.endpoints.Namespace,
-				t.cluster1.endpoints.Name, t.cluster1.clusterID)
-			Expect(endpointSlice).ToNot(BeNil())
+			endpointSlices := findEndpointSlices(t.brokerEndpointSliceClient, t.cluster1.service.Namespace,
+				t.cluster1.service.Name, t.cluster1.clusterID)
+			Expect(endpointSlices).To(HaveLen(1))
+			endpointSlice := endpointSlices[0]
 
 			t.afterEach()
 			t = newTestDiver()
@@ -212,9 +216,10 @@ var _ = Describe("Reconciliation", func() {
 
 	When("a remote EndpointSlice is stale in the local datastore on startup", func() {
 		It("should delete it from the local datastore on reconciliation", func() {
-			endpointSlice := findEndpointSlice(t.cluster2.localEndpointSliceClient, t.cluster1.endpoints.Namespace,
-				t.cluster1.endpoints.Name, t.cluster1.clusterID)
-			Expect(endpointSlice).ToNot(BeNil())
+			endpointSlices := findEndpointSlices(t.cluster2.localEndpointSliceClient, t.cluster1.service.Namespace,
+				t.cluster1.service.Name, t.cluster1.clusterID)
+			Expect(endpointSlices).To(HaveLen(1))
+			endpointSlice := endpointSlices[0]
 
 			t.afterEach()
 			t = newTestDiver()
@@ -225,6 +230,22 @@ var _ = Describe("Reconciliation", func() {
 			awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient, t.cluster1.service.Namespace,
 				t.cluster1.service.Name, t.cluster1.clusterID)
 		})
+	})
+})
+
+var _ = Describe("EndpointSlice migration", func() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
 	})
 
 	When("a local EndpointSlice with the old naming convention sans namespace exists on startup", func() {
@@ -239,6 +260,35 @@ var _ = Describe("Reconciliation", func() {
 						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 						constants.MCSLabelSourceCluster: clusterID1,
 						mcsv1a1.LabelServiceName:        "nginx",
+					},
+				},
+			}
+
+			test.CreateResource(t.cluster1.localEndpointSliceClient, eps)
+
+			eps.Namespace = test.RemoteNamespace
+			test.CreateResource(t.brokerEndpointSliceClient, test.SetClusterIDLabel(eps, clusterID1))
+		})
+
+		It("should delete it", func() {
+			test.AwaitNoResource(t.cluster1.localEndpointSliceClient, epsName)
+			test.AwaitNoResource(t.brokerEndpointSliceClient, epsName)
+		})
+	})
+
+	When("a legacy local EndpointSlice derived from Endpoints exists on startup", func() {
+		epsName := fmt.Sprintf("nginx-%s-%s", serviceNamespace, clusterID1)
+
+		JustBeforeEach(func() {
+			eps := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      epsName,
+					Namespace: serviceNamespace,
+					Labels: map[string]string{
+						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+						constants.MCSLabelSourceCluster: clusterID1,
+						mcsv1a1.LabelServiceName:        "nginx",
+						constants.LabelIsHeadless:       strconv.FormatBool(true),
 					},
 				},
 			}

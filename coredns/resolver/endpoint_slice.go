@@ -24,42 +24,42 @@ import (
 	"strconv"
 	"strings"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/submariner-io/admiral/pkg/resource"
-	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const maxRecordsToLog = 5
 
-func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
-	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
+func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice) bool {
+	if len(endpointSlices) == 0 {
+		return false
+	}
+
+	key, clusterID, ok := getKeyInfoFrom(endpointSlices[0])
 	if !ok {
 		return false
 	}
 
-	if ignoreEndpointSlice(endpointSlice) {
-		return false
-	}
-
-	logger.Infof("Put EndpointSlice %q on cluster %q", key, clusterID)
+	logger.Infof("Put EndpointSlices for %q on cluster %q", key, clusterID)
 
 	var localEndpointSliceErr error
 
-	globalnetEnabled := endpointSlice.Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
+	globalnetEnabled := endpointSlices[0].Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
 	localClusterID := i.clusterStatus.GetLocalClusterID()
 
-	if globalnetEnabled && localClusterID != "" && clusterID == localClusterID {
+	if isHeadless(endpointSlices[0]) && globalnetEnabled && localClusterID != "" && clusterID == localClusterID {
 		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
-		localEndpointSliceErr = i.replaceWithLocalEndpointSlices(endpointSlice)
+		endpointSlices, localEndpointSliceErr = i.getLocalEndpointSlices(endpointSlices[0])
 	}
 
 	i.mutex.Lock()
@@ -74,7 +74,7 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 	}
 
 	if !serviceInfo.isHeadless {
-		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlice, serviceInfo)
+		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], serviceInfo)
 	}
 
 	if localEndpointSliceErr != nil {
@@ -83,7 +83,7 @@ func (i *Interface) PutEndpointSlice(endpointSlice *discovery.EndpointSlice) boo
 		return true
 	}
 
-	i.putHeadlessEndpointSlice(key, clusterID, endpointSlice, serviceInfo)
+	i.putHeadlessEndpointSlices(key, clusterID, endpointSlices, serviceInfo)
 
 	return false
 }
@@ -129,57 +129,58 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 	return false
 }
 
-func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo) {
+func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSlices []*discovery.EndpointSlice, serviceInfo *serviceInfo) {
 	clusterInfo := &clusterInfo{
 		endpointRecordsByHost: make(map[string][]DNSRecord),
 	}
 
 	serviceInfo.clusters[clusterID] = clusterInfo
 
-	mcsPorts := mcsServicePortsFrom(endpointSlice.Ports)
+	for _, endpointSlice := range endpointSlices {
+		mcsPorts := mcsServicePortsFrom(endpointSlice.Ports)
+		publishNotReadyAddresses := endpointSlice.Annotations[constants.PublishNotReadyAddresses] == strconv.FormatBool(true)
 
-	publishNotReadyAddresses := endpointSlice.Annotations[constants.PublishNotReadyAddresses] == strconv.FormatBool(true)
+		for i := range endpointSlice.Endpoints {
+			endpoint := &endpointSlice.Endpoints[i]
 
-	for i := range endpointSlice.Endpoints {
-		endpoint := &endpointSlice.Endpoints[i]
-
-		// Skip if not ready and the user does not want to publish not-ready addresses. Note: we're treating nil as ready
-		// to be on the safe side as the EndpointConditions doc states "In most cases consumers should interpret this
-		// unknown state (ie nil) as ready".
-		if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready && !publishNotReadyAddresses {
-			continue
-		}
-
-		var (
-			records  []DNSRecord
-			hostname string
-		)
-
-		switch {
-		case endpoint.Hostname != nil && *endpoint.Hostname != "":
-			hostname = *endpoint.Hostname
-		case endpoint.TargetRef != nil && strings.ToLower((*endpoint.TargetRef).Kind) == "pod":
-			hostname = (*endpoint.TargetRef).Name
-		}
-
-		for _, address := range endpoint.Addresses {
-
-			record := DNSRecord{
-				IP:          address,
-				Ports:       mcsPorts,
-				ClusterName: clusterID,
+			// Skip if not ready and the user does not want to publish not-ready addresses. Note: we're treating nil as ready
+			// to be on the safe side as the EndpointConditions doc states "In most cases consumers should interpret this
+			// unknown state (ie nil) as ready".
+			if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready && !publishNotReadyAddresses {
+				continue
 			}
 
-			record.HostName = hostname
+			var (
+				records  []DNSRecord
+				hostname string
+			)
 
-			records = append(records, record)
+			switch {
+			case endpoint.Hostname != nil && *endpoint.Hostname != "":
+				hostname = *endpoint.Hostname
+			case endpoint.TargetRef != nil && strings.ToLower((*endpoint.TargetRef).Kind) == "pod":
+				hostname = (*endpoint.TargetRef).Name
+			}
+
+			for _, address := range endpoint.Addresses {
+
+				record := DNSRecord{
+					IP:          address,
+					Ports:       mcsPorts,
+					ClusterName: clusterID,
+				}
+
+				record.HostName = hostname
+
+				records = append(records, record)
+			}
+
+			if hostname != "" {
+				clusterInfo.endpointRecordsByHost[hostname] = records
+			}
+
+			clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, records...)
 		}
-
-		if hostname != "" {
-			clusterInfo.endpointRecordsByHost[hostname] = records
-		}
-
-		clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, records...)
 	}
 
 	if len(clusterInfo.endpointRecords) <= maxRecordsToLog {
@@ -192,52 +193,45 @@ func (i *Interface) putHeadlessEndpointSlice(key, clusterID string, endpointSlic
 	}
 }
 
-func (i *Interface) replaceWithLocalEndpointSlices(forEps *discovery.EndpointSlice) error {
+func (i *Interface) getLocalEndpointSlices(forEPS *discovery.EndpointSlice) ([]*discovery.EndpointSlice, error) {
 	epsGVR := schema.GroupVersionResource{
 		Group:    discovery.SchemeGroupVersion.Group,
 		Version:  discovery.SchemeGroupVersion.Version,
 		Resource: "endpointslices",
 	}
 
-	epSlices, err := i.client.Resource(epsGVR).Namespace(forEps.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
+	list, err := i.client.Resource(epsGVR).Namespace(forEPS.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
 		metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{
-				constants.KubernetesServiceName: forEps.Labels[mcsv1a1.LabelServiceName],
+				constants.KubernetesServiceName: forEPS.Labels[mcsv1a1.LabelServiceName],
 			}).String(),
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(epSlices.Items) == 0 {
-		return fmt.Errorf("local EndpointSlice not found for %s/%s", forEps.Labels[constants.LabelSourceNamespace],
-			forEps.Labels[mcsv1a1.LabelServiceName])
+	if len(list.Items) == 0 {
+		return nil, fmt.Errorf("local EndpointSlice not found for %s/%s", forEPS.Labels[constants.LabelSourceNamespace],
+			forEPS.Labels[mcsv1a1.LabelServiceName])
 	}
 
-	forEps.Endpoints = nil
-	forEps.Ports = nil
-
-	for i := range epSlices.Items {
+	epSlices := make([]*discovery.EndpointSlice, len(list.Items))
+	for i := range list.Items {
 		epSlice := &discovery.EndpointSlice{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(epSlices.Items[i].Object, epSlice)
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, epSlice)
+		utilruntime.Must(err)
 
-		forEps.Endpoints = append(forEps.Endpoints, epSlice.Endpoints...)
-		forEps.Ports = slices.Union(forEps.Ports, epSlice.Ports, func(p discovery.EndpointPort) string {
-			return fmt.Sprintf("n:%spr:%sp:%d", pointer.StringDeref(p.Name, ""),
-				pointer.StringDeref((*string)(p.Protocol), ""), pointer.Int32Deref(p.Port, 0))
-		})
+		epSlice.Labels = forEPS.Labels
+		epSlice.Annotations = forEPS.Annotations
+		epSlices[i] = epSlice
 	}
 
-	return nil
+	return epSlices, nil
 }
 
 func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) {
 	key, clusterID, ok := getKeyInfoFrom(endpointSlice)
 	if !ok {
-		return
-	}
-
-	if ignoreEndpointSlice(endpointSlice) {
 		return
 	}
 
@@ -295,7 +289,6 @@ func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1a1.ServicePort {
 	return mcsPorts
 }
 
-func ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
-	isOnBroker := eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
-	return isOnBroker
+func isHeadless(endpointSlice *discovery.EndpointSlice) bool {
+	return endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true)
 }
