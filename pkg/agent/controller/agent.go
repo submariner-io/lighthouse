@@ -303,10 +303,10 @@ func FindServiceExportStatusCondition(conditions []mcsv1a1.ServiceExportConditio
 	return nil
 }
 
-func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	svc := obj.(*corev1.Service)
 
-	obj, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
+	_, found, err := a.serviceExportSyncer.GetResource(svc.Name, svc.Namespace)
 	if err != nil {
 		// some other error. Log and requeue
 		logger.Errorf(err, "Error retrieving ServiceExport for Service (%s/%s)", svc.Namespace, svc.Name)
@@ -318,16 +318,17 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, numRequeue
 		return nil, false
 	}
 
+	logger.V(log.DEBUG).Infof("Exported Service %s/%s %sd", svc.Namespace, svc.Name, op)
+
 	if op == syncer.Create || op == syncer.Update {
-		return a.serviceExportToServiceImport(obj, numRequeues, op)
+		a.serviceExportSyncer.RequeueResource(svc.Name, svc.Namespace)
+		return nil, false
 	}
 
-	svcExport := obj.(*mcsv1a1.ServiceExport)
-
-	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
+	serviceImport := a.newServiceImport(svc.Name, svc.Namespace)
 
 	// Update the status and requeue
-	a.serviceExportClient.updateStatusConditions(svcExport.Name, svcExport.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
+	a.serviceExportClient.updateStatusConditions(svc.Name, svc.Namespace, newServiceExportCondition(mcsv1a1.ServiceExportValid,
 		corev1.ConditionFalse, serviceUnavailable, "Service to be exported doesn't exist"))
 
 	return serviceImport, false

@@ -97,11 +97,13 @@ func testClusterIPServiceInOneCluster() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 			t.cluster1.localDynClient.Fake.ClearActions()
 
+			By("Deleting the service")
 			t.cluster1.deleteService()
 			t.cluster1.awaitServiceUnavailableStatus()
 			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "NoServiceImport"))
 			t.awaitServiceUnexported(&t.cluster1)
 
+			By("Re-creating the service")
 			t.cluster1.createService()
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
