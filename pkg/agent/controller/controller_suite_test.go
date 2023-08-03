@@ -327,8 +327,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 
 	c.localServiceImportReactor = fake.NewFailingReactorForResource(&c.localDynClient.Fake, "serviceimports")
 
-	fake.AddDeleteCollectionReactor(&c.localDynClient.Fake,
-		discovery.SchemeGroupVersion.WithKind("EndpointSlice"))
+	fake.AddDeleteCollectionReactor(&c.localDynClient.Fake)
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace)
