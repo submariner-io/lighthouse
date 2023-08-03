@@ -27,6 +27,7 @@ const (
 	LabelValueManagedBy      = "lighthouse-agent.submariner.io"
 	MCSLabelSourceCluster    = "multicluster.kubernetes.io/source-cluster"
 	LabelIsHeadless          = "lighthouse.submariner.io/is-headless"
+	LabelSourceName          = "lighthouse.submariner.io/source-name"
 	PublishNotReadyAddresses = "lighthouse.submariner.io/publish-not-ready-addresses"
 	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"
 )

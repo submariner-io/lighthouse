@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -60,7 +60,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		publishNotReadyAddresses: serviceImport.Annotations[constants.PublishNotReadyAddresses],
 		stopCh:                   make(chan struct{}),
 		globalIngressIPCache:     globalIngressIPCache,
-		localClient:              localClient,
+		localClient:              localClient.Resource(endpointSliceGVR).Namespace(serviceNamespace),
 		ingressIPClient:          localClient.Resource(*globalIngressIPGVR),
 		federator:                federate.NewCreateOrUpdateFederator(localClient, restMapper, serviceNamespace, ""),
 	}
@@ -71,7 +71,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		Name:            "K8s EndpointSlice -> LH EndpointSlice",
 		SourceClient:    localClient,
 		SourceNamespace: serviceNamespace,
-		SourceLabelSelector: labels.Set(map[string]string{
+		SourceLabelSelector: k8slabels.Set(map[string]string{
 			discovery.LabelServiceName: serviceName,
 		}).String(),
 		RestMapper:   restMapper,
@@ -99,14 +99,8 @@ func (c *ServiceEndpointSliceController) stop() {
 }
 
 func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
-	resourceClient := c.localClient.Resource(schema.GroupVersionResource{
-		Group:    discovery.SchemeGroupVersion.Group,
-		Version:  discovery.SchemeGroupVersion.Version,
-		Resource: "endpointslices",
-	}).Namespace(c.serviceNamespace)
-
 	listOptions := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
+		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 			constants.LabelSourceNamespace:  c.serviceNamespace,
 			constants.MCSLabelSourceCluster: c.clusterID,
@@ -114,7 +108,7 @@ func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
 		}).String(),
 	}
 
-	list, err := resourceClient.List(context.Background(), listOptions)
+	list, err := c.localClient.List(context.Background(), listOptions)
 	if err != nil {
 		return false, errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
 			c.serviceNamespace, c.serviceName)
@@ -124,7 +118,7 @@ func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
 		return false, nil
 	}
 
-	err = resourceClient.DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions)
+	err = c.localClient.DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions)
 
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, errors.Wrapf(err, "error deleting the EndpointSlices associated with service %s/%s",
@@ -159,7 +153,29 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 		return nil, requeue
 	}
 
-	logger.V(logLevel).Infof("Returning EndpointSlice %s/%s: %s", serviceEPS.Namespace, returnEPS.Name,
+	if op == syncer.Delete {
+		list, err := c.localClient.List(context.Background(), metav1.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(returnEPS.Labels).String(),
+		})
+		if err != nil {
+			logger.Error(err, "Error listing EndpointSlice resources for delete")
+			return nil, true
+		}
+
+		if len(list.Items) == 0 {
+			logger.V(log.DEBUG).Infof("Existing EndpointSlice not found with labels: %#v", returnEPS.Labels)
+			return nil, false
+		}
+
+		returnEPS.Name = list.Items[0].GetName()
+	}
+
+	name := returnEPS.Name
+	if name == "" {
+		name = returnEPS.GenerateName
+	}
+
+	logger.V(logLevel).Infof("Returning EndpointSlice %s/%s: %s", serviceEPS.Namespace, name,
 		endpointSliceStringer{returnEPS})
 
 	return returnEPS, false
@@ -231,14 +247,9 @@ func (c *ServiceEndpointSliceController) headlessEndpointSliceFrom(serviceEPS *d
 }
 
 func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discovery.EndpointSlice) *discovery.EndpointSlice {
-	name := c.serviceName
-	if c.isHeadless() {
-		name = serviceEPS.Name
-	}
-
-	return &discovery.EndpointSlice{
+	eps := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s-%s", name, serviceEPS.Namespace, c.clusterID),
+			GenerateName: c.serviceName + "-",
 			Labels: map[string]string{
 				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace:  c.serviceNamespace,
@@ -253,6 +264,12 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 		},
 		AddressType: serviceEPS.AddressType,
 	}
+
+	if c.isHeadless() {
+		eps.Labels[constants.LabelSourceName] = serviceEPS.Name
+	}
+
+	return eps
 }
 
 func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(endpoint *discovery.Endpoint) []string {
@@ -315,8 +332,9 @@ type endpointSliceStringer struct {
 }
 
 func (s endpointSliceStringer) String() string {
+	labels, _ := json.MarshalIndent(&s.Labels, "", "  ")
 	ports, _ := json.MarshalIndent(&s.Ports, "", "  ")
 	endpoints, _ := json.MarshalIndent(&s.Endpoints, "", "  ")
 
-	return fmt.Sprintf("endpoints: %s\nports: %s", endpoints, ports)
+	return fmt.Sprintf("\nlabels: %s\naddressType: %s\nendpoints: %s\nports: %s", labels, s.AddressType, endpoints, ports)
 }
