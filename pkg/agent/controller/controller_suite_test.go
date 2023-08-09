@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -158,7 +158,7 @@ func newTestDiver() *testDriver {
 	}, &unstructured.UnstructuredList{})
 
 	brokerClient := dynamicfake.NewSimpleDynamicClient(syncerScheme)
-	fake.AddFilteringListReactor(&brokerClient.Fake)
+	fake.AddBasicReactors(&brokerClient.Fake)
 
 	t := &testDriver{
 		aggregatedServicePorts: []mcsv1a1.ServicePort{port1, port2},
@@ -322,13 +322,9 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
 	c.serviceIP = c.service.Spec.ClusterIP
 
 	c.localDynClient = dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
-	fake.AddFilteringListReactor(&c.localDynClient.Fake)
-	fake.AddFilteringWatchReactor(&c.localDynClient.Fake)
+	fake.AddBasicReactors(&c.localDynClient.Fake)
 
 	c.localServiceImportReactor = fake.NewFailingReactorForResource(&c.localDynClient.Fake, "serviceimports")
-
-	fake.AddDeleteCollectionReactor(&c.localDynClient.Fake,
-		discovery.SchemeGroupVersion.WithKind("EndpointSlice"))
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace)
@@ -604,6 +600,18 @@ func (c *cluster) ensureNoEndpointSlice() {
 }
 
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport) {
+	sortSlices := func(si *mcsv1a1.ServiceImport) {
+		sort.SliceStable(si.Spec.Ports, func(i, j int) bool {
+			return si.Spec.Ports[i].Port < si.Spec.Ports[j].Port
+		})
+
+		sort.SliceStable(si.Status.Clusters, func(i, j int) bool {
+			return si.Status.Clusters[i].Cluster < si.Status.Clusters[j].Cluster
+		})
+	}
+
+	sortSlices(expected)
+
 	var serviceImport *mcsv1a1.ServiceImport
 
 	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
@@ -615,6 +623,8 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 
 			serviceImport = &mcsv1a1.ServiceImport{}
 			Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+
+			sortSlices(serviceImport)
 
 			return reflect.DeepEqual(&expected.Spec, &serviceImport.Spec) && reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
 		})
@@ -654,6 +664,18 @@ func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clust
 }
 
 func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, expected *discovery.EndpointSlice) {
+	sortSlices := func(eps *discovery.EndpointSlice) {
+		sort.SliceStable(eps.Ports, func(i, j int) bool {
+			return *eps.Ports[i].Port < *eps.Ports[j].Port
+		})
+
+		sort.SliceStable(eps.Endpoints, func(i, j int) bool {
+			return eps.Endpoints[i].Addresses[0] < eps.Endpoints[j].Addresses[0]
+		})
+	}
+
+	sortSlices(expected)
+
 	var endpointSlice *discovery.EndpointSlice
 
 	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
@@ -662,16 +684,22 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 		//nolint:contextcheck // Ignore Function `findEndpointSlice` should pass the context parameter
 		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[constants.MCSLabelSourceCluster])
 
-		for _, eps := range slices {
-			if strings.HasPrefix(eps.Name, expected.Name) {
-				endpointSlice = eps
-				break
+		if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
+			for _, eps := range slices {
+				if eps.Labels[constants.LabelSourceName] == expected.Name {
+					endpointSlice = eps
+					break
+				}
 			}
+		} else if len(slices) == 1 {
+			endpointSlice = slices[0]
 		}
 
 		if endpointSlice == nil {
 			return false, nil
 		}
+
+		sortSlices(endpointSlice)
 
 		return reflect.DeepEqual(expected.Endpoints, endpointSlice.Endpoints) &&
 			reflect.DeepEqual(expected.Ports, endpointSlice.Ports), nil
@@ -786,7 +814,6 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 			expected = append(expected, *eps)
 		}
 	} else {
-		epsTemplate.Name = c.service.Name
 		epsTemplate.Endpoints = []discovery.Endpoint{
 			{
 				Addresses:  []string{c.serviceIP},
@@ -891,7 +918,9 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 
 	// Ensure the service's EndpointSlices are no longer being watched by creating a EndpointSlice and verifying the
 	// exported EndpointSlice isn't recreated.
-	_, err := endpointSliceClientFor(c.localDynClient, c.service.Namespace).Create(context.TODO(),
+	epsClient := endpointSliceClientFor(c.localDynClient, c.service.Namespace)
+
+	_, err := epsClient.Create(context.Background(),
 		resource.MustToUnstructured(&discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "dummy",
@@ -901,6 +930,7 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 	Expect(err).To(Succeed())
 
 	c.ensureNoEndpointSlice()
+	Expect(epsClient.Delete(context.Background(), "dummy", metav1.DeleteOptions{})).To(Succeed())
 }
 
 func newServiceExportValidCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {

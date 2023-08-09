@@ -167,7 +167,6 @@ func testHeadlessService() {
 				annotations = map[string]string{
 					constants.GlobalnetEnabled:         strconv.FormatBool(true),
 					constants.PublishNotReadyAddresses: strconv.FormatBool(true),
-					constants.LabelIsHeadless:          strconv.FormatBool(true),
 				}
 
 				// If the local cluster EndpointSlice is created before the local K8s EndpointSlice, PutEndpointSlices should
@@ -181,7 +180,7 @@ func testHeadlessService() {
 						Name:      service1 + "local-1",
 						Namespace: namespace1,
 						Labels: map[string]string{
-							constants.KubernetesServiceName: service1,
+							discovery.LabelServiceName: service1,
 						},
 					},
 					Ports: []discovery.EndpointPort{{

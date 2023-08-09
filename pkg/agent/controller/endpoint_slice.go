@@ -113,23 +113,15 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 		return nil, false
 	}
 
+	logger.V(log.DEBUG).Infof("Local EndpointSlice \"%s/%s\" for service %q %sd",
+		endpointSlice.Namespace, endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelServiceName], op)
+
 	return obj, false
 }
 
 func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
-	// The original name sans namespace prior to 0.15.
-	origName := endpointSlice.Labels[mcsv1a1.LabelServiceName] + "-" + endpointSlice.Labels[constants.MCSLabelSourceCluster]
-	if endpointSlice.Name == origName {
-		return true
-	}
-
-	// Check for headless EndpointSlice derived from service Endpoints prior to 0.16.
-	if endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) &&
-		strings.HasPrefix(endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelServiceName]+"-"+endpointSlice.Namespace) {
-		return true
-	}
-
-	return false
+	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
+	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[constants.MCSLabelSourceCluster])
 }
 
 func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
@@ -145,7 +137,15 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
 	serviceNamespace := endpointSlice.Labels[constants.LabelSourceNamespace]
 
-	logger.V(log.DEBUG).Infof("Local EndpointSlice for service \"%s/%s\" %sd on broker", serviceNamespace, serviceName, op)
+	logger.V(log.DEBUG).Infof("Local EndpointSlice \"%s/%s\" for service %q %sd on broker",
+		endpointSlice.Namespace, endpointSlice.Name, serviceName, op)
+
+	if isLegacyEndpointSlice(endpointSlice) {
+		logger.Infof("EndpointSlice \"%s/%s\" is legacy - skipping it",
+			endpointSlice.Namespace, endpointSlice.Name)
+
+		return false
+	}
 
 	var err error
 

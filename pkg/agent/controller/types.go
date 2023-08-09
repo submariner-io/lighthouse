@@ -99,7 +99,7 @@ type ServiceEndpointSliceController struct {
 	publishNotReadyAddresses string
 	stopCh                   chan struct{}
 	stopOnce                 sync.Once
-	localClient              dynamic.Interface
+	localClient              dynamic.ResourceInterface
 	ingressIPClient          dynamic.NamespaceableResourceInterface
 	globalIngressIPCache     *globalIngressIPCache
 	epsSyncer                syncer.Interface

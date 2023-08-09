@@ -35,8 +35,6 @@ const (
 var dnsQueryCounter *prometheus.GaugeVec
 
 func init() {
-	log.Infof("Initializing dns query counter")
-
 	dnsQueryCounter = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: ServiceDiscoveryQueryCounterName,
