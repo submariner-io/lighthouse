@@ -55,14 +55,18 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 
 	gip.allocatedIP, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
 	if gip.allocatedIP == "" {
+		gip.unallocatedMsg = defaultMsgIPUnavailable
+		gip.unallocatedReason = defaultReasonIPUnavailable
+
 		conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
-		if len(conditions) > 0 {
-			latestCondition := conditions[len(conditions)-1].(map[string]interface{})
-			gip.unallocatedMsg = latestCondition["message"].(string)
-			gip.unallocatedReason = latestCondition["reason"].(string)
-		} else {
-			gip.unallocatedMsg = defaultMsgIPUnavailable
-			gip.unallocatedReason = defaultReasonIPUnavailable
+		for i := range conditions {
+			c := conditions[i].(map[string]interface{})
+			if c["type"].(string) == "Allocated" {
+				gip.unallocatedMsg = c["message"].(string)
+				gip.unallocatedReason = c["reason"].(string)
+
+				break
+			}
 		}
 	}
 
