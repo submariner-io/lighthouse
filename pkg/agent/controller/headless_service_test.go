@@ -137,7 +137,7 @@ var _ = Describe("Headless Service export", func() {
 			t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf("%s-%s2", serviceName, clusterID1),
-					Labels: map[string]string{discovery.LabelServiceName: serviceName},
+					Labels: t.cluster1.serviceEndpointSlices[0].Labels,
 				},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{

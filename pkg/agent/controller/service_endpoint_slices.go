@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -263,6 +264,12 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 			},
 		},
 		AddressType: serviceEPS.AddressType,
+	}
+
+	for k, v := range serviceEPS.Labels {
+		if !strings.Contains(k, "kubernetes.io/") {
+			eps.Labels[k] = v
+		}
 	}
 
 	if c.isHeadless() {
