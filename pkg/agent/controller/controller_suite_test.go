@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -173,6 +174,10 @@ func newTestDiver() *testDriver {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: serviceNamespace,
+					Labels: map[string]string{
+						"service-label1": "value1",
+						"service-label2": "value2",
+					},
 				},
 				Spec: corev1.ServiceSpec{
 					ClusterIP: "10.253.9.1",
@@ -189,8 +194,11 @@ func newTestDiver() *testDriver {
 			serviceEndpointSlices: []discovery.EndpointSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:   fmt.Sprintf("%s-%s1", serviceName, clusterID1),
-						Labels: map[string]string{discovery.LabelServiceName: serviceName},
+						Name: fmt.Sprintf("%s-%s1", serviceName, clusterID1),
+						Labels: map[string]string{
+							discovery.LabelServiceName:      serviceName,
+							"kubernetes.io/cluster-service": "true",
+						},
 					},
 					AddressType: discovery.AddressTypeIPv4,
 					Endpoints: []discovery.Endpoint{
@@ -319,6 +327,10 @@ func (t *testDriver) afterEach() {
 }
 
 func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
+	for k, v := range c.service.Labels {
+		c.serviceEndpointSlices[0].Labels[k] = v
+	}
+
 	c.serviceIP = c.service.Spec.ClusterIP
 
 	c.localDynClient = dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
@@ -713,9 +725,15 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 		Fail(fmt.Sprintf("EndpointSlice for %s/%s not found", expected.Namespace, expected.Name))
 	}
 
-	for k, v := range expected.Labels {
-		Expect(endpointSlice.Labels).To(HaveKeyWithValue(k, v))
+	actualLabels := map[string]string{}
+
+	for k, v := range endpointSlice.Labels {
+		if !strings.HasPrefix(k, "submariner-io/") {
+			actualLabels[k] = v
+		}
 	}
+
+	Expect(actualLabels).To(Equal(expected.Labels))
 
 	for k, v := range expected.Annotations {
 		Expect(endpointSlice.Annotations).To(HaveKeyWithValue(k, v))
@@ -800,6 +818,10 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		AddressType: discovery.AddressTypeIPv4,
 	}
 
+	for k, v := range c.service.Labels {
+		epsTemplate.Labels[k] = v
+	}
+
 	var expected []discovery.EndpointSlice
 
 	if isHeadless {
@@ -811,6 +833,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 			eps.Endpoints = c.headlessEndpointAddresses[i]
 			eps.Ports = c.serviceEndpointSlices[i].Ports
 			eps.Name = c.serviceEndpointSlices[i].Name
+			eps.Labels[constants.LabelSourceName] = c.serviceEndpointSlices[i].Name
 			expected = append(expected, *eps)
 		}
 	} else {

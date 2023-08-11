@@ -20,6 +20,7 @@ package controller_test
 
 import (
 	"fmt"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/resource"
@@ -244,6 +245,7 @@ func testClusterIPServiceInOneCluster() {
 						constants.MCSLabelSourceCluster: t.cluster1.clusterID,
 						mcsv1a1.LabelServiceName:        service.Name,
 						constants.LabelSourceNamespace:  service.Namespace,
+						constants.LabelIsHeadless:       strconv.FormatBool(false),
 					},
 				},
 				AddressType: discovery.AddressTypeIPv4,
@@ -438,7 +440,7 @@ func testClusterIPServiceWithMultipleEPS() {
 		t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf("%s-%s2", serviceName, clusterID1),
-				Labels: map[string]string{discovery.LabelServiceName: serviceName},
+				Labels: t.cluster1.serviceEndpointSlices[0].Labels,
 			},
 			AddressType: discovery.AddressTypeIPv4,
 			Endpoints: []discovery.Endpoint{
