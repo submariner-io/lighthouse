@@ -56,19 +56,6 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		serviceExportClient:     serviceExportClient,
 	}
 
-	syncCounter := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: syncerMetricNames.ServiceImportCounterName,
-			Help: "Count of imported services",
-		},
-		[]string{
-			syncer.DirectionLabel,
-			syncer.OperationLabel,
-			syncer.SyncerNameLabel,
-		},
-	)
-	prometheus.MustRegister(syncCounter)
-
 	var err error
 
 	controller.localSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -81,7 +68,10 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		ResourceType:    &mcsv1a1.ServiceImport{},
 		Transform:       controller.onLocalServiceImport,
 		Scheme:          syncerConfig.Scheme,
-		SyncCounter:     syncCounter,
+		SyncCounterOpts: &prometheus.GaugeOpts{
+			Name: syncerMetricNames.ServiceExportCounterName,
+			Help: "Count of exported services",
+		},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local ServiceImport syncer")
@@ -107,6 +97,10 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		OnSuccessfulSync: controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
 		Scheme:           syncerConfig.Scheme,
 		ResyncPeriod:     brokerResyncePeriod,
+		SyncCounterOpts: &prometheus.GaugeOpts{
+			Name: syncerMetricNames.ServiceImportCounterName,
+			Help: "Count of imported services",
+		},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceImport watcher")
