@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
         with:
           fetch-depth: 0
       - name: Run gitlint
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run golangci-lint
         run: make golangci-lint
 
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Check the licenses
         run: make licensecheck
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run markdownlint
         run: make markdownlint
 
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run packagedoc-lint
         run: make packagedoc-lint
 
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@24fd7c9060f3c96848dd1929fac8d796fb5ae4b4
         id: scan
@@ -122,6 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run yamllint
         run: make yamllint
