@@ -66,7 +66,7 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 				c.enqueueForConflictCheck(obj.(*discovery.EndpointSlice))
 				return false
 			},
-			BrokerResyncPeriod: brokerResyncePeriod,
+			BrokerResyncPeriod: BrokerResyncPeriod,
 		},
 	}
 
@@ -199,6 +199,11 @@ func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *di
 }
 
 func (c *EndpointSliceController) checkForConflicts(key, name, namespace string) (bool, error) {
+	localServiceExport := c.serviceExportClient.getLocalInstance(name, namespace)
+	if localServiceExport == nil {
+		return false, nil
+	}
+
 	epsList, err := c.syncer.GetLocalClient().Resource(endpointSliceGVR).Namespace(namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy: constants.LabelValueManagedBy,
@@ -236,7 +241,7 @@ func (c *EndpointSliceController) checkForConflicts(key, name, namespace string)
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the intersection of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
-	} else {
+	} else if FindServiceExportStatusCondition(localServiceExport.Status.Conditions, mcsv1a1.ServiceExportConflict) != nil {
 		c.serviceExportClient.removeStatusCondition(name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
 	}
 

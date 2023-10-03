@@ -104,7 +104,7 @@ func (c *ServiceExportClient) doUpdate(name, namespace string, update func(toUpd
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		obj, err := c.Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			logger.Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
+			logger.V(log.TRACE).Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
 		} else if err != nil {
 			return errors.Wrap(err, "error retrieving ServiceExport")
@@ -125,6 +125,15 @@ func (c *ServiceExportClient) doUpdate(name, namespace string, update func(toUpd
 	if err != nil {
 		logger.Errorf(err, "Error updating status for ServiceExport (%s/%s)", namespace, name)
 	}
+}
+
+func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1a1.ServiceExport {
+	obj, found, _ := c.localSyncer.GetResource(name, namespace)
+	if !found {
+		return nil
+	}
+
+	return obj.(*mcsv1a1.ServiceExport)
 }
 
 func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {
