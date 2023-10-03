@@ -39,7 +39,7 @@ const (
 	portConflictReason = "ConflictingPorts"
 )
 
-var brokerResyncePeriod = time.Minute * 2
+var BrokerResyncPeriod = time.Minute * 2
 
 type converter struct {
 	scheme *runtime.Scheme
@@ -118,6 +118,7 @@ type EndpointSliceController struct {
 type ServiceExportClient struct {
 	dynamic.NamespaceableResourceInterface
 	converter
+	localSyncer syncer.Interface
 }
 
 type globalIngressIPCache struct {
