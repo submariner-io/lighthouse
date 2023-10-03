@@ -66,6 +66,11 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, "AwaitingExport"),
 					newServiceExportReadyCondition(corev1.ConditionTrue, ""))
 				t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+
+				By(fmt.Sprintf("Ensure cluster %q does not try to update the status for a non-existent ServiceExport",
+					t.cluster2.clusterID))
+
+				t.cluster2.ensureNoServiceExportActions()
 			})
 		})
 
@@ -329,6 +334,10 @@ func testClusterIPServiceInTwoClusters() {
 		t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
 		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+
+		By("Ensure conflict checking does not try to unnecessarily update the ServiceExport status")
+
+		t.cluster1.ensureNoServiceExportActions()
 	})
 
 	Context("with differing ports", func() {
