@@ -96,7 +96,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Transform:        controller.onRemoteServiceImport,
 		OnSuccessfulSync: controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
 		Scheme:           syncerConfig.Scheme,
-		ResyncPeriod:     brokerResyncePeriod,
+		ResyncPeriod:     BrokerResyncPeriod,
 		SyncCounterOpts: &prometheus.GaugeOpts{
 			Name: syncerMetricNames.ServiceImportCounterName,
 			Help: "Count of imported services",

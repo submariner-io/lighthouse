@@ -72,16 +72,6 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	agentController.serviceExportClient = &ServiceExportClient{
-		NamespaceableResourceInterface: syncerConf.LocalClient.Resource(*gvr),
-		converter:                      converter{scheme: syncerConf.Scheme},
-	}
-
-	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient)
-	if err != nil {
-		return nil, err
-	}
-
 	agentController.localServiceImportFederator = federate.NewCreateOrUpdateFederator(syncerConf.LocalClient, syncerConf.RestMapper,
 		spec.Namespace, "")
 
@@ -114,6 +104,17 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Service syncer")
+	}
+
+	agentController.serviceExportClient = &ServiceExportClient{
+		NamespaceableResourceInterface: syncerConf.LocalClient.Resource(*gvr),
+		converter:                      converter{scheme: syncerConf.Scheme},
+		localSyncer:                    agentController.serviceExportSyncer,
+	}
+
+	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient)
+	if err != nil {
+		return nil, err
 	}
 
 	agentController.serviceImportController, err = newServiceImportController(spec, syncerMetricNames, syncerConf,

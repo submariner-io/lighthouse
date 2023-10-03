@@ -38,6 +38,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -108,6 +109,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	controller.BrokerResyncPeriod = time.Millisecond * 100
 }
 
 func TestController(t *testing.T) {
@@ -609,6 +612,14 @@ func (c *cluster) ensureNoEndpointSlice() {
 	Consistently(func() int {
 		return len(findEndpointSlices(c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID))
 	}, 300*time.Millisecond).Should(BeZero(), "Unexpected EndpointSlice")
+}
+
+func (c *cluster) ensureNoServiceExportActions() {
+	c.localDynClient.Fake.ClearActions()
+
+	Consistently(func() []string {
+		return testutil.GetOccurredActionVerbs(&c.localDynClient.Fake, "serviceexports", "get", "update")
+	}, 500*time.Millisecond).Should(BeEmpty())
 }
 
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport) {
