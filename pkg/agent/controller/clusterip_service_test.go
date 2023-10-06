@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -281,7 +282,8 @@ func testClusterIPServiceInOneCluster() {
 				Labels: map[string]string{discovery.LabelManagedBy: "other"},
 			}})
 
-		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient, test.RemoteNamespace)), "other-eps")
+		testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient,
+			test.RemoteNamespace)), "other-eps")
 	})
 
 	When("an existing ServiceExport has the legacy Synced status condition", func() {

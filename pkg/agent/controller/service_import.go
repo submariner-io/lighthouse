@@ -306,7 +306,8 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	// is determined from the constituent clusters' EndpointSlices, thus each cluster must have a consistent view of all
 	// the EndpointSlices in order for the aggregated port information to be eventually consistent.
 
-	result, err := util.CreateOrUpdate(context.Background(), resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
+	result, err := util.CreateOrUpdate[runtime.Object](context.Background(),
+		resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
 		c.converter.toUnstructured(aggregate),
 		func(obj runtime.Object) (runtime.Object, error) {
 			existing := c.converter.toServiceImport(obj)
