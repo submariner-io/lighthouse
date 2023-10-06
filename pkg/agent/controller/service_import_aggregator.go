@@ -121,8 +121,8 @@ func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mc
 		},
 	}
 
-	//nolint:wrapcheck // No need to wrap the return error.
-	return util.Update(context.Background(), resource.ForDynamic(a.brokerServiceImportClient()), a.converter.toUnstructured(aggregate),
+	return util.Update[runtime.Object](context.Background(), resource.ForDynamic(a.brokerServiceImportClient()),
+		a.converter.toUnstructured(aggregate),
 		func(obj runtime.Object) (runtime.Object, error) {
 			existing := a.converter.toServiceImport(obj)
 
