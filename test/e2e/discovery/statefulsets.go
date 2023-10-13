@@ -30,7 +30,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 )
 
-var _ = Describe("[discovery] Test Stateful Sets Discovery Across Clusters", func() {
+var _ = Describe("Test Stateful Sets Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a podname from stateful set in a remote cluster", func() {

@@ -35,7 +35,7 @@ const (
 	opAre        = "are"
 )
 
-var _ = Describe("[discovery] Test Headless Service Discovery Across Clusters", func() {
+var _ = Describe("Test Headless Service Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a headless service in a remote cluster", func() {
