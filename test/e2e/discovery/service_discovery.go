@@ -34,12 +34,13 @@ import (
 )
 
 const (
-	not = " not"
+	not       = " not"
+	TestLabel = "service-discovery"
 )
 
 var checkedDomains = lhframework.CheckedDomains
 
-var _ = Describe("[discovery] Test Service Discovery Across Clusters", func() {
+var _ = Describe("Test Service Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
