@@ -110,6 +110,8 @@ func main() {
 	exitOnError(err, "Error processing env config for agent spec")
 	logger.Infof("AgentSpec: %#v", agentSpec)
 
+	util.AddCertificateErrorHandler(agentSpec.HaltOnCertError)
+
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
 	exitOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
 
