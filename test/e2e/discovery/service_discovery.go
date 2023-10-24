@@ -34,7 +34,6 @@ import (
 )
 
 const (
-	not       = " not"
 	TestLabel = "service-discovery"
 )
 
@@ -557,7 +556,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 		checkedDomains, "", false)
 }
 
-//nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
+//nolint:unparam // Keep srcCluster as a parameter for consistency and possible future extensions
 func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	domains []string, clusterName string, withPort, shouldContain bool,
 ) {
@@ -566,11 +565,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 		for _, port := range ports {
 			cmd := []string{"dig", "+short", "SRV"}
 
-			clusterDNSName := service.Name + "." + f.Namespace + ".svc." + domains[i]
-
-			if clusterName != "" {
-				clusterDNSName = clusterName + "." + clusterDNSName
-			}
+			clusterDNSName := lhframework.BuildServiceDNSName(clusterName, service.Name, f.Namespace, domains[i])
 
 			portName := clusterDNSName
 
@@ -582,7 +577,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 
 			op := "is"
 			if !shouldContain {
-				op += not
+				op += " not"
 			}
 
 			By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
@@ -632,7 +627,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 	cmd := []string{"dig", "+short"}
 
 	for i := range domains {
-		cmd = append(cmd, serviceName+"."+f.Namespace+".svc."+domains[i])
+		cmd = append(cmd, lhframework.BuildServiceDNSName("", serviceName, f.Namespace, domains[i]))
 	}
 
 	serviceIPMap := make(map[string]int)

@@ -30,11 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	httpPortName = "http"
-	opAre        = "are"
-)
-
 var _ = Describe("Test Headless Service Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
@@ -331,10 +326,10 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 		for j := range ports {
 			port := &ports[j]
 			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
-			op := opAre
+			op := "are"
 
 			if !shouldContain {
-				op += not
+				op += " not"
 			}
 
 			By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
@@ -384,7 +379,7 @@ func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *c
 ) (cmd []string, domainName string) {
 	cmd = []string{"dig", "+short", "SRV"}
 
-	domainName = service.Name + "." + f.Namespace + ".svc." + domain
+	domainName = lhframework.BuildServiceDNSName("", service.Name, f.Namespace, domain)
 	clusterDNSName := domainName
 
 	if withcluster {
