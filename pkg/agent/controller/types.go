@@ -60,9 +60,11 @@ type Controller struct {
 type AgentSpecification struct {
 	ClusterID        string
 	Namespace        string
+	Verbosity        int
 	GlobalnetEnabled bool `split_words:"true"`
 	Uninstall        bool
 	HaltOnCertError  bool `split_words:"true"`
+	Debug            bool
 }
 
 type ServiceImportAggregator struct {

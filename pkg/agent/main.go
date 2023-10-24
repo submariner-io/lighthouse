@@ -69,16 +69,18 @@ func exitOnError(err error, reason string) {
 }
 
 func main() {
-	// Handle environment variables:
-	// SUBMARINER_VERBOSITY determines the verbosity level (1 by default)
-	// SUBMARINER_DEBUG, if set to true, sets the verbosity level to 3
-	if debug := os.Getenv("SUBMARINER_DEBUG"); debug == "true" {
-		os.Args = append(os.Args, fmt.Sprintf("-v=%d", log.LIBDEBUG))
-	} else if verbosity := os.Getenv("SUBMARINER_VERBOSITY"); verbosity != "" {
-		os.Args = append(os.Args, fmt.Sprintf("-v=%s", verbosity))
-	} else {
-		os.Args = append(os.Args, fmt.Sprintf("-v=%d", log.DEBUG))
+	agentSpec := controller.AgentSpecification{
+		Verbosity: log.DEBUG,
 	}
+	err := envconfig.Process("submariner", &agentSpec)
+	exitOnError(err, "Error processing env config for agent spec")
+
+	if agentSpec.Debug {
+		agentSpec.Verbosity = log.LIBDEBUG
+	}
+
+	// Set up verbosity based on environment variables
+	os.Args = append(os.Args, fmt.Sprintf("-v=%d", agentSpec.Verbosity))
 
 	kzerolog.AddFlags(nil)
 	flag.Parse()
@@ -104,10 +106,6 @@ func main() {
 	klogFlags.Parse(os.Args[1:])
 
 	logger.Infof("Arguments: %v", os.Args)
-
-	agentSpec := controller.AgentSpecification{}
-	err := envconfig.Process("submariner", &agentSpec)
-	exitOnError(err, "Error processing env config for agent spec")
 	logger.Infof("AgentSpec: %#v", agentSpec)
 
 	util.AddCertificateErrorHandler(agentSpec.HaltOnCertError)
