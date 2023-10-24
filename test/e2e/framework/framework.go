@@ -629,18 +629,23 @@ func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.C
 	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
 }
 
+func BuildServiceDNSName(clusterName, serviceName, namespace, tld string) string {
+	name := ""
+
+	if clusterName != "" {
+		name = clusterName + "."
+	}
+
+	return name + serviceName + "." + namespace + ".svc." + tld
+}
+
 func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	domains []string, clusterName, serviceIP string, shouldContain bool,
 ) {
 	cmd := []string{"dig", "+short"}
 
-	var clusterDNSName string
-	if clusterName != "" {
-		clusterDNSName = clusterName + "."
-	}
-
 	for i := range domains {
-		cmd = append(cmd, clusterDNSName+service.Name+"."+f.Namespace+".svc."+domains[i])
+		cmd = append(cmd, BuildServiceDNSName(clusterName, service.Name, f.Namespace, domains[i]))
 	}
 
 	op := "is"

@@ -30,6 +30,8 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 )
 
+const httpPortName = "http"
+
 var _ = Describe("Test Stateful Sets Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
