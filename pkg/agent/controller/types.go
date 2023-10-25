@@ -62,6 +62,7 @@ type AgentSpecification struct {
 	Namespace        string
 	GlobalnetEnabled bool `split_words:"true"`
 	Uninstall        bool
+	HaltOnCertError  bool `split_words:"true"`
 }
 
 type ServiceImportAggregator struct {

@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.27.10
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/submariner-io/admiral v0.16.0-m4.0.20231010063642-6d040ab176ec
+	github.com/submariner-io/admiral v0.16.0-m4.0.20231024075740-7ca36d2067a5
 	github.com/submariner-io/shipyard v0.16.0-m4
 	github.com/uw-labs/lichen v0.1.7
 	k8s.io/api v0.28.1
@@ -78,7 +78,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
