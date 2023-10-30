@@ -65,7 +65,7 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 			BrokerResourceType:       &discovery.EndpointSlice{},
 			TransformBrokerToLocal:   c.onRemoteEndpointSlice,
 			OnSuccessfulSyncFromBroker: func(obj runtime.Object, op syncer.Operation) bool {
-				c.enqueueForConflictCheck(obj.(*discovery.EndpointSlice), op)
+				c.enqueueForConflictCheck(context.TODO(), obj.(*discovery.EndpointSlice), op)
 				return false
 			},
 			BrokerResyncPeriod: BrokerResyncPeriod,
@@ -102,12 +102,13 @@ func (c *EndpointSliceController) start(stopCh <-chan struct{}) error {
 
 func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
+	ctx := context.TODO()
 
 	if op != syncer.Delete && isLegacyEndpointSlice(endpointSlice) {
 		logger.Infof("Found legacy EndpointSlice %s/%s - deleting it",
 			endpointSlice.Namespace, endpointSlice.Name)
 
-		err := c.syncer.GetLocalFederator().Delete(endpointSlice)
+		err := c.syncer.GetLocalFederator().Delete(ctx, endpointSlice)
 		if err != nil {
 			logger.Errorf(err, "Error deleting legacy EndpointSlice %s/%s", endpointSlice.Namespace, endpointSlice.Name)
 		}
@@ -135,6 +136,7 @@ func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ in
 
 func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object, op syncer.Operation) bool {
 	endpointSlice := obj.(*discovery.EndpointSlice)
+	ctx := context.TODO()
 
 	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
 	serviceNamespace := endpointSlice.Labels[constants.LabelSourceNamespace]
@@ -153,18 +155,20 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 
 	if op == syncer.Delete {
 		if c.hasNoRemainingEndpointSlices(endpointSlice) {
-			err = c.serviceImportAggregator.updateOnDelete(serviceName, serviceNamespace)
+			err = c.serviceImportAggregator.updateOnDelete(ctx, serviceName, serviceNamespace)
 		}
 	} else {
-		err = c.serviceImportAggregator.updateOnCreateOrUpdate(serviceName, serviceNamespace)
+		err = c.serviceImportAggregator.updateOnCreateOrUpdate(ctx, serviceName, serviceNamespace)
 		if err != nil {
-			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportReady,
-				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
+			c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
+				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, exportFailedReason,
+					fmt.Sprintf("Unable to export: %v", err)))
 		} else {
-			c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, newServiceExportCondition(constants.ServiceExportReady,
-				corev1.ConditionTrue, "", "Service was successfully exported to the broker"))
+			c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
+				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionTrue, "",
+					"Service was successfully exported to the broker"))
 
-			c.enqueueForConflictCheck(endpointSlice, op)
+			c.enqueueForConflictCheck(ctx, endpointSlice, op)
 		}
 	}
 
@@ -201,6 +205,8 @@ func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *di
 }
 
 func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (bool, error) {
+	ctx := context.TODO()
+
 	localServiceExport := c.serviceExportClient.getLocalInstance(name, namespace)
 	if localServiceExport == nil {
 		return false, nil
@@ -230,26 +236,26 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 	}
 
 	if conflict {
-		c.serviceExportClient.updateStatusConditions(name, namespace, newServiceExportCondition(
+		c.serviceExportClient.updateStatusConditions(ctx, name, namespace, newServiceExportCondition(
 			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, portConflictReason,
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the intersection of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
 	} else if FindServiceExportStatusCondition(localServiceExport.Status.Conditions, mcsv1a1.ServiceExportConflict) != nil {
-		c.serviceExportClient.removeStatusCondition(name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
+		c.serviceExportClient.removeStatusCondition(ctx, name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
 	}
 
 	return false, nil
 }
 
-func (c *EndpointSliceController) enqueueForConflictCheck(eps *discovery.EndpointSlice, op syncer.Operation) {
+func (c *EndpointSliceController) enqueueForConflictCheck(ctx context.Context, eps *discovery.EndpointSlice, op syncer.Operation) {
 	if eps.Labels[constants.LabelIsHeadless] != "false" {
 		return
 	}
 
 	// Since the conflict checking works off of the local cache for efficiency, wait a little bit here for the local cache to be updated
 	// with the latest state of the EndpointSlice.
-	_ = wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 100*time.Millisecond, true,
+	_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 100*time.Millisecond, true,
 		func(_ context.Context) (bool, error) {
 			_, found, _ := c.syncer.GetLocalResource(eps.Name, eps.Namespace, eps)
 			return (op == syncer.Delete && !found) || (op != syncer.Delete && found), nil

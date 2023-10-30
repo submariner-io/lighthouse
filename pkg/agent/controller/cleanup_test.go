@@ -228,7 +228,7 @@ var _ = Describe("Cleanup", func() {
 	})
 
 	It("should correctly remove local and remote ServiceImports and EndpointSlices", func() {
-		Expect(t.cluster1.agentController.Cleanup()).To(Succeed())
+		Expect(t.cluster1.agentController.Cleanup(context.Background())).To(Succeed())
 
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1.Name)
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1.Name)

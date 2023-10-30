@@ -48,8 +48,8 @@ func newServiceImportAggregator(brokerClient dynamic.Interface, brokerNamespace,
 	}
 }
 
-func (a *ServiceImportAggregator) updateOnCreateOrUpdate(name, namespace string) error {
-	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) error {
+func (a *ServiceImportAggregator) updateOnCreateOrUpdate(ctx context.Context, name, namespace string) error {
+	return a.update(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
 		var added bool
 
 		existing.Status.Clusters, added = slices.AppendIfNotPresent(existing.Status.Clusters,
@@ -60,11 +60,11 @@ func (a *ServiceImportAggregator) updateOnCreateOrUpdate(name, namespace string)
 				a.clusterID, existing.Name, existing.Status.Clusters)
 		}
 
-		return a.setServicePorts(existing)
+		return a.setServicePorts(ctx, existing)
 	})
 }
 
-func (a *ServiceImportAggregator) setServicePorts(si *mcsv1a1.ServiceImport) error {
+func (a *ServiceImportAggregator) setServicePorts(ctx context.Context, si *mcsv1a1.ServiceImport) error {
 	// We don't set the port info for headless services.
 	if si.Spec.Type != mcsv1a1.ClusterSetIP {
 		return nil
@@ -73,7 +73,7 @@ func (a *ServiceImportAggregator) setServicePorts(si *mcsv1a1.ServiceImport) err
 	serviceName := si.Annotations[mcsv1a1.LabelServiceName]
 	serviceNamespace := si.Annotations[constants.LabelSourceNamespace]
 
-	list, err := a.brokerClient.Resource(endpointSliceGVR).Namespace(a.brokerNamespace).List(context.Background(), metav1.ListOptions{
+	list, err := a.brokerClient.Resource(endpointSliceGVR).Namespace(a.brokerNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
 			constants.LabelSourceNamespace: serviceNamespace,
@@ -97,8 +97,8 @@ func (a *ServiceImportAggregator) setServicePorts(si *mcsv1a1.ServiceImport) err
 	return nil
 }
 
-func (a *ServiceImportAggregator) updateOnDelete(name, namespace string) error {
-	return a.update(name, namespace, func(existing *mcsv1a1.ServiceImport) error {
+func (a *ServiceImportAggregator) updateOnDelete(ctx context.Context, name, namespace string) error {
+	return a.update(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
 		var removed bool
 
 		existing.Status.Clusters, removed = slices.Remove(existing.Status.Clusters, mcsv1a1.ClusterStatus{Cluster: a.clusterID},
@@ -110,11 +110,11 @@ func (a *ServiceImportAggregator) updateOnDelete(name, namespace string) error {
 		logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
 			a.clusterID, existing.Name, existing.Status.Clusters)
 
-		return a.setServicePorts(existing)
+		return a.setServicePorts(ctx, existing)
 	})
 }
 
-func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mcsv1a1.ServiceImport) error) error {
+func (a *ServiceImportAggregator) update(ctx context.Context, name, namespace string, mutate func(*mcsv1a1.ServiceImport) error) error {
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", name, namespace),
@@ -122,7 +122,7 @@ func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mc
 	}
 
 	//nolint:wrapcheck // No need to wrap the return error.
-	return util.Update(context.Background(), resource.ForDynamic(a.brokerServiceImportClient()), a.converter.toUnstructured(aggregate),
+	return util.Update(ctx, resource.ForDynamic(a.brokerServiceImportClient()), a.converter.toUnstructured(aggregate),
 		func(obj runtime.Object) (runtime.Object, error) {
 			existing := a.converter.toServiceImport(obj)
 
@@ -134,7 +134,7 @@ func (a *ServiceImportAggregator) update(name, namespace string, mutate func(*mc
 			if len(existing.Status.Clusters) == 0 {
 				logger.V(log.DEBUG).Infof("Deleting aggregated ServiceImport %q", existing.Name)
 
-				err := a.brokerServiceImportClient().Delete(context.Background(), existing.Name, metav1.DeleteOptions{
+				err := a.brokerServiceImportClient().Delete(ctx, existing.Name, metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{
 						ResourceVersion: ptr.To(existing.ResourceVersion),
 					},

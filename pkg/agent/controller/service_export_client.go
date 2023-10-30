@@ -32,8 +32,10 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (c *ServiceExportClient) removeStatusCondition(name, namespace string, condType mcsv1a1.ServiceExportConditionType, reason string) {
-	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
+func (c *ServiceExportClient) removeStatusCondition(ctx context.Context, name, namespace string,
+	condType mcsv1a1.ServiceExportConditionType, reason string,
+) {
+	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		condition := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
 		if condition != nil && reflect.DeepEqual(condition.Reason, &reason) {
 			logger.V(log.DEBUG).Infof("Removing status condition (Type: %q, Reason: %q) from ServiceExport (%s/%s)",
@@ -51,11 +53,13 @@ func (c *ServiceExportClient) removeStatusCondition(name, namespace string, cond
 	})
 }
 
-func (c *ServiceExportClient) updateStatusConditions(name, namespace string, conditions ...mcsv1a1.ServiceExportCondition) {
-	c.tryUpdateStatusConditions(name, namespace, true, conditions...)
+func (c *ServiceExportClient) updateStatusConditions(ctx context.Context, name, namespace string,
+	conditions ...mcsv1a1.ServiceExportCondition,
+) {
+	c.tryUpdateStatusConditions(ctx, name, namespace, true, conditions...)
 }
 
-func (c *ServiceExportClient) tryUpdateStatusConditions(name, namespace string, canReplace bool,
+func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, name, namespace string, canReplace bool,
 	conditions ...mcsv1a1.ServiceExportCondition,
 ) {
 	findStatusCondition := func(conditions []mcsv1a1.ServiceExportCondition, condType mcsv1a1.ServiceExportConditionType,
@@ -71,7 +75,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(name, namespace string, 
 		return cond
 	}
 
-	c.doUpdate(name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
+	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
@@ -100,9 +104,9 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(name, namespace string, 
 	})
 }
 
-func (c *ServiceExportClient) doUpdate(name, namespace string, update func(toUpdate *mcsv1a1.ServiceExport) bool) {
+func (c *ServiceExportClient) doUpdate(ctx context.Context, name, namespace string, update func(toUpdate *mcsv1a1.ServiceExport) bool) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		obj, err := c.Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		obj, err := c.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			logger.V(log.TRACE).Infof("ServiceExport (%s/%s) not found - unable to update status", namespace, name)
 			return nil
@@ -117,8 +121,7 @@ func (c *ServiceExportClient) doUpdate(name, namespace string, update func(toUpd
 			return nil
 		}
 
-		_, err = c.Namespace(toUpdate.Namespace).UpdateStatus(context.TODO(),
-			c.toUnstructured(toUpdate), metav1.UpdateOptions{})
+		_, err = c.Namespace(toUpdate.Namespace).UpdateStatus(ctx, c.toUnstructured(toUpdate), metav1.UpdateOptions{})
 
 		return errors.Wrap(err, "error from UpdateStatus")
 	})

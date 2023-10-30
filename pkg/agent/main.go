@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -141,7 +140,7 @@ func main() {
 	if agentSpec.Uninstall {
 		logger.Info("Uninstalling lighthouse")
 
-		err := lightHouseAgent.Cleanup()
+		err := lightHouseAgent.Cleanup(ctx)
 		exitOnError(err, "Error cleaning up the lighthouse agent controller")
 
 		return
@@ -156,7 +155,7 @@ func main() {
 
 	logger.Info("All controllers stopped or exited. Stopping main loop")
 
-	if err := httpServer.Shutdown(context.TODO()); err != nil {
+	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Error(err, "Error shutting down metrics HTTP server")
 	}
 }
