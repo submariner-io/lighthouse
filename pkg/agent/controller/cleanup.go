@@ -48,12 +48,12 @@ var (
 	}
 )
 
-func (a *Controller) Cleanup() error {
+func (a *Controller) Cleanup(ctx context.Context) error {
 	// Delete all ServiceImports from the local cluster skipping those in the broker namespace if the broker is on the
 	// local cluster.
 	siClient := a.serviceImportController.localClient.Resource(serviceImportGVR)
 
-	list, err := listResources(siClient, metav1.NamespaceAll,
+	list, err := listResources(ctx, siClient, metav1.NamespaceAll,
 		&metav1.ListOptions{
 			FieldSelector: fields.OneTermNotEqualSelector("metadata.namespace",
 				a.serviceImportController.serviceImportAggregator.brokerNamespace).String(),
@@ -65,13 +65,13 @@ func (a *Controller) Cleanup() error {
 	for i := range list {
 		_, ok := list[i].GetLabels()[mcsv1a1.LabelServiceName]
 		if ok {
-			err = a.serviceImportController.Delete(&list[i])
+			err = a.serviceImportController.Delete(ctx, &list[i])
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
 
-		err = siClient.Namespace(list[i].GetNamespace()).Delete(context.TODO(), list[i].GetName(), metav1.DeleteOptions{})
+		err = siClient.Namespace(list[i].GetNamespace()).Delete(ctx, list[i].GetName(), metav1.DeleteOptions{})
 
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err //nolint:wrapcheck // Let the caller wrap
@@ -80,7 +80,7 @@ func (a *Controller) Cleanup() error {
 
 	// Delete all EndpointSlices from the local cluster skipping those in the broker namespace if the broker is on the
 	// local cluster.
-	err = deleteResources(a.endpointSliceController.syncer.GetLocalClient().Resource(endpointSliceGVR), metav1.NamespaceAll,
+	err = deleteResources(ctx, a.endpointSliceController.syncer.GetLocalClient().Resource(endpointSliceGVR), metav1.NamespaceAll,
 		&metav1.ListOptions{
 			FieldSelector: fields.OneTermNotEqualSelector("metadata.namespace",
 				a.serviceImportController.serviceImportAggregator.brokerNamespace).String(),
@@ -91,7 +91,7 @@ func (a *Controller) Cleanup() error {
 	}
 
 	// Delete all local EndpointSlices from the broker.
-	err = deleteResources(a.endpointSliceController.syncer.GetBrokerClient().Resource(endpointSliceGVR),
+	err = deleteResources(ctx, a.endpointSliceController.syncer.GetBrokerClient().Resource(endpointSliceGVR),
 		a.endpointSliceController.syncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{constants.MCSLabelSourceCluster: a.clusterID}).String(),
@@ -100,14 +100,14 @@ func (a *Controller) Cleanup() error {
 	return errors.Wrap(err, "error deleting remote EndpointSlices")
 }
 
-func deleteResources(client dynamic.NamespaceableResourceInterface, ns string, options *metav1.ListOptions) error {
-	list, err := listResources(client, ns, options)
+func deleteResources(ctx context.Context, client dynamic.NamespaceableResourceInterface, ns string, options *metav1.ListOptions) error {
+	list, err := listResources(ctx, client, ns, options)
 	if err != nil {
 		return err
 	}
 
 	for i := range list {
-		err = client.Namespace(list[i].GetNamespace()).Delete(context.TODO(), list[i].GetName(), metav1.DeleteOptions{})
+		err = client.Namespace(list[i].GetNamespace()).Delete(ctx, list[i].GetName(), metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err //nolint:wrapcheck // Let the caller wrap
 		}
@@ -116,10 +116,10 @@ func deleteResources(client dynamic.NamespaceableResourceInterface, ns string, o
 	return nil
 }
 
-func listResources(client dynamic.NamespaceableResourceInterface, ns string,
+func listResources(ctx context.Context, client dynamic.NamespaceableResourceInterface, ns string,
 	options *metav1.ListOptions,
 ) ([]unstructured.Unstructured, error) {
-	list, err := client.Namespace(ns).List(context.TODO(), *options)
+	list, err := client.Namespace(ns).List(ctx, *options)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err //nolint:wrapcheck // Let the caller wrap
 	}
