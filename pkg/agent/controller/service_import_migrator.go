@@ -110,7 +110,7 @@ func (c *ServiceImportMigrator) onSuccessfulSyncFromBroker(obj runtime.Object, o
 		logger.Infof("All remote clusters have been upgraded for service \"%s/%s\" - removing local ServiceImport %q from the broker",
 			aggregatedServiceImport.Namespace, aggregatedServiceImport.Name, localServiceImportName)
 
-		err := c.brokerClient.Delete(context.Background(), localServiceImportName, metav1.DeleteOptions{})
+		err := c.brokerClient.Delete(context.TODO(), localServiceImportName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Error(err, "error deleting legacy ServiceImport from the broker")
 			return true
@@ -122,14 +122,14 @@ func (c *ServiceImportMigrator) onSuccessfulSyncFromBroker(obj runtime.Object, o
 	return false
 }
 
-func (c *ServiceImportMigrator) onLocalServiceImportDeleted(serviceImport *mcsv1a1.ServiceImport) error {
+func (c *ServiceImportMigrator) onLocalServiceImportDeleted(ctx context.Context, serviceImport *mcsv1a1.ServiceImport) error {
 	if serviceImport.Labels[LegacySourceClusterLabel] != c.clusterID {
 		return nil
 	}
 
 	logger.Infof("Legacy local ServiceImport %q deleted - removing from the broker", serviceImport.Name)
 
-	err := c.brokerClient.Delete(context.Background(), serviceImport.Name, metav1.DeleteOptions{})
+	err := c.brokerClient.Delete(ctx, serviceImport.Name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}

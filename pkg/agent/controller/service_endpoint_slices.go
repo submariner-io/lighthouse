@@ -99,7 +99,7 @@ func (c *ServiceEndpointSliceController) stop() {
 	})
 }
 
-func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
+func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) (bool, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy:        constants.LabelValueManagedBy,
@@ -109,7 +109,7 @@ func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
 		}).String(),
 	}
 
-	list, err := c.localClient.List(context.Background(), listOptions)
+	list, err := c.localClient.List(ctx, listOptions)
 	if err != nil {
 		return false, errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
 			c.serviceNamespace, c.serviceName)
@@ -119,7 +119,7 @@ func (c *ServiceEndpointSliceController) cleanup() (bool, error) {
 		return false, nil
 	}
 
-	err = c.localClient.DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions)
+	err = c.localClient.DeleteCollection(ctx, metav1.DeleteOptions{}, listOptions)
 
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, errors.Wrapf(err, "error deleting the EndpointSlices associated with service %s/%s",
@@ -155,7 +155,7 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 	}
 
 	if op == syncer.Delete {
-		list, err := c.localClient.List(context.Background(), metav1.ListOptions{
+		list, err := c.localClient.List(context.TODO(), metav1.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(returnEPS.Labels).String(),
 		})
 		if err != nil {
@@ -320,18 +320,18 @@ func (c *ServiceEndpointSliceController) isHeadless() bool {
 	return c.serviceImportSpec.Type == mcsv1a1.Headless
 }
 
-func (c *ServiceEndpointSliceController) Distribute(obj runtime.Object) error {
-	return c.federator.Distribute(obj) //nolint:wrapcheck // No need to wrap here
+func (c *ServiceEndpointSliceController) Distribute(ctx context.Context, obj runtime.Object) error {
+	return c.federator.Distribute(ctx, obj) //nolint:wrapcheck // No need to wrap here
 }
 
-func (c *ServiceEndpointSliceController) Delete(obj runtime.Object) error {
+func (c *ServiceEndpointSliceController) Delete(ctx context.Context, obj runtime.Object) error {
 	if c.isHeadless() {
-		return c.federator.Delete(obj) //nolint:wrapcheck // No need to wrap here
+		return c.federator.Delete(ctx, obj) //nolint:wrapcheck // No need to wrap here
 	}
 
 	// For a non-headless service, we never delete the single exported EPS - we update its endpoint condition based on
 	// the backend service EPS's as they are created/updated/deleted.
-	return c.Distribute(obj)
+	return c.Distribute(ctx, obj)
 }
 
 type endpointSliceStringer struct {
