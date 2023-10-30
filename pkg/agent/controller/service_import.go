@@ -232,12 +232,12 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 	return nil
 }
 
-func (c *ServiceImportController) stopEndpointsController(key string) (bool, error) {
+func (c *ServiceImportController) stopEndpointsController(ctx context.Context, key string) (bool, error) {
 	if obj, found := c.endpointControllers.Load(key); found {
 		endpointController := obj.(*ServiceEndpointSliceController)
 		endpointController.stop()
 
-		found, err := endpointController.cleanup()
+		found, err := endpointController.cleanup(ctx)
 		if err == nil {
 			c.endpointControllers.Delete(key)
 		}
@@ -251,6 +251,7 @@ func (c *ServiceImportController) stopEndpointsController(key string) (bool, err
 func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
+	ctx := context.TODO()
 
 	serviceName := serviceImportSourceName(serviceImport)
 
@@ -262,13 +263,13 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
 
 	if op == syncer.Delete {
-		c.serviceExportClient.updateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+		c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
 		return obj, false
 	} else if op == syncer.Create {
-		c.serviceExportClient.tryUpdateStatusConditions(serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+		c.serviceExportClient.tryUpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			false, newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
@@ -276,7 +277,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	return obj, false
 }
 
-func (c *ServiceImportController) Distribute(obj runtime.Object) error {
+func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Object) error {
 	localServiceImport := c.converter.toServiceImport(obj)
 	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
 
@@ -306,7 +307,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	// is determined from the constituent clusters' EndpointSlices, thus each cluster must have a consistent view of all
 	// the EndpointSlices in order for the aggregated port information to be eventually consistent.
 
-	result, err := util.CreateOrUpdate[runtime.Object](context.Background(),
+	result, err := util.CreateOrUpdate[runtime.Object](ctx,
 		resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
 		c.converter.toUnstructured(aggregate),
 		func(obj runtime.Object) (runtime.Object, error) {
@@ -319,11 +320,12 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 					fmt.Sprintf("The service type %q does not match the type (%q) of the existing service export",
 						localServiceImport.Spec.Type, existing.Spec.Type))
 
-				c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace, conflictCondition,
+				c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace, conflictCondition,
 					newServiceExportCondition(constants.ServiceExportReady,
 						corev1.ConditionFalse, exportFailedReason, "Unable to export due to an irresolvable conflict"))
 			} else {
-				c.serviceExportClient.removeStatusCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, typeConflictReason)
+				c.serviceExportClient.removeStatusCondition(ctx, serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
+					typeConflictReason)
 			}
 
 			return obj, nil
@@ -333,7 +335,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	}
 
 	if err != nil {
-		c.serviceExportClient.updateStatusConditions(serviceName, serviceNamespace,
+		c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
 			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 	}
@@ -345,7 +347,7 @@ func (c *ServiceImportController) Distribute(obj runtime.Object) error {
 	return err
 }
 
-func (c *ServiceImportController) Delete(obj runtime.Object) error {
+func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object) error {
 	localServiceImport := c.converter.toServiceImport(obj)
 	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
 
@@ -356,13 +358,13 @@ func (c *ServiceImportController) Delete(obj runtime.Object) error {
 	// was never started or if there are no local EndpointSlices, which can happen during reconciliation on startup or
 	// during clean up on uninstall, then we handle removal here.
 
-	found, err := c.stopEndpointsController(key)
+	found, err := c.stopEndpointsController(ctx, key)
 	if err != nil {
 		return err
 	}
 
 	if !found {
-		err = c.serviceImportAggregator.updateOnDelete(serviceImportSourceName(localServiceImport),
+		err = c.serviceImportAggregator.updateOnDelete(ctx, serviceImportSourceName(localServiceImport),
 			localServiceImport.Labels[constants.LabelSourceNamespace])
 	}
 
@@ -370,7 +372,7 @@ func (c *ServiceImportController) Delete(obj runtime.Object) error {
 		return err
 	}
 
-	return c.serviceImportMigrator.onLocalServiceImportDeleted(localServiceImport)
+	return c.serviceImportMigrator.onLocalServiceImportDeleted(ctx, localServiceImport)
 }
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
