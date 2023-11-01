@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/lighthouse/pkg/constants"
@@ -59,7 +60,11 @@ var _ = Describe("Reconciliation", func() {
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
-		t.awaitNonHeadlessServiceExported(&t.cluster1)
+		if t.cluster1.service.Spec.ClusterIP == corev1.ClusterIPNone {
+			t.awaitHeadlessServiceExported(&t.cluster1)
+		} else {
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		}
 
 		var err error
 
@@ -144,6 +149,7 @@ var _ = Describe("Reconciliation", func() {
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
 			t.cluster1.createService()
+			t.cluster1.createServiceEndpointSlices()
 			t.cluster1.start(t, *t.syncerConfig)
 
 			t.awaitServiceUnexported(&t.cluster1)
@@ -157,6 +163,7 @@ var _ = Describe("Reconciliation", func() {
 
 			restoreBrokerResources()
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
+			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
 			t.cluster1.createServiceExport()
 			t.cluster1.start(t, *t.syncerConfig)
 
@@ -229,6 +236,83 @@ var _ = Describe("Reconciliation", func() {
 
 			awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient, t.cluster1.service.Namespace,
 				t.cluster1.service.Name, t.cluster1.clusterID)
+		})
+	})
+
+	When("a local EndpointSlice is stale on startup", func() {
+		Context("because the service no longer exists", func() {
+			It("should delete it from the local datastore", func() {
+				t.afterEach()
+				t = newTestDiver()
+
+				By("Restarting controllers")
+
+				restoreBrokerResources()
+				test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
+				t.cluster1.start(t, *t.syncerConfig)
+
+				t.awaitServiceUnexported(&t.cluster1)
+			})
+		})
+
+		Context("because the K8s EndpointSlice no longer exists", func() {
+			BeforeEach(func() {
+				t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
+			})
+
+			It("should delete it from the local datastore", func() {
+				t.afterEach()
+				t = newTestDiver()
+
+				t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
+
+				By("Restarting controllers")
+
+				restoreBrokerResources()
+				test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
+				test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
+				test.CreateResource(t.cluster1.localServiceExportClient, serviceExport)
+				t.cluster1.createService()
+
+				// Create a remote EPS for the same service and ensure it's not deleted.
+				remoteEndpointSlice := localEndpointSlice.DeepCopy()
+				remoteEndpointSlice.Name = "remote-eps"
+				remoteEndpointSlice.Labels[constants.MCSLabelSourceCluster] = t.cluster2.clusterID
+				remoteEndpointSlice.Labels[federate.ClusterIDLabelKey] = t.cluster2.clusterID
+				test.CreateResource(t.cluster1.localEndpointSliceClient, remoteEndpointSlice)
+
+				remoteEndpointSlice.Namespace = test.RemoteNamespace
+				test.CreateResource(t.brokerEndpointSliceClient, remoteEndpointSlice)
+
+				// Create an EPS for a service in another namespace and ensure it's not deleted.
+				otherNS := "other-ns"
+				otherNSEndpointSlice := localEndpointSlice.DeepCopy()
+				otherNSEndpointSlice.Name = "other-ns-eps"
+				otherNSEndpointSlice.Namespace = otherNS
+				otherNSEndpointSlice.Labels[constants.LabelSourceNamespace] = otherNS
+				test.CreateResource(endpointSliceClientFor(t.cluster1.localDynClient, otherNS), otherNSEndpointSlice)
+
+				test.CreateResource(t.cluster1.dynamicServiceClientFor().Namespace(otherNS), &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      t.cluster1.service.Name,
+						Namespace: otherNS,
+					},
+				})
+
+				t.cluster1.start(t, *t.syncerConfig)
+
+				t.awaitNoEndpointSlice(&t.cluster1)
+
+				Consistently(func() bool {
+					test.AwaitResource(t.cluster1.localEndpointSliceClient, remoteEndpointSlice.Name)
+					return true
+				}).Should(BeTrue())
+
+				Consistently(func() bool {
+					test.AwaitResource(endpointSliceClientFor(t.cluster1.localDynClient, otherNS), otherNSEndpointSlice.Name)
+					return true
+				}).Should(BeTrue())
+			})
 		})
 	})
 })
