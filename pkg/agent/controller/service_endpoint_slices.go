@@ -45,6 +45,7 @@ import (
 
 func startEndpointSliceController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
 	serviceImport *mcsv1a1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
+	localLHEndpointSliceLister EndpointSliceListerFn,
 ) (*ServiceEndpointSliceController, error) {
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
 	serviceName := serviceImportSourceName(serviceImport)
@@ -87,6 +88,29 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 
 	if err := controller.epsSyncer.Start(controller.stopCh); err != nil {
 		return nil, errors.Wrap(err, "error starting Endpoints syncer")
+	}
+
+	if controller.isHeadless() {
+		controller.epsSyncer.Reconcile(func() []runtime.Object {
+			list := localLHEndpointSliceLister(k8slabels.SelectorFromSet(map[string]string{
+				constants.LabelSourceNamespace:  serviceNamespace,
+				mcsv1a1.LabelServiceName:        serviceName,
+				constants.MCSLabelSourceCluster: clusterID,
+			}))
+
+			retList := make([]runtime.Object, 0, len(list))
+			for _, o := range list {
+				eps := o.(*discovery.EndpointSlice)
+				retList = append(retList, &discovery.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      eps.Labels[constants.LabelSourceName],
+						Namespace: serviceNamespace,
+					},
+				})
+			}
+
+			return retList
+		})
 	}
 
 	return controller, nil

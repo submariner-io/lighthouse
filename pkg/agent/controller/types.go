@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	"k8s.io/apimachinery/pkg/api/meta"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -40,6 +41,8 @@ const (
 )
 
 var BrokerResyncPeriod = time.Minute * 2
+
+type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
 
 type converter struct {
 	scheme *runtime.Scheme
@@ -78,18 +81,19 @@ type ServiceImportAggregator struct {
 // from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
 // aggregated ServiceImports from the broker to the local service namespace. It also creates a ServiceEndpointSliceController.
 type ServiceImportController struct {
-	localClient             dynamic.Interface
-	restMapper              meta.RESTMapper
-	serviceImportAggregator *ServiceImportAggregator
-	serviceImportMigrator   *ServiceImportMigrator
-	serviceExportClient     *ServiceExportClient
-	localSyncer             syncer.Interface
-	remoteSyncer            syncer.Interface
-	endpointControllers     sync.Map
-	clusterID               string
-	localNamespace          string
-	converter               converter
-	globalIngressIPCache    *globalIngressIPCache
+	localClient                dynamic.Interface
+	restMapper                 meta.RESTMapper
+	serviceImportAggregator    *ServiceImportAggregator
+	serviceImportMigrator      *ServiceImportMigrator
+	serviceExportClient        *ServiceExportClient
+	localSyncer                syncer.Interface
+	remoteSyncer               syncer.Interface
+	endpointControllers        sync.Map
+	clusterID                  string
+	localNamespace             string
+	converter                  converter
+	globalIngressIPCache       *globalIngressIPCache
+	localLHEndpointSliceLister EndpointSliceListerFn
 }
 
 // Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
@@ -115,6 +119,7 @@ type EndpointSliceController struct {
 	syncer                  *broker.Syncer
 	serviceImportAggregator *ServiceImportAggregator
 	serviceExportClient     *ServiceExportClient
+	serviceSyncer           syncer.Interface
 	conflictCheckWorkQueue  workqueue.Interface
 }
 

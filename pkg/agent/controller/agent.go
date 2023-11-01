@@ -37,6 +37,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
@@ -113,14 +114,18 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 		localSyncer:                    agentController.serviceExportSyncer,
 	}
 
-	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient)
+	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient,
+		agentController.serviceSyncer)
 	if err != nil {
 		return nil, err
 	}
 
 	agentController.serviceImportController, err = newServiceImportController(spec, syncerMetricNames, syncerConf,
 		agentController.endpointSliceController.syncer.GetBrokerClient(),
-		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.serviceExportClient)
+		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.serviceExportClient,
+		func(selector k8slabels.Selector) []runtime.Object {
+			return agentController.endpointSliceController.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, selector)
+		})
 	if err != nil {
 		return nil, err
 	}

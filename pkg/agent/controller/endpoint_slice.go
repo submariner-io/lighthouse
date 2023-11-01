@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,11 +44,12 @@ import (
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
-	serviceExportClient *ServiceExportClient,
+	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
 		clusterID:              spec.ClusterID,
 		serviceExportClient:    serviceExportClient,
+		serviceSyncer:          serviceSyncer,
 		conflictCheckWorkQueue: workqueue.New("ConflictChecker"),
 	}
 
@@ -116,8 +118,31 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 		return nil, false
 	}
 
+	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
+
 	logger.V(log.DEBUG).Infof("Local EndpointSlice \"%s/%s\" for service %q %sd",
-		endpointSlice.Namespace, endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelServiceName], op)
+		endpointSlice.Namespace, endpointSlice.Name, serviceName, op)
+
+	// Check if the associated Service exists and, if not, delete the EndpointSlice. On restart, it's possible the Service could've been
+	// deleted.
+	if op == syncer.Create {
+		_, found, _ := c.serviceSyncer.GetResource(serviceName, endpointSlice.Namespace)
+		if !found {
+			logger.Infof("The service %q for EndpointSlice \"%s/%s\" does not exist - deleting it",
+				serviceName, endpointSlice.Namespace, endpointSlice.Name)
+
+			err := c.syncer.GetLocalFederator().Delete(ctx, endpointSlice)
+			if apierrors.IsNotFound(err) {
+				err = nil
+			}
+
+			if err != nil {
+				logger.Errorf(err, "Error deleting EndpointSlice %s/%s", endpointSlice.Namespace, endpointSlice.Name)
+			}
+
+			return nil, err != nil
+		}
+	}
 
 	return obj, false
 }
