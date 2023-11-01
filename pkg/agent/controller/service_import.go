@@ -45,15 +45,17 @@ import (
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newServiceImportController(spec *AgentSpecification, syncerMetricNames AgentConfig, syncerConfig broker.SyncerConfig,
 	brokerClient dynamic.Interface, brokerNamespace string, serviceExportClient *ServiceExportClient,
+	localLHEndpointSliceLister EndpointSliceListerFn,
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
-		localClient:             syncerConfig.LocalClient,
-		restMapper:              syncerConfig.RestMapper,
-		clusterID:               spec.ClusterID,
-		localNamespace:          spec.Namespace,
-		converter:               converter{scheme: syncerConfig.Scheme},
-		serviceImportAggregator: newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
-		serviceExportClient:     serviceExportClient,
+		localClient:                syncerConfig.LocalClient,
+		restMapper:                 syncerConfig.RestMapper,
+		clusterID:                  spec.ClusterID,
+		localNamespace:             spec.Namespace,
+		converter:                  converter{scheme: syncerConfig.Scheme},
+		serviceImportAggregator:    newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
+		serviceExportClient:        serviceExportClient,
+		localLHEndpointSliceLister: localLHEndpointSliceLister,
 	}
 
 	var err error
@@ -222,7 +224,7 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 	}
 
 	endpointController, err := startEndpointSliceController(c.localClient, c.restMapper, c.converter.scheme,
-		serviceImport, c.clusterID, c.globalIngressIPCache)
+		serviceImport, c.clusterID, c.globalIngressIPCache, c.localLHEndpointSliceLister)
 	if err != nil {
 		return errors.Wrapf(err, "failed to start endpoints controller for %q", key)
 	}
