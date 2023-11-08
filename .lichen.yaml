@@ -15,6 +15,7 @@ allow:
   - "PostgreSQL"
   - "X11"
   - "Zlib"
+  - "ImageMagick"
 
 override:
   - path: "github.com/flynn/go-shlex"
