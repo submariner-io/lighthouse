@@ -15,16 +15,11 @@ allow:
   - "PostgreSQL"
   - "X11"
   - "Zlib"
-  - "ImageMagick"
 
 override:
   - path: "github.com/flynn/go-shlex"
     licenses: ["Apache-2.0"]
   - path: "../"
     licenses: ["Apache-2.0"]
-
-# https://github.com/cncf/foundation/tree/master/license-exceptions
-exceptions:
-  licenseNotPermitted:
-    - path: "github.com/hashicorp/golang-lru"
-      licenses: ["MPL-2.0"]
+  - path: "sigs.k8s.io/yaml"
+    licenses: ["Apache-2.0", "MIT"]
