@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -309,10 +310,10 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	// is determined from the constituent clusters' EndpointSlices, thus each cluster must have a consistent view of all
 	// the EndpointSlices in order for the aggregated port information to be eventually consistent.
 
-	result, err := util.CreateOrUpdate[runtime.Object](ctx,
+	result, err := util.CreateOrUpdate(ctx,
 		resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
 		c.converter.toUnstructured(aggregate),
-		func(obj runtime.Object) (runtime.Object, error) {
+		func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 			existing := c.converter.toServiceImport(obj)
 
 			if localServiceImport.Spec.Type != existing.Spec.Type {
