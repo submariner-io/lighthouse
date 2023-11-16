@@ -31,6 +31,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -121,9 +122,10 @@ func (a *ServiceImportAggregator) update(ctx context.Context, name, namespace st
 		},
 	}
 
-	return util.Update[runtime.Object](ctx, resource.ForDynamic(a.brokerServiceImportClient()),
+	//nolint:wrapcheck // Let the caller wrap it
+	return util.Update(ctx, resource.ForDynamic(a.brokerServiceImportClient()),
 		a.converter.toUnstructured(aggregate),
-		func(obj runtime.Object) (runtime.Object, error) {
+		func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 			existing := a.converter.toServiceImport(obj)
 
 			err := mutate(existing)
