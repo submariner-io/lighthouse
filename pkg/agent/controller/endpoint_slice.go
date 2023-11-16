@@ -237,7 +237,10 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 		return false, nil
 	}
 
-	epsList := c.syncer.ListLocalResources(&discovery.EndpointSlice{})
+	epsList := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
+		constants.LabelSourceNamespace: namespace,
+		mcsv1a1.LabelServiceName:       name,
+	}))
 
 	var prevServicePorts []mcsv1a1.ServicePort
 	var intersectedServicePorts []mcsv1a1.ServicePort
