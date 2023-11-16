@@ -478,8 +478,9 @@ func (c *cluster) newGlobalIngressIP(name, ip string) *unstructured.Unstructured
 	return ingressIP
 }
 
-func (c *cluster) retrieveServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) *mcsv1a1.ServiceExportCondition {
-	obj, err := c.localServiceExportClient.Get(context.TODO(), c.serviceExport.Name, metav1.GetOptions{})
+func (c *cluster) retrieveServiceExportCondition(se *mcsv1a1.ServiceExport, condType mcsv1a1.ServiceExportConditionType,
+) *mcsv1a1.ServiceExportCondition {
+	obj, err := serviceExportClientFor(c.localDynClient, se.Namespace).Get(context.TODO(), se.Name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	return controller.FindServiceExportStatusCondition(toServiceExport(obj).Status.Conditions, condType)
@@ -571,16 +572,28 @@ func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExpo
 		resource.ToJSON(expected)))
 }
 
-func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) {
-	Consistently(func() interface{} {
-		return c.retrieveServiceExportCondition(condType)
-	}).Should(BeNil(), "Unexpected ServiceExport status condition")
+func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {
+	if len(serviceExports) == 0 {
+		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
+	}
+
+	for _, se := range serviceExports {
+		Consistently(func() interface{} {
+			return c.retrieveServiceExportCondition(se, condType)
+		}).Should(BeNil(), "Unexpected ServiceExport status condition")
+	}
 }
 
-func (c *cluster) awaitNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType) {
-	Eventually(func() interface{} {
-		return c.retrieveServiceExportCondition(condType)
-	}).Should(BeNil(), "Unexpected ServiceExport status condition")
+func (c *cluster) awaitNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {
+	if len(serviceExports) == 0 {
+		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
+	}
+
+	for _, se := range serviceExports {
+		Eventually(func() interface{} {
+			return c.retrieveServiceExportCondition(se, condType)
+		}).Should(BeNil(), "Unexpected ServiceExport status condition")
+	}
 }
 
 func (c *cluster) awaitServiceUnavailableStatus() {

@@ -271,6 +271,9 @@ func testClusterIPServiceInOneCluster() {
 
 			// Ensure the resources for the first Service weren't overwritten
 			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
+
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict, serviceExport)
 		})
 	})
 
