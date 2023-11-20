@@ -6,7 +6,7 @@ require (
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.11.1
 	github.com/go-logr/logr v1.3.0
-	github.com/miekg/dns v1.1.56
+	github.com/miekg/dns v1.1.57
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
 	github.com/pkg/errors v0.9.1
