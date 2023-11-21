@@ -59,8 +59,8 @@ export-nginx: deploy-latest
 	KUBECONFIG=output/kubeconfigs/kind-config-cluster1 ~/.local/bin/subctl export service nginx-upgrade -n default
 
 check-nginx:
-	KUBECONFIG=output/kubeconfigs/kind-config-cluster1 kubectl get serviceexports.multicluster.x-k8s.io -n default nginx-upgrade
-	KUBECONFIG=output/kubeconfigs/kind-config-cluster2 kubectl get serviceimports.multicluster.x-k8s.io -n default nginx-upgrade
+	kubectl get serviceexports.multicluster.x-k8s.io --kubeconfig output/kubeconfigs/kind-config-cluster1 -n default nginx-upgrade
+	. $(SCRIPTS_DIR)/lib/utils && with_retries 10 sleep_on_fail 1s kubectl get serviceimports.multicluster.x-k8s.io --kubeconfig output/kubeconfigs/kind-config-cluster1 -n default nginx-upgrade
 
 $(TARGETS):
 	./scripts/$@
