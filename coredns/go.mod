@@ -7,14 +7,14 @@ require (
 	github.com/coredns/coredns v1.11.1
 	github.com/go-logr/logr v1.3.0
 	github.com/miekg/dns v1.1.57
-	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.29.0
+	github.com/onsi/ginkgo/v2 v2.13.1
+	github.com/onsi/gomega v1.30.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/submariner-io/admiral v0.17.0-m0
-	k8s.io/api v0.28.3
-	k8s.io/apimachinery v0.28.3
-	k8s.io/client-go v0.28.3
+	github.com/submariner-io/admiral v0.17.0-m1
+	k8s.io/api v0.28.4
+	k8s.io/apimachinery v0.28.4
+	k8s.io/client-go v0.28.4
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.16.3
 	sigs.k8s.io/mcs-api v0.1.0
@@ -93,14 +93,14 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db // indirect
-	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.4.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
