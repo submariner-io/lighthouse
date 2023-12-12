@@ -718,13 +718,13 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 			return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
 		}
 		for _, ip := range ipList {
-			doesContain := strings.Contains(result.(string), ip)
-			if doesContain && !shouldContain {
+			count := strings.Count(result.(string), ip)
+			if count > 0 && !shouldContain {
 				return false, fmt.Sprintf("expected execution result %q not to contain %q", result, ip), nil
 			}
 
-			if !doesContain && shouldContain {
-				return false, fmt.Sprintf("expected execution result %q to contain %q", result, ip), nil
+			if count != 1 && shouldContain {
+				return false, fmt.Sprintf("expected execution result %q to contain one occurrence of %q", result, ip), nil
 			}
 		}
 
