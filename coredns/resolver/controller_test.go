@@ -134,6 +134,10 @@ var _ = Describe("Controller", func() {
 			)
 			epsName2 = eps.Name
 			t.createEndpointSlice(eps)
+
+			epsOnBroker := eps.DeepCopy()
+			epsOnBroker.Namespace = test.RemoteNamespace
+			t.createEndpointSlice(epsOnBroker)
 		})
 
 		Specify("GetDNSRecords should return their DNS record", func() {

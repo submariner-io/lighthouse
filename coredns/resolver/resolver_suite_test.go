@@ -19,6 +19,7 @@ limitations under the License.
 package resolver_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"reflect"
@@ -175,12 +176,13 @@ func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, ex
 	var records []resolver.DNSRecord
 	var found, isHeadless bool
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		records, isHeadless, found = t.resolver.GetDNSRecords(ns, name, cluster, hostname)
-		sortRecords(records)
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(_ context.Context) (bool, error) {
+			records, isHeadless, found = t.resolver.GetDNSRecords(ns, name, cluster, hostname)
+			sortRecords(records)
 
-		return found && isHeadless == expIsHeadless && reflect.DeepEqual(records, expRecords), nil
-	})
+			return found && isHeadless == expIsHeadless && reflect.DeepEqual(records, expRecords), nil
+		})
 	if err == nil {
 		return
 	}
