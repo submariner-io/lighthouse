@@ -120,7 +120,7 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 	var epSlices []*discovery.EndpointSlice
 	for i := range list {
 		eps := list[i].(*discovery.EndpointSlice)
-		if !isLegacyEndpointSlice(eps) {
+		if !isOnBroker(eps) && !isLegacyEndpointSlice(eps) {
 			epSlices = append(epSlices, eps)
 		}
 	}
@@ -157,8 +157,11 @@ func (c *controller) onServiceImportDelete(obj runtime.Object, _ int) bool {
 }
 
 func (c *controller) ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
-	isOnBroker := eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
-	return isOnBroker || (isLegacyEndpointSlice(eps) && len(c.getAllEndpointSlices(eps)) > 0)
+	return isOnBroker(eps) || (isLegacyEndpointSlice(eps) && len(c.getAllEndpointSlices(eps)) > 0)
+}
+
+func isOnBroker(eps *discovery.EndpointSlice) bool {
+	return eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
 }
 
 func isLegacyEndpointSlice(eps *discovery.EndpointSlice) bool {
