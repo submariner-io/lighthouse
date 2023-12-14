@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
 )
@@ -323,22 +324,33 @@ func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	namespace string, count int,
 ) (ipList, hostNameList []string) {
-	ep := framework.KubeClients[targetCluster].CoreV1().Endpoints(namespace)
+	client := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
-		return ep.Get(context.TODO(), name, metav1.GetOptions{})
+		return client.List(context.Background(), metav1.ListOptions{
+			LabelSelector: labels.SelectorFromSet(map[string]string{
+				discovery.LabelServiceName: name,
+			}).String(),
+		})
 	}, func(result interface{}) (bool, string, error) {
 		ipList = make([]string, 0)
 		hostNameList = make([]string, 0)
-		endpoint := result.(*v1.Endpoints)
-		for _, eps := range endpoint.Subsets {
-			for _, addr := range eps.Addresses {
-				ipList = append(ipList, addr.IP)
+
+		epsList := result.(*discovery.EndpointSliceList).Items
+		for i := range epsList {
+			for j := range epsList[i].Endpoints {
+				ep := &epsList[i].Endpoints[j]
+				if !ptr.Deref(ep.Conditions.Ready, true) {
+					continue
+				}
+
+				ipList = append(ipList, ep.Addresses...)
+
 				switch {
-				case addr.Hostname != "":
-					hostNameList = append(hostNameList, addr.Hostname)
-				case addr.TargetRef != nil:
-					hostNameList = append(hostNameList, addr.TargetRef.Name)
+				case ptr.Deref(ep.Hostname, "") != "":
+					hostNameList = append(hostNameList, *ep.Hostname)
+				case ep.TargetRef != nil:
+					hostNameList = append(hostNameList, ep.TargetRef.Name)
 				}
 			}
 		}
