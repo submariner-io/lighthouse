@@ -10,25 +10,45 @@ updates:
     target-branch: release-0.13
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.14
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.15
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.16
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
+    groups:
+      gomod:
+        patterns:
+          - "*"
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
@@ -49,6 +69,10 @@ updates:
     directory: /coredns
     schedule:
       interval: weekly
+    groups:
+      gomod:
+        patterns:
+          - "*"
     ignore:
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
