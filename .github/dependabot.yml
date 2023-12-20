@@ -5,6 +5,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.14
