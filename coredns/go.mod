@@ -114,3 +114,8 @@ require (
 // Avoid an ambiguous import (cloud.google.com/go/compute/metadata in both
 // cloud.google.com/go v0.81.0 and cloud.google.com/go/compute v0.1.3.0)
 replace cloud.google.com/go => cloud.google.com/go v0.103.0
+
+// sourcegraph.com/sourcegraph/appdash is gone
+replace sourcegraph.com/sourcegraph/appdash => github.com/sourcegraph/appdash v0.0.0-20190731080439-ebfcffb1b5c0
+
+replace sourcegraph.com/sourcegraph/appdash-data => github.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
