@@ -63,6 +63,7 @@ import (
 	_ "github.com/coredns/coredns/plugin/tls"
 	_ "github.com/coredns/coredns/plugin/trace"
 	_ "github.com/coredns/coredns/plugin/whoami"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	_ "github.com/submariner-io/lighthouse/coredns/plugin"
@@ -120,12 +121,16 @@ func init() {
 }
 
 func main() {
+	kzerolog.AddFlags(nil)
 	flag.Parse()
+
 	admversion.Print(names.LighthouseCoreDNSComponent, version)
 
 	if showVersion {
 		return
 	}
+
+	kzerolog.InitK8sLogging()
 
 	coremain.Run()
 }
