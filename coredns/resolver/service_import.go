@@ -47,6 +47,8 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 		i.serviceMap[key] = svcInfo
 	}
 
+	svcInfo.isExported = true
+
 	if svcInfo.isHeadless || !isLegacy {
 		return
 	}
@@ -82,7 +84,14 @@ func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	delete(i.serviceMap, key)
+	svcInfo, found := i.serviceMap[key]
+	if found {
+		if len(svcInfo.clusters) == 0 {
+			delete(i.serviceMap, key)
+		} else {
+			svcInfo.isExported = false
+		}
+	}
 }
 
 func getServiceImportKey(from *mcsv1a1.ServiceImport) (string, bool) {
