@@ -5,16 +5,15 @@ go 1.18
 require (
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.11.1
-	github.com/go-logr/logr v1.2.4
 	github.com/miekg/dns v1.1.55
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
-	github.com/submariner-io/admiral v0.16.2
-	k8s.io/api v0.27.7
-	k8s.io/apimachinery v0.27.7
-	k8s.io/client-go v0.27.7
+	github.com/submariner-io/admiral v0.16.3
+	k8s.io/api v0.27.9
+	k8s.io/apimachinery v0.27.9
+	k8s.io/client-go v0.27.9
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.15.2
 	sigs.k8s.io/mcs-api v0.1.0
@@ -44,6 +43,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/farsightsec/golang-framestream v0.3.0 // indirect
 	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
