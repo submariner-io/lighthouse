@@ -246,6 +246,67 @@ func testHeadlessService() {
 			})
 		})
 	})
+
+	When("a service has multiple EndpointSlices with duplicate addresses", func() {
+		BeforeEach(func() {
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP1},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP2},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP3},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+			)
+		})
+
+		JustBeforeEach(func() {
+			Expect(t.resolver.PutEndpointSlices(endpointSlice, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP1},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP3},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP4},
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+			))).To(BeFalse())
+		})
+
+		It("should return DNS records with unique addresses", func() {
+			t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				resolver.DNSRecord{
+					IP:          endpointIP1,
+					Ports:       []mcsv1a1.ServicePort{port1},
+					ClusterName: clusterID1,
+				},
+				resolver.DNSRecord{
+					IP:          endpointIP2,
+					Ports:       []mcsv1a1.ServicePort{port1},
+					ClusterName: clusterID1,
+				},
+				resolver.DNSRecord{
+					IP:          endpointIP3,
+					Ports:       []mcsv1a1.ServicePort{port1},
+					ClusterName: clusterID1,
+				},
+				resolver.DNSRecord{
+					IP:          endpointIP4,
+					Ports:       []mcsv1a1.ServicePort{port1},
+					ClusterName: clusterID1,
+				},
+			)
+		})
+	})
 }
 
 func testHeadlessServiceInMultipleClusters() {

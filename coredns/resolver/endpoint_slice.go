@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -142,6 +143,8 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 
 	serviceInfo.clusters[clusterID] = clusterInfo
 
+	allAddresses := sets.New[string]()
+
 	for _, endpointSlice := range endpointSlices {
 		mcsPorts := mcsServicePortsFrom(endpointSlice.Ports)
 		publishNotReadyAddresses := endpointSlice.Annotations[constants.PublishNotReadyAddresses] == strconv.FormatBool(true)
@@ -169,14 +172,18 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 			}
 
 			for _, address := range endpoint.Addresses {
+				if allAddresses.Has(address) {
+					continue
+				}
+
+				allAddresses.Insert(address)
 
 				record := DNSRecord{
 					IP:          address,
 					Ports:       mcsPorts,
 					ClusterName: clusterID,
+					HostName:    hostname,
 				}
-
-				record.HostName = hostname
 
 				records = append(records, record)
 			}
