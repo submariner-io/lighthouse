@@ -36,8 +36,7 @@ bin/%/lighthouse-agent: $(shell find pkg/agent)
 
 bin/%/lighthouse-coredns: $(shell find coredns)
 	mkdir -p $(@D)
-	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
-	mv coredns/$@ $@
+	cd coredns && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $(CURDIR)/$@ .
 
 e2e:
 
@@ -47,7 +46,7 @@ licensecheck: $(ARCH_BINARIES) bin/lichen
 
 bin/lichen:
 	mkdir -p $(@D)
-	go build -o $@ github.com/uw-labs/lichen
+	cd tools && go build -o $(CURDIR)/$@ github.com/uw-labs/lichen
 
 # Lighthouse-specific upgrade test:
 # deploy latest, start nginx service, export it, upgrade, check service
