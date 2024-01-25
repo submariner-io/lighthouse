@@ -5,6 +5,7 @@ bin
 dist
 junit.xml
 Makefile.dapper
+Makefile.shipyard
 output
 package/.image.*
 vendor
