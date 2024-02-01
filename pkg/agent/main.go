@@ -19,15 +19,12 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
@@ -147,33 +144,15 @@ func main() {
 	err = lightHouseAgent.Start(ctx.Done())
 	exitOnError(err, "Failed to start lighthouse agent")
 
-	httpServer := startHTTPServer()
+	defer http.StartServer(http.Metrics|http.Profile, 8082)()
 
 	<-ctx.Done()
 
 	logger.Info("All controllers stopped or exited. Stopping main loop")
-
-	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Error(err, "Error shutting down metrics HTTP server")
-	}
 }
 
 func init() {
 	flag.StringVar(&kubeConfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-}
-
-func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8082", ReadHeaderTimeout: 60 * time.Second}
-
-	http.Handle("/metrics", promhttp.Handler())
-
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Error(err, "Error starting metrics server")
-		}
-	}()
-
-	return srv
 }
