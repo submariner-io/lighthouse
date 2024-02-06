@@ -3,6 +3,10 @@
 *.md @aswinsuryan @dfarrell07 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
 /.github/workflows/ @aswinsuryan @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
 /scripts/ @aswinsuryan @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
+coredns/go.mod @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+coredns/go.sum @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
 Dockerfile.dapper @aswinsuryan @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
+go.mod @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+go.sum @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
 Makefile* @aswinsuryan @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
 package/ @aswinsuryan @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar

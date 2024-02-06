@@ -1,8 +1,10 @@
 @aswinsuryan *
-@dfarrell07 *.md
+@dfarrell07 *.md go.mod go.sum coredns/go.mod coredns/go.sum
+@maayanf24 go.mod go.sum coredns/go.mod coredns/go.sum
 @mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper package/
 @Oats87 *
 @skitt *
 @sridhargaddam *
 @tpantelis *
 @vthapar *
+@yboaron go.mod go.sum coredns/go.mod coredns/go.sum
