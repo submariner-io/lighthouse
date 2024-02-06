@@ -19,7 +19,7 @@ jobs:
         globalnet: ['', 'globalnet']
         deploytool: ['operator']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.28']
+        k8s_version: ['1.29']
         include:
           # Bottom of supported K8s version range
           - k8s_version: '1.26'
