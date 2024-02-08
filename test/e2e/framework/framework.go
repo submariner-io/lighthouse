@@ -614,10 +614,7 @@ func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) (h
 			return false, "", err
 		}
 
-		if !found {
-			return true, "", nil
-		}
-		return true, "", nil
+		return found, "", nil
 	})
 
 	return healthCheckEnabled
