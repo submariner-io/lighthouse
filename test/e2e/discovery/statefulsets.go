@@ -137,6 +137,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				nginxServiceClusterB, checkedDomains, sourceCluster == clusterAName, sourceCluster == clusterAName)
+
 			verifyCount++
 		}
 	}
@@ -204,6 +205,7 @@ func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.Clus
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				service, checkedDomains, shouldContain, sourceCluster == localClusterName)
+
 			count++
 		}
 	}

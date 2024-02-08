@@ -155,8 +155,8 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 func (c *ServiceImportController) reconcileRemoteAggregatedServiceImports() {
 	c.localSyncer.Reconcile(func() []runtime.Object {
 		siList := c.remoteSyncer.ListResources()
-
 		retList := make([]runtime.Object, 0, len(siList))
+
 		for i := range siList {
 			si := c.converter.toServiceImport(siList[i])
 
@@ -193,6 +193,7 @@ func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
 		}
 
 		retList := make([]runtime.Object, 0, len(siList.Items))
+
 		for i := range siList.Items {
 			si := c.converter.toServiceImport(&siList.Items[i])
 

@@ -350,13 +350,16 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 				return stdout, nil
 			}, func(result interface{}) (bool, string, error) {
 				By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+
 				if len(hostNameList) == 0 && result != "" {
 					return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
 				}
+
 				for _, hostName := range hostNameList {
 					hostDNS := hostName + "." + domainName
 					doesContain := strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
 						strings.Contains(result.(string), hostDNS)
+
 					if doesContain && !shouldContain {
 						framework.Logf("expected execution result %q not to contain %q and %d", result, hostDNS, int(port.Port))
 						return false, fmt.Sprintf("expected execution result %q not to contain %q and %d", result, hostDNS, int(port.Port)), nil
