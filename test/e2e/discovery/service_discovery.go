@@ -608,6 +608,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 
 				By(fmt.Sprintf("Validating that port in dig result for SRV Record %q %s %d and the domain name %s %q", result,
 					op, port.Port, op, clusterDNSName))
+
 				if doesContain && !shouldContain {
 					return false, fmt.Sprintf("expected execution result %q not to contain %d", result, port.Port), nil
 				}
@@ -615,6 +616,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 				if !doesContain && shouldContain {
 					return false, fmt.Sprintf("expected execution result %q to contain %q", result, port.Port), nil
 				}
+
 				return true, "", nil
 			})
 		}
@@ -657,6 +659,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 				if strings.Contains(result.(string), serviceIP) {
 					serviceIPMap[serviceIP]++
 					retIPs = append(retIPs, serviceIP)
+
 					break
 				}
 			}

@@ -354,9 +354,11 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 				}
 			}
 		}
+
 		if count != anyCount && len(ipList) != count {
 			return false, fmt.Sprintf("endpoints have %d IPs when expected %d", len(ipList), count), nil
 		}
+
 		return true, "", nil
 	})
 
@@ -580,8 +582,8 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpoi
 
 				var found bool
 				var err error
-				healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
 
+				healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
 				if err != nil {
 					return false, "", err
 				}
@@ -591,6 +593,7 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpoi
 				}
 			}
 		}
+
 		return true, "", nil
 	})
 
@@ -604,12 +607,14 @@ func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) (h
 		return unstructuredSubmarinerConfig, err
 	}, func(result interface{}) (bool, string, error) {
 		unstructuredSubmarinerConfig := result.(*unstructured.Unstructured)
+
 		By(fmt.Sprintf("Getting the Submariner Config, for cluster %s", framework.TestContext.ClusterIDs[cluster]))
+
 		var found bool
 		var err error
+
 		healthCheckEnabled, found, err = unstructured.NestedBool(unstructuredSubmarinerConfig.Object,
 			"spec", "connectionHealthCheck", "enabled")
-
 		if err != nil {
 			return false, "", err
 		}
@@ -680,6 +685,7 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 	}, func(result interface{}) (bool, string, error) {
 		doesContain := strings.Contains(result.(string), serviceIP)
 		By(fmt.Sprintf("Validating that dig result %q %s %q", result, op, serviceIP))
+
 		if doesContain && !shouldContain {
 			return false, fmt.Sprintf("expected execution result %q not to contain %q", result, serviceIP), nil
 		}
@@ -728,9 +734,11 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 		return stdout, nil
 	}, func(result interface{}) (bool, string, error) {
 		By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+
 		if len(ipList) == 0 && result != "" {
 			return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
 		}
+
 		for _, ip := range ipList {
 			count := strings.Count(result.(string), ip)
 			if count > 0 && !shouldContain {

@@ -99,6 +99,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 			}))
 
 			retList := make([]runtime.Object, 0, len(list))
+
 			for _, o := range list {
 				eps := o.(*discovery.EndpointSlice)
 				retList = append(retList, &discovery.EndpointSlice{
