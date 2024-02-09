@@ -28,7 +28,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -111,7 +110,7 @@ func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bo
 }
 
 func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*discovery.EndpointSlice {
-	list := c.resourceWatcher.ListResources(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
+	list := c.resourceWatcher.ListResources(&discovery.EndpointSlice{}, labels.SelectorFromSet(map[string]string{
 		constants.LabelSourceNamespace:  forEPS.Labels[constants.LabelSourceNamespace],
 		mcsv1a1.LabelServiceName:        forEPS.Labels[mcsv1a1.LabelServiceName],
 		constants.MCSLabelSourceCluster: forEPS.Labels[constants.MCSLabelSourceCluster],
