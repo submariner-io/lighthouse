@@ -48,7 +48,7 @@ func NewController(r *Interface) *controller {
 	}
 }
 
-func (c *controller) Start(config watcher.Config) error {
+func (c *controller) Start(config *watcher.Config) error {
 	logger.Infof("Starting Resolver Controller")
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
@@ -77,7 +77,7 @@ func (c *controller) Start(config watcher.Config) error {
 
 	var err error
 
-	c.resourceWatcher, err = watcher.New(&config)
+	c.resourceWatcher, err = watcher.New(config)
 	if err != nil {
 		return errors.Wrap(err, "error creating the resource watcher")
 	}

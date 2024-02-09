@@ -109,7 +109,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	resolverController := resolver.NewController(lh.Resolver)
 
-	err = resolverController.Start(watcher.Config{
+	err = resolverController.Start(&watcher.Config{
 		RestConfig: cfg,
 		Client:     localClient,
 		RestMapper: restMapper,

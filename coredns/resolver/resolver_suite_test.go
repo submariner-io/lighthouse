@@ -145,7 +145,7 @@ func newTestDriver() *testDriver {
 		t.resolver = resolver.New(t.clusterStatus, client)
 		controller := resolver.NewController(t.resolver)
 
-		Expect(controller.Start(watcher.Config{
+		Expect(controller.Start(&watcher.Config{
 			RestMapper: restMapper,
 			Client:     client,
 		})).To(Succeed())
