@@ -34,6 +34,9 @@ type server struct {
 	weight int64
 }
 
+//nolint:gosec // This is only used to shuffle the list of resolvers
+var randgen = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 var _ = Describe("Smooth Weighted RR", func() {
 	// Global Vars
 	var servers []server
@@ -123,20 +126,18 @@ var _ = Describe("Smooth Weighted RR", func() {
 			{name: "server2", weight: 1},
 			{name: "server3", weight: 1},
 		}
-		rand.Seed(time.Now().UnixNano())
 		servers = []server{
 			{name: "server1", weight: randInt()},
 			{name: "server2", weight: randInt()},
 			{name: "server3", weight: randInt()},
 		}
-
 		roundRobinServers = []server{
 			{name: "server1", weight: 1},
 			{name: "server2", weight: 1},
 			{name: "server3", weight: 1},
 		}
 
-		rand.Shuffle(len(servers), func(i, j int) { servers[i], servers[j] = servers[j], servers[i] })
+		randgen.Shuffle(len(servers), func(i, j int) { servers[i], servers[j] = servers[j], servers[i] })
 	})
 
 	When("first created", func() {
