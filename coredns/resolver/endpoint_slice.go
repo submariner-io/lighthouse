@@ -167,8 +167,8 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 			switch {
 			case endpoint.Hostname != nil && *endpoint.Hostname != "":
 				hostname = *endpoint.Hostname
-			case endpoint.TargetRef != nil && strings.ToLower((*endpoint.TargetRef).Kind) == "pod":
-				hostname = (*endpoint.TargetRef).Name
+			case endpoint.TargetRef != nil && strings.EqualFold(endpoint.TargetRef.Kind, "pod"):
+				hostname = endpoint.TargetRef.Name
 			}
 
 			for _, address := range endpoint.Addresses {
