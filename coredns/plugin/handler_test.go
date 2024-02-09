@@ -84,7 +84,7 @@ type FailingResponseWriter struct {
 	errorMsg string
 }
 
-func (w *FailingResponseWriter) WriteMsg(m *dns.Msg) error {
+func (w *FailingResponseWriter) WriteMsg(_ *dns.Msg) error {
 	return errors.New(w.errorMsg)
 }
 
