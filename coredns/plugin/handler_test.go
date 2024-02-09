@@ -1005,8 +1005,8 @@ func newServiceImport(namespace, name string, siType mcsv1a1.ServiceImportType) 
 }
 
 //nolint:unparam // `namespace` always receives `namespace1`.
-func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort,
-	endpoints ...discovery.Endpoint) *discovery.EndpointSlice {
+func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort, endpoints ...discovery.Endpoint,
+) *discovery.EndpointSlice {
 	epPorts := make([]discovery.EndpointPort, len(ports))
 	for i := range ports {
 		epPorts[i] = discovery.EndpointPort{

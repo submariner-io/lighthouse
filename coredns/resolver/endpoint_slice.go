@@ -95,7 +95,8 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 	return false
 }
 
-func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo) bool {
+func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo,
+) bool {
 	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
 	if !found {
 		// This is a legacy pre-0.15 EndpointSlice.
