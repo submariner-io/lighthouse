@@ -151,6 +151,7 @@ func testCorrectConfig() {
 		c := caddy.NewTestController("dns", config)
 		lh, err := lighthouseParse(c)
 		Expect(err).NotTo(HaveOccurred())
+
 		setupErr := setupLighthouse(c) // For coverage
 		Expect(setupErr).NotTo(HaveOccurred())
 		Expect(lh.Fall).Should(Equal(fall.F{}))

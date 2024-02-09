@@ -181,6 +181,7 @@ func (c *Controller) updateClusterStatusMap(connections []interface{}) {
 				if newMap == nil {
 					newMap = copyMap(currentMap)
 				}
+
 				delete(newMap, clusterID)
 			}
 		}
@@ -250,6 +251,7 @@ func (c *Controller) getCheckedClientset(client dynamic.Interface) (dynamic.Reso
 	// First check if the Submariner resource is present.
 	gvr, _ := schema.ParseResourceArg("submariners.v1alpha1.submariner.io")
 	list, err := client.Resource(*gvr).Namespace(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+
 	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) || (err == nil && len(list.Items) == 0) {
 		return nil, apierrors.NewNotFound(gvr.GroupResource(), "")
 	}

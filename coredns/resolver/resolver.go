@@ -49,6 +49,7 @@ func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (
 	}
 
 	records, found = i.getHeadlessRecords(serviceInfo, clusterID, hostname)
+
 	return records, true, found
 }
 

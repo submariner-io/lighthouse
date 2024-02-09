@@ -117,6 +117,7 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 	}))
 
 	var epSlices []*discovery.EndpointSlice
+
 	for i := range list {
 		eps := list[i].(*discovery.EndpointSlice)
 		if !isOnBroker(eps) && !isLegacyEndpointSlice(eps) {

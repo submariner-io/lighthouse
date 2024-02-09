@@ -117,6 +117,7 @@ var (
 
 func init() {
 	flag.BoolVar(&showVersion, "subm-version", showVersion, "Show version")
+
 	dnsserver.Directives = directives
 }
 
