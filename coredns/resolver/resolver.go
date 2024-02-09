@@ -30,7 +30,7 @@ func New(clusterStatus ClusterStatus, client dynamic.Interface) *Interface {
 	}
 }
 
-func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (records []DNSRecord, isHeadless bool, found bool) {
+func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (records []DNSRecord, isHeadless, found bool) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
