@@ -136,7 +136,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		for i, str := range lh.Zones {
 			hosts := plugin.Host(str).NormalizeExact()
 			if hosts == nil {
-				c.Errf("Failed to normalize zone %q", str)
+				log.Infof("Failed to normalize zone %q", str)
 				lh.Zones[i] = ""
 				continue
 			}
