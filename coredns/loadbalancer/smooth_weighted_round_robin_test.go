@@ -166,7 +166,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	When("a nil is added", func() {
 		It("should return an error", func() {
 			err := lb.Add(nil, 100)
-			Expect(err).ToNot(BeNil())
+			Expect(err).To(HaveOccurred())
 			validateEmptyLBState()
 		})
 	})
@@ -174,7 +174,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	When("an item is added with a negative weight", func() {
 		It("should return an error", func() {
 			err := lb.Add(servers[0], -100)
-			Expect(err).ToNot(BeNil())
+			Expect(err).To(HaveOccurred())
 			validateEmptyLBState()
 		})
 	})
@@ -194,7 +194,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 			s := servers[0]
 			addServer(s)
 			err := lb.Add(s.name, s.weight)
-			Expect(err).ToNot(BeNil())
+			Expect(err).To(HaveOccurred())
 			Expect(lb.ItemCount()).To(Equal(1))
 		})
 	})
@@ -203,7 +203,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("should balance between them in an equal manner", func() {
 			for _, s := range roundRobinServers {
 				err := lb.Add(s.name, s.weight)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			}
 			for i := 0; i < 100; i++ {
 				for _, s := range roundRobinServers {
@@ -254,7 +254,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 			newServer := server{name: "server4", weight: 1}
 			smoothTestingServers = append(smoothTestingServers, newServer)
 			err := lb.Add(newServer.name, newServer.weight)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
 			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[2].name))
