@@ -317,6 +317,7 @@ func testWithFallback() {
 			m := new(dns.Msg)
 			m.SetRcode(r, dns.RcodeBadCookie)
 			_ = w.WriteMsg(m)
+
 			return dns.RcodeBadCookie, nil
 		})
 

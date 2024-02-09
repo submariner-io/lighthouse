@@ -121,6 +121,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	c.OnShutdown(func() error {
 		gwController.Stop()
 		resolverController.Stop()
+
 		return nil
 	})
 
@@ -137,7 +138,9 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 			hosts := plugin.Host(str).NormalizeExact()
 			if hosts == nil {
 				log.Infof("Failed to normalize zone %q", str)
+
 				lh.Zones[i] = ""
+
 				continue
 			}
 

@@ -229,6 +229,7 @@ func (i *Interface) getLocalEndpointSlices(forEPS *discovery.EndpointSlice) ([]*
 	}
 
 	epSlices := make([]*discovery.EndpointSlice, len(list.Items))
+
 	for i := range list.Items {
 		epSlice := &discovery.EndpointSlice{}
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, epSlice)

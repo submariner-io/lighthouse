@@ -48,6 +48,7 @@ func testHeadlessService() {
 
 	BeforeEach(func() {
 		t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+
 		annotations = nil
 		endpointSlice = nil
 	})
