@@ -121,7 +121,7 @@ func (c *Controller) Stop() {
 	logger.Infof("Gateway status Controller stopped")
 }
 
-func (c *Controller) processNextGateway(key, name, ns string) (bool, error) {
+func (c *Controller) processNextGateway(key, _, _ string) (bool, error) {
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
 		// requeue the item to work on later.

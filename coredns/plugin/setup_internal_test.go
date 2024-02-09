@@ -40,7 +40,7 @@ import (
 
 type fakeHandler struct{}
 
-func (f *fakeHandler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+func (f *fakeHandler) ServeDNS(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) (int, error) {
 	return dns.RcodeSuccess, nil
 }
 
