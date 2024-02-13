@@ -992,7 +992,6 @@ func (t *handlerTestDriver) executeTestCase(rec *dnstest.Recorder, tc test.Case)
 	}
 }
 
-//nolint:unparam // `name` always receives `service1'.
 func newServiceImport(namespace, name string, siType mcsv1a1.ServiceImportType) *mcsv1a1.ServiceImport {
 	return &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1005,7 +1004,6 @@ func newServiceImport(namespace, name string, siType mcsv1a1.ServiceImportType) 
 	}
 }
 
-//nolint:unparam // `namespace` always receives `namespace1`.
 func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort, endpoints ...discovery.Endpoint,
 ) *discovery.EndpointSlice {
 	epPorts := make([]discovery.EndpointPort, len(ports))

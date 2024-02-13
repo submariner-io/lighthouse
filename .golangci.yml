@@ -156,4 +156,5 @@ issues:
       linters:
         - gochecknoinits
         - goerr113
+        - unparam
         - wrapcheck
