@@ -41,7 +41,7 @@ type controller struct {
 	stopCh          chan struct{}
 }
 
-func NewController(r *Interface) *controller {
+func NewController(r *Interface) *controller { //nolint:revive // Returning a private type doesn't cause problems here.
 	return &controller{
 		resolver: r,
 		stopCh:   make(chan struct{}),
