@@ -49,7 +49,8 @@ var (
 	buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
 	newDynamicClient = func(c *rest.Config) (dynamic.Interface, error) {
-		return dynamic.NewForConfig(c)
+		client, err := dynamic.NewForConfig(c)
+		return client, errors.Wrap(err, "error creating a dynamic client")
 	}
 
 	restMapper meta.RESTMapper
