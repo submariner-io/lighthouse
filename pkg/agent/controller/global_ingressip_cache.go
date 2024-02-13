@@ -37,15 +37,15 @@ func newGlobalIngressIPCache(config watcher.Config) (*globalIngressIPCache, erro
 			Name:         "GlobalIngressIP watcher",
 			ResourceType: GetGlobalIngressIPObj(),
 			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnCreateFunc: func(obj runtime.Object, _ int) bool {
 					c.onCreateOrUpdate(obj.(*unstructured.Unstructured))
 					return false
 				},
-				OnUpdateFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnUpdateFunc: func(obj runtime.Object, _ int) bool {
 					c.onCreateOrUpdate(obj.(*unstructured.Unstructured))
 					return false
 				},
-				OnDeleteFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnDeleteFunc: func(obj runtime.Object, _ int) bool {
 					c.onDelete(obj.(*unstructured.Unstructured))
 					return false
 				},
@@ -72,7 +72,7 @@ func (c *globalIngressIPCache) onCreateOrUpdate(obj *unstructured.Unstructured) 
 }
 
 func (c *globalIngressIPCache) onDelete(obj *unstructured.Unstructured) {
-	c.applyToCache(obj, func(to *sync.Map, key string, obj *unstructured.Unstructured) {
+	c.applyToCache(obj, func(to *sync.Map, key string, _ *unstructured.Unstructured) {
 		to.Delete(key)
 	})
 }

@@ -62,7 +62,7 @@ var _ = Describe("Plugin setup", func() {
 			Resource: "submariners",
 		}
 
-		newDynamicClient = func(c *rest.Config) (dynamic.Interface, error) {
+		newDynamicClient = func(_ *rest.Config) (dynamic.Interface, error) {
 			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
 				gatewaysGVR:    "GatewayList",
 				submarinersGVR: "SubmarinersList",
@@ -88,7 +88,7 @@ func testCorrectConfig() {
 	)
 
 	BeforeEach(func() {
-		buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+		buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 			return &rest.Config{}, nil
 		}
 
@@ -176,7 +176,7 @@ func testIncorrectConfig() {
                 dummy
 		    } noplugin`
 
-			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 				return &rest.Config{}, nil
 			}
 		})
@@ -192,7 +192,7 @@ func testIncorrectConfig() {
                 ttl
 		    } noplugin`
 
-			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 				return &rest.Config{}, nil
 			}
 		})
@@ -208,7 +208,7 @@ func testIncorrectConfig() {
                 ttl -10
 		    } noplugin`
 
-			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 				return &rest.Config{}, nil
 			}
 		})
@@ -222,7 +222,7 @@ func testIncorrectConfig() {
 		BeforeEach(func() {
 			config = PluginName
 
-			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 				return nil, errors.New("mock")
 			}
 		})
@@ -236,7 +236,7 @@ func testIncorrectConfig() {
 func testPluginRegistration() {
 	When("plugin setup succeeds", func() {
 		It("should properly register the Lighthouse plugin with the DNS server", func() {
-			buildKubeConfigFunc = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
 				return &rest.Config{}, nil
 			}
 

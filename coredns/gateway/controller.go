@@ -88,7 +88,7 @@ func (c *Controller) Start(client dynamic.Interface) error {
 	//nolint:wrapcheck // Let the caller wrap these errors.
 	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return gwClientset.List(context.TODO(), metav1.ListOptions{})
+			return gwClientset.List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return gwClientset.Watch(context.TODO(), options)

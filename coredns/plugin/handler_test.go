@@ -313,7 +313,7 @@ func testWithFallback() {
 		t.mockCs.SetLocalClusterID(clusterID)
 
 		t.lh.Fall = fall.F{Zones: []string{"clusterset.local."}}
-		t.lh.Next = test.HandlerFunc(func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+		t.lh.Next = test.HandlerFunc(func(_ context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 			m := new(dns.Msg)
 			m.SetRcode(r, dns.RcodeBadCookie)
 			_ = w.WriteMsg(m)

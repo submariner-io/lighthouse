@@ -130,7 +130,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 	go func() {
 		<-stopCh
 
-		c.endpointControllers.Range(func(key, value interface{}) bool {
+		c.endpointControllers.Range(func(_, value interface{}) bool {
 			value.(*ServiceEndpointSliceController).stop()
 			return true
 		})
