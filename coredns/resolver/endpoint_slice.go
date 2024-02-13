@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
@@ -220,7 +221,7 @@ func (i *Interface) getLocalEndpointSlices(forEPS *discovery.EndpointSlice) ([]*
 			}).String(),
 		})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error retrieving the endpointslices in namespace %s", forEPS.Labels[constants.LabelSourceNamespace])
 	}
 
 	if len(list.Items) == 0 {
