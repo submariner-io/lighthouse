@@ -317,7 +317,7 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 		clusterBName, false, true, true)
 }
 
-//nolint:gocognit,unparam // This really isn't that complex and would be awkward to refactor.
+//nolint:gocognit // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool,
 ) {

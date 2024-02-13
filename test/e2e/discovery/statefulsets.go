@@ -192,7 +192,6 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
 }
 
-//nolint:unparam //  `targetCluster` always receives `framework.ClusterA`.
 func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
 	endpointSlices *discovery.EndpointSliceList, service *corev1.Service, verifyCount int, shouldContain bool, localClusterName string,
 ) {

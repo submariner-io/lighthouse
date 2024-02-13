@@ -556,7 +556,6 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 		checkedDomains, "", false)
 }
 
-//nolint:unparam // Keep srcCluster as a parameter for consistency and possible future extensions
 func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, service *corev1.Service, targetPod *corev1.PodList,
 	domains []string, clusterName string, withPort, shouldContain bool,
 ) {
