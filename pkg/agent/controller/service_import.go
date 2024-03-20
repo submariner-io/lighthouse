@@ -302,6 +302,13 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			Type:  localServiceImport.Spec.Type,
 			Ports: []mcsv1a1.ServicePort{},
 		},
+		Status: mcsv1a1.ServiceImportStatus{
+			Clusters: []mcsv1a1.ClusterStatus{
+				{
+					Cluster: c.clusterID,
+				},
+			},
+		},
 	}
 
 	conflict := false
@@ -330,9 +337,19 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			} else {
 				c.serviceExportClient.removeStatusCondition(ctx, serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 					typeConflictReason)
+
+				var added bool
+
+				existing.Status.Clusters, added = slices.AppendIfNotPresent(existing.Status.Clusters,
+					mcsv1a1.ClusterStatus{Cluster: c.clusterID}, clusterStatusKey)
+
+				if added {
+					logger.V(log.DEBUG).Infof("Added cluster name %q to aggregated ServiceImport %q. New status: %#v",
+						c.clusterID, existing.Name, existing.Status.Clusters)
+				}
 			}
 
-			return obj, nil
+			return c.converter.toUnstructured(existing), nil
 		})
 	if err == nil && !conflict {
 		err = c.startEndpointsController(localServiceImport)
@@ -345,7 +362,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	}
 
 	if result == util.OperationResultCreated {
-		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %q", aggregate.Name)
+		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(aggregate))
 	}
 
 	return err
