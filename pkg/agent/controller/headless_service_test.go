@@ -63,7 +63,7 @@ var _ = Describe("Headless Service export", func() {
 		Context("and no backend service EndpointSlice initially exists", func() {
 			It("should eventually export the EndpointSlice", func() {
 				t.cluster1.createServiceExport()
-				t.awaitAggregatedServiceImport(mcsv1a1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace)
+				t.awaitAggregatedServiceImport(mcsv1a1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
 
 				t.cluster1.createServiceEndpointSlices()
 				t.awaitEndpointSlice(&t.cluster1)
