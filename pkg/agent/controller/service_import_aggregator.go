@@ -50,16 +50,6 @@ func newServiceImportAggregator(brokerClient dynamic.Interface, brokerNamespace,
 
 func (a *ServiceImportAggregator) updateOnCreateOrUpdate(ctx context.Context, name, namespace string) error {
 	return a.update(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
-		var added bool
-
-		existing.Status.Clusters, added = slices.AppendIfNotPresent(existing.Status.Clusters,
-			mcsv1a1.ClusterStatus{Cluster: a.clusterID}, clusterStatusKey)
-
-		if added {
-			logger.V(log.DEBUG).Infof("Added cluster name %q to aggregated ServiceImport %q. New status: %#v",
-				a.clusterID, existing.Name, existing.Status.Clusters)
-		}
-
 		return a.setServicePorts(ctx, existing)
 	})
 }
