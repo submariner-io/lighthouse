@@ -119,10 +119,10 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -130,7 +130,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -160,7 +160,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	verifySRVWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "",
 		false, false)
 
-	By(fmt.Sprintf("Re-creating Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Re-creating Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB.ObjectMeta = metav1.ObjectMeta{
 		Name:   nginxServiceClusterB.Name,
@@ -188,17 +188,17 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterAName))
 	// don't need ServiceExport for local service
 	nginxServiceClusterA := f.Framework.NewNginxService(framework.ClusterA)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -206,7 +206,7 @@ func RunServiceDiscoveryLocalTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 	clusterADomain := getClusterDomain(f.Framework, framework.ClusterA, netshootPodList)
@@ -241,16 +241,16 @@ func RunServiceExportTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx ServiceExport on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx ServiceExport on %q", clusterBName))
 	f.NewServiceExport(framework.ClusterB, "nginx-demo", f.Namespace)
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -275,9 +275,9 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -285,7 +285,7 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -323,10 +323,10 @@ func RunServicesPodAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -334,16 +334,16 @@ func RunServicesPodAvailabilityMultiClusterTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 
 	nginxServiceClusterC := f.Framework.NewNginxService(framework.ClusterC)
 
 	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -397,19 +397,19 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterAName))
 
 	nginxServiceClusterA := f.Framework.NewNginxService(framework.ClusterA)
 
 	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -417,7 +417,7 @@ func RunServiceDiscoveryClusterNameTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -456,10 +456,10 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -467,16 +467,16 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 
 	nginxServiceClusterC := f.Framework.NewNginxService(framework.ClusterC)
 
 	f.NewServiceExport(framework.ClusterC, nginxServiceClusterC.Name, nginxServiceClusterC.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -511,9 +511,9 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -521,7 +521,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterCName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -533,9 +533,9 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 
 	nginxServiceClusterC := f.NewNginxService(framework.ClusterC)
 
@@ -579,7 +579,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 				op += " not"
 			}
 
-			By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
+			framework.By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
 				service.Name, op))
 			framework.AwaitUntil("verify if service Ports is discoverable", func() (interface{}, error) {
 				stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
@@ -605,7 +605,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 						strings.Contains(result.(string), clusterDNSName)
 				}
 
-				By(fmt.Sprintf("Validating that port in dig result for SRV Record %q %s %d and the domain name %s %q", result,
+				framework.By(fmt.Sprintf("Validating that port in dig result for SRV Record %q %s %d and the domain name %s %q", result,
 					op, port.Port, op, clusterDNSName))
 
 				if doesContain && !shouldContain {
@@ -633,7 +633,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 
 	serviceIPMap := make(map[string]int)
 
-	By(fmt.Sprintf("Executing %q to verify IPs %q for service %q are discoverable in a"+
+	framework.By(fmt.Sprintf("Executing %q to verify IPs %q for service %q are discoverable in a"+
 		" round-robin fashion", strings.Join(cmd, " "), serviceIPList, serviceName))
 
 	var retIPs []string
@@ -667,7 +667,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 		})
 	}
 
-	By(fmt.Sprintf("Service IP %q was returned %d times and Service IP %q was returned %d times - "+
+	framework.By(fmt.Sprintf("Service IP %q was returned %d times and Service IP %q was returned %d times - "+
 		"verifying the difference between them is within the threshold", serviceIPList[0], serviceIPMap[serviceIPList[0]],
 		serviceIPList[1], serviceIPMap[serviceIPList[1]]))
 

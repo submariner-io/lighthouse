@@ -58,12 +58,12 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
 		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
@@ -71,7 +71,7 @@ func RunSSDiscoveryTest(f *lhframework.Framework) {
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -91,22 +91,22 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	// Create StatefulSet on ClusterB
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
 		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
 
 	// Create StatefulSet on ClusterA
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterAName))
 
 	nginxSSClusterA := f.NewNginxStatefulSet(framework.ClusterA)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
 	nginxServiceClusterA := f.NewHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName,
 		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterA)
@@ -117,7 +117,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -153,14 +153,14 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
 	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
 	f.SetNginxStatefulSetReplicas(framework.ClusterB, 3)
 
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName,
 		httpPortName, corev1.ProtocolTCP, map[string]string{"app": appName}, framework.ClusterB)
@@ -168,7 +168,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
