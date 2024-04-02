@@ -52,17 +52,17 @@ func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
 	}, metav1.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred(), "Error creating namespace")
 
-	By(fmt.Sprintf("Created namespace %q for netshoot deployment on %q", netshootNS.Name, clusterAName))
+	framework.By(fmt.Sprintf("Created namespace %q for netshoot deployment on %q", netshootNS.Name, clusterAName))
 
 	f.AddNamespacesToDelete(netshootNS)
 
 	Expect(framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Delete(context.TODO(),
 		f.Namespace, metav1.DeleteOptions{})).To(Succeed())
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
 	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
 
@@ -70,7 +70,7 @@ func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeploymentInNS(framework.ClusterA, netshootNS.Name)
 
@@ -85,7 +85,7 @@ func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
 			"", false)
 	}
 
-	By(fmt.Sprintf("Recreating namespace %q on %q", f.Namespace, clusterAName))
+	framework.By(fmt.Sprintf("Recreating namespace %q on %q", f.Namespace, clusterAName))
 
 	_, err = framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{

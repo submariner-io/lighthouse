@@ -72,17 +72,17 @@ func RunHeadlessDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxHeadlessClusterB := f.NewNginxHeadlessService(framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -110,9 +110,9 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxHeadlessClusterB := f.NewNginxHeadlessService(framework.ClusterB)
 
@@ -120,9 +120,9 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterB, 1)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
 	nginxHeadlessClusterA := f.NewNginxHeadlessService(framework.ClusterA)
 
@@ -130,7 +130,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxHeadlessClusterA, 2)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -166,18 +166,18 @@ func RunHeadlessEndpointDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating a Headless Service without selector on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Headless Service without selector on %q", clusterBName))
 
 	headlessClusterB := f.NewHeadlessServiceEndpointIP(framework.ClusterB)
 
-	By("Creating an endpoint")
+	framework.By("Creating an endpoint")
 	f.NewEndpointForHeadlessService(framework.ClusterB, headlessClusterB)
 
-	By("Exporting the service %q")
+	framework.By("Exporting the service %q")
 	f.NewServiceExport(framework.ClusterB, headlessClusterB.Name, headlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, headlessClusterB.Name, headlessClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -205,11 +205,11 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 	f.SetNginxReplicaSet(framework.ClusterB, 3)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxHeadlessClusterB := f.NewNginxHeadlessService(framework.ClusterB)
 
@@ -217,7 +217,7 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -239,11 +239,11 @@ func RunHeadlessPodsAvailabilityTest(f *lhframework.Framework) {
 func RunHeadlessPodsAvailabilityTestLocal(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 	f.SetNginxReplicaSet(framework.ClusterA, 3)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
 	nginxHeadlessClusterA := f.NewNginxHeadlessService(framework.ClusterA)
 
@@ -251,7 +251,7 @@ func RunHeadlessPodsAvailabilityTestLocal(f *lhframework.Framework) {
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -274,27 +274,27 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterAName))
 	f.NewNginxDeployment(framework.ClusterA)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
 	nginxHeadlessClusterA := f.NewNginxHeadlessService(framework.ClusterA)
 
 	f.NewServiceExport(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxHeadlessClusterA.Name, nginxHeadlessClusterA.Namespace)
 
-	By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
-	By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
 	nginxHeadlessClusterB := f.NewNginxHeadlessService(framework.ClusterB)
 
 	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 
-	By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
 
@@ -332,7 +332,7 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 				op += " not"
 			}
 
-			By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
+			framework.By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
 				strings.Join(cmd, " "), hostNameList, service.Name, op))
 			framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
 				stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
@@ -349,7 +349,7 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 
 				return stdout, nil
 			}, func(result interface{}) (bool, string, error) {
-				By(fmt.Sprintf("Validating that dig result %s %q", op, result))
+				framework.By(fmt.Sprintf("Validating that dig result %s %q", op, result))
 
 				if len(hostNameList) == 0 && result != "" {
 					return false, fmt.Sprintf("expected execution result %q to be empty", result), nil
