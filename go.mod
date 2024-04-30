@@ -5,11 +5,11 @@ go 1.22.0
 require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.17.1
-	github.com/onsi/gomega v1.32.0
+	github.com/onsi/gomega v1.33.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
-	github.com/submariner-io/admiral v0.18.0-m2
-	github.com/submariner-io/shipyard v0.18.0-m2
+	github.com/submariner-io/admiral v0.18.0-m3
+	github.com/submariner-io/shipyard v0.18.0-m3
 	k8s.io/api v0.30.0
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.30.0
