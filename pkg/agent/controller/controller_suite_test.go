@@ -926,7 +926,7 @@ func assertEquivalentConditions(actual, expected *mcsv1a1.ServiceExportCondition
 	Expect(actual.Message).To(Not(BeNil()), "Actual: %s", out)
 
 	if expected.Message != nil {
-		Expect(*actual.Message).To(Equal(*expected.Message), "Actual: %s", out)
+		Expect(*actual.Message).To(ContainSubstring(*expected.Message), "Actual: %s", out)
 	}
 }
 

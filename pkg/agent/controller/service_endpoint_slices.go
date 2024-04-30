@@ -163,19 +163,16 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 
 	logger.V(logLevel).Infof("Service EndpointSlice %s/%s %sd", serviceEPS.Namespace, serviceEPS.Name, op)
 
-	var (
-		returnEPS *discovery.EndpointSlice
-		requeue   bool
-	)
+	var returnEPS *discovery.EndpointSlice
 
 	if c.isHeadless() {
-		returnEPS, requeue = c.headlessEndpointSliceFrom(serviceEPS, op)
+		returnEPS = c.headlessEndpointSliceFrom(serviceEPS, op)
 	} else {
 		returnEPS = c.clusterIPEndpointSliceFrom(serviceEPS)
 	}
 
-	if requeue || returnEPS == nil {
-		return nil, requeue
+	if returnEPS == nil {
+		return nil, false
 	}
 
 	if op == syncer.Delete {
@@ -247,13 +244,12 @@ func (c *ServiceEndpointSliceController) getReadyAddressCount() int {
 	return readyCount
 }
 
-func (c *ServiceEndpointSliceController) headlessEndpointSliceFrom(serviceEPS *discovery.EndpointSlice, op syncer.Operation) (
-	*discovery.EndpointSlice, bool,
-) {
+func (c *ServiceEndpointSliceController) headlessEndpointSliceFrom(serviceEPS *discovery.EndpointSlice, op syncer.Operation,
+) *discovery.EndpointSlice {
 	endpointSlice := c.newEndpointSliceFrom(serviceEPS)
 
 	if op == syncer.Delete {
-		return endpointSlice, false
+		return endpointSlice
 	}
 
 	endpointSlice.Ports = serviceEPS.Ports
@@ -261,14 +257,14 @@ func (c *ServiceEndpointSliceController) headlessEndpointSliceFrom(serviceEPS *d
 
 	for i := range serviceEPS.Endpoints {
 		endpointSlice.Endpoints[i] = serviceEPS.Endpoints[i]
-		endpointSlice.Endpoints[i].Addresses = c.getHeadlessEndpointAddresses(&serviceEPS.Endpoints[i])
+		endpointSlice.Endpoints[i].Addresses = c.getHeadlessEndpointAddresses(serviceEPS.Name, &serviceEPS.Endpoints[i])
 
 		if len(endpointSlice.Endpoints[i].Addresses) == 0 {
-			return nil, true
+			return nil
 		}
 	}
 
-	return endpointSlice, false
+	return endpointSlice
 }
 
 func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discovery.EndpointSlice) *discovery.EndpointSlice {
@@ -303,31 +299,35 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 	return eps
 }
 
-func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(endpoint *discovery.Endpoint) []string {
+func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(name string, endpoint *discovery.Endpoint) []string {
 	if c.globalIngressIPCache == nil {
 		return endpoint.Addresses
 	}
 
+	transform := func(obj *unstructured.Unstructured) (any, bool) {
+		ip, _, _ := unstructured.NestedString(obj.Object, "status", "allocatedIP")
+		return ip, ip != ""
+	}
+
+	requeue := func() {
+		c.epsSyncer.RequeueResource(name, c.serviceNamespace)
+	}
+
 	var (
-		obj    *unstructured.Unstructured
+		ret    any
 		found  bool
-		ip     string
 		forPod bool
 	)
 
 	if endpoint.TargetRef != nil && endpoint.TargetRef.Kind == "Pod" {
 		forPod = true
-		obj, found = c.globalIngressIPCache.getForPod(c.serviceNamespace, endpoint.TargetRef.Name)
+		ret, found = c.globalIngressIPCache.getForPod(c.serviceNamespace, endpoint.TargetRef.Name, transform, requeue)
 	} else {
 		forPod = false
-		obj, found = c.globalIngressIPCache.getForEndpoints(c.serviceNamespace, endpoint.Addresses[0])
+		ret, found = c.globalIngressIPCache.getForEndpoints(c.serviceNamespace, endpoint.Addresses[0], transform, requeue)
 	}
 
-	if found {
-		ip, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
-	}
-
-	if ip == "" {
+	if !found {
 		if forPod {
 			logger.Infof("GlobalIP for Endpoint pod name %q is not allocated yet", endpoint.TargetRef.Name)
 		} else {
@@ -337,7 +337,7 @@ func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(endpoint *
 		return nil
 	}
 
-	return []string{ip}
+	return []string{ret.(string)}
 }
 
 func (c *ServiceEndpointSliceController) isHeadless() bool {
