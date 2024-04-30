@@ -19,8 +19,6 @@ limitations under the License.
 package controller
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,22 +28,32 @@ import (
 
 //nolint:gocritic // (hugeParam) This function modifies config so we don't want to pass by pointer.
 func newGlobalIngressIPCache(config watcher.Config) (*globalIngressIPCache, error) {
-	c := &globalIngressIPCache{}
+	c := &globalIngressIPCache{
+		byService: globalIngressIPMap{
+			entries: map[string]*globalIngressIPEntry{},
+		},
+		byPod: globalIngressIPMap{
+			entries: map[string]*globalIngressIPEntry{},
+		},
+		byEndpoints: globalIngressIPMap{
+			entries: map[string]*globalIngressIPEntry{},
+		},
+	}
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
 		{
 			Name:         "GlobalIngressIP watcher",
 			ResourceType: GetGlobalIngressIPObj(),
 			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnCreateFunc: func(obj runtime.Object, _ int) bool {
 					c.onCreateOrUpdate(obj.(*unstructured.Unstructured))
 					return false
 				},
-				OnUpdateFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnUpdateFunc: func(obj runtime.Object, _ int) bool {
 					c.onCreateOrUpdate(obj.(*unstructured.Unstructured))
 					return false
 				},
-				OnDeleteFunc: func(obj runtime.Object, numRequeues int) bool {
+				OnDeleteFunc: func(obj runtime.Object, _ int) bool {
 					c.onDelete(obj.(*unstructured.Unstructured))
 					return false
 				},
@@ -66,19 +74,39 @@ func (c *globalIngressIPCache) start(stopCh <-chan struct{}) error {
 }
 
 func (c *globalIngressIPCache) onCreateOrUpdate(obj *unstructured.Unstructured) {
-	c.applyToCache(obj, func(to *sync.Map, key string, obj *unstructured.Unstructured) {
-		to.Store(key, obj)
+	c.applyToCache(obj, func(to *globalIngressIPMap, key string, obj *unstructured.Unstructured) {
+		var onAddOrUpdate func()
+
+		to.Lock()
+
+		e := to.entries[key]
+		if e == nil {
+			e = &globalIngressIPEntry{}
+			to.entries[key] = e
+		}
+
+		e.obj = obj
+		onAddOrUpdate = e.onAddOrUpdate
+
+		to.Unlock()
+
+		if onAddOrUpdate != nil {
+			onAddOrUpdate()
+		}
 	})
 }
 
 func (c *globalIngressIPCache) onDelete(obj *unstructured.Unstructured) {
-	c.applyToCache(obj, func(to *sync.Map, key string, obj *unstructured.Unstructured) {
-		to.Delete(key)
+	c.applyToCache(obj, func(to *globalIngressIPMap, key string, _ *unstructured.Unstructured) {
+		to.Lock()
+		defer to.Unlock()
+
+		delete(to.entries, key)
 	})
 }
 
 func (c *globalIngressIPCache) applyToCache(obj *unstructured.Unstructured,
-	apply func(to *sync.Map, key string, obj *unstructured.Unstructured),
+	apply func(to *globalIngressIPMap, key string, obj *unstructured.Unstructured),
 ) {
 	target, _, _ := unstructured.NestedString(obj.Object, "spec", "target")
 	switch target {
@@ -95,25 +123,48 @@ func (c *globalIngressIPCache) applyToCache(obj *unstructured.Unstructured,
 	}
 }
 
-func (c *globalIngressIPCache) getForService(namespace, name string) (*unstructured.Unstructured, bool) {
-	return c.get(&c.byService, namespace, name)
+func (c *globalIngressIPCache) getForService(namespace, name string, transform globalIngressIPTransformFn, onAddOrUpdate func(),
+) (any, bool) {
+	return c.get(&c.byService, namespace, name, transform, onAddOrUpdate)
 }
 
-func (c *globalIngressIPCache) getForPod(namespace, name string) (*unstructured.Unstructured, bool) {
-	return c.get(&c.byPod, namespace, name)
+func (c *globalIngressIPCache) getForPod(namespace, name string, transform globalIngressIPTransformFn, onAddOrUpdate func(),
+) (any, bool) {
+	return c.get(&c.byPod, namespace, name, transform, onAddOrUpdate)
 }
 
-func (c *globalIngressIPCache) getForEndpoints(namespace, ip string) (*unstructured.Unstructured, bool) {
-	return c.get(&c.byEndpoints, namespace, ip)
+func (c *globalIngressIPCache) getForEndpoints(namespace, ip string, transform globalIngressIPTransformFn, onAddOrUpdate func(),
+) (any, bool) {
+	return c.get(&c.byEndpoints, namespace, ip, transform, onAddOrUpdate)
 }
 
-func (c *globalIngressIPCache) get(from *sync.Map, namespace, name string) (*unstructured.Unstructured, bool) {
-	v, found := from.Load(c.key(namespace, name))
-	if !found {
+func (c *globalIngressIPCache) get(from *globalIngressIPMap, namespace, name string, transform globalIngressIPTransformFn,
+	onAddOrUpdate func(),
+) (any, bool) {
+	from.Lock()
+	defer from.Unlock()
+
+	key := c.key(namespace, name)
+
+	e := from.entries[key]
+	if e == nil {
+		e = &globalIngressIPEntry{}
+		from.entries[key] = e
+	}
+
+	if e.obj == nil {
+		e.onAddOrUpdate = onAddOrUpdate
 		return nil, false
 	}
 
-	return v.(*unstructured.Unstructured), true
+	r, ok := transform(e.obj)
+	if !ok {
+		e.onAddOrUpdate = onAddOrUpdate
+	} else {
+		e.onAddOrUpdate = nil
+	}
+
+	return r, ok
 }
 
 func (c *globalIngressIPCache) key(ns, n string) string {
