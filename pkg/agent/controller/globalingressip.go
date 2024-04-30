@@ -19,6 +19,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/submariner-io/admiral/pkg/util"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -32,38 +33,25 @@ const (
 
 type IngressIP struct {
 	namespace         string
-	target            string
 	allocatedIP       string
 	unallocatedReason string
 	unallocatedMsg    string
 }
 
 func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
-	var (
-		found bool
-		err   error
-	)
-
 	gip := &IngressIP{}
 	gip.namespace = obj.GetNamespace()
-
-	gip.target, found, err = unstructured.NestedString(obj.Object, "spec", "target")
-	if !found || err != nil {
-		logger.Errorf(nil, "target field not found in spec %#v", obj.Object)
-		return nil
-	}
 
 	gip.allocatedIP, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
 	if gip.allocatedIP == "" {
 		gip.unallocatedMsg = defaultMsgIPUnavailable
 		gip.unallocatedReason = defaultReasonIPUnavailable
 
-		conditions, _, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
+		conditions := util.ConditionsFromUnstructured(obj, "status", "conditions")
 		for i := range conditions {
-			c := conditions[i].(map[string]interface{})
-			if c["type"].(string) == "Allocated" {
-				gip.unallocatedMsg = c["message"].(string)
-				gip.unallocatedReason = c["reason"].(string)
+			if conditions[i].Type == "Allocated" {
+				gip.unallocatedMsg = "Unable to obtain global IP: " + conditions[i].Message
+				gip.unallocatedReason = conditions[i].Reason
 
 				break
 			}

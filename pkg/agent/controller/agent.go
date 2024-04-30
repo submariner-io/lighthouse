@@ -252,18 +252,19 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	if svcType == mcsv1a1.ClusterSetIP {
 		if a.globalnetEnabled {
-			ip, reason, msg := a.getGlobalIP(svc)
-			if ip == "" {
+			ingressIP := a.getIngressIP(svc.Name, svc.Namespace)
+			if ingressIP.allocatedIP == "" {
 				logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
 					svcExport.Namespace, svcExport.Name)
-				// Globalnet enabled but service doesn't have globalIp yet, Update the status and requeue
+				// Globalnet enabled but service doesn't have globalIp yet - update the status.
 				a.serviceExportClient.updateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-					newServiceExportCondition(mcsv1a1.ServiceExportValid, corev1.ConditionFalse, reason, msg))
+					newServiceExportCondition(mcsv1a1.ServiceExportValid, corev1.ConditionFalse, ingressIP.unallocatedReason,
+						ingressIP.unallocatedMsg))
 
-				return nil, true
+				return nil, false
 			}
 
-			serviceImport.Spec.IPs = []string{ip}
+			serviceImport.Spec.IPs = []string{ingressIP.allocatedIP}
 		} else {
 			serviceImport.Spec.IPs = []string{svc.Spec.ClusterIP}
 		}
@@ -380,26 +381,24 @@ func (a *Controller) getObjectNameWithClusterID(name, namespace string) string {
 	return name + "-" + namespace + "-" + a.clusterID
 }
 
-func (a *Controller) getGlobalIP(service *corev1.Service) (ip, reason, msg string) {
-	if a.globalnetEnabled {
-		ingressIP, found := a.getIngressIP(service.Name, service.Namespace)
-		if !found {
-			return "", defaultReasonIPUnavailable, defaultMsgIPUnavailable
+func (a *Controller) getIngressIP(name, namespace string) *IngressIP {
+	ret, _ := a.serviceImportController.globalIngressIPCache.getForService(namespace, name,
+		func(obj *unstructured.Unstructured) (any, bool) {
+			ingressIP := parseIngressIP(obj)
+			return ingressIP, ingressIP.allocatedIP != ""
+		}, func() {
+			a.serviceExportSyncer.RequeueResource(name, namespace)
+		})
+
+	if ret == nil {
+		ret = &IngressIP{
+			namespace:         namespace,
+			unallocatedReason: defaultReasonIPUnavailable,
+			unallocatedMsg:    defaultMsgIPUnavailable,
 		}
-
-		return ingressIP.allocatedIP, ingressIP.unallocatedReason, ingressIP.unallocatedMsg
 	}
 
-	return "", "GlobalnetDisabled", "Globalnet is not enabled"
-}
-
-func (a *Controller) getIngressIP(name, namespace string) (*IngressIP, bool) {
-	obj, found := a.serviceImportController.globalIngressIPCache.getForService(namespace, name)
-	if !found {
-		return nil, false
-	}
-
-	return parseIngressIP(obj), true
+	return ret.(*IngressIP)
 }
 
 func (a *Controller) toServiceExport(obj runtime.Object) *mcsv1a1.ServiceExport {

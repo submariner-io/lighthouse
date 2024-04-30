@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -129,10 +130,21 @@ type ServiceExportClient struct {
 	localSyncer syncer.Interface
 }
 
-type globalIngressIPCache struct {
+type globalIngressIPEntry struct {
+	obj           *unstructured.Unstructured
+	onAddOrUpdate func()
+}
+
+type globalIngressIPTransformFn func(obj *unstructured.Unstructured) (any, bool)
+
+type globalIngressIPMap struct {
 	sync.Mutex
-	byService   sync.Map
-	byPod       sync.Map
-	byEndpoints sync.Map
+	entries map[string]*globalIngressIPEntry
+}
+
+type globalIngressIPCache struct {
+	byService   globalIngressIPMap
+	byPod       globalIngressIPMap
+	byEndpoints globalIngressIPMap
 	watcher     watcher.Interface
 }
