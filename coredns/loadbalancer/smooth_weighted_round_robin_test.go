@@ -19,10 +19,7 @@ limitations under the License.
 package loadbalancer_test
 
 import (
-	cryptoRand "crypto/rand"
-	"math/big"
-	"math/rand"
-	"time"
+	"math/rand/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,24 +31,12 @@ type server struct {
 	weight int64
 }
 
-//nolint:gosec // This is only used to shuffle the list of resolvers
-var randgen = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 var _ = Describe("Smooth Weighted RR", func() {
 	// Global Vars
 	var servers []server
 	var smoothTestingServers []server
 	var roundRobinServers []server
 	var lb loadbalancer.Interface
-	// Helpers
-	randInt := func() int64 {
-		maxWeight := int64(20)
-		rInt, err := cryptoRand.Int(cryptoRand.Reader, big.NewInt(maxWeight))
-		if err != nil {
-			return int64(10)
-		}
-		return rInt.Int64()
-	}
 
 	addServer := func(s server) {
 		err := lb.Add(s.name, s.weight)
@@ -126,10 +111,11 @@ var _ = Describe("Smooth Weighted RR", func() {
 			{name: "server2", weight: 1},
 			{name: "server3", weight: 1},
 		}
+		maxWeight := int64(20)
 		servers = []server{
-			{name: "server1", weight: randInt()},
-			{name: "server2", weight: randInt()},
-			{name: "server3", weight: randInt()},
+			{name: "server1", weight: rand.N(maxWeight)},
+			{name: "server2", weight: rand.N(maxWeight)},
+			{name: "server3", weight: rand.N(maxWeight)},
 		}
 		roundRobinServers = []server{
 			{name: "server1", weight: 1},
@@ -137,7 +123,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 			{name: "server3", weight: 1},
 		}
 
-		randgen.Shuffle(len(servers), func(i, j int) { servers[i], servers[j] = servers[j], servers[i] })
+		rand.Shuffle(len(servers), func(i, j int) { servers[i], servers[j] = servers[j], servers[i] })
 	})
 
 	When("first created", func() {
