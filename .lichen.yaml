@@ -23,3 +23,11 @@ override:
     licenses: ["Apache-2.0"]
   - path: "sigs.k8s.io/yaml"
     licenses: ["Apache-2.0", "MIT"]
+
+# Check https://github.com/cncf/foundation/blob/main/license-exceptions/CNCF-licensing-exceptions.csv
+exceptions:
+  licenseNotPermitted:
+    - path: "github.com/hashicorp/errwrap"
+      licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/go-multierror"
+      licenses: ["MPL-2.0"]
