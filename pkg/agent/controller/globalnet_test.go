@@ -25,6 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -72,6 +73,7 @@ var _ = Describe("Globalnet enabled", func() {
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
 					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
+					By("Creating GlobalIngressIP")
 					t.cluster1.createGlobalIngressIP(ingressIP)
 					t.awaitNonHeadlessServiceExported(&t.cluster1)
 				})
@@ -87,6 +89,7 @@ var _ = Describe("Globalnet enabled", func() {
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
 					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
+					By("Updating GlobalIngressIP")
 					setIngressAllocatedIP(ingressIP, globalIP1)
 					test.UpdateResource(t.cluster1.localIngressIPClient, ingressIP)
 					t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -188,6 +191,28 @@ var _ = Describe("Globalnet enabled", func() {
 
 		It("should export the service with the global IPs", func() {
 			t.awaitHeadlessServiceExported(&t.cluster1)
+		})
+
+		Context("and it initially does not have a global IP for all endpoint addresses", func() {
+			BeforeEach(func() {
+				t.cluster1.serviceEndpointSlices[0].Endpoints = append(t.cluster1.serviceEndpointSlices[0].Endpoints,
+					discovery.Endpoint{
+						Addresses: []string{epIP3},
+						Hostname:  ptr.To("host3"),
+					})
+
+				t.cluster1.headlessEndpointAddresses[0] = append(t.cluster1.headlessEndpointAddresses[0],
+					discovery.Endpoint{
+						Addresses: []string{globalIP3},
+						Hostname:  ptr.To("host3"),
+					})
+			})
+
+			It("should eventually export the service with the global IPs", func() {
+				t.cluster1.ensureNoEndpointSlice()
+				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("three", globalIP3, epIP3))
+				t.awaitEndpointSlice(&t.cluster1)
+			})
 		})
 	})
 })
