@@ -109,8 +109,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	controller.BrokerResyncPeriod = time.Millisecond * 100
 }
 
 func TestController(t *testing.T) {
@@ -293,7 +291,7 @@ func newTestDiver() *testDriver {
 		syncerConfig: &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
 			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{}, &corev1.Service{},
-				&corev1.Endpoints{}, &discovery.EndpointSlice{}, controller.GetGlobalIngressIPObj()),
+				&corev1.Endpoints{}, &corev1.Namespace{}, &discovery.EndpointSlice{}, controller.GetGlobalIngressIPObj()),
 			BrokerClient: brokerClient,
 			Scheme:       syncerScheme,
 		},

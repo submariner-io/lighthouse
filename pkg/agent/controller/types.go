@@ -32,6 +32,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -59,6 +60,7 @@ type Controller struct {
 	serviceSyncer               syncer.Interface
 	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
+	namespaceInformer           cache.SharedInformer
 }
 
 type AgentSpecification struct {

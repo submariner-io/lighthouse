@@ -108,6 +108,17 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 		return nil, errors.Wrap(err, "error creating Service syncer")
 	}
 
+	syncerConf.NamespaceInformer, err = syncer.NewSharedInformer(&syncer.ResourceSyncerConfig{
+		SourceClient: syncerConf.LocalClient,
+		RestMapper:   syncerConf.RestMapper,
+		ResourceType: &corev1.Namespace{},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating namespace informer")
+	}
+
+	agentController.namespaceInformer = syncerConf.NamespaceInformer
+
 	agentController.serviceExportClient = &ServiceExportClient{
 		NamespaceableResourceInterface: syncerConf.LocalClient.Resource(*gvr),
 		converter:                      converter{scheme: syncerConf.Scheme},
@@ -138,6 +149,10 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 
 	// Start the informer factories to begin populating the informer caches
 	logger.Info("Starting Agent controller")
+
+	go func() {
+		a.namespaceInformer.Run(stopCh)
+	}()
 
 	if err := a.serviceExportSyncer.Start(stopCh); err != nil {
 		return errors.Wrap(err, "error starting ServiceExport syncer")

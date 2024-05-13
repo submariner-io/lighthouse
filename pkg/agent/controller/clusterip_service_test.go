@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
@@ -286,6 +287,48 @@ func testClusterIPServiceInOneCluster() {
 
 		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.syncerConfig.BrokerClient,
 			test.RemoteNamespace)), "other-eps")
+	})
+
+	When("the namespace of an exported service does not initially exist on an importing cluster", func() {
+		BeforeEach(func() {
+			fake.AddVerifyNamespaceReactor(&t.cluster2.localDynClient.Fake, "serviceimports", "endpointslices")
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+		})
+
+		It("should eventually import the service when the namespace is created", func() {
+			expServiceImport := &mcsv1a1.ServiceImport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      t.cluster1.service.Name,
+					Namespace: t.cluster1.service.Namespace,
+				},
+				Spec: mcsv1a1.ServiceImportSpec{
+					Type:  mcsv1a1.ClusterSetIP,
+					Ports: t.aggregatedServicePorts,
+				},
+				Status: mcsv1a1.ServiceImportStatus{
+					Clusters: []mcsv1a1.ClusterStatus{{Cluster: t.cluster1.clusterID}},
+				},
+			}
+
+			awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport)
+
+			testutil.EnsureNoResource(resource.ForDynamic(t.cluster2.localServiceImportClient.Namespace(
+				t.cluster1.service.Namespace)), t.cluster1.service.Name)
+			t.cluster2.ensureNoEndpointSlice()
+
+			By("Creating namespace on importing cluster")
+
+			test.CreateResource(t.cluster2.localDynClient.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")),
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: t.cluster1.service.Namespace},
+				})
+
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
 	})
 
 	When("an existing ServiceExport has the legacy Synced status condition", func() {
