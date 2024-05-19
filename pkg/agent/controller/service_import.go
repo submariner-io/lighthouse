@@ -90,16 +90,17 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 	}
 
 	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:             "Remote ServiceImport",
-		SourceClient:     brokerClient,
-		SourceNamespace:  brokerNamespace,
-		RestMapper:       syncerConfig.RestMapper,
-		Federator:        federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
-		ResourceType:     &mcsv1a1.ServiceImport{},
-		Transform:        controller.onRemoteServiceImport,
-		OnSuccessfulSync: controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
-		Scheme:           syncerConfig.Scheme,
-		ResyncPeriod:     BrokerResyncPeriod,
+		Name:              "Remote ServiceImport",
+		SourceClient:      brokerClient,
+		SourceNamespace:   brokerNamespace,
+		RestMapper:        syncerConfig.RestMapper,
+		Federator:         federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
+		ResourceType:      &mcsv1a1.ServiceImport{},
+		Transform:         controller.onRemoteServiceImport,
+		OnSuccessfulSync:  controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
+		Scheme:            syncerConfig.Scheme,
+		ResyncPeriod:      BrokerResyncPeriod,
+		NamespaceInformer: syncerConfig.NamespaceInformer,
 		SyncCounterOpts: &prometheus.GaugeOpts{
 			Name: syncerMetricNames.ServiceImportCounterName,
 			Help: "Count of imported services",
