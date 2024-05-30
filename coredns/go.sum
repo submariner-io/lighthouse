@@ -463,8 +463,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/submariner-io/admiral v0.16.5 h1:MZVblbG75i6ttLsAN9Ui8D3uhJoYnpOcA5OqCWr5U/I=
-github.com/submariner-io/admiral v0.16.5/go.mod h1:rJN1ezTS2jVL5J/AxjjkyHmTxJe9ogGqRlR25PLoVVk=
+github.com/submariner-io/admiral v0.16.6 h1:Z3otILEfC6B6ZuBxRrJsdDbnvdSC6z4RVu4mUIlHXTo=
+github.com/submariner-io/admiral v0.16.6/go.mod h1:9l9gSnMyYY3WelvB560BbRUkYpC0Iqyw1yao8+alR9U=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tinylib/msgp v1.1.8 h1:FCXC1xanKO4I8plpHGH2P7koL/RzZs12l/+r7vakfm0=
 github.com/tinylib/msgp v1.1.8/go.mod h1:qkpG+2ldGg4xRFmx+jfTvZPxfGFhi64BcnL9vkCm/Tw=
