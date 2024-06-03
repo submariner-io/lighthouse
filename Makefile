@@ -1,4 +1,4 @@
-BASE_BRANCH ?= devel
+BASE_BRANCH ?= release-0.18
 export BASE_BRANCH
 
 ifneq (,$(DAPPER_HOST_ARCH))
