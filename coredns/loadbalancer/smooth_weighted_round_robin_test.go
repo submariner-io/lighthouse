@@ -104,6 +104,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		Expect(lb.Next().(string)).To(Equal(servers[0].name))
 	}
 
+	//nolint:gosec // Use of math/rand over crypto/rand is fine here as this is a unit test and is not security-sensitive.
 	BeforeEach(func() {
 		lb = loadbalancer.NewSmoothWeightedRR()
 		smoothTestingServers = []server{
