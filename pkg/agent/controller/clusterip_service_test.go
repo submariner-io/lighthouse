@@ -193,6 +193,21 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	When("the session affinity is configured for an exported service", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			}
+		})
+
+		It("should be propagated to the ServiceImport", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
+	})
+
 	When("two Services with the same name in different namespaces are exported", func() {
 		It("should correctly export both services", func() {
 			t.cluster1.createService()
@@ -306,8 +321,9 @@ func testClusterIPServiceInOneCluster() {
 					Namespace: t.cluster1.service.Namespace,
 				},
 				Spec: mcsv1a1.ServiceImportSpec{
-					Type:  mcsv1a1.ClusterSetIP,
-					Ports: t.aggregatedServicePorts,
+					Type:            mcsv1a1.ClusterSetIP,
+					Ports:           t.aggregatedServicePorts,
+					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 				Status: mcsv1a1.ServiceImportStatus{
 					Clusters: []mcsv1a1.ClusterStatus{{Cluster: t.cluster1.clusterID}},
@@ -357,6 +373,11 @@ func testClusterIPServiceInTwoClusters() {
 
 	BeforeEach(func() {
 		t = newTestDiver()
+
+		t.cluster2.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+		t.cluster2.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+			ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+		}
 	})
 
 	JustBeforeEach(func() {
