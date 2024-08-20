@@ -181,9 +181,10 @@ func newTestDiver() *testDriver {
 					},
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.253.9.1",
-					Selector:  map[string]string{"app": "test"},
-					Ports:     []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
+					ClusterIP:       "10.253.9.1",
+					Selector:        map[string]string{"app": "test"},
+					Ports:           []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
+					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 			},
 			serviceExport: &mcsv1a1.ServiceExport{
@@ -259,9 +260,10 @@ func newTestDiver() *testDriver {
 					Namespace: serviceNamespace,
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.253.10.1",
-					Selector:  map[string]string{"app": "test"},
-					Ports:     []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
+					ClusterIP:       "10.253.10.1",
+					Selector:        map[string]string{"app": "test"},
+					Ports:           []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
+					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 			},
 			serviceExport: &mcsv1a1.ServiceExport{
@@ -783,8 +785,9 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 			Namespace: test.RemoteNamespace,
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  sType,
-			Ports: []mcsv1a1.ServicePort{},
+			Type:            sType,
+			Ports:           []mcsv1a1.ServicePort{},
+			SessionAffinity: corev1.ServiceAffinityNone,
 		},
 	}
 
@@ -796,6 +799,14 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 		for _, c := range clusters {
 			expServiceImport.Status.Clusters = append(expServiceImport.Status.Clusters,
 				mcsv1a1.ClusterStatus{Cluster: c.clusterID})
+
+			if c.service.Spec.SessionAffinity != corev1.ServiceAffinityNone {
+				expServiceImport.Spec.SessionAffinity = c.service.Spec.SessionAffinity
+			}
+
+			if c.service.Spec.SessionAffinityConfig != nil {
+				expServiceImport.Spec.SessionAffinityConfig = c.service.Spec.SessionAffinityConfig
+			}
 		}
 	}
 

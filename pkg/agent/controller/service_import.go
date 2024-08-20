@@ -300,8 +300,10 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  localServiceImport.Spec.Type,
-			Ports: []mcsv1a1.ServicePort{},
+			Type:                  localServiceImport.Spec.Type,
+			Ports:                 []mcsv1a1.ServicePort{},
+			SessionAffinity:       localServiceImport.Spec.SessionAffinity,
+			SessionAffinityConfig: localServiceImport.Spec.SessionAffinityConfig,
 		},
 		Status: mcsv1a1.ServiceImportStatus{
 			Clusters: []mcsv1a1.ClusterStatus{
@@ -338,6 +340,14 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			} else {
 				c.serviceExportClient.removeStatusCondition(ctx, serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 					typeConflictReason)
+
+				if existing.Spec.SessionAffinity == "" || existing.Spec.SessionAffinity == corev1.ServiceAffinityNone {
+					existing.Spec.SessionAffinity = localServiceImport.Spec.SessionAffinity
+				}
+
+				if existing.Spec.SessionAffinityConfig == nil {
+					existing.Spec.SessionAffinityConfig = localServiceImport.Spec.SessionAffinityConfig
+				}
 
 				var added bool
 

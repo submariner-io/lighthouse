@@ -254,7 +254,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
 		Type:                  svcType,
-		SessionAffinityConfig: new(corev1.SessionAffinityConfig),
+		SessionAffinity:       svc.Spec.SessionAffinity,
+		SessionAffinityConfig: svc.Spec.SessionAffinityConfig,
 	}
 
 	serviceImport.Status = mcsv1a1.ServiceImportStatus{
