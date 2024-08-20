@@ -21,7 +21,6 @@ package lighthouse
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
@@ -47,8 +46,7 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 
 	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA && state.QType() != dns.TypeSRV {
-		msg := fmt.Sprintf("Query of type %d is not supported", state.QType())
-		log.Debugf(msg)
+		log.Debugf("Query of type %d is not supported", state.QType())
 
 		return lh.nextOrFailure(ctx, state, r, dns.RcodeNotImplemented)
 	}
