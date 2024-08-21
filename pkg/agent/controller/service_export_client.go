@@ -28,11 +28,25 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (c *ServiceExportClient) removeStatusCondition(ctx context.Context, name, namespace string,
+func NewServiceExportClient(client dynamic.Interface, scheme *runtime.Scheme) *ServiceExportClient {
+	return &ServiceExportClient{
+		NamespaceableResourceInterface: client.Resource(schema.GroupVersionResource{
+			Group:    mcsv1a1.GroupVersion.Group,
+			Version:  mcsv1a1.GroupVersion.Version,
+			Resource: "serviceexports",
+		}),
+		converter: converter{scheme: scheme},
+	}
+}
+
+func (c *ServiceExportClient) RemoveStatusCondition(ctx context.Context, name, namespace string,
 	condType mcsv1a1.ServiceExportConditionType, reason string,
 ) {
 	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
@@ -53,7 +67,7 @@ func (c *ServiceExportClient) removeStatusCondition(ctx context.Context, name, n
 	})
 }
 
-func (c *ServiceExportClient) updateStatusConditions(ctx context.Context, name, namespace string,
+func (c *ServiceExportClient) UpdateStatusConditions(ctx context.Context, name, namespace string,
 	conditions ...mcsv1a1.ServiceExportCondition,
 ) {
 	c.tryUpdateStatusConditions(ctx, name, namespace, true, conditions...)
