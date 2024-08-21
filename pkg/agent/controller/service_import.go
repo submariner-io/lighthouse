@@ -267,7 +267,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
 
 	if op == syncer.Delete {
-		c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
+		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
@@ -333,11 +333,11 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 					fmt.Sprintf("The service type %q does not match the type (%q) of the existing service export",
 						localServiceImport.Spec.Type, existing.Spec.Type))
 
-				c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace, conflictCondition,
+				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conflictCondition,
 					newServiceExportCondition(constants.ServiceExportReady,
 						corev1.ConditionFalse, exportFailedReason, "Unable to export due to an irresolvable conflict"))
 			} else {
-				c.serviceExportClient.removeStatusCondition(ctx, serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
+				c.serviceExportClient.RemoveStatusCondition(ctx, serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 					typeConflictReason)
 
 				if existing.Spec.SessionAffinity == "" || existing.Spec.SessionAffinity == corev1.ServiceAffinityNone {
@@ -366,7 +366,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	}
 
 	if err != nil {
-		c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
+		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
 			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, exportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 	}
