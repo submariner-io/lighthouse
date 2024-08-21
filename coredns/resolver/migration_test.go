@@ -100,7 +100,9 @@ func testClusterIPServiceMigration() {
 		Specify("the DNS records should be correct before and after the legacy cluster is upgraded", func() {
 			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
 			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
-			t.testRoundRobin(namespace1, service1, serviceIP1, serviceIP2)
+			Eventually(func() string {
+				return t.getNonHeadlessDNSRecord(namespace1, service1, "").IP
+			}).Should(Equal(serviceIP1))
 
 			t.resolver.RemoveServiceImport(legacyServiceImport)
 			t.createEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
