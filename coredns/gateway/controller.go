@@ -85,21 +85,25 @@ func (c *Controller) Start(client dynamic.Interface) error {
 
 	logger.Infof("Starting Gateway status Controller")
 
-	c.store, c.informer = cache.NewInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return gwClientset.List(context.TODO(), options)
+	c.store, c.informer = cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return gwClientset.List(context.TODO(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return gwClientset.Watch(context.TODO(), options)
+			},
 		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return gwClientset.Watch(context.TODO(), options)
-		},
-	}, &unstructured.Unstructured{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: c.queue.Enqueue,
-		UpdateFunc: func(_ interface{}, newObj interface{}) {
-			c.queue.Enqueue(newObj)
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			logger.V(log.DEBUG).Infof("GatewayStatus %q deleted", key)
+		ObjectType: &unstructured.Unstructured{},
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: c.queue.Enqueue,
+			UpdateFunc: func(_ interface{}, newObj interface{}) {
+				c.queue.Enqueue(newObj)
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				logger.V(log.DEBUG).Infof("GatewayStatus %q deleted", key)
+			},
 		},
 	})
 
