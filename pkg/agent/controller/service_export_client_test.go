@@ -100,34 +100,6 @@ var _ = Describe("ServiceExportClient", func() {
 		})
 	})
 
-	Context("RemoveStatusCondition", func() {
-		BeforeEach(func() {
-			initialServiceExport.Status.Conditions = []mcsv1a1.ServiceExportCondition{
-				{
-					Type:   constants.ServiceExportReady,
-					Status: corev1.ConditionFalse,
-					Reason: ptr.To("Failed"),
-				},
-			}
-		})
-
-		It("should remove the condition if the reason matches", func() {
-			serviceExportClient.RemoveStatusCondition(context.TODO(), serviceName, serviceNamespace,
-				constants.ServiceExportReady, "Failed")
-
-			Expect(controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions,
-				constants.ServiceExportReady)).To(BeNil())
-		})
-
-		It("should not remove the condition if the reason does not match", func() {
-			serviceExportClient.RemoveStatusCondition(context.TODO(), serviceName, serviceNamespace,
-				constants.ServiceExportReady, "NotMatching")
-
-			Expect(controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions,
-				constants.ServiceExportReady)).ToNot(BeNil())
-		})
-	})
-
 	Context("with Conflict condition type", func() {
 		It("should aggregate the different reasons and messages", func() {
 			// The condition shouldn't be added with Status False.

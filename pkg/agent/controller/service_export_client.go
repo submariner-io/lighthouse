@@ -26,7 +26,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,27 +47,6 @@ func NewServiceExportClient(client dynamic.Interface, scheme *runtime.Scheme) *S
 		}),
 		converter: converter{scheme: scheme},
 	}
-}
-
-func (c *ServiceExportClient) RemoveStatusCondition(ctx context.Context, name, namespace string,
-	condType mcsv1a1.ServiceExportConditionType, reason string,
-) {
-	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
-		condition := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
-		if condition != nil && reflect.DeepEqual(condition.Reason, &reason) {
-			logger.V(log.DEBUG).Infof("Removing status condition (Type: %q, Reason: %q) from ServiceExport (%s/%s)",
-				condType, reason, namespace, name)
-
-			toUpdate.Status.Conditions, _ = slices.Remove(toUpdate.Status.Conditions, *condition,
-				func(c mcsv1a1.ServiceExportCondition) mcsv1a1.ServiceExportConditionType {
-					return c.Type
-				})
-
-			return true
-		}
-
-		return false
-	})
 }
 
 func (c *ServiceExportClient) UpdateStatusConditions(ctx context.Context, name, namespace string,
