@@ -20,7 +20,6 @@ package controller
 
 import (
 	"sync"
-	"time"
 
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -39,8 +38,6 @@ const (
 	typeConflictReason = "ConflictingType"
 	portConflictReason = "ConflictingPorts"
 )
-
-var BrokerResyncPeriod = time.Minute * 2
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
 

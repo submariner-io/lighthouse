@@ -109,8 +109,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	controller.BrokerResyncPeriod = time.Millisecond * 100
 }
 
 func TestController(t *testing.T) {
