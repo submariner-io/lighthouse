@@ -99,7 +99,6 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Transform:         controller.onRemoteServiceImport,
 		OnSuccessfulSync:  controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
 		Scheme:            syncerConfig.Scheme,
-		ResyncPeriod:      BrokerResyncPeriod,
 		NamespaceInformer: syncerConfig.NamespaceInformer,
 		SyncCounterOpts: &prometheus.GaugeOpts{
 			Name: syncerMetricNames.ServiceImportCounterName,
