@@ -584,18 +584,6 @@ func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportC
 	}
 }
 
-func (c *cluster) awaitNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {
-	if len(serviceExports) == 0 {
-		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
-	}
-
-	for _, se := range serviceExports {
-		Eventually(func() interface{} {
-			return c.retrieveServiceExportCondition(se, condType)
-		}).Should(BeNil(), "Unexpected ServiceExport status condition")
-	}
-}
-
 func (c *cluster) awaitServiceUnavailableStatus() {
 	c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceUnavailable"))
 }

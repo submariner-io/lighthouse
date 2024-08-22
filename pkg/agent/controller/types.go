@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	exportFailedReason = "ExportFailed"
-	typeConflictReason = "ConflictingType"
-	portConflictReason = "ConflictingPorts"
+	ExportFailedReason = "ExportFailed"
+	TypeConflictReason = "ConflictingType"
+	PortConflictReason = "ConflictingPorts"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
