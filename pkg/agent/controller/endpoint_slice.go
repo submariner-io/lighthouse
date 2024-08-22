@@ -70,7 +70,6 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 				c.enqueueForConflictCheck(context.TODO(), obj.(*discovery.EndpointSlice), op)
 				return false
 			},
-			BrokerResyncPeriod: BrokerResyncPeriod,
 		},
 	}
 
