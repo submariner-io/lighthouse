@@ -20,6 +20,7 @@ package controller_test
 
 import (
 	"context"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -124,6 +125,106 @@ var _ = Describe("ServiceExportClient", func() {
 
 			Expect(controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions,
 				constants.ServiceExportReady)).ToNot(BeNil())
+		})
+	})
+
+	Context("with Conflict condition type", func() {
+		It("should aggregate the different reasons and messages", func() {
+			// The condition shouldn't be added with Status False.
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, mcsv1a1.ServiceExportCondition{
+				Type:    mcsv1a1.ServiceExportConflict,
+				Status:  corev1.ConditionFalse,
+				Reason:  ptr.To(""),
+				Message: ptr.To(""),
+			})
+
+			Expect(controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions,
+				mcsv1a1.ServiceExportConflict)).To(BeNil())
+
+			portConflictMsg := "The service ports conflict"
+			typeConflictMsg := "The service types conflict"
+
+			cond := mcsv1a1.ServiceExportCondition{
+				Type:    mcsv1a1.ServiceExportConflict,
+				Status:  corev1.ConditionTrue,
+				Reason:  ptr.To(controller.PortConflictReason),
+				Message: ptr.To(portConflictMsg),
+			}
+
+			// Add first condition reason
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, cond)
+
+			Expect(controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)).To(Equal(&cond))
+
+			// Add second condition reason
+
+			cond.Reason = ptr.To(controller.TypeConflictReason)
+			cond.Message = ptr.To(typeConflictMsg)
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, cond)
+
+			actual := controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)
+			Expect(strings.Split(*actual.Reason, ",")).To(HaveExactElements(controller.PortConflictReason, controller.TypeConflictReason))
+			Expect(strings.Split(*actual.Message, "\n")).To(HaveExactElements(portConflictMsg, typeConflictMsg))
+			Expect(actual.Status).To(Equal(corev1.ConditionTrue))
+
+			// Update second condition message
+
+			typeConflictMsg = "The service types still conflict"
+			cond.Message = ptr.To(typeConflictMsg)
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, cond)
+
+			actual = controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)
+			Expect(strings.Split(*actual.Reason, ",")).To(HaveExactElements(controller.PortConflictReason, controller.TypeConflictReason))
+			Expect(strings.Split(*actual.Message, "\n")).To(HaveExactElements(portConflictMsg, typeConflictMsg))
+			Expect(actual.Status).To(Equal(corev1.ConditionTrue))
+
+			// Resolve first condition
+
+			cond.Reason = ptr.To(controller.PortConflictReason)
+			cond.Message = ptr.To("")
+			cond.Status = corev1.ConditionFalse
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, cond)
+
+			actual = controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)
+			Expect(*actual.Reason).To(Equal(controller.TypeConflictReason))
+			Expect(*actual.Message).To(Equal(typeConflictMsg))
+			Expect(actual.Status).To(Equal(corev1.ConditionTrue))
+
+			// Resolve second condition
+
+			cond.Reason = ptr.To(controller.TypeConflictReason)
+
+			for i := 1; i <= 2; i++ {
+				serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, cond)
+
+				actual = controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)
+				Expect(actual.Status).To(Equal(corev1.ConditionFalse))
+				Expect(*actual.Reason).To(BeEmpty())
+				Expect(*actual.Message).To(BeEmpty())
+			}
+
+			// Add the first condition back
+
+			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, mcsv1a1.ServiceExportCondition{
+				Type:    mcsv1a1.ServiceExportConflict,
+				Status:  corev1.ConditionTrue,
+				Reason:  ptr.To(controller.PortConflictReason),
+				Message: ptr.To(""),
+			}, mcsv1a1.ServiceExportCondition{
+				Type:    mcsv1a1.ServiceExportConflict,
+				Status:  corev1.ConditionFalse,
+				Reason:  ptr.To(controller.TypeConflictReason),
+				Message: ptr.To(""),
+			})
+
+			actual = controller.FindServiceExportStatusCondition(getServiceExport().Status.Conditions, cond.Type)
+			Expect(*actual.Reason).To(Equal(controller.PortConflictReason))
+			Expect(actual.Status).To(Equal(corev1.ConditionTrue))
 		})
 	})
 })

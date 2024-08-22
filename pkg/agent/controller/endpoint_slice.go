@@ -185,7 +185,7 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(ctx, serviceName, serviceNamespace)
 		if err != nil {
 			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, exportFailedReason,
+				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, ExportFailedReason,
 					fmt.Sprintf("Unable to export: %v", err)))
 		} else {
 			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
@@ -264,12 +264,13 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 
 	if conflict {
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, portConflictReason,
+			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, PortConflictReason,
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the intersection of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
 	} else if FindServiceExportStatusCondition(localServiceExport.Status.Conditions, mcsv1a1.ServiceExportConflict) != nil {
-		c.serviceExportClient.RemoveStatusCondition(ctx, name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
+		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, PortConflictReason, ""))
 	}
 
 	return false, nil
