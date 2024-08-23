@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/testing"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -174,12 +173,7 @@ var _ = Describe("Reconciliation", func() {
 
 	When("a remote aggregated ServiceImport is stale in the local datastore on startup", func() {
 		It("should delete it from the local datastore on reconciliation", func() {
-			obj, err := t.cluster2.localServiceImportClient.Namespace(t.cluster1.service.Namespace).Get(context.TODO(),
-				t.cluster1.service.Name, metav1.GetOptions{})
-			Expect(err).To(Succeed())
-
-			serviceImport := &mcsv1a1.ServiceImport{}
-			Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+			serviceImport := getServiceImport(t.cluster2.localServiceImportClient, t.cluster1.service.Namespace, t.cluster1.service.Name)
 
 			t.afterEach()
 			t = newTestDiver()

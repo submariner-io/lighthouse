@@ -32,7 +32,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes/scheme"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -171,12 +170,8 @@ func testServiceImportMigration() {
 
 				// Get the aggregated ServiceImport on the broker.
 
-				obj, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).Get(context.Background(),
-					fmt.Sprintf("%s-%s", t.cluster1.service.Name, t.cluster1.service.Namespace), metav1.GetOptions{})
-				Expect(err).To(Succeed())
-
-				aggregatedServiceImport := &mcsv1a1.ServiceImport{}
-				Expect(scheme.Scheme.Convert(obj, aggregatedServiceImport, nil)).To(Succeed())
+				aggregatedServiceImport := getServiceImport(t.brokerServiceImportClient, test.RemoteNamespace,
+					fmt.Sprintf("%s-%s", t.cluster1.service.Name, t.cluster1.service.Namespace))
 
 				By(fmt.Sprintf("Upgrade the first remote cluster %q", remoteServiceImport1.Status.Clusters[0].Cluster))
 

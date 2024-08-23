@@ -21,6 +21,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
+	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,12 +40,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
+
+const timestampAnnotationPrefix = "timestamp.submariner.io/"
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newServiceImportController(spec *AgentSpecification, syncerMetricNames AgentConfig, syncerConfig broker.SyncerConfig,
@@ -97,7 +105,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Federator:         federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
 		ResourceType:      &mcsv1a1.ServiceImport{},
 		Transform:         controller.onRemoteServiceImport,
-		OnSuccessfulSync:  controller.serviceImportMigrator.onSuccessfulSyncFromBroker,
+		OnSuccessfulSync:  controller.onSuccessfulSyncFromBroker,
 		Scheme:            syncerConfig.Scheme,
 		NamespaceInformer: syncerConfig.NamespaceInformer,
 		SyncCounterOpts: &prometheus.GaugeOpts{
@@ -290,12 +298,25 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	serviceName := serviceImportSourceName(localServiceImport)
 	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
 
+	localTimestamp := strconv.FormatInt(int64(math.MaxInt64-1), 10)
+
+	// As per the MCS spec, a conflict will be resolved by assigning precedence based on each ServiceExport's
+	// creationTimestamp, from oldest to newest. We don't have access to other cluster's ServiceExports so
+	// instead add our ServiceExport's creationTimestamp as an annotation on the aggregated ServiceImport.
+	localServiceExport := c.serviceExportClient.getLocalInstance(serviceName, serviceNamespace)
+	if localServiceExport != nil {
+		localTimestamp = strconv.FormatInt(localServiceExport.CreationTimestamp.UTC().UnixNano(), 10)
+	}
+
+	timestampAnnotationKey := makeTimestampAnnotationKey(c.clusterID)
+
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
 			Annotations: map[string]string{
 				mcsv1a1.LabelServiceName:       serviceName,
 				constants.LabelSourceNamespace: serviceNamespace,
+				timestampAnnotationKey:         localTimestamp,
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
@@ -313,12 +334,13 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 		},
 	}
 
-	conflict := false
+	typeConflict := false
 
-	// Here we just create the aggregated ServiceImport on the broker. We don't merge the local service info until we've
-	// successfully synced our local EndpointSlice to the broker. This is mainly done b/c the aggregated port information
-	// is determined from the constituent clusters' EndpointSlices, thus each cluster must have a consistent view of all
-	// the EndpointSlices in order for the aggregated port information to be eventually consistent.
+	// Here we create the aggregated ServiceImport on the broker or update the existing instance with our local service
+	// info, but we don't add/merge our local service ports until we've successfully synced our local EndpointSlice to
+	// the broker. This is mainly done b/c the aggregated port information is determined from the constituent clusters'
+	// EndpointSlices, thus each cluster must have a consistent view of all the EndpointSlices in order for the
+	// aggregated port information to be eventually consistent.
 
 	result, err := util.CreateOrUpdate(ctx,
 		resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
@@ -327,26 +349,31 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			existing := c.converter.toServiceImport(obj)
 
 			if localServiceImport.Spec.Type != existing.Spec.Type {
-				conflict = true
+				typeConflict = true
 				conflictCondition := newServiceExportCondition(
 					mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, TypeConflictReason,
-					fmt.Sprintf("The service type %q does not match the type (%q) of the existing service export",
+					fmt.Sprintf("The local service type (%q) does not match the type (%q) of the existing exported service",
 						localServiceImport.Spec.Type, existing.Spec.Type))
 
 				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conflictCondition,
 					newServiceExportCondition(constants.ServiceExportReady,
 						corev1.ConditionFalse, ExportFailedReason, "Unable to export due to an irresolvable conflict"))
 			} else {
-				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, newServiceExportCondition(
-					mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, TypeConflictReason, ""))
-
-				if existing.Spec.SessionAffinity == "" || existing.Spec.SessionAffinity == corev1.ServiceAffinityNone {
-					existing.Spec.SessionAffinity = localServiceImport.Spec.SessionAffinity
+				if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, TypeConflictReason) {
+					c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, newServiceExportCondition(
+						mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, TypeConflictReason, ""))
 				}
 
-				if existing.Spec.SessionAffinityConfig == nil {
-					existing.Spec.SessionAffinityConfig = localServiceImport.Spec.SessionAffinityConfig
+				if existing.Annotations == nil {
+					existing.Annotations = map[string]string{}
 				}
+
+				existing.Annotations[timestampAnnotationKey] = localTimestamp
+
+				// Update the appropriate aggregated ServiceImport fields if we're the oldest exporting cluster
+				_ = c.updateAggregatedServiceImport(existing, localServiceImport)
+
+				c.checkConflicts(ctx, existing, localServiceImport)
 
 				var added bool
 
@@ -361,7 +388,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 
 			return c.converter.toUnstructured(existing), nil
 		})
-	if err == nil && !conflict {
+	if err == nil && !typeConflict {
 		err = c.startEndpointsController(localServiceImport)
 	}
 
@@ -424,6 +451,101 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 	return c.serviceImportMigrator.onRemoteServiceImport(serviceImport)
 }
 
+func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Object, op syncer.Operation) bool {
+	ctx := context.TODO()
+
+	retry := c.serviceImportMigrator.onSuccessfulSyncFromBroker(synced, op)
+
+	aggregatedServiceImport := synced.(*mcsv1a1.ServiceImport)
+
+	// Check for conflicts with the local ServiceImport
+
+	siList := c.localSyncer.ListResourcesBySelector(k8slabels.SelectorFromSet(map[string]string{
+		mcsv1a1.LabelServiceName:        aggregatedServiceImport.Name,
+		constants.LabelSourceNamespace:  aggregatedServiceImport.Namespace,
+		constants.MCSLabelSourceCluster: c.clusterID,
+	}))
+
+	if len(siList) == 0 {
+		// Service not exported locally.
+		return retry
+	}
+
+	localServiceImport := siList[0].(*mcsv1a1.ServiceImport)
+
+	// This handles the case where the previously oldest exporting cluster has unexported its service. If we're now
+	// the oldest exporting cluster, then update the appropriate aggregated ServiceImport fields to match those of
+	// our service's.
+	if c.updateAggregatedServiceImport(aggregatedServiceImport, localServiceImport) {
+		err := c.serviceImportAggregator.update(ctx, aggregatedServiceImport.Name, aggregatedServiceImport.Namespace,
+			func(aggregated *mcsv1a1.ServiceImport) error {
+				aggregated.Spec.SessionAffinity = localServiceImport.Spec.SessionAffinity
+				aggregated.Spec.SessionAffinityConfig = localServiceImport.Spec.SessionAffinityConfig
+
+				return nil
+			})
+		if err != nil {
+			logger.Errorf(err, "error updating aggregated ServiceImport on broker sync")
+
+			return true
+		}
+	}
+
+	c.checkConflicts(ctx, aggregatedServiceImport, localServiceImport)
+
+	return retry
+}
+
+func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated, local *mcsv1a1.ServiceImport) {
+	var conditions []mcsv1a1.ServiceExportCondition
+
+	serviceName := local.Labels[mcsv1a1.LabelServiceName]
+	serviceNamespace := local.Labels[constants.LabelSourceNamespace]
+
+	precedentCluster := findClusterWithOldestTimestamp(aggregated.Annotations)
+
+	if local.Spec.SessionAffinity != aggregated.Spec.SessionAffinity {
+		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+			SessionAffinityConflictReason,
+			fmt.Sprintf("The local service SessionAffinity %q conflicts with other constituent clusters. "+
+				"Using SessionAffinity %q from the oldest exported service in cluster %q.",
+				local.Spec.SessionAffinity, aggregated.Spec.SessionAffinity, precedentCluster)))
+	} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
+		SessionAffinityConflictReason) {
+		conditions = append(conditions, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, SessionAffinityConflictReason, ""))
+	}
+
+	if !reflect.DeepEqual(local.Spec.SessionAffinityConfig, aggregated.Spec.SessionAffinityConfig) {
+		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+			SessionAffinityConfigConflictReason,
+			fmt.Sprintf("The local service SessionAffinityConfig %q conflicts with other constituent clusters. "+
+				"Using SessionAffinityConfig %q from the oldest exported service in cluster %q.",
+				toSessionAffinityConfigString(local.Spec.SessionAffinityConfig),
+				toSessionAffinityConfigString(aggregated.Spec.SessionAffinityConfig), precedentCluster)))
+	} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
+		SessionAffinityConfigConflictReason) {
+		conditions = append(conditions, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, SessionAffinityConfigConflictReason, ""))
+	}
+
+	c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conditions...)
+}
+
+func (c *ServiceImportController) updateAggregatedServiceImport(aggregated, local *mcsv1a1.ServiceImport) bool {
+	oldestCluster := findClusterWithOldestTimestamp(aggregated.Annotations)
+	if oldestCluster != sanitizeClusterID(c.clusterID) {
+		return false
+	}
+
+	origSpec := aggregated.Spec
+
+	aggregated.Spec.SessionAffinity = local.Spec.SessionAffinity
+	aggregated.Spec.SessionAffinityConfig = local.Spec.SessionAffinityConfig
+
+	return !reflect.DeepEqual(origSpec, aggregated.Spec)
+}
+
 func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
 	siList := c.localSyncer.ListResources()
 
@@ -441,4 +563,49 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 	}
 
 	return retList
+}
+
+func findClusterWithOldestTimestamp(from map[string]string) string {
+	oldest := int64(math.MaxInt64)
+	foundCluster := ""
+
+	for k, v := range from {
+		cluster, found := strings.CutPrefix(k, timestampAnnotationPrefix)
+		if !found {
+			continue
+		}
+
+		t, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			logger.Warningf("Invalid timestamp annotation value %q for cluster %q", v, cluster)
+			continue
+		}
+
+		if t < oldest || (t == oldest && cluster < foundCluster) {
+			foundCluster = cluster
+			oldest = t
+		}
+	}
+
+	return foundCluster
+}
+
+func toSessionAffinityConfigString(c *corev1.SessionAffinityConfig) string {
+	if c != nil && c.ClientIP != nil && c.ClientIP.TimeoutSeconds != nil {
+		return fmt.Sprintf("ClientIP TimeoutSeconds: %d", *c.ClientIP.TimeoutSeconds)
+	}
+
+	return "none"
+}
+
+func makeTimestampAnnotationKey(clusterID string) string {
+	return timestampAnnotationPrefix + sanitizeClusterID(clusterID)
+}
+
+func sanitizeClusterID(clusterID string) string {
+	if len(clusterID) > validation.DNS1123LabelMaxLength {
+		clusterID = clusterID[:validation.DNS1123LabelMaxLength]
+	}
+
+	return resource.EnsureValidName(clusterID)
 }

@@ -21,6 +21,7 @@ package controller_test
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/fake"
@@ -201,6 +202,9 @@ func testClusterIPServiceInOneCluster() {
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
 				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
 			}
+
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 		})
 
 		It("should be propagated to the ServiceImport", func() {
@@ -388,11 +392,6 @@ func testClusterIPServiceInTwoClusters() {
 
 	BeforeEach(func() {
 		t = newTestDiver()
-
-		t.cluster2.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
-		t.cluster2.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-			ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
-		}
 	})
 
 	JustBeforeEach(func() {
@@ -400,27 +399,48 @@ func testClusterIPServiceInTwoClusters() {
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
-		t.justBeforeEach()
+		t.cluster1.start(t, *t.syncerConfig)
+
+		// Sleep a little before starting the second cluster to ensure its resource CreationTimestamps will be
+		// later than the first cluster to ensure conflict checking in deterministic.
+		time.Sleep(100 * time.Millisecond)
 
 		t.cluster2.createServiceEndpointSlices()
 		t.cluster2.createService()
 		t.cluster2.createServiceExport()
+
+		t.cluster2.start(t, *t.syncerConfig)
 	})
 
 	AfterEach(func() {
 		t.afterEach()
 	})
 
-	It("should export the service in both clusters", func() {
-		t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
-		t.cluster1.ensureLastServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionTrue, ""))
-		t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
-		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
-		t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+	Context("", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			}
 
-		By("Ensure conflict checking does not try to unnecessarily update the ServiceExport status")
+			t.cluster2.service.Spec.SessionAffinity = t.cluster1.service.Spec.SessionAffinity
+			t.cluster2.service.Spec.SessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 
-		t.cluster1.ensureNoServiceExportActions()
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+		})
+
+		It("should export the service in both clusters", func() {
+			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+			t.cluster1.ensureLastServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionTrue, ""))
+			t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+
+			By("Ensure conflict checking does not try to unnecessarily update the ServiceExport status")
+
+			t.cluster1.ensureNoServiceExportActions()
+		})
 	})
 
 	Context("with differing ports", func() {
@@ -490,6 +510,165 @@ func testClusterIPServiceInTwoClusters() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
 				t.cluster2.awaitServiceExportCondition(noConflictCondition)
 			})
+		})
+	})
+
+	Context("with differing service SessionAffinity", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+		})
+
+		It("should resolve the conflict and set the Conflict status condition on the conflicting cluster", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				controller.SessionAffinityConflictReason))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+
+		Context("initially and after updating the SessionAffinity on the conflicting cluster to match", func() {
+			It("should clear the Conflict status condition on the conflicting cluster", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConflictReason))
+
+				By("Updating the SessionAffinity on the service")
+
+				t.cluster2.service.Spec.SessionAffinity = t.cluster1.service.Spec.SessionAffinity
+				t.cluster2.updateService()
+
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+
+		Context("initially and after updating the SessionAffinity on the oldest exporting cluster to match", func() {
+			It("should clear the Conflict status condition on the conflicting cluster", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConflictReason))
+
+				By("Updating the SessionAffinity on the service")
+
+				t.cluster1.service.Spec.SessionAffinity = t.cluster2.service.Spec.SessionAffinity
+				t.cluster1.updateService()
+
+				t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+					&t.cluster1, &t.cluster2)
+
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+
+		Context("initially and after the service on the oldest exporting cluster is unexported", func() {
+			It("should update the SessionAffinity on the aggregated ServiceImport and clear the Conflict status condition", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConflictReason))
+
+				By("Unexporting the service")
+
+				t.cluster1.deleteServiceExport()
+
+				t.aggregatedSessionAffinity = t.cluster2.service.Spec.SessionAffinity
+				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster2)
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+	})
+
+	Context("with differing service SessionAffinityConfig", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.cluster2.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+
+			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			}
+			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+		})
+
+		It("should resolve the conflict and set the Conflict status condition on the conflicting cluster", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				controller.SessionAffinityConfigConflictReason))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+
+		Context("initially and after updating the SessionAffinityConfig on the conflicting cluster to match", func() {
+			It("should clear the Conflict status condition on the conflicting cluster", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConfigConflictReason))
+
+				By("Updating the SessionAffinityConfig on the service")
+
+				t.cluster2.service.Spec.SessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+				t.cluster2.updateService()
+
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+
+		Context("initially and after updating the SessionAffinityConfig on the oldest exporting cluster to match", func() {
+			It("should clear the Conflict status condition on the conflicting cluster", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConfigConflictReason))
+
+				By("Updating the SessionAffinityConfig on the service")
+
+				t.cluster1.service.Spec.SessionAffinityConfig = t.cluster2.service.Spec.SessionAffinityConfig
+				t.cluster1.updateService()
+
+				t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+					&t.cluster1, &t.cluster2)
+
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+
+		Context("initially and after the service on the oldest exporting cluster is unexported", func() {
+			BeforeEach(func() {
+				t.cluster2.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+					ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(20))},
+				}
+			})
+
+			It("should update the SessionAffinity on the aggregated ServiceImport and clear the Conflict status condition", func() {
+				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+					controller.SessionAffinityConfigConflictReason))
+
+				By("Unexporting the service")
+
+				t.cluster1.deleteServiceExport()
+
+				t.aggregatedSessionAffinityConfig = t.cluster2.service.Spec.SessionAffinityConfig
+				t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster2)
+				t.cluster2.awaitServiceExportCondition(noConflictCondition)
+			})
+		})
+	})
+
+	Context("with differing service SessionAffinity and SessionAffinityConfig", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+
+			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			}
+			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+		})
+
+		It("should resolve the conflicts and set the Conflict status condition on the conflicting cluster", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				fmt.Sprintf("%s,%s", controller.SessionAffinityConflictReason, controller.SessionAffinityConfigConflictReason)))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		})
 	})
 }
