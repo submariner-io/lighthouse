@@ -101,6 +101,8 @@ func (a *ServiceImportAggregator) updateOnDelete(ctx context.Context, name, name
 		logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
 			a.clusterID, existing.Name, existing.Status.Clusters)
 
+		delete(existing.Annotations, makeTimestampAnnotationKey(a.clusterID))
+
 		return a.setServicePorts(ctx, existing)
 	})
 }

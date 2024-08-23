@@ -58,6 +58,10 @@ func (c *ServiceExportClient) UpdateStatusConditions(ctx context.Context, name, 
 func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, name, namespace string, canReplace bool,
 	conditions ...mcsv1a1.ServiceExportCondition,
 ) {
+	if len(conditions) == 0 {
+		return
+	}
+
 	findStatusCondition := func(conditions []mcsv1a1.ServiceExportCondition, condType mcsv1a1.ServiceExportConditionType,
 	) *mcsv1a1.ServiceExportCondition {
 		cond := FindServiceExportStatusCondition(conditions, condType)
@@ -81,6 +85,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 
 			if prevCond == nil {
 				if condition.Type == mcsv1a1.ServiceExportConflict && condition.Status == corev1.ConditionFalse {
+					// The caller intends to clear the Conflict condition so don't add it.
 					continue
 				}
 
@@ -90,12 +95,14 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
 				updated = true
 			} else if condition.Type == mcsv1a1.ServiceExportConflict {
-				updated = updated || c.mergeConflictCondition(prevCond, condition)
-				if updated {
+				condUpdated := c.mergeConflictCondition(prevCond, condition)
+				if condUpdated {
 					logger.V(log.DEBUG).Infof(
 						"Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 						namespace, name, condition.Type, prevCond.Status, *prevCond.Reason, *prevCond.Message)
 				}
+
+				updated = updated || condUpdated
 			} else if serviceExportConditionEqual(prevCond, condition) {
 				logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 					namespace, name, prevCond)
@@ -116,11 +123,11 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *mcsv1a1.ServiceEx
 	var reasons, messages []string
 
 	if ptr.Deref(to.Reason, "") != "" {
-		reasons = strings.Split(ptr.Deref(to.Reason, ""), ",")
+		reasons = strings.Split(*to.Reason, ",")
 	}
 
 	if ptr.Deref(to.Message, "") != "" {
-		messages = strings.Split(ptr.Deref(to.Message, ""), "\n")
+		messages = strings.Split(*to.Message, "\n")
 	}
 
 	index := goslices.Index(reasons, *from.Reason)
@@ -194,6 +201,18 @@ func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1a1.
 	}
 
 	return obj.(*mcsv1a1.ServiceExport)
+}
+
+//nolint:unparam // Ignore `condType` always receives `mcsv1a1.ServiceExportConflict`
+func (c *ServiceExportClient) hasCondition(name, namespace string, condType mcsv1a1.ServiceExportConditionType, reason string) bool {
+	se := c.getLocalInstance(name, namespace)
+	if se == nil {
+		return false
+	}
+
+	cond := FindServiceExportStatusCondition(se.Status.Conditions, condType)
+
+	return cond != nil && strings.Contains(ptr.Deref(cond.Reason, ""), reason)
 }
 
 func serviceExportConditionEqual(c1, c2 *mcsv1a1.ServiceExportCondition) bool {

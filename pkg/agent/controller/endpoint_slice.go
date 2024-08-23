@@ -268,7 +268,7 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the intersection of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
-	} else if FindServiceExportStatusCondition(localServiceExport.Status.Conditions, mcsv1a1.ServiceExportConflict) != nil {
+	} else if c.serviceExportClient.hasCondition(name, namespace, mcsv1a1.ServiceExportConflict, PortConflictReason) {
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
 			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, PortConflictReason, ""))
 	}

@@ -135,16 +135,18 @@ type cluster struct {
 }
 
 type testDriver struct {
-	cluster1                   cluster
-	cluster2                   cluster
-	brokerServiceImportClient  dynamic.NamespaceableResourceInterface
-	brokerEndpointSliceClient  dynamic.ResourceInterface
-	brokerEndpointSliceReactor *fake.FailingReactor
-	stopCh                     chan struct{}
-	syncerConfig               *broker.SyncerConfig
-	doStart                    bool
-	brokerServiceImportReactor *fake.FailingReactor
-	aggregatedServicePorts     []mcsv1a1.ServicePort
+	cluster1                        cluster
+	cluster2                        cluster
+	brokerServiceImportClient       dynamic.NamespaceableResourceInterface
+	brokerEndpointSliceClient       dynamic.ResourceInterface
+	brokerEndpointSliceReactor      *fake.FailingReactor
+	stopCh                          chan struct{}
+	syncerConfig                    *broker.SyncerConfig
+	doStart                         bool
+	brokerServiceImportReactor      *fake.FailingReactor
+	aggregatedServicePorts          []mcsv1a1.ServicePort
+	aggregatedSessionAffinity       corev1.ServiceAffinity
+	aggregatedSessionAffinityConfig *corev1.SessionAffinityConfig
 }
 
 func newTestDiver() *testDriver {
@@ -163,7 +165,8 @@ func newTestDiver() *testDriver {
 	fake.AddBasicReactors(&brokerClient.Fake)
 
 	t := &testDriver{
-		aggregatedServicePorts: []mcsv1a1.ServicePort{port1, port2},
+		aggregatedServicePorts:    []mcsv1a1.ServicePort{port1, port2},
+		aggregatedSessionAffinity: corev1.ServiceAffinityNone,
 		cluster1: cluster{
 			clusterID: clusterID1,
 			agentSpec: controller.AgentSpecification{
@@ -595,8 +598,7 @@ func (c *cluster) findLocalServiceImport() *mcsv1a1.ServiceImport {
 	for i := range list.Items {
 		if list.Items[i].GetLabels()[mcsv1a1.LabelServiceName] == c.service.Name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == c.service.Namespace {
-			serviceImport := &mcsv1a1.ServiceImport{}
-			Expect(scheme.Scheme.Convert(&list.Items[i], serviceImport, nil)).To(Succeed())
+			serviceImport := toServiceImport(&list.Items[i])
 
 			return serviceImport
 		}
@@ -645,8 +647,7 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 				return false, nil
 			}
 
-			serviceImport = &mcsv1a1.ServiceImport{}
-			Expect(scheme.Scheme.Convert(obj, serviceImport, nil)).To(Succeed())
+			serviceImport = toServiceImport(obj)
 
 			sortSlices(serviceImport)
 
@@ -665,6 +666,13 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 	Expect(serviceImport.Status).To(Equal(expected.Status))
 
 	Expect(serviceImport.Labels).To(BeEmpty())
+}
+
+func getServiceImport(client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
+	obj, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	Expect(err).To(Succeed())
+
+	return toServiceImport(obj)
 }
 
 func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clusterID string) []*discovery.EndpointSlice {
@@ -777,9 +785,10 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 			Namespace: test.RemoteNamespace,
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:            sType,
-			Ports:           []mcsv1a1.ServicePort{},
-			SessionAffinity: corev1.ServiceAffinityNone,
+			Type:                  sType,
+			Ports:                 []mcsv1a1.ServicePort{},
+			SessionAffinity:       t.aggregatedSessionAffinity,
+			SessionAffinityConfig: t.aggregatedSessionAffinityConfig,
 		},
 	}
 
@@ -791,14 +800,6 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 		for _, c := range clusters {
 			expServiceImport.Status.Clusters = append(expServiceImport.Status.Clusters,
 				mcsv1a1.ClusterStatus{Cluster: c.clusterID})
-
-			if c.service.Spec.SessionAffinity != corev1.ServiceAffinityNone {
-				expServiceImport.Spec.SessionAffinity = c.service.Spec.SessionAffinity
-			}
-
-			if c.service.Spec.SessionAffinityConfig != nil {
-				expServiceImport.Spec.SessionAffinityConfig = c.service.Spec.SessionAffinityConfig
-			}
 		}
 	}
 
@@ -936,6 +937,13 @@ func toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
 	Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 	return se
+}
+
+func toServiceImport(obj interface{}) *mcsv1a1.ServiceImport {
+	si := &mcsv1a1.ServiceImport{}
+	Expect(scheme.Scheme.Convert(obj, si, nil)).To(Succeed())
+
+	return si
 }
 
 func (t *testDriver) awaitNonHeadlessServiceExported(clusters ...*cluster) {
