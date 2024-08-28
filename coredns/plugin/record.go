@@ -88,7 +88,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 				Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.TTL},
 				Priority: 0,
 				Weight:   50,
-				Port:     uint16(port.Port),
+				Port:     uint16(port.Port), //nolint:gosec // Need to ignore integer conversion error
 				Target:   target,
 			}
 			records = append(records, record)
