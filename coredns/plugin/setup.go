@@ -177,7 +177,7 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 		return 0, c.ArgErr() //nolint:wrapcheck // No need to wrap this.
 	}
 
-	t, err := strconv.Atoi(args[0])
+	t, err := strconv.ParseInt(args[0], 10, 32)
 	if err != nil {
 		return 0, errors.Wrap(err, "error parsing TTL")
 	}
@@ -186,7 +186,7 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t) //nolint:wrapcheck // No need to wrap this.
 	}
 
-	return uint32(t), nil
+	return uint32(t), nil //nolint:gosec // We can safely ignore integer conversion error
 }
 
 func init() {

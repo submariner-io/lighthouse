@@ -43,6 +43,7 @@ linters:
     - bidichk
     - bodyclose
     - contextcheck
+    - copyloopvar
     # - cyclop # This is equivalent to gocyclo
     # - depguard # depguard now denies by default, it should only be enabled if we actually use it
     - dogsled
@@ -53,7 +54,6 @@ linters:
     - errname
     - exhaustive
     # - exhaustivestruct # Not recommended for general use - meant to be used only for special cases
-    - exportloopref
     # - forbidigo # We don't forbid any statements
     # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
     #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
