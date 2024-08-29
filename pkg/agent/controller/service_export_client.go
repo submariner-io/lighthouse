@@ -21,39 +21,35 @@ package controller
 import (
 	"context"
 	"reflect"
+	goslices "slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (c *ServiceExportClient) removeStatusCondition(ctx context.Context, name, namespace string,
-	condType mcsv1a1.ServiceExportConditionType, reason string,
-) {
-	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
-		condition := FindServiceExportStatusCondition(toUpdate.Status.Conditions, condType)
-		if condition != nil && reflect.DeepEqual(condition.Reason, &reason) {
-			logger.V(log.DEBUG).Infof("Removing status condition (Type: %q, Reason: %q) from ServiceExport (%s/%s)",
-				condType, reason, namespace, name)
-
-			toUpdate.Status.Conditions, _ = slices.Remove(toUpdate.Status.Conditions, *condition,
-				func(c mcsv1a1.ServiceExportCondition) mcsv1a1.ServiceExportConditionType {
-					return c.Type
-				})
-
-			return true
-		}
-
-		return false
-	})
+func NewServiceExportClient(client dynamic.Interface, scheme *runtime.Scheme) *ServiceExportClient {
+	return &ServiceExportClient{
+		NamespaceableResourceInterface: client.Resource(schema.GroupVersionResource{
+			Group:    mcsv1a1.GroupVersion.Group,
+			Version:  mcsv1a1.GroupVersion.Version,
+			Resource: "serviceexports",
+		}),
+		converter: converter{scheme: scheme},
+	}
 }
 
-func (c *ServiceExportClient) updateStatusConditions(ctx context.Context, name, namespace string,
+func (c *ServiceExportClient) UpdateStatusConditions(ctx context.Context, name, namespace string,
 	conditions ...mcsv1a1.ServiceExportCondition,
 ) {
 	c.tryUpdateStatusConditions(ctx, name, namespace, true, conditions...)
@@ -82,12 +78,24 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 			condition := &conditions[i]
 
 			prevCond := findStatusCondition(toUpdate.Status.Conditions, condition.Type)
+
 			if prevCond == nil {
+				if condition.Type == mcsv1a1.ServiceExportConflict && condition.Status == corev1.ConditionFalse {
+					continue
+				}
+
 				logger.V(log.DEBUG).Infof("Add status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 					namespace, name, condition.Type, condition.Status, *condition.Reason, *condition.Message)
 
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
 				updated = true
+			} else if condition.Type == mcsv1a1.ServiceExportConflict {
+				updated = updated || c.mergeConflictCondition(prevCond, condition)
+				if updated {
+					logger.V(log.DEBUG).Infof(
+						"Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+						namespace, name, condition.Type, prevCond.Status, *prevCond.Reason, *prevCond.Message)
+				}
 			} else if serviceExportConditionEqual(prevCond, condition) {
 				logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 					namespace, name, prevCond)
@@ -102,6 +110,55 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 
 		return updated
 	})
+}
+
+func (c *ServiceExportClient) mergeConflictCondition(to, from *mcsv1a1.ServiceExportCondition) bool {
+	var reasons, messages []string
+
+	if ptr.Deref(to.Reason, "") != "" {
+		reasons = strings.Split(ptr.Deref(to.Reason, ""), ",")
+	}
+
+	if ptr.Deref(to.Message, "") != "" {
+		messages = strings.Split(ptr.Deref(to.Message, ""), "\n")
+	}
+
+	index := goslices.Index(reasons, *from.Reason)
+	if index >= 0 {
+		if from.Status == corev1.ConditionTrue {
+			if index < len(messages) {
+				messages[index] = *from.Message
+			}
+		} else {
+			reasons = goslices.Delete(reasons, index, index+1)
+
+			if index < len(messages) {
+				messages = goslices.Delete(messages, index, index+1)
+			}
+		}
+	} else if from.Status == corev1.ConditionTrue {
+		reasons = append(reasons, *from.Reason)
+		messages = append(messages, *from.Message)
+	}
+
+	newReason := strings.Join(reasons, ",")
+	newMessage := strings.Join(messages, "\n")
+	updated := newReason != ptr.Deref(to.Reason, "") || newMessage != ptr.Deref(to.Message, "")
+
+	to.Reason = ptr.To(newReason)
+	to.Message = ptr.To(newMessage)
+
+	if *to.Reason != "" {
+		to.Status = corev1.ConditionTrue
+	} else {
+		to.Status = corev1.ConditionFalse
+	}
+
+	if updated {
+		to.LastTransitionTime = from.LastTransitionTime
+	}
+
+	return updated
 }
 
 func (c *ServiceExportClient) doUpdate(ctx context.Context, name, namespace string, update func(toUpdate *mcsv1a1.ServiceExport) bool) {

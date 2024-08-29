@@ -184,11 +184,11 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	} else {
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(ctx, serviceName, serviceNamespace)
 		if err != nil {
-			c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, exportFailedReason,
+			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
+				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, ExportFailedReason,
 					fmt.Sprintf("Unable to export: %v", err)))
 		} else {
-			c.serviceExportClient.updateStatusConditions(ctx, serviceName, serviceNamespace,
+			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
 				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionTrue, "",
 					"Service was successfully exported to the broker"))
 
@@ -263,13 +263,14 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 	}
 
 	if conflict {
-		c.serviceExportClient.updateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, portConflictReason,
+		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, PortConflictReason,
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the intersection of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
 	} else if FindServiceExportStatusCondition(localServiceExport.Status.Conditions, mcsv1a1.ServiceExportConflict) != nil {
-		c.serviceExportClient.removeStatusCondition(ctx, name, namespace, mcsv1a1.ServiceExportConflict, portConflictReason)
+		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
+			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, PortConflictReason, ""))
 	}
 
 	return false, nil
