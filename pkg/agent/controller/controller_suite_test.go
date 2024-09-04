@@ -669,6 +669,10 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 
 func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clusterID string) []*discovery.EndpointSlice {
 	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	if resource.IsMissingNamespaceErr(err) {
+		return []*discovery.EndpointSlice{}
+	}
+
 	Expect(err).To(Succeed())
 
 	var endpointSlices []*discovery.EndpointSlice

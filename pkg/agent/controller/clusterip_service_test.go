@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -306,8 +307,18 @@ func testClusterIPServiceInOneCluster() {
 	})
 
 	When("the namespace of an exported service does not initially exist on an importing cluster", func() {
+		createNamespace := func(dynClient dynamic.Interface, name string) {
+			test.CreateResource(dynClient.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")), &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+			})
+		}
+
 		BeforeEach(func() {
 			fake.AddVerifyNamespaceReactor(&t.cluster2.localDynClient.Fake, "serviceimports", "endpointslices")
+
+			createNamespace(t.cluster2.localDynClient, test.LocalNamespace)
 		})
 
 		JustBeforeEach(func() {
@@ -339,10 +350,7 @@ func testClusterIPServiceInOneCluster() {
 
 			By("Creating namespace on importing cluster")
 
-			test.CreateResource(t.cluster2.localDynClient.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")),
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: t.cluster1.service.Namespace},
-				})
+			createNamespace(t.cluster2.localDynClient, t.cluster1.service.Namespace)
 
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
