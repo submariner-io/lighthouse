@@ -28,18 +28,67 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"github.com/submariner-io/lighthouse/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-var _ = Describe("ServiceImport migration", func() {
-	Describe("after restart on upgrade with a service that was previously exported", testServiceImportMigration)
+var _ = Describe("Legacy ServiceImport migration", func() {
+	Describe("after restart on upgrade with a service that was previously exported", testLegacyServiceImportMigration)
 })
 
-func testServiceImportMigration() {
+var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDiver()
+	})
+
+	JustBeforeEach(func() {
+		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), &mcsv1a1.ServiceImport{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
+				Annotations: map[string]string{
+					mcsv1a1.LabelServiceName:       serviceName,
+					constants.LabelSourceNamespace: serviceNamespace,
+				},
+			},
+			Spec: mcsv1a1.ServiceImportSpec{
+				Type: mcsv1a1.ClusterSetIP,
+			},
+		})
+
+		t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+		t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+			ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+		}
+
+		t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+		t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+
+		t.cluster1.createServiceEndpointSlices()
+		t.cluster1.createService()
+		t.cluster1.createServiceExport()
+
+		t.justBeforeEach()
+	})
+
+	AfterEach(func() {
+		t.afterEach()
+	})
+
+	It("should update the existing aggregated ServiceImport and not create any Conflict conditions", func() {
+		t.awaitNonHeadlessServiceExported(&t.cluster1)
+
+		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+	})
+})
+
+func testLegacyServiceImportMigration() {
 	var (
 		t                   *testDriver
 		legacyServiceImport *mcsv1a1.ServiceImport

@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -52,7 +53,7 @@ import (
 const timestampAnnotationPrefix = "timestamp.submariner.io/"
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func newServiceImportController(spec *AgentSpecification, syncerMetricNames AgentConfig, syncerConfig broker.SyncerConfig,
+func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfig, syncerConfig broker.SyncerConfig,
 	brokerClient dynamic.Interface, brokerNamespace string, serviceExportClient *ServiceExportClient,
 	localLHEndpointSliceLister EndpointSliceListerFn,
 ) (*ServiceImportController, error) {
@@ -65,6 +66,8 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		serviceImportAggregator:    newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
 		serviceExportClient:        serviceExportClient,
 		localLHEndpointSliceLister: localLHEndpointSliceLister,
+		clustersetIPPool:           agentConfig.IPPool,
+		clustersetIPEnabled:        spec.ClustersetIPEnabled,
 	}
 
 	var err error
@@ -80,7 +83,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Transform:       controller.onLocalServiceImport,
 		Scheme:          syncerConfig.Scheme,
 		SyncCounterOpts: &prometheus.GaugeOpts{
-			Name: syncerMetricNames.ServiceExportCounterName,
+			Name: agentConfig.ServiceExportCounterName,
 			Help: "Count of exported services",
 		},
 	})
@@ -109,7 +112,7 @@ func newServiceImportController(spec *AgentSpecification, syncerMetricNames Agen
 		Scheme:            syncerConfig.Scheme,
 		NamespaceInformer: syncerConfig.NamespaceInformer,
 		SyncCounterOpts: &prometheus.GaugeOpts{
-			Name: syncerMetricNames.ServiceImportCounterName,
+			Name: agentConfig.ServiceImportCounterName,
 			Help: "Count of imported services",
 		},
 	})
@@ -146,6 +149,10 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		logger.Info("ServiceImport Controller stopped")
 	}()
 
+	if err := c.reserveAggregatedServiceImportIPs(); err != nil {
+		return err
+	}
+
 	if err := c.localSyncer.Start(stopCh); err != nil {
 		return errors.Wrap(err, "error starting local ServiceImport syncer")
 	}
@@ -156,6 +163,42 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 
 	c.reconcileLocalAggregatedServiceImports()
 	c.reconcileRemoteAggregatedServiceImports()
+
+	return nil
+}
+
+func (c *ServiceImportController) isIPInClustersetCIDR(si *mcsv1a1.ServiceImport) bool {
+	if c.clustersetIPPool == nil || len(si.Spec.IPs) == 0 {
+		return false
+	}
+
+	ip := net.ParseIP(si.Spec.IPs[0])
+	_, cidr, _ := net.ParseCIDR(c.clustersetIPPool.GetCIDR())
+
+	return ip != nil && cidr.Contains(ip)
+}
+
+func (c *ServiceImportController) reserveAggregatedServiceImportIPs() error {
+	client := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll)
+
+	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "error listing the local ServiceImports")
+	}
+
+	for i := range list.Items {
+		si := c.converter.toServiceImport(&list.Items[i])
+
+		if serviceImportSourceName(si) != "" || !c.isIPInClustersetCIDR(si) {
+			continue
+		}
+
+		err = c.clustersetIPPool.Reserve(si.Spec.IPs[0])
+		if err != nil {
+			logger.Errorf(err, "Unable to reserve clusterset IP %q in CIDR %q for ServiceImport %s",
+				si.Spec.IPs[0], c.clustersetIPPool.GetCIDR(), resource.ToJSON(si))
+		}
+	}
 
 	return nil
 }
@@ -335,6 +378,9 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	}
 
 	typeConflict := false
+	clusterSetIP := ""
+
+	useClusterSetIP := c.determineUseClusterSetIP(localServiceImport)
 
 	// Here we create the aggregated ServiceImport on the broker or update the existing instance with our local service
 	// info, but we don't add/merge our local service ports until we've successfully synced our local EndpointSlice to
@@ -342,10 +388,10 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	// EndpointSlices, thus each cluster must have a consistent view of all the EndpointSlices in order for the
 	// aggregated port information to be eventually consistent.
 
-	result, err := util.CreateOrUpdate(ctx,
-		resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
-		c.converter.toUnstructured(aggregate),
-		func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	result, newAggregate, err := util.CreateOrUpdateWithOptions(ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
+		Client: resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
+		Obj:    c.converter.toUnstructured(aggregate),
+		MutateOnUpdate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 			existing := c.converter.toServiceImport(obj)
 
 			if localServiceImport.Spec.Type != existing.Spec.Type {
@@ -370,10 +416,15 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 
 				existing.Annotations[timestampAnnotationKey] = localTimestamp
 
+				if _, found := existing.Annotations[constants.UseClustersetIP]; !found {
+					// This will happen on migration from pre-clusterset IP version
+					existing.Annotations[constants.UseClustersetIP] = strconv.FormatBool(false)
+				}
+
 				// Update the appropriate aggregated ServiceImport fields if we're the oldest exporting cluster
 				_ = c.updateAggregatedServiceImport(existing, localServiceImport)
 
-				c.checkConflicts(ctx, existing, localServiceImport)
+				c.checkConflicts(ctx, existing, localServiceImport, &useClusterSetIP)
 
 				var added bool
 
@@ -387,7 +438,28 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			}
 
 			return c.converter.toUnstructured(existing), nil
-		})
+		},
+		MutateOnCreate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			si := c.converter.toServiceImport(obj)
+
+			if si.Spec.Type != mcsv1a1.ClusterSetIP {
+				return obj, nil
+			}
+
+			var err error
+
+			if useClusterSetIP {
+				clusterSetIP, err = c.allocateClusterSetIPIfNeeded(clusterSetIP)
+
+				si.Spec.IPs = []string{clusterSetIP}
+				si.Annotations[constants.ClustersetIPAllocatedBy] = c.clusterID
+			}
+
+			si.Annotations[constants.UseClustersetIP] = strconv.FormatBool(useClusterSetIP)
+
+			return c.converter.toUnstructured(si), err
+		},
+	})
 	if err == nil && !typeConflict {
 		err = c.startEndpointsController(localServiceImport)
 	}
@@ -396,10 +468,14 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
 			newServiceExportCondition(constants.ServiceExportReady,
 				corev1.ConditionFalse, ExportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
+
+		if clusterSetIP != "" {
+			_ = c.clustersetIPPool.Release(clusterSetIP)
+		}
 	}
 
 	if result == util.OperationResultCreated {
-		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(aggregate))
+		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(newAggregate))
 	}
 
 	return err
@@ -458,6 +534,14 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 
 	aggregatedServiceImport := synced.(*mcsv1a1.ServiceImport)
 
+	if op == syncer.Delete {
+		if c.isIPInClustersetCIDR(aggregatedServiceImport) {
+			_ = c.clustersetIPPool.Release(aggregatedServiceImport.Spec.IPs[0])
+		}
+
+		return retry
+	}
+
 	// Check for conflicts with the local ServiceImport
 
 	siList := c.localSyncer.ListResourcesBySelector(k8slabels.SelectorFromSet(map[string]string{
@@ -491,12 +575,38 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 		}
 	}
 
-	c.checkConflicts(ctx, aggregatedServiceImport, localServiceImport)
+	c.checkConflicts(ctx, aggregatedServiceImport, localServiceImport, nil)
 
 	return retry
 }
 
-func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated, local *mcsv1a1.ServiceImport) {
+func (c *ServiceImportController) determineUseClusterSetIP(localServiceImport *mcsv1a1.ServiceImport) bool {
+	var useClusterSetIP bool
+
+	useClusterSetIPStr, found := localServiceImport.Annotations[constants.UseClustersetIP]
+	if found {
+		useClusterSetIP = useClusterSetIPStr == strconv.FormatBool(true)
+	} else {
+		useClusterSetIP = c.clustersetIPEnabled
+	}
+
+	return useClusterSetIP && c.clustersetIPPool != nil
+}
+
+func (c *ServiceImportController) allocateClusterSetIPIfNeeded(existingIP string) (string, error) {
+	if existingIP == "" {
+		allocatedIPs, err := c.clustersetIPPool.Allocate(1)
+		if err != nil {
+			return "", errors.Wrap(err, "unable to allocate clusterset IP from the pool")
+		}
+
+		existingIP = allocatedIPs[0]
+	}
+
+	return existingIP, nil
+}
+
+func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated, local *mcsv1a1.ServiceImport, useClusterSetIP *bool) {
 	var conditions []mcsv1a1.ServiceExportCondition
 
 	serviceName := local.Labels[mcsv1a1.LabelServiceName]
@@ -527,6 +637,25 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 		SessionAffinityConfigConflictReason) {
 		conditions = append(conditions, newServiceExportCondition(
 			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, SessionAffinityConfigConflictReason, ""))
+	}
+
+	if aggregated.Spec.Type == mcsv1a1.ClusterSetIP && useClusterSetIP != nil {
+		if aggregated.Annotations[constants.UseClustersetIP] != strconv.FormatBool(*useClusterSetIP) {
+			clusterName := aggregated.Annotations[constants.ClustersetIPAllocatedBy]
+			if clusterName == "" {
+				clusterName = precedentCluster
+			}
+
+			conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+				ClusterSetIPEnablementConflictReason,
+				fmt.Sprintf("The local service clusterset IP enablement setting %q conflicts with the enablement setting %q"+
+					" determined by the first exporting cluster %q.",
+					strconv.FormatBool(*useClusterSetIP), aggregated.Annotations[constants.UseClustersetIP], clusterName)))
+		} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
+			ClusterSetIPEnablementConflictReason) {
+			conditions = append(conditions, newServiceExportCondition(
+				mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, ClusterSetIPEnablementConflictReason, ""))
+		}
 	}
 
 	c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conditions...)

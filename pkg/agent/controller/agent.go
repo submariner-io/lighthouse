@@ -27,6 +27,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -52,12 +53,13 @@ const (
 type AgentConfig struct {
 	ServiceImportCounterName string
 	ServiceExportCounterName string
+	IPPool                   *ipam.IPPool
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("agent")}
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricNames AgentConfig) (*Controller, error) {
+func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig AgentConfig) (*Controller, error) {
 	if errs := validations.IsDNS1123Label(spec.ClusterID); len(errs) > 0 {
 		return nil, errors.Errorf("%s is not a valid ClusterID %v", spec.ClusterID, errs)
 	}
@@ -124,7 +126,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, syncerMetricN
 		return nil, err
 	}
 
-	agentController.serviceImportController, err = newServiceImportController(spec, syncerMetricNames, syncerConf,
+	agentController.serviceImportController, err = newServiceImportController(spec, agentConfig, syncerConf,
 		agentController.endpointSliceController.syncer.GetBrokerClient(),
 		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.serviceExportClient,
 		func(selector k8slabels.Selector) []runtime.Object {
@@ -244,6 +246,10 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 	serviceImport.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(svc.Spec.PublishNotReadyAddresses)
 
+	if svcExport.Annotations[constants.UseClustersetIP] != "" {
+		serviceImport.Annotations[constants.UseClustersetIP] = svcExport.Annotations[constants.UseClustersetIP]
+	}
+
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
 		Type:                  svcType,
@@ -303,6 +309,11 @@ func getServiceImportType(service *corev1.Service) (mcsv1a1.ServiceImportType, b
 }
 
 func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructured.Unstructured) bool {
+	// To reduce unnecessary churn, only process a ServiceExport update if the UseClustersetIP annotation or the Valid condition changed.
+	if oldObj.GetAnnotations()[constants.UseClustersetIP] != newObj.GetAnnotations()[constants.UseClustersetIP] {
+		return true
+	}
+
 	oldValidCond := FindServiceExportStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 	newValidCond := FindServiceExportStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
 

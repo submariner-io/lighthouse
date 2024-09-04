@@ -19,11 +19,13 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
@@ -214,6 +216,90 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	Context("with clusterset IP enabled", func() {
+		BeforeEach(func() {
+			t.useClusterSetIP = true
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+		})
+
+		Context("via ServiceExport annotation", func() {
+			BeforeEach(func() {
+				t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+			})
+
+			It("should allocate an IP for the aggregated ServiceImport and release the IP when unexported", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
+
+				localSI := getServiceImport(t.cluster1.localServiceImportClient, t.cluster1.service.Namespace, t.cluster1.service.Name)
+				Expect(localSI.Annotations).To(HaveKeyWithValue(constants.ClustersetIPAllocatedBy, t.cluster1.clusterID))
+
+				By("Unexporting the service")
+
+				t.cluster1.deleteServiceExport()
+
+				Eventually(func() error {
+					return t.ipPool.Reserve(localSI.Spec.IPs...)
+				}).Should(Succeed(), "ServiceImport IP was not released")
+			})
+
+			Context("but with no IP pool specified", func() {
+				BeforeEach(func() {
+					t.useClusterSetIP = false
+					t.ipPool = nil
+				})
+
+				It("should not set the IP on the aggregated ServiceImport", func() {
+					t.awaitNonHeadlessServiceExported(&t.cluster1)
+				})
+			})
+
+			Context("with the IP pool initially exhausted", func() {
+				var ips []string
+
+				BeforeEach(func() {
+					var err error
+
+					ips, err = t.ipPool.Allocate(t.ipPool.Size())
+					Expect(err).To(Succeed())
+				})
+
+				It("should eventually set the IP on the aggregated ServiceImport", func() {
+					t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse,
+						controller.ExportFailedReason))
+
+					_ = t.ipPool.Release(ips...)
+
+					t.awaitNonHeadlessServiceExported(&t.cluster1)
+				})
+			})
+		})
+
+		Context("via the global setting", func() {
+			BeforeEach(func() {
+				t.cluster1.agentSpec.ClustersetIPEnabled = true
+			})
+
+			It("should set the IP on the aggregated ServiceImport", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			})
+
+			Context("but disabled via ServiceExport annotation", func() {
+				BeforeEach(func() {
+					t.useClusterSetIP = false
+					t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(false)}
+				})
+
+				It("should not set the IP on the aggregated ServiceImport", func() {
+					t.awaitNonHeadlessServiceExported(&t.cluster1)
+				})
+			})
+		})
+	})
+
 	When("two Services with the same name in different namespaces are exported", func() {
 		It("should correctly export both services", func() {
 			t.cluster1.createService()
@@ -288,7 +374,7 @@ func testClusterIPServiceInOneCluster() {
 			test.CreateResource(t.cluster1.dynamicServiceClientFor().Namespace(service.Namespace), service)
 			test.CreateResource(serviceExportClientFor(t.cluster1.localDynClient, service.Namespace), serviceExport)
 
-			awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport)
+			awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport, t.ipPool)
 			awaitEndpointSlice(endpointSliceClientFor(t.cluster2.localDynClient, service.Namespace), service.Name, expEndpointSlice)
 
 			// Ensure the resources for the first Service weren't overwritten
@@ -346,7 +432,7 @@ func testClusterIPServiceInOneCluster() {
 				},
 			}
 
-			awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport)
+			awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport, t.ipPool)
 
 			testutil.EnsureNoResource(resource.ForDynamic(t.cluster2.localServiceImportClient.Namespace(
 				t.cluster1.service.Namespace)), t.cluster1.service.Name)
@@ -402,7 +488,7 @@ func testClusterIPServiceInTwoClusters() {
 		t.cluster1.start(t, *t.syncerConfig)
 
 		// Sleep a little before starting the second cluster to ensure its resource CreationTimestamps will be
-		// later than the first cluster to ensure conflict checking in deterministic.
+		// later than the first cluster to ensure conflict checking is deterministic.
 		time.Sleep(100 * time.Millisecond)
 
 		t.cluster2.createServiceEndpointSlices()
@@ -669,6 +755,87 @@ func testClusterIPServiceInTwoClusters() {
 			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
 				fmt.Sprintf("%s,%s", controller.SessionAffinityConflictReason, controller.SessionAffinityConfigConflictReason)))
 			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+	})
+
+	Context("with clusterset IP enabled on the first exporting cluster but not the second", func() {
+		BeforeEach(func() {
+			t.useClusterSetIP = true
+			t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+		})
+
+		JustBeforeEach(func() {
+			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+		})
+
+		It("should set the Conflict status condition on the second cluster", func() {
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(controller.ClusterSetIPEnablementConflictReason))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+
+			By("Updating the ServiceExport on the second cluster")
+
+			se, err := t.cluster2.localServiceExportClient.Get(context.TODO(), t.cluster2.serviceExport.Name, metav1.GetOptions{})
+			Expect(err).To(Succeed())
+
+			se.SetAnnotations(map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)})
+			test.UpdateResource(t.cluster2.localServiceExportClient, se)
+
+			t.cluster2.awaitServiceExportCondition(noConflictCondition)
+		})
+
+		It("should not release the allocated clusterset IP until all clusters have unexported", func() {
+			localSI := getServiceImport(t.cluster1.localServiceImportClient, t.cluster1.service.Namespace, t.cluster1.service.Name)
+
+			By("Unexporting service on the first cluster")
+
+			t.cluster1.deleteServiceExport()
+
+			t.awaitNoEndpointSlice(&t.cluster1)
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster2)
+
+			Consistently(func() error {
+				return t.ipPool.Reserve(localSI.Spec.IPs...)
+			}).ShouldNot(Succeed(), "ServiceImport IP was released")
+
+			By("Unexporting service on the second cluster")
+
+			t.cluster2.deleteServiceExport()
+
+			t.awaitServiceUnexported(&t.cluster2)
+
+			Eventually(func() error {
+				return t.ipPool.Reserve(localSI.Spec.IPs...)
+			}).Should(Succeed(), "ServiceImport IP was not released")
+		})
+	})
+
+	Context("with clusterset IP disabled on the first exporting cluster but enabled on the second", func() {
+		BeforeEach(func() {
+			t.cluster2.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+		})
+
+		It("should set the Conflict status condition on the second cluster", func() {
+			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(controller.ClusterSetIPEnablementConflictReason))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		})
+	})
+
+	Context("with clusterset IP enabled on both clusters", func() {
+		BeforeEach(func() {
+			t.useClusterSetIP = true
+			t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+			t.cluster2.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+		})
+
+		Specify("the first cluster should allocate the clusterset IP", func() {
+			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+
+			localSI := getServiceImport(t.cluster1.localServiceImportClient, t.cluster1.service.Namespace, t.cluster1.service.Name)
+			Expect(localSI.Annotations).To(HaveKeyWithValue(constants.ClustersetIPAllocatedBy, t.cluster1.clusterID))
+
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		})
 	})
 }
