@@ -39,9 +39,12 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 
 	if !found {
 		svcInfo = &serviceInfo{
-			clusters:   make(map[string]*clusterInfo),
-			balancer:   loadbalancer.NewSmoothWeightedRR(),
-			isHeadless: serviceImport.Spec.Type == mcsv1a1.Headless,
+			clusters: make(map[string]*clusterInfo),
+			balancer: loadbalancer.NewSmoothWeightedRR(),
+		}
+
+		if !isLegacy {
+			svcInfo.spec = serviceImport.Spec
 		}
 
 		i.serviceMap[key] = svcInfo
@@ -49,7 +52,7 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 
 	svcInfo.isExported = true
 
-	if svcInfo.isHeadless || !isLegacy {
+	if svcInfo.isHeadless() || !isLegacy {
 		return
 	}
 

@@ -39,7 +39,7 @@ func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (
 		return nil, false, false
 	}
 
-	if !serviceInfo.isHeadless {
+	if !serviceInfo.isHeadless() {
 		record, found := i.getClusterIPRecord(serviceInfo, clusterID)
 		if record != nil {
 			return []DNSRecord{*record}, false, true
@@ -62,6 +62,13 @@ func (i *Interface) getClusterIPRecord(serviceInfo *serviceInfo, clusterID strin
 		}
 
 		return &clusterInfo.endpointRecords[0], true
+	}
+
+	if len(serviceInfo.spec.IPs) > 0 {
+		return &DNSRecord{
+			IP:    serviceInfo.spec.IPs[0],
+			Ports: serviceInfo.spec.Ports,
+		}, true
 	}
 
 	// If we are aware of the local cluster and we found some accessible IP, we shall return it.

@@ -88,3 +88,7 @@ func (si *serviceInfo) selectIP(checkCluster func(string) bool) *DNSRecord {
 
 	return nil
 }
+
+func (si *serviceInfo) isHeadless() bool {
+	return si.spec.Type == mcsv1a1.Headless
+}
