@@ -55,7 +55,7 @@ type clusterInfo struct {
 type serviceInfo struct {
 	clusters   map[string]*clusterInfo
 	balancer   loadbalancer.Interface
-	isHeadless bool
 	isExported bool
 	ports      []mcsv1a1.ServicePort
+	spec       mcsv1a1.ServiceImportSpec
 }

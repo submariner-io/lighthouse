@@ -76,7 +76,7 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		return true
 	}
 
-	if !serviceInfo.isHeadless {
+	if !serviceInfo.isHeadless() {
 		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], serviceInfo)
 	}
 
@@ -264,7 +264,7 @@ func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) 
 
 	if len(serviceInfo.clusters) == 0 && !serviceInfo.isExported {
 		delete(i.serviceMap, key)
-	} else if !serviceInfo.isHeadless {
+	} else if !serviceInfo.isHeadless() {
 		serviceInfo.mergePorts()
 		serviceInfo.resetLoadBalancing()
 	}

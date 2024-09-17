@@ -77,6 +77,7 @@ var _ = Describe("Lighthouse DNS plugin Handler", func() {
 	Context("Headless services", testHeadlessService)
 	Context("Local services", testLocalService)
 	Context("Service with multiple ports", testSRVMultiplePorts)
+	Context("Service with clusterset IP", testClusterSetIP)
 })
 
 type FailingResponseWriter struct {
@@ -955,6 +956,58 @@ func testSRVMultiplePorts() {
 					test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s.%s.svc.clusterset.local.", qname, port1.Port, service1, namespace1)),
 				},
 			})
+		})
+	})
+}
+
+func testClusterSetIP() {
+	const clusterSetIP = "243.1.0.1"
+
+	qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
+
+	var (
+		rec *dnstest.Recorder
+		t   *handlerTestDriver
+	)
+
+	BeforeEach(func() {
+		t = newHandlerTestDriver()
+
+		si := newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP)
+		si.Spec.IPs = []string{clusterSetIP}
+		si.Spec.Ports = []mcsv1a1.ServicePort{port1, port2}
+
+		t.lh.Resolver.PutServiceImport(si)
+
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+			newEndpoint(serviceIP, "", true)))
+
+		t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port2},
+			newEndpoint(serviceIP2, "", true)))
+
+		rec = dnstest.NewRecorder(&test.ResponseWriter{})
+	})
+
+	Specify("DNS query of Type A record should succeed and write an A record response", func() {
+		t.executeTestCase(rec, test.Case{
+			Qname: qname,
+			Qtype: dns.TypeA,
+			Rcode: dns.RcodeSuccess,
+			Answer: []dns.RR{
+				test.A(fmt.Sprintf("%s    5    IN    A    %s", qname, clusterSetIP)),
+			},
+		})
+	})
+
+	Specify("DNS query of Type SRV should succeed and write an SRV record response", func() {
+		t.executeTestCase(rec, test.Case{
+			Qname: qname,
+			Qtype: dns.TypeSRV,
+			Rcode: dns.RcodeSuccess,
+			Answer: []dns.RR{
+				test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, port2.Port, qname)),
+				test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, port1.Port, qname)),
+			},
 		})
 	})
 }

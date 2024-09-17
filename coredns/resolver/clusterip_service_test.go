@@ -32,6 +32,7 @@ var _ = Describe("GetDNSRecords", func() {
 		When("a service is present in one cluster", testClusterIPServiceInOneCluster)
 		When("a service is present in two clusters", testClusterIPServiceInTwoClusters)
 		When("a service is present in three clusters", testClusterIPServiceInThreeClusters)
+		Context("with a clusterset IP", testClusterSetIP)
 
 		testClusterIPServiceMisc()
 	})
@@ -438,6 +439,42 @@ func testClusterIPServiceMisc() {
 			Expect(t.resolver.PutEndpointSlices(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true))).To(BeTrue())
 
 			t.resolver.RemoveServiceImport(serviceImport)
+		})
+	})
+}
+
+func testClusterSetIP() {
+	const clusterSetIP = "243.1.0.1"
+
+	t := newTestDriver()
+
+	BeforeEach(func() {
+		si := newAggregatedServiceImport(namespace1, service1)
+		si.Spec.IPs = []string{clusterSetIP}
+		si.Spec.Ports = []mcsv1a1.ServicePort{port1, port2}
+
+		t.resolver.PutServiceImport(si)
+
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
+		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID2, serviceIP2, true, port2))
+	})
+
+	Context("and no specific cluster is requested", func() {
+		It("should return the clusterset IP DNS record", func() {
+			t.assertDNSRecordsFound(namespace1, service1, "", "", false, resolver.DNSRecord{
+				IP:    clusterSetIP,
+				Ports: []mcsv1a1.ServicePort{port1, port2},
+			})
+		})
+	})
+
+	Context("and a cluster is requested", func() {
+		It("should return its DNS record", func() {
+			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
+				IP:          serviceIP1,
+				Ports:       []mcsv1a1.ServicePort{port1},
+				ClusterName: clusterID1,
+			})
 		})
 	})
 }
