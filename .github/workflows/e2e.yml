@@ -68,3 +68,49 @@ jobs:
       - name: Post mortem
         if: failure()
         uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+  conformance-test:
+    name: MCS Conformance
+    needs: images
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        using: ['clusterset-ip', '']
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - name: Check out the mcs-api repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+        with:
+          ref: efcb2f8996f0a58f21f8b0c855bfdd3cf04d214b
+          repository: kubernetes-sigs/mcs-api
+          path: mcs-api
+
+      - name: Deploy Submariner
+        shell: bash
+        run: |
+          make deploy using="${{ matrix.using }}"
+
+      - name: Run conformance tests
+        shell: bash
+        run: |
+          export KUBECONFIG=$(find $(git rev-parse --show-toplevel)/output/kubeconfigs/ -type f -printf %p:)
+          label_filter="(!ClusterIP || Connectivity) && !ExportedLabels"
+          if [[ "${{ matrix.using }}" =~ "clusterset-ip" ]]; then
+                label_filter="ClusterIP && !Connectivity"
+          fi
+          cd mcs-api/conformance
+          go test -v -timeout 30m -contexts cluster1,cluster2 -args -test.timeout 15m \
+              --ginkgo.v --ginkgo.trace --ginkgo.label-filter "${label_filter}"
+
+      - name: Print report.html
+        if: always()
+        shell: bash
+        run: |
+          cat mcs-api/conformance/report.html
+
+      - name: Post mortem
+        if: failure()
+        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
