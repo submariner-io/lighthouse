@@ -34,13 +34,20 @@ import (
 )
 
 const (
-	TestLabel = "service-discovery"
+	TestLabel             = "service-discovery"
+	ClusterSetIPTestLabel = "clusterset-ip"
 )
 
 var checkedDomains = lhframework.CheckedDomains
 
 var _ = Describe("Test Service Discovery Across Clusters", Label(TestLabel), func() {
 	f := lhframework.NewFramework("discovery")
+
+	BeforeEach(func() {
+		if lhframework.ClusterSetIPEnabled {
+			Skip("The clusterset IP feature is enabled globally - skipping the test")
+		}
+	})
 
 	When("a pod tries to resolve a service in a remote cluster", func() {
 		It("should be able to discover the remote service successfully", func() {
