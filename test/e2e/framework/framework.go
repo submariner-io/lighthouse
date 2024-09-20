@@ -22,10 +22,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
@@ -61,9 +64,10 @@ type Framework struct {
 }
 
 var (
-	MCSClients        []*mcsClientset.Clientset
-	EndpointClients   []dynamic.ResourceInterface
-	SubmarinerClients []dynamic.ResourceInterface
+	MCSClients          []*mcsClientset.Clientset
+	EndpointClients     []dynamic.ResourceInterface
+	SubmarinerClients   []dynamic.ResourceInterface
+	ClusterSetIPEnabled = false
 )
 
 func init() {
@@ -97,6 +101,23 @@ func beforeSuite() {
 	}
 
 	framework.DetectGlobalnet()
+
+	for _, k8sClient := range framework.KubeClients {
+		framework.AwaitUntil("find lighthouse agent deployment", func() (interface{}, error) {
+			return k8sClient.AppsV1().Deployments(framework.TestContext.SubmarinerNamespace).Get(context.TODO(),
+				names.ServiceDiscoveryComponent, metav1.GetOptions{})
+		}, func(result interface{}) (bool, string, error) {
+			d := result.(*appsv1.Deployment)
+			for i := range d.Spec.Template.Spec.Containers[0].Env {
+				if d.Spec.Template.Spec.Containers[0].Env[i].Name == "SUBMARINER_CLUSTERSET_IP_ENABLED" &&
+					d.Spec.Template.Spec.Containers[0].Env[i].Value == strconv.FormatBool(true) {
+					ClusterSetIPEnabled = true
+				}
+			}
+
+			return true, "", nil
+		})
+	}
 }
 
 func createLighthouseClient(restConfig *rest.Config) *mcsClientset.Clientset {
@@ -131,18 +152,23 @@ func createSubmarinerClientSet(restConfig *rest.Config) dynamic.ResourceInterfac
 }
 
 func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
-	nginxServiceExport := mcsv1a1.ServiceExport{
+	return f.CreateServiceExport(cluster, &mcsv1a1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 		},
-	}
-	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
-	framework.By(fmt.Sprintf("Creating serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
-	serviceExport := framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
-		return se.Create(context.TODO(), &nginxServiceExport, metav1.CreateOptions{})
-	}, framework.NoopCheckResult).(*mcsv1a1.ServiceExport)
+	})
+}
 
-	return serviceExport
+func (f *Framework) CreateServiceExport(cluster framework.ClusterIndex, serviceExport *mcsv1a1.ServiceExport) *mcsv1a1.ServiceExport {
+	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(serviceExport.Namespace)
+
+	framework.By(fmt.Sprintf("Creating serviceExport %s.%s on %q", serviceExport.Name, serviceExport.Namespace,
+		framework.TestContext.ClusterIDs[cluster]))
+
+	return framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
+		return se.Create(context.TODO(), serviceExport, metav1.CreateOptions{})
+	}, framework.NoopCheckResult).(*mcsv1a1.ServiceExport)
 }
 
 func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
@@ -186,14 +212,17 @@ func (f *Framework) GetService(cluster framework.ClusterIndex, name, namespace s
 	return framework.KubeClients[cluster].CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.ClusterIndex, svc *v1.Service, clusterCount int) {
+func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.ClusterIndex, svc *v1.Service, clusterCount int,
+) *mcsv1a1.ServiceImport {
 	framework.By(fmt.Sprintf("Retrieving ServiceImport for %q in ns %q on %q", svc.Name, svc.Namespace,
 		framework.TestContext.ClusterIDs[targetCluster]))
 
-	si := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(svc.Namespace)
+	var si *mcsv1a1.ServiceImport
+
+	siClient := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(svc.Namespace)
 
 	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
-		obj, err := si.Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		obj, err := siClient.Get(context.TODO(), svc.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil, nil //nolint:nilnil // Intentional
 		}
@@ -212,7 +241,7 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 			return false, "ServiceImport not found", nil
 		}
 
-		si := result.(*mcsv1a1.ServiceImport)
+		si = result.(*mcsv1a1.ServiceImport)
 
 		if len(si.Status.Clusters) != clusterCount {
 			return false, fmt.Sprintf("Actual cluster count %d does not match expected %d",
@@ -231,14 +260,14 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 		if svc.Spec.ClusterIP != v1.ClusterIPNone && !slices.Equivalent(expPorts, si.Spec.Ports, func(p mcsv1a1.ServicePort) string {
 			return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
 		}) {
-			s1, _ := json.MarshalIndent(expPorts, "", "  ")
-			s2, _ := json.MarshalIndent(si.Spec.Ports, "", "  ")
-
-			return false, fmt.Sprintf("ServiceImport ports do not match. Expected: %s, Actual: %s", s1, s2), nil
+			return false, fmt.Sprintf("ServiceImport ports do not match. Expected: %s, Actual: %s",
+				resource.ToJSON(expPorts), resource.ToJSON(si.Spec.Ports)), nil
 		}
 
 		return true, "", nil
 	})
+
+	return si
 }
 
 func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol v1.Protocol,
