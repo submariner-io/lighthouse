@@ -121,7 +121,15 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 	agentController.serviceExportClient.localSyncer = agentController.serviceExportSyncer
 
 	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient,
-		agentController.serviceSyncer)
+		agentController.serviceSyncer, func(serviceName string, serviceNamespace string) *mcsv1a1.ServiceImport {
+			obj, found, _ := agentController.serviceImportController.remoteSyncer.GetResource(
+				brokerAggregatedServiceImportName(serviceName, serviceNamespace), syncerConf.BrokerNamespace)
+			if !found {
+				return nil
+			}
+
+			return obj.(*mcsv1a1.ServiceImport)
+		})
 	if err != nil {
 		return nil, err
 	}

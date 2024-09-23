@@ -39,18 +39,20 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
-	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface,
+	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface, aggregatedServiceImportGetter AggregatedServiceImportGetterFn,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
-		clusterID:              spec.ClusterID,
-		serviceExportClient:    serviceExportClient,
-		serviceSyncer:          serviceSyncer,
-		conflictCheckWorkQueue: workqueue.New("ConflictChecker"),
+		clusterID:                     spec.ClusterID,
+		serviceExportClient:           serviceExportClient,
+		serviceSyncer:                 serviceSyncer,
+		conflictCheckWorkQueue:        workqueue.New("ConflictChecker"),
+		aggregatedServiceImportGetter: aggregatedServiceImportGetter,
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -243,11 +245,17 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 
 	var prevServicePorts []mcsv1a1.ServicePort
 	var intersectedServicePorts []mcsv1a1.ServicePort
-	clusterNames := make([]string, 0, len(epsList))
+	clusterNames := set.New[string]()
 	conflict := false
 
 	for _, o := range epsList {
 		eps := o.(*discovery.EndpointSlice)
+
+		if clusterNames.Has(eps.Labels[constants.MCSLabelSourceCluster]) {
+			continue
+		}
+
+		clusterNames.Insert(eps.Labels[constants.MCSLabelSourceCluster])
 
 		servicePorts := c.serviceExportClient.toServicePorts(eps.Ports)
 		if prevServicePorts == nil {
@@ -258,16 +266,28 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 		}
 
 		intersectedServicePorts = slices.Intersect(intersectedServicePorts, servicePorts, servicePortKey)
-
-		clusterNames = append(clusterNames, eps.Labels[constants.MCSLabelSourceCluster])
 	}
 
 	if conflict {
+		aggregatedSI := c.aggregatedServiceImportGetter(name, namespace)
+		if aggregatedSI == nil {
+			return false, nil
+		}
+
+		exposedOp := "intersection"
+		exposedPorts := intersectedServicePorts
+
+		if len(aggregatedSI.Spec.IPs) > 0 {
+			exposedPorts = aggregatedSI.Spec.Ports
+			exposedOp = "union"
+		}
+
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
 			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, PortConflictReason,
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
-				"The service will expose the intersection of all the ports: %s",
-				fmt.Sprintf("[%s]", strings.Join(clusterNames, ", ")), servicePortsToString(intersectedServicePorts))))
+				"The service will expose the %s of all the ports: %s",
+				fmt.Sprintf("[%s]", strings.Join(clusterNames.UnsortedList(), ", ")), exposedOp,
+				servicePortsToString(exposedPorts))))
 	} else if c.serviceExportClient.hasCondition(name, namespace, mcsv1a1.ServiceExportConflict, PortConflictReason) {
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
 			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, PortConflictReason, ""))

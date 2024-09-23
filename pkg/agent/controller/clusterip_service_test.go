@@ -837,6 +837,22 @@ func testClusterIPServiceInTwoClusters() {
 			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 		})
+
+		Context("with differing ports", func() {
+			BeforeEach(func() {
+				t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port3)}
+				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
+			})
+
+			It("should correctly set the Conflict status condition", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
+
+				t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(controller.PortConflictReason))
+
+				Expect(ptr.Deref(t.cluster1.retrieveServiceExportCondition(
+					t.cluster1.serviceExport, mcsv1a1.ServiceExportConflict).Message, "")).To(ContainSubstring("expose the union"))
+			})
+		})
 	})
 }
 

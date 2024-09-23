@@ -110,7 +110,7 @@ func (a *ServiceImportAggregator) updateOnDelete(ctx context.Context, name, name
 func (a *ServiceImportAggregator) update(ctx context.Context, name, namespace string, mutate func(*mcsv1a1.ServiceImport) error) error {
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s", name, namespace),
+			Name: brokerAggregatedServiceImportName(name, namespace),
 		},
 	}
 
