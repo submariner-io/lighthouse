@@ -186,7 +186,7 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t) //nolint:wrapcheck // No need to wrap this.
 	}
 
-	return uint32(t), nil //nolint:gosec // We can safely ignore integer conversion error
+	return uint32(t), nil
 }
 
 func init() {
