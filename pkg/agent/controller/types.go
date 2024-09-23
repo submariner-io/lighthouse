@@ -47,6 +47,8 @@ const (
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
 
+type AggregatedServiceImportGetterFn func(serviceName string, serviceNamespace string) *mcsv1a1.ServiceImport
+
 type converter struct {
 	scheme *runtime.Scheme
 }
@@ -123,12 +125,13 @@ type ServiceEndpointSliceController struct {
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
 type EndpointSliceController struct {
-	clusterID               string
-	syncer                  *broker.Syncer
-	serviceImportAggregator *ServiceImportAggregator
-	serviceExportClient     *ServiceExportClient
-	serviceSyncer           syncer.Interface
-	conflictCheckWorkQueue  workqueue.Interface
+	clusterID                     string
+	syncer                        *broker.Syncer
+	aggregatedServiceImportGetter AggregatedServiceImportGetterFn
+	serviceImportAggregator       *ServiceImportAggregator
+	serviceExportClient           *ServiceExportClient
+	serviceSyncer                 syncer.Interface
+	conflictCheckWorkQueue        workqueue.Interface
 }
 
 type ServiceExportClient struct {

@@ -355,7 +355,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 
 	aggregate := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
+			Name: brokerAggregatedServiceImportName(serviceName, serviceNamespace),
 			Annotations: map[string]string{
 				mcsv1a1.LabelServiceName:       serviceName,
 				constants.LabelSourceNamespace: serviceNamespace,
@@ -479,6 +479,10 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	}
 
 	return err
+}
+
+func brokerAggregatedServiceImportName(serviceName, serviceNamespace string) string {
+	return fmt.Sprintf("%s-%s", serviceName, serviceNamespace)
 }
 
 func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object) error {
