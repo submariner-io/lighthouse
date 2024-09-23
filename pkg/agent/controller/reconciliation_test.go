@@ -41,12 +41,13 @@ import (
 
 var _ = Describe("Reconciliation", func() {
 	var (
-		t                    *testDriver
-		serviceExport        *mcsv1a1.ServiceExport
-		localServiceImport   *mcsv1a1.ServiceImport
-		localEndpointSlice   *discovery.EndpointSlice
-		brokerServiceImports *unstructured.UnstructuredList
-		brokerEndpointSlices *unstructured.UnstructuredList
+		t                            *testDriver
+		serviceExport                *mcsv1a1.ServiceExport
+		localServiceImport           *mcsv1a1.ServiceImport
+		localAggregatedServiceImport *unstructured.Unstructured
+		localEndpointSlice           *discovery.EndpointSlice
+		brokerServiceImports         *unstructured.UnstructuredList
+		brokerEndpointSlices         *unstructured.UnstructuredList
 	)
 
 	BeforeEach(func() {
@@ -55,6 +56,7 @@ var _ = Describe("Reconciliation", func() {
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
+
 		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
@@ -75,6 +77,11 @@ var _ = Describe("Reconciliation", func() {
 
 		localServiceImport = t.cluster1.findLocalServiceImport()
 		Expect(localServiceImport).ToNot(BeNil())
+
+		localAggregatedServiceImport, err = t.cluster1.localServiceImportClient.Namespace(serviceNamespace).Get(context.TODO(),
+			serviceName, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+		localAggregatedServiceImport.SetResourceVersion("")
 
 		endpointSlices := t.cluster1.findLocalEndpointSlices()
 		Expect(endpointSlices).To(HaveLen(1))
@@ -100,13 +107,23 @@ var _ = Describe("Reconciliation", func() {
 	}
 
 	Context("on restart after a service was exported", func() {
+		BeforeEach(func() {
+			t.useClusterSetIP = true
+			t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+		})
+
 		It("should retain the exported resources on reconciliation", func() {
 			t.afterEach()
 			t = newTestDiver()
+			t.useClusterSetIP = true
 
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
 			test.CreateResource(t.cluster1.localServiceExportClient, serviceExport)
+
+			_, err := t.cluster1.localServiceImportClient.Namespace(serviceNamespace).Create(context.TODO(), localAggregatedServiceImport,
+				metav1.CreateOptions{})
+			Expect(err).To(Succeed())
 
 			restoreBrokerResources()
 

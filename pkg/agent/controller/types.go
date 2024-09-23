@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -36,11 +37,12 @@ import (
 )
 
 const (
-	ExportFailedReason                  = "ExportFailed"
-	TypeConflictReason                  = "ConflictingType"
-	PortConflictReason                  = "ConflictingPorts"
-	SessionAffinityConflictReason       = "ConflictingSessionAffinity"
-	SessionAffinityConfigConflictReason = "ConflictingSessionAffinityConfig"
+	ExportFailedReason                   = "ExportFailed"
+	TypeConflictReason                   = "ConflictingType"
+	PortConflictReason                   = "ConflictingPorts"
+	SessionAffinityConflictReason        = "ConflictingSessionAffinity"
+	SessionAffinityConfigConflictReason  = "ConflictingSessionAffinityConfig"
+	ClusterSetIPEnablementConflictReason = "ConflictingClusterSetIPEnablement"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
@@ -63,13 +65,15 @@ type Controller struct {
 }
 
 type AgentSpecification struct {
-	ClusterID        string
-	Namespace        string
-	Verbosity        int
-	GlobalnetEnabled bool `split_words:"true"`
-	Uninstall        bool
-	HaltOnCertError  bool `split_words:"true"`
-	Debug            bool
+	ClusterID           string
+	Namespace           string
+	Verbosity           int
+	ClustersetIPCidr    string `split_words:"true"`
+	ClustersetIPEnabled bool   `split_words:"true"`
+	GlobalnetEnabled    bool   `split_words:"true"`
+	Uninstall           bool
+	HaltOnCertError     bool `split_words:"true"`
+	Debug               bool
 }
 
 type ServiceImportAggregator struct {
@@ -96,6 +100,8 @@ type ServiceImportController struct {
 	converter                  converter
 	globalIngressIPCache       *globalIngressIPCache
 	localLHEndpointSliceLister EndpointSliceListerFn
+	clustersetIPPool           *ipam.IPPool
+	clustersetIPEnabled        bool
 }
 
 // Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.

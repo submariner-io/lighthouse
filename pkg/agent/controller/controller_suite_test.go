@@ -34,6 +34,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -143,6 +144,8 @@ type testDriver struct {
 	stopCh                          chan struct{}
 	syncerConfig                    *broker.SyncerConfig
 	doStart                         bool
+	useClusterSetIP                 bool
+	ipPool                          *ipam.IPPool
 	brokerServiceImportReactor      *fake.FailingReactor
 	aggregatedServicePorts          []mcsv1a1.ServicePort
 	aggregatedSessionAffinity       corev1.ServiceAffinity
@@ -304,6 +307,11 @@ func newTestDiver() *testDriver {
 		doStart: true,
 	}
 
+	var err error
+
+	t.ipPool, err = ipam.NewIPPool("243.10.1.0/24", nil)
+	Expect(err).To(Succeed())
+
 	t.brokerServiceImportReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, "serviceimports")
 	t.brokerEndpointSliceReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, "endpointslices")
 
@@ -384,6 +392,7 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
 			ServiceExportCounterName: serviceExportCounterName,
+			IPPool:                   t.ipPool,
 		})
 
 	Expect(err).To(Succeed())
@@ -625,7 +634,8 @@ func (c *cluster) ensureNoServiceExportActions() {
 	}, 500*time.Millisecond).Should(BeEmpty())
 }
 
-func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport) {
+func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport, ipPool *ipam.IPPool,
+) *mcsv1a1.ServiceImport {
 	sortSlices := func(si *mcsv1a1.ServiceImport) {
 		sort.SliceStable(si.Spec.Ports, func(i, j int) bool {
 			return si.Spec.Ports[i].Port < si.Spec.Ports[j].Port
@@ -637,6 +647,10 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 	}
 
 	sortSlices(expected)
+
+	expected = expected.DeepCopy()
+	expectedServiceImportIPs := expected.Spec.IPs
+	expected.Spec.IPs = nil
 
 	var serviceImport *mcsv1a1.ServiceImport
 
@@ -651,7 +665,12 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 
 			sortSlices(serviceImport)
 
-			return reflect.DeepEqual(&expected.Spec, &serviceImport.Spec) && reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
+			ipsEquivalent := len(expectedServiceImportIPs) == len(serviceImport.Spec.IPs)
+			actualSpec := serviceImport.Spec.DeepCopy()
+			actualSpec.IPs = nil
+
+			return ipsEquivalent && reflect.DeepEqual(&expected.Spec, actualSpec) &&
+				reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
 		})
 
 	if !wait.Interrupted(err) {
@@ -662,10 +681,21 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 		Fail(fmt.Sprintf("ServiceImport %s/%s not found", expected.Namespace, expected.Name))
 	}
 
+	Expect(serviceImport.Spec.IPs).To(HaveLen(len(expectedServiceImportIPs)))
+
+	if len(serviceImport.Spec.IPs) > 0 {
+		Expect(ipPool.Reserve(serviceImport.Spec.IPs...)).ToNot(Succeed(), ""+
+			"ServiceImport IP was not allocated or reserved")
+	}
+
+	serviceImport.Spec.IPs = nil
+
 	Expect(serviceImport.Spec).To(Equal(expected.Spec))
 	Expect(serviceImport.Status).To(Equal(expected.Status))
 
 	Expect(serviceImport.Labels).To(BeEmpty())
+
+	return serviceImport
 }
 
 func getServiceImport(client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
@@ -795,6 +825,10 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 	if len(clusters) > 0 {
 		if sType == mcsv1a1.ClusterSetIP {
 			expServiceImport.Spec.Ports = t.aggregatedServicePorts
+
+			if t.useClusterSetIP {
+				expServiceImport.Spec.IPs = []string{"1.1.1.1"}
+			}
 		}
 
 		for _, c := range clusters {
@@ -803,13 +837,17 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 		}
 	}
 
-	awaitServiceImport(t.brokerServiceImportClient, expServiceImport)
+	actual := awaitServiceImport(t.brokerServiceImportClient, expServiceImport, t.ipPool)
+
+	if sType == mcsv1a1.ClusterSetIP {
+		Expect(actual.Annotations).To(HaveKeyWithValue(constants.UseClustersetIP, strconv.FormatBool(t.useClusterSetIP)))
+	}
 
 	expServiceImport.Name = name
 	expServiceImport.Namespace = ns
 
-	awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport)
-	awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport)
+	awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport, t.ipPool)
+	awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport, t.ipPool)
 }
 
 func (t *testDriver) ensureAggregatedServiceImport(sType mcsv1a1.ServiceImportType, name, ns string, clusters ...*cluster) {

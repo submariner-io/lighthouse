@@ -25,9 +25,11 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/admiral/pkg/http"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
@@ -102,7 +104,7 @@ func main() {
 	klogFlags.Parse(os.Args[1:])
 
 	logger.Infof("Arguments: %v", os.Args)
-	logger.Infof("AgentSpec: %#v", agentSpec)
+	logger.Infof("AgentSpec: %s", resource.ToJSON(agentSpec))
 
 	util.AddCertificateErrorHandler(agentSpec.HaltOnCertError)
 
@@ -121,6 +123,13 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
 
+	var ipPool *ipam.IPPool
+
+	if agentSpec.ClustersetIPCidr != "" {
+		ipPool, err = ipam.NewIPPool(agentSpec.ClustersetIPCidr, nil)
+		exitOnError(err, "Error creating clusterset IP pool")
+	}
+
 	lightHouseAgent, err := controller.New(&agentSpec, broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalClient:     localClient,
@@ -129,6 +138,7 @@ func main() {
 	}, controller.AgentConfig{
 		ServiceImportCounterName: "submariner_service_import",
 		ServiceExportCounterName: "submariner_service_export",
+		IPPool:                   ipPool,
 	})
 	exitOnError(err, "Failed to create lighthouse agent")
 

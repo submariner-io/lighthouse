@@ -30,6 +30,8 @@ const (
 	LabelSourceName          = "lighthouse.submariner.io/source-name"
 	PublishNotReadyAddresses = "lighthouse.submariner.io/publish-not-ready-addresses"
 	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"
+	UseClustersetIP          = "lighthouse.submariner.io/use-clusterset-ip"
+	ClustersetIPAllocatedBy  = "lighthouse.submariner.io/clusterset-ip-allocated-by"
 )
 
 const ServiceExportReady v1alpha1.ServiceExportConditionType = "Ready"
