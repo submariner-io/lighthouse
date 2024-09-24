@@ -20,7 +20,9 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	goslices "slices"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -76,14 +78,25 @@ func (a *ServiceImportAggregator) setServicePorts(ctx context.Context, si *mcsv1
 			serviceNamespace, serviceName)
 	}
 
-	si.Spec.Ports = make([]mcsv1a1.ServicePort, 0)
+	portsByCluster := map[string][]mcsv1a1.ServicePort{}
 
 	for i := range list.Items {
 		eps := a.converter.toEndpointSlice(&list.Items[i])
-		si.Spec.Ports = slices.Union(si.Spec.Ports, a.converter.toServicePorts(eps.Ports), servicePortKey)
+		portsByCluster[eps.Labels[constants.MCSLabelSourceCluster]] = a.converter.toServicePorts(eps.Ports)
 	}
 
-	logger.V(log.DEBUG).Infof("Calculated ports for aggregated ServiceImport %q: %#v", si.Name, si.Spec.Ports)
+	// Sort the clusters by their ServiceExport timestamps stored in the ServiceImport annotations so conflicting ports are
+	// resolved by taking the oldest as per the MCS spec's conflict resolution policy.
+
+	si.Spec.Ports = make([]mcsv1a1.ServicePort, 0)
+	for _, clusterName := range getClusterNamesOrderedByTimestamp(si.Annotations) {
+		ports := portsByCluster[clusterName]
+		si.Spec.Ports = slices.Union(si.Spec.Ports, ports, func(p mcsv1a1.ServicePort) string {
+			return p.Name
+		})
+	}
+
+	logger.V(log.DEBUG).Infof("Calculated ports for aggregated ServiceImport %q: %s", si.Name, servicePortsToString(si.Spec.Ports))
 
 	return nil
 }
@@ -152,6 +165,45 @@ func clusterStatusKey(c mcsv1a1.ClusterStatus) string {
 	return c.Cluster
 }
 
-func servicePortKey(p mcsv1a1.ServicePort) string {
-	return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
+type clusterSortInfo struct {
+	name      string
+	timestamp int64
+}
+
+func getClusterNamesOrderedByTimestamp(from map[string]string) []string {
+	info := make([]clusterSortInfo, 0, len(from))
+
+	for k, v := range from {
+		cluster, found := strings.CutPrefix(k, timestampAnnotationPrefix)
+		if !found {
+			continue
+		}
+
+		t, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			logger.Warningf("Invalid timestamp annotation value %q for cluster %q", v, cluster)
+			continue
+		}
+
+		info = append(info, clusterSortInfo{name: cluster, timestamp: t})
+	}
+
+	goslices.SortFunc(info, func(a, b clusterSortInfo) int {
+		if a.timestamp == b.timestamp {
+			return strings.Compare(a.name, b.name)
+		}
+
+		if a.timestamp < b.timestamp {
+			return -1
+		}
+
+		return 1
+	})
+
+	sortedNames := make([]string, len(info))
+	for i := range info {
+		sortedNames[i] = info[i].name
+	}
+
+	return sortedNames
 }

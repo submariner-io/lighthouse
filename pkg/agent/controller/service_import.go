@@ -25,7 +25,6 @@ import (
 	"net"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -699,28 +698,12 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 }
 
 func findClusterWithOldestTimestamp(from map[string]string) string {
-	oldest := int64(math.MaxInt64)
-	foundCluster := ""
-
-	for k, v := range from {
-		cluster, found := strings.CutPrefix(k, timestampAnnotationPrefix)
-		if !found {
-			continue
-		}
-
-		t, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			logger.Warningf("Invalid timestamp annotation value %q for cluster %q", v, cluster)
-			continue
-		}
-
-		if t < oldest || (t == oldest && cluster < foundCluster) {
-			foundCluster = cluster
-			oldest = t
-		}
+	names := getClusterNamesOrderedByTimestamp(from)
+	if len(names) > 0 {
+		return names[0]
 	}
 
-	return foundCluster
+	return ""
 }
 
 func toSessionAffinityConfigString(c *corev1.SessionAffinityConfig) string {

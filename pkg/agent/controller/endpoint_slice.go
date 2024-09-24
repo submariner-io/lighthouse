@@ -39,6 +39,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -243,6 +244,10 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 		mcsv1a1.LabelServiceName:       name,
 	}))
 
+	servicePortKey := func(p mcsv1a1.ServicePort) string {
+		return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
+	}
+
 	var prevServicePorts []mcsv1a1.ServicePort
 	var intersectedServicePorts []mcsv1a1.ServicePort
 	clusterNames := set.New[string]()
@@ -271,7 +276,7 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 	if conflict {
 		aggregatedSI := c.aggregatedServiceImportGetter(name, namespace)
 		if aggregatedSI == nil {
-			return false, nil
+			return true, nil
 		}
 
 		exposedOp := "intersection"
@@ -321,7 +326,8 @@ func (c *EndpointSliceController) enqueueForConflictCheck(ctx context.Context, e
 func servicePortsToString(p []mcsv1a1.ServicePort) string {
 	s := make([]string, len(p))
 	for i := range p {
-		s[i] = fmt.Sprintf("[name: %s, protocol: %s, port: %v]", p[i].Name, p[i].Protocol, p[i].Port)
+		s[i] = fmt.Sprintf("[name: %s, protocol: %s, port: %v, appProtocol: %q]", p[i].Name, p[i].Protocol, p[i].Port,
+			ptr.Deref(p[i].AppProtocol, ""))
 	}
 
 	return strings.Join(s, ", ")
