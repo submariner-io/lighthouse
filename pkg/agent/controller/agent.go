@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -123,7 +124,8 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient,
 		agentController.serviceSyncer, func(serviceName string, serviceNamespace string) *mcsv1a1.ServiceImport {
 			obj, found, _ := agentController.serviceImportController.remoteSyncer.GetResource(
-				brokerAggregatedServiceImportName(serviceName, serviceNamespace), syncerConf.BrokerNamespace)
+				brokerAggregatedServiceImportName(serviceName, serviceNamespace),
+				agentController.endpointSliceController.syncer.GetBrokerNamespace())
 			if !found {
 				return nil
 			}
@@ -479,9 +481,9 @@ func (c converter) toServicePorts(from []discovery.EndpointPort) []mcsv1a1.Servi
 	to := make([]mcsv1a1.ServicePort, len(from))
 	for i := range from {
 		to[i] = mcsv1a1.ServicePort{
-			Name:        *from[i].Name,
-			Protocol:    *from[i].Protocol,
-			Port:        *from[i].Port,
+			Name:        ptr.Deref(from[i].Name, ""),
+			Protocol:    ptr.Deref(from[i].Protocol, ""),
+			Port:        ptr.Deref(from[i].Port, 0),
 			AppProtocol: from[i].AppProtocol,
 		}
 	}

@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/slices"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -44,7 +45,7 @@ func (si *serviceInfo) mergePorts() {
 			si.ports = info.endpointRecords[0].Ports
 		} else {
 			si.ports = slices.Intersect(si.ports, info.endpointRecords[0].Ports, func(p mcsv1a1.ServicePort) string {
-				return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
+				return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
 			})
 		}
 	}
