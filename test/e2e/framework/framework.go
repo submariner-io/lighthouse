@@ -22,12 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
+	"sync/atomic"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/names"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/lighthouse/pkg/constants"
@@ -67,7 +66,7 @@ var (
 	MCSClients          []*mcsClientset.Clientset
 	EndpointClients     []dynamic.ResourceInterface
 	SubmarinerClients   []dynamic.ResourceInterface
-	ClusterSetIPEnabled = false
+	clusterSetIPEnabled = atomic.Pointer[bool]{}
 )
 
 func init() {
@@ -101,23 +100,6 @@ func beforeSuite() {
 	}
 
 	framework.DetectGlobalnet()
-
-	for _, k8sClient := range framework.KubeClients {
-		framework.AwaitUntil("find lighthouse agent deployment", func() (interface{}, error) {
-			return k8sClient.AppsV1().Deployments(framework.TestContext.SubmarinerNamespace).Get(context.TODO(),
-				names.ServiceDiscoveryComponent, metav1.GetOptions{})
-		}, func(result interface{}) (bool, string, error) {
-			d := result.(*appsv1.Deployment)
-			for i := range d.Spec.Template.Spec.Containers[0].Env {
-				if d.Spec.Template.Spec.Containers[0].Env[i].Name == "SUBMARINER_CLUSTERSET_IP_ENABLED" &&
-					d.Spec.Template.Spec.Containers[0].Env[i].Value == strconv.FormatBool(true) {
-					ClusterSetIPEnabled = true
-				}
-			}
-
-			return true, "", nil
-		})
-	}
 }
 
 func createLighthouseClient(restConfig *rest.Config) *mcsClientset.Clientset {
@@ -149,6 +131,31 @@ func createSubmarinerClientSet(restConfig *rest.Config) dynamic.ResourceInterfac
 	Expect(err).To(Not(HaveOccurred()))
 
 	return submarinersClient
+}
+
+func IsClusterSetIPEnabled() bool {
+	enabledPtr := clusterSetIPEnabled.Load()
+	if enabledPtr != nil {
+		return *enabledPtr
+	}
+
+	gvr, _ := schema.ParseResourceArg("servicediscoveries.v1alpha1.submariner.io")
+	sdClient := framework.DynClients[0].Resource(*gvr).Namespace(framework.TestContext.SubmarinerNamespace)
+
+	framework.AwaitUntil("find service-discovery resource", func() (interface{}, error) {
+		return sdClient.Get(context.TODO(), "service-discovery", metav1.GetOptions{})
+	}, func(result interface{}) (bool, string, error) {
+		enabled, _, err := unstructured.NestedBool(result.(*unstructured.Unstructured).Object, "spec", "clustersetIPEnabled")
+		if err != nil {
+			return false, "", err
+		}
+
+		clusterSetIPEnabled.Store(ptr.To(enabled))
+
+		return true, "", nil
+	})
+
+	return *clusterSetIPEnabled.Load()
 }
 
 func (f *Framework) NewServiceExport(cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
