@@ -44,7 +44,7 @@ var _ = Describe("Test Service Discovery Across Clusters", Label(TestLabel), fun
 	f := lhframework.NewFramework("discovery")
 
 	BeforeEach(func() {
-		if lhframework.ClusterSetIPEnabled {
+		if lhframework.IsClusterSetIPEnabled() {
 			Skip("The clusterset IP feature is enabled globally - skipping the test")
 		}
 	})
