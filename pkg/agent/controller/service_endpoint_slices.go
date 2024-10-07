@@ -28,7 +28,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -176,29 +178,7 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 		return nil, false
 	}
 
-	if op == syncer.Delete {
-		list, err := c.localClient.List(context.TODO(), metav1.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(returnEPS.Labels).String(),
-		})
-		if err != nil {
-			logger.Error(err, "Error listing EndpointSlice resources for delete")
-			return nil, true
-		}
-
-		if len(list.Items) == 0 {
-			logger.V(log.DEBUG).Infof("Existing EndpointSlice not found with labels: %#v", returnEPS.Labels)
-			return nil, false
-		}
-
-		returnEPS.Name = list.Items[0].GetName()
-	}
-
-	name := returnEPS.Name
-	if name == "" {
-		name = returnEPS.GenerateName
-	}
-
-	logger.V(logLevel).Infof("Returning EndpointSlice %s/%s: %s", serviceEPS.Namespace, name,
+	logger.V(logLevel).Infof("Returning EndpointSlice %s/%s: %s", serviceEPS.Namespace, returnEPS.GenerateName,
 		endpointSliceStringer{returnEPS})
 
 	return returnEPS, false
@@ -346,12 +326,48 @@ func (c *ServiceEndpointSliceController) isHeadless() bool {
 }
 
 func (c *ServiceEndpointSliceController) Distribute(ctx context.Context, obj runtime.Object) error {
-	return c.federator.Distribute(ctx, obj) //nolint:wrapcheck // No need to wrap here
+	toDistribute := resource.MustToUnstructured(obj)
+	labels := toDistribute.GetLabels()
+
+	identifyingLabels := map[string]string{}
+	if c.isHeadless() {
+		identifyingLabels[constants.LabelSourceName] = labels[constants.LabelSourceName]
+	} else {
+		identifyingLabels[mcsv1a1.LabelServiceName] = labels[mcsv1a1.LabelServiceName]
+		identifyingLabels[constants.LabelSourceNamespace] = labels[constants.LabelSourceNamespace]
+		identifyingLabels[constants.MCSLabelSourceCluster] = labels[constants.MCSLabelSourceCluster]
+	}
+
+	_, _, err := util.CreateOrUpdateWithOptions[*unstructured.Unstructured](ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
+		Client: resource.ForDynamic(c.localClient),
+		Obj:    toDistribute,
+		MutateOnUpdate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			return util.CopyImmutableMetadata(obj, toDistribute), nil
+		},
+		IdentifyingLabels: identifyingLabels,
+	})
+
+	return err
 }
 
 func (c *ServiceEndpointSliceController) Delete(ctx context.Context, obj runtime.Object) error {
 	if c.isHeadless() {
-		return c.federator.Delete(ctx, obj) //nolint:wrapcheck // No need to wrap here
+		list, err := c.localClient.List(ctx, metav1.ListOptions{
+			LabelSelector: k8slabels.Set(map[string]string{
+				constants.LabelSourceName: resource.MustToMeta(obj).GetLabels()[constants.LabelSourceName],
+			}).String(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "error listing EndpointSlice resources for delete")
+		}
+
+		if len(list.Items) == 0 {
+			logger.V(log.DEBUG).Infof("Existing EndpointSlice not found for service EPS %q",
+				resource.MustToMeta(obj).GetLabels()[constants.LabelSourceName])
+			return nil
+		}
+
+		return c.localClient.Delete(ctx, list.Items[0].GetName(), metav1.DeleteOptions{}) //nolint:wrapcheck // No need to wrap here
 	}
 
 	// For a non-headless service, we never delete the single exported EPS - we update its endpoint condition based on
