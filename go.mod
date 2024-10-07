@@ -7,8 +7,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.20.2
-	github.com/submariner-io/admiral v0.19.0-m3
+	github.com/prometheus/client_golang v1.20.4
+	github.com/submariner-io/admiral v0.19.0-m3.0.20241007113622-538061402b91
 	github.com/submariner-io/shipyard v0.19.0-m3
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
