@@ -198,6 +198,41 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	When("the labels for an exported service are updated", func() {
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
+
+		It("should update the existing EndpointSlice labels", func() {
+			existingEPS := findEndpointSlices(t.cluster1.localEndpointSliceClient, t.cluster1.service.Namespace,
+				t.cluster1.service.Name, t.cluster1.clusterID)[0]
+
+			By("Updating service labels")
+
+			newLabelName := "new-label"
+			newLabelValue := "new-value"
+
+			t.cluster1.service.Labels[newLabelName] = newLabelValue
+			t.cluster1.serviceEndpointSlices[0].Labels[newLabelName] = newLabelValue
+
+			t.cluster1.updateServiceEndpointSlices()
+
+			Eventually(func() map[string]string {
+				eps, err := t.cluster1.localEndpointSliceClient.Get(context.TODO(), existingEPS.Name, metav1.GetOptions{})
+				Expect(err).To(Succeed())
+
+				return eps.GetLabels()
+			}).Should(HaveKeyWithValue(newLabelName, newLabelValue))
+
+			newSlices := findEndpointSlices(t.cluster1.localEndpointSliceClient, t.cluster1.service.Namespace,
+				t.cluster1.service.Name, t.cluster1.clusterID)
+			Expect(newSlices).To(HaveLen(1))
+			Expect(newSlices[0].Name).To(Equal(existingEPS.Name))
+		})
+	})
+
 	When("the session affinity is configured for an exported service", func() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
