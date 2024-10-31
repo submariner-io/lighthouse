@@ -1,4 +1,5 @@
 ARG BASE_BRANCH
+ARG FEDORA_VERSION=40
 ARG SOURCE=/go/src/github.com/submariner-io/lighthouse
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
@@ -8,6 +9,16 @@ ARG TARGETPLATFORM
 COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/lighthouse-coredns
+
+FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
+ARG FEDORA_VERSION
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY package/dnf_install /
+
+RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/lighthouse-coredns \
+    setup
 
 FROM --platform=${TARGETPLATFORM} debian:stable-slim AS certificates
 ARG SOURCE
@@ -19,6 +30,7 @@ FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
 ARG TARGETPLATFORM
 
+COPY --from=base /output/lighthouse-coredns /
 COPY --from=certificates /etc/ssl/certs /etc/ssl/certs
 COPY --from=builder ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-coredns /usr/local/bin/
 

@@ -1,4 +1,5 @@
 ARG BASE_BRANCH
+ARG FEDORA_VERSION=40
 ARG SOURCE=/go/src/github.com/submariner-io/lighthouse
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
@@ -9,12 +10,23 @@ COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/lighthouse-agent
 
+FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
+ARG FEDORA_VERSION
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY package/dnf_install /
+
+RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/lighthouse-agent \
+    setup
+
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
+COPY --from=base /output/lighthouse-agent /
 COPY --from=builder ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-agent /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
