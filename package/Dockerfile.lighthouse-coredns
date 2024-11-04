@@ -20,11 +20,15 @@ COPY package/dnf_install /
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/lighthouse-coredns \
     setup
 
-FROM --platform=${TARGETPLATFORM} debian:stable-slim AS certificates
+FROM --platform=${TARGETPLATFORM} fedora:${FEDORA_VERSION} AS certificates
+ARG FEDORA_VERSION
 ARG SOURCE
 ARG TARGETPLATFORM
 
-RUN apt-get update && apt-get -y install ca-certificates && update-ca-certificates
+COPY package/dnf_install /
+
+RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/lighthouse-coredns \
+    ca-certificates
 
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
