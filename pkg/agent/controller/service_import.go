@@ -247,8 +247,8 @@ func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
 		for i := range siList.Items {
 			si := c.converter.toServiceImport(&siList.Items[i])
 
-			if serviceImportSourceName(si) != "" {
-				// This is not an aggregated ServiceImport.
+			if serviceImportSourceName(si) != "" || si.Annotations[mcsv1a1.LabelServiceName] != "" {
+				// This is not a local aggregated ServiceImport.
 				continue
 			}
 
