@@ -312,8 +312,8 @@ func newTestDiver() *testDriver {
 	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace)
 
-	t.cluster1.init(t.syncerConfig)
-	t.cluster2.init(t.syncerConfig)
+	t.cluster1.init(t.syncerConfig, nil)
+	t.cluster2.init(t.syncerConfig, nil)
 
 	return t
 }
@@ -327,15 +327,18 @@ func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(syncerConfig *broker.SyncerConfig) {
+func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient *dynamicfake.FakeDynamicClient) {
 	for k, v := range c.service.Labels {
 		c.serviceEndpointSlices[0].Labels[k] = v
 	}
 
 	c.serviceIP = c.service.Spec.ClusterIP
 
-	c.localDynClient = dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
-	fake.AddBasicReactors(&c.localDynClient.Fake)
+	c.localDynClient = dynClient
+	if c.localDynClient == nil {
+		c.localDynClient = dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
+		fake.AddBasicReactors(&c.localDynClient.Fake)
+	}
 
 	c.localServiceImportReactor = fake.NewFailingReactorForResource(&c.localDynClient.Fake, "serviceimports")
 
