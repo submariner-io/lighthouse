@@ -117,6 +117,11 @@ var _ = Describe("Reconciliation", func() {
 			t = newTestDiver()
 			t.useClusterSetIP = true
 
+			brokerDynClient := t.syncerConfig.BrokerClient.(*fake.FakeDynamicClient)
+
+			// Use the broker client for cluster1 to simulate the broker being on the same cluster.
+			t.cluster1.init(t.syncerConfig, brokerDynClient)
+
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
 			test.CreateResource(t.cluster1.localServiceExportClient, serviceExport)
@@ -133,12 +138,6 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.start(t, *t.syncerConfig)
 			t.cluster2.start(t, *t.syncerConfig)
 
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
-
-			testutil.EnsureNoActionsForResource(&t.cluster1.localDynClient.Fake, "serviceimports", "delete")
-			testutil.EnsureNoActionsForResource(&t.cluster1.localDynClient.Fake, "endpointslices", "delete")
-
-			brokerDynClient := t.syncerConfig.BrokerClient.(*fake.FakeDynamicClient)
 			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "endpointslices", "delete")
 
 			// For migration cleanup, it may attempt to delete a local legacy ServiceImport from the broker so ignore it.
@@ -153,6 +152,8 @@ var _ = Describe("Reconciliation", func() {
 
 				return false
 			}).Should(BeFalse())
+
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
 	})
 
