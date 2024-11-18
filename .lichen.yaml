@@ -31,3 +31,9 @@ exceptions:
       licenses: ["MPL-2.0"]
     - path: "github.com/hashicorp/go-multierror"
       licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/go-secure-stdlib/parseutil"
+      licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/go-secure-stdlib/strutil"
+      licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/go-sockaddr"
+      licenses: ["MPL-2.0"]
