@@ -43,11 +43,11 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 			balancer: loadbalancer.NewSmoothWeightedRR(),
 		}
 
-		if !isLegacy {
-			svcInfo.spec = serviceImport.Spec
-		}
-
 		i.serviceMap[key] = svcInfo
+	}
+
+	if !isLegacy {
+		svcInfo.spec = serviceImport.Spec
 	}
 
 	svcInfo.isExported = true
