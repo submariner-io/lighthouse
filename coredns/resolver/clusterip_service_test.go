@@ -450,9 +450,13 @@ func testClusterSetIP() {
 
 	BeforeEach(func() {
 		si := newAggregatedServiceImport(namespace1, service1)
-		si.Spec.IPs = []string{clusterSetIP}
-		si.Spec.Ports = []mcsv1a1.ServicePort{port1, port2}
 
+		si.Spec.IPs = []string{clusterSetIP}
+		t.resolver.PutServiceImport(si)
+
+		// We call PutServiceImport separately with the ports to ensure it updates the cache. This simulates the
+		// real behavior where the port information is added/updated in the ServiceImport some time after creation.
+		si.Spec.Ports = []mcsv1a1.ServicePort{port1, port2}
 		t.resolver.PutServiceImport(si)
 
 		t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
