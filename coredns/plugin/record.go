@@ -25,6 +25,7 @@ import (
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
+	"k8s.io/utils/set"
 	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -83,7 +84,15 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 			target = dnsRecord.HostName + "." + target
 		}
 
+		portsSeen := set.New[int32]()
+
 		for _, port := range reqPorts {
+			if portsSeen.Has(port.Port) {
+				continue
+			}
+
+			portsSeen.Insert(port.Port)
+
 			record := &dns.SRV{
 				Hdr:      dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeSRV, Class: state.QClass(), Ttl: lh.TTL},
 				Priority: 0,
@@ -91,6 +100,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 				Port:     uint16(port.Port), //nolint:gosec // Need to ignore integer conversion error
 				Target:   target,
 			}
+
 			records = append(records, record)
 		}
 	}
