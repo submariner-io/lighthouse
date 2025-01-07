@@ -46,6 +46,7 @@ var _ = Describe("ClusterIP Service export", func() {
 	Describe("with multiple service EndpointSlices", testClusterIPServiceWithMultipleEPS)
 })
 
+//nolint:maintidx // This function composes test cases so ignore low maintainability index.
 func testClusterIPServiceInOneCluster() {
 	var t *testDriver
 
@@ -502,6 +503,7 @@ func testClusterIPServiceInOneCluster() {
 	})
 }
 
+//nolint:maintidx // This function composes test cases so ignore low maintainability index.
 func testClusterIPServiceInTwoClusters() {
 	noConflictCondition := &mcsv1a1.ServiceExportCondition{
 		Type:   mcsv1a1.ServiceExportConflict,
