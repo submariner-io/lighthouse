@@ -126,7 +126,7 @@ func RunServiceDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
@@ -250,7 +250,7 @@ func RunServiceExportTest(f *lhframework.Framework) {
 
 	framework.By(fmt.Sprintf("Creating an Nginx ServiceExport on %q", clusterBName))
 	f.NewServiceExport(framework.ClusterB, "nginx-demo", f.Namespace)
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
@@ -282,7 +282,7 @@ func RunServicesPodAvailabilityTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
@@ -518,7 +518,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
@@ -540,7 +540,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 	f.AwaitEndpointSlices(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterCName))
 	f.NewNginxDeployment(framework.ClusterC)
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterCName))
 

@@ -45,7 +45,7 @@ func RunClusterSetIPTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))

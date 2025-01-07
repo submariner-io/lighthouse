@@ -59,7 +59,7 @@ func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
 	Expect(framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Delete(context.TODO(),
 		f.Namespace, metav1.DeleteOptions{})).To(Succeed())
 
-	framework.By(fmt.Sprintf("Creating an Nginx Deployment on on %q", clusterBName))
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
 	f.NewNginxDeployment(framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
