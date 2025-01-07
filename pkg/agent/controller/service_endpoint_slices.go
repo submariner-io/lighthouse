@@ -20,7 +20,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -380,9 +379,9 @@ type endpointSliceStringer struct {
 }
 
 func (s endpointSliceStringer) String() string {
-	labels, _ := json.MarshalIndent(&s.Labels, "", "  ")
-	ports, _ := json.MarshalIndent(&s.Ports, "", "  ")
-	endpoints, _ := json.MarshalIndent(&s.Endpoints, "", "  ")
+	labels := resource.ToJSON(&s.Labels)
+	ports := resource.ToJSON(&s.Ports)
+	endpoints := resource.ToJSON(&s.Endpoints)
 
 	return fmt.Sprintf("\nlabels: %s\naddressType: %s\nendpoints: %s\nports: %s", labels, s.AddressType, endpoints, ports)
 }

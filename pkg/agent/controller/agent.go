@@ -20,7 +20,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -29,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/lighthouse/pkg/constants"
@@ -496,6 +496,5 @@ type serviceImportStringer struct {
 }
 
 func (s serviceImportStringer) String() string {
-	spec, _ := json.MarshalIndent(&s.Spec, "", "  ")
-	return "spec: " + string(spec)
+	return "spec: " + resource.ToJSON(&s.Spec)
 }
