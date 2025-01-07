@@ -359,7 +359,9 @@ func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex
 
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	namespace string, count int,
-) (ipList, hostNameList []string) {
+) ([]string, []string) {
+	var ipList, hostNameList []string
+
 	client := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	framework.By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
@@ -403,10 +405,10 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 
 func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int,
 	isLocal bool,
-) (ipList, hostNameList []string) {
+) ([]string, []string) {
 	podList := f.Framework.AwaitPodsByAppLabel(targetCluster, svc.Labels["app"], svc.Namespace, count)
-	hostNameList = make([]string, 0)
-	ipList = make([]string, 0)
+	hostNameList := make([]string, 0)
+	ipList := make([]string, 0)
 
 	for i := range len(podList.Items) {
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
@@ -431,7 +433,7 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 
 func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int,
 	isLocal bool,
-) (ipList, hostNameList []string) {
+) ([]string, []string) {
 	if framework.TestContext.GlobalnetEnabled {
 		return f.AwaitPodIngressIPs(targetCluster, svc, count, isLocal)
 	}
@@ -439,13 +441,13 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count)
 }
 
-func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) (ipList, hostNameList []string) {
+func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
 	return f.AwaitPodIPs(targetCluster, service, anyCount, isLocal)
 }
 
-func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) (ipList, hostNameList []string) {
-	hostNameList = make([]string, 0)
-	ipList = make([]string, 0)
+func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {
+	hostNameList := make([]string, 0)
+	ipList := make([]string, 0)
 
 	endpoint := framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
 		return framework.KubeClients[targetCluster].CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
@@ -467,7 +469,7 @@ func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex
 	return ipList, hostNameList
 }
 
-func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1.Service) (ipList, hostNameList []string) {
+func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {
 	if framework.TestContext.GlobalnetEnabled {
 		return f.AwaitEndpointIngressIPs(targetCluster, svc)
 	}
@@ -548,7 +550,9 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
 	expSliceCount, expReadyCount int,
-) (endpointSliceList *discovery.EndpointSliceList) {
+) *discovery.EndpointSliceList {
+	var endpointSliceList *discovery.EndpointSliceList
+
 	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
 		discovery.LabelManagedBy: constants.LabelValueManagedBy,
@@ -604,7 +608,9 @@ func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, 
 	return result
 }
 
-func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpointName, healthCheckIP string) {
+func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (string, string) {
+	var endpointName, healthCheckIP string
+
 	framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
 		unstructuredEndpointList, err := EndpointClients[cluster].List(context.TODO(), metav1.ListOptions{})
 		return unstructuredEndpointList, err
@@ -636,7 +642,9 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (endpoi
 	return endpointName, healthCheckIP
 }
 
-func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) (healthCheckEnabled bool) {
+func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) bool {
+	var healthCheckEnabled bool
+
 	framework.AwaitUntil("Get healthCheckEnabled Configuration", func() (interface{}, error) {
 		unstructuredSubmarinerConfig, err := SubmarinerClients[cluster].Get(context.TODO(),
 			"submariner", metav1.GetOptions{})

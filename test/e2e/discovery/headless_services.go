@@ -379,10 +379,10 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 
 func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *corev1.Service,
 	domain string, clusterName string, withPort, withcluster bool,
-) (cmd []string, domainName string) {
-	cmd = []string{"dig", "+short", "SRV"}
+) ([]string, string) {
+	cmd := []string{"dig", "+short", "SRV"}
 
-	domainName = lhframework.BuildServiceDNSName("", service.Name, f.Namespace, domain)
+	domainName := lhframework.BuildServiceDNSName("", service.Name, f.Namespace, domain)
 	clusterDNSName := domainName
 
 	if withcluster {

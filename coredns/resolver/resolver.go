@@ -30,7 +30,7 @@ func New(clusterStatus ClusterStatus, client dynamic.Interface) *Interface {
 	}
 }
 
-func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (records []DNSRecord, isHeadless, found bool) {
+func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) ([]DNSRecord, bool, bool) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -48,7 +48,7 @@ func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (
 		return nil, false, found
 	}
 
-	records, found = i.getHeadlessRecords(serviceInfo, clusterID, hostname)
+	records, found := i.getHeadlessRecords(serviceInfo, clusterID, hostname)
 
 	return records, true, found
 }

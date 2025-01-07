@@ -65,7 +65,7 @@ func (lb *smoothWeightedRR) ItemCount() int {
 }
 
 // Add - adds a new unique item to the list.
-func (lb *smoothWeightedRR) Add(item interface{}, weight int64) (err error) {
+func (lb *smoothWeightedRR) Add(item interface{}, weight int64) error {
 	if item == nil {
 		return fmt.Errorf("item cannot be nil")
 	}
@@ -115,7 +115,8 @@ func (lb *smoothWeightedRR) nextWeightedItem() *weightedItem {
 	return nextSmoothWeightedItem(lb.items)
 }
 
-func nextSmoothWeightedItem(items []*weightedItem) (best *weightedItem) {
+func nextSmoothWeightedItem(items []*weightedItem) *weightedItem {
+	var best *weightedItem
 	total := int64(0)
 
 	for _, item := range items {

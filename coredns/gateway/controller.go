@@ -204,7 +204,7 @@ func (c *Controller) updateLocalClusterIDIfNeeded(clusterID string) {
 	}
 }
 
-func getGatewayStatus(obj *unstructured.Unstructured) (connections []interface{}, clusterID string, gwStatus bool) {
+func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bool) {
 	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
 		logger.Errorf(err, "status field not found in %#v, err was", obj)
@@ -212,6 +212,8 @@ func getGatewayStatus(obj *unstructured.Unstructured) (connections []interface{}
 	}
 
 	localClusterID, found, err := unstructured.NestedString(status, "localEndpoint", "cluster_id")
+
+	var connections []interface{}
 
 	if !found || err != nil {
 		logger.Errorf(err, "localEndpoint->cluster_id not found in %#v, err was", status)
