@@ -534,7 +534,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 			}
 
 			return nil
-		}).ShouldNot(BeNil(), fmt.Sprintf("ServiceExport condition not received. Expected: %s", resource.ToJSON(expected[i])))
+		}).ShouldNot(BeNil(), "ServiceExport condition not received. Expected: "+resource.ToJSON(expected[i]))
 	}
 
 	last := len(expected) - 1
@@ -551,7 +551,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 		}
 
 		return nil
-	}).ShouldNot(BeNil(), fmt.Sprintf("ServiceExport condition not found. Expected: %s", resource.ToJSON(expected[last])))
+	}).ShouldNot(BeNil(), "ServiceExport condition not found. Expected: "+resource.ToJSON(expected[last]))
 
 	for i := range expected {
 		assertEquivalentConditions(actual[i], expected[i])
@@ -575,7 +575,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExpo
 			}
 		}
 
-		Fail(fmt.Sprintf("ServiceExport condition not found. Expected: %s", resource.ToJSON(expected)))
+		Fail("ServiceExport condition not found. Expected: " + resource.ToJSON(expected))
 
 		return -1
 	}
@@ -583,8 +583,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExpo
 	initialIndex := indexOfLastCondition()
 	Consistently(func() int {
 		return indexOfLastCondition()
-	}).Should(Equal(initialIndex), fmt.Sprintf("Expected ServiceExport condition to not change: %s",
-		resource.ToJSON(expected)))
+	}).Should(Equal(initialIndex), "Expected ServiceExport condition to not change: "+resource.ToJSON(expected))
 }
 
 func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {

@@ -20,7 +20,6 @@ package gateway
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync/atomic"
 
@@ -110,7 +109,7 @@ func (c *Controller) Start(client dynamic.Interface) error {
 	go c.informer.Run(c.stopCh)
 
 	if ok := cache.WaitForCacheSync(c.stopCh, c.informer.HasSynced); !ok {
-		return fmt.Errorf("failed to wait for informer cache to sync")
+		return errors.New("failed to wait for informer cache to sync")
 	}
 
 	go c.queue.Run(c.stopCh, c.processNextGateway)

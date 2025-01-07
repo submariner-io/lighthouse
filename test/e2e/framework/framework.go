@@ -411,7 +411,7 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 	ipList := make([]string, 0)
 
 	for i := range len(podList.Items) {
-		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
+		ingressIPName := "pod-" + podList.Items[i].Name
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
 
 		if isLocal {
@@ -652,7 +652,7 @@ func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) bo
 	}, func(result interface{}) (bool, string, error) {
 		unstructuredSubmarinerConfig := result.(*unstructured.Unstructured)
 
-		framework.By(fmt.Sprintf("Getting the Submariner Config, for cluster %s", framework.TestContext.ClusterIDs[cluster]))
+		framework.By("Getting the Submariner Config, for cluster " + framework.TestContext.ClusterIDs[cluster])
 
 		var found bool
 		var err error

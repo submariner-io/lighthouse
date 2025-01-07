@@ -21,6 +21,7 @@ package loadbalancer
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -67,7 +68,7 @@ func (lb *smoothWeightedRR) ItemCount() int {
 // Add - adds a new unique item to the list.
 func (lb *smoothWeightedRR) Add(item interface{}, weight int64) error {
 	if item == nil {
-		return fmt.Errorf("item cannot be nil")
+		return errors.New("item cannot be nil")
 	}
 
 	if weight < 0 {
