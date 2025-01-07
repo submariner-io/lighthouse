@@ -56,7 +56,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and no specific cluster is requested", func() {
 		It("should consistently return its DNS record", func() {
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
 			}
 		})
@@ -64,7 +64,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and the cluster is requested", func() {
 		It("should consistently return its DNS record", func() {
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
 			}
 		})
@@ -145,7 +145,7 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should consistently return its DNS record", func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").IP).To(Equal(serviceIP1))
 			}
 		})
@@ -164,7 +164,7 @@ func testClusterIPServiceInTwoClusters() {
 
 		Context("and no specific cluster is requested", func() {
 			It("should consistently return the DNS record of the connected cluster", func() {
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
 				}
 			})
@@ -210,7 +210,7 @@ func testClusterIPServiceInTwoClusters() {
 
 		Context("and no specific cluster is requested", func() {
 			It("should consistently return the DNS record of the healthy cluster", func() {
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
 				}
 			})
@@ -245,7 +245,7 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should consistently return the DNS record of the remaining cluster", func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
 			}
 		})
@@ -279,7 +279,7 @@ func testClusterIPServiceInThreeClusters() {
 		})
 
 		It("should consistently return the merged service ports", func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
 			}
 		})
@@ -293,7 +293,7 @@ func testClusterIPServiceInThreeClusters() {
 		}
 
 		It("should consistently return its DNS record", func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, expDNSRecord)
 			}
 		})
@@ -320,7 +320,7 @@ func testClusterIPServiceInThreeClusters() {
 
 		Context("and subsequently healthy again", func() {
 			It("should consistently return the all DNS records round-robin", func() {
-				for i := 0; i < 5; i++ {
+				for range 5 {
 					Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").IP).To(Or(Equal(serviceIP1), Equal(serviceIP3)))
 				}
 

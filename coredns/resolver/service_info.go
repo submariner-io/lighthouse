@@ -75,7 +75,7 @@ func (si *serviceInfo) newRecordFrom(from *DNSRecord) *DNSRecord {
 
 func (si *serviceInfo) selectIP(checkCluster func(string) bool) *DNSRecord {
 	queueLength := si.balancer.ItemCount()
-	for i := 0; i < queueLength; i++ {
+	for range queueLength {
 		clusterID := si.balancer.Next().(string)
 		clusterInfo := si.clusters[clusterID]
 

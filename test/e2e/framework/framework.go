@@ -408,7 +408,7 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 	hostNameList = make([]string, 0)
 	ipList = make([]string, 0)
 
-	for i := 0; i < len(podList.Items); i++ {
+	for i := range len(podList.Items) {
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[i].Name)
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
 

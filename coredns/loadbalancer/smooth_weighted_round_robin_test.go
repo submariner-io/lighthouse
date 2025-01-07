@@ -59,7 +59,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 
 	// Validations
 	validateServerAdded := func(s server) {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			if lb.Next() == s.name {
 				return
 			}
@@ -75,7 +75,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 
 	validateEmptyLBState := func() {
 		Expect(lb.ItemCount()).To(Equal(0))
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			Expect(lb.Next()).To(BeNil())
 		}
 	}
@@ -83,7 +83,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	validateLoadBalancingByCount := func(rounds int, servers []server) {
 		totalServersWeight := getTotalServesWeight(servers)
 		results := make(map[string]int64)
-		for i := 0; i < rounds; i++ {
+		for range rounds {
 			s := lb.Next().(string)
 			results[s]++
 		}
@@ -170,7 +170,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("Next() should return it all the time", func() {
 			s := servers[0]
 			addServer(s)
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				Expect(lb.Next()).To(Equal(s.name))
 			}
 		})
@@ -192,7 +192,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 				err := lb.Add(s.name, s.weight)
 				Expect(err).ToNot(HaveOccurred())
 			}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				for _, s := range roundRobinServers {
 					Expect(lb.Next().(string)).To(Equal(s.name))
 				}

@@ -645,7 +645,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 
 	var retIPs []string
 
-	for count := 0; count < 10; count++ {
+	for range 10 {
 		framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
 			stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 				Command:       cmd,

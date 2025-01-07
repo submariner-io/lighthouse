@@ -259,7 +259,7 @@ func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 	ipsCount := len(serviceIPs)
 	rrIPs := make([]string, 0)
 
-	for i := 0; i < ipsCount; i++ {
+	for i := range ipsCount {
 		r := t.getNonHeadlessDNSRecord(ns, service, "")
 		rrIPs = append(rrIPs, r.IP)
 		slice := rrIPs[0:i]
@@ -267,7 +267,7 @@ func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 		Expect(serviceIPs).To(ContainElement(r.IP))
 	}
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		for _, ip := range rrIPs {
 			testIP := t.getNonHeadlessDNSRecord(ns, service, "").IP
 			Expect(testIP).To(Equal(ip))

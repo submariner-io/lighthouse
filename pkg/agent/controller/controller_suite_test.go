@@ -510,7 +510,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 	actual := make([]*mcsv1a1.ServiceExportCondition, len(expected))
 	lastIndex := -1
 
-	for i := 0; i < len(expected)-1; i++ {
+	for i := range len(expected) - 1 {
 		j := lastIndex + 1
 
 		Eventually(func() interface{} {
