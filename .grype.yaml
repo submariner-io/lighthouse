@@ -15,3 +15,8 @@ ignore:
   - vulnerability: GHSA-hfmw-7g3m-gj6q
     package:
       name: github.com/coredns/coredns
+  # Bumping to a fixed version requires bumping Go and K8s versions as well which
+  # are problematic in a dot release.
+  - vulnerability: GHSA-m9w6-wp3h-vq8g
+    package:
+      name: github.com/coredns/coredns
