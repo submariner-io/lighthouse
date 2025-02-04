@@ -47,7 +47,7 @@ jobs:
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.29']
+        k8s_version: ['1.32']
         include:
           # Oldest Kubernetes version thought to work with SubM's Service Discovery.
           # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:

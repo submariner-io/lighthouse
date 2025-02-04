@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Run markdown-link-check
-        uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec
+        uses: gaurav-nelson/github-action-markdown-link-check@1b916f2cf6c36510a6059943104e3c42ce6c16bc
         with:
           config-file: ".markdownlinkcheck.json"
           check-modified-files-only: "yes"
@@ -111,7 +111,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@869c549e657a088dc0441b08ce4fc0ecdac2bb65
+        uses: anchore/scan-action@7c05671ae9be166aeb155bad2d7df9121823df32
         id: scan
         with:
           path: "."
@@ -122,7 +122,7 @@ jobs:
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
         if: always()
-        uses: github/codeql-action/upload-sarif@f09c1c0a94de965c15400f5634aa42fac8fb8f88
+        uses: github/codeql-action/upload-sarif@dd746615b3b9d728a6a37ca2045b68ca76d4841a
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
