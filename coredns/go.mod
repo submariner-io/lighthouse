@@ -2,6 +2,9 @@ module github.com/submariner-io/lighthouse/coredns
 
 go 1.22.0
 
+// Fixes CVE-2024-53259
+replace github.com/quic-go/quic-go v0.42.0 => github.com/quic-go/quic-go v0.48.2
+
 require (
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.11.3
