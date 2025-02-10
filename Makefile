@@ -16,6 +16,7 @@ PLATFORMS ?= linux/amd64,linux/arm64
 BINARIES := lighthouse-agent lighthouse-coredns
 ARCH_BINARIES := $(foreach platform,$(subst $(comma),$(space),$(PLATFORMS)),$(foreach binary,$(BINARIES),bin/$(call gotodockerarch,$(platform))/$(binary)))
 IMAGES := lighthouse-agent lighthouse-coredns
+export LOCAL_COMPONENTS := submariner-lighthouse-agent submariner-lighthouse-coredns
 MULTIARCH_IMAGES := $(IMAGES)
 SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.yml
 
