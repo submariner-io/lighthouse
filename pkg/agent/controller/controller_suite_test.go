@@ -119,7 +119,8 @@ func TestController(t *testing.T) {
 
 type cluster struct {
 	agentSpec                 controller.AgentSpecification
-	localDynClient            *dynamicfake.FakeDynamicClient
+	localDynClient            dynamic.Interface
+	localDynClientFake        *k8stesting.Fake
 	localServiceExportClient  dynamic.ResourceInterface
 	localServiceImportClient  dynamic.NamespaceableResourceInterface
 	localIngressIPClient      dynamic.ResourceInterface
@@ -325,8 +326,8 @@ func newTestDiver() *testDriver {
 	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace)
 
-	t.cluster1.init(t.syncerConfig, nil)
-	t.cluster2.init(t.syncerConfig, nil)
+	t.cluster1.init(t.syncerConfig, nil, nil)
+	t.cluster2.init(t.syncerConfig, nil, nil)
 
 	return t
 }
@@ -340,20 +341,24 @@ func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient *dynamicfake.FakeDynamicClient) {
+func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Interface, dynClientFake *k8stesting.Fake) {
 	for k, v := range c.service.Labels {
 		c.serviceEndpointSlices[0].Labels[k] = v
 	}
 
 	c.serviceIP = c.service.Spec.ClusterIP
 
-	c.localDynClient = dynClient
-	if c.localDynClient == nil {
-		c.localDynClient = dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
-		fake.AddBasicReactors(&c.localDynClient.Fake)
+	if dynClient == nil {
+		fakeDynClient := dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
+		c.localDynClient = fakeDynClient
+		c.localDynClientFake = &fakeDynClient.Fake
+		fake.AddBasicReactors(c.localDynClientFake)
+	} else {
+		c.localDynClient = dynClient
+		c.localDynClientFake = dynClientFake
 	}
 
-	c.localServiceImportReactor = fake.NewFailingReactorForResource(&c.localDynClient.Fake, "serviceimports")
+	c.localServiceImportReactor = fake.NewFailingReactorForResource(c.localDynClientFake, "serviceimports")
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace)
@@ -514,7 +519,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 		j := lastIndex + 1
 
 		Eventually(func() interface{} {
-			actions := c.localDynClient.Fake.Actions()
+			actions := c.localDynClientFake.Actions()
 			for j < len(actions) {
 				a := actions[j]
 				j++
@@ -560,7 +565,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 
 func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExportCondition) {
 	indexOfLastCondition := func() int {
-		actions := c.localDynClient.Fake.Actions()
+		actions := c.localDynClientFake.Actions()
 		for i := len(actions) - 1; i >= 0; i-- {
 			if !actions[i].Matches("update", "serviceexports") {
 				continue
@@ -629,10 +634,10 @@ func (c *cluster) ensureNoEndpointSlice() {
 }
 
 func (c *cluster) ensureNoServiceExportActions() {
-	c.localDynClient.Fake.ClearActions()
+	c.localDynClientFake.ClearActions()
 
 	Consistently(func() []string {
-		return testutil.GetOccurredActionVerbs(&c.localDynClient.Fake, "serviceexports", "get", "update")
+		return testutil.GetOccurredActionVerbs(c.localDynClientFake, "serviceexports", "get", "update")
 	}, 500*time.Millisecond).Should(BeEmpty())
 }
 
@@ -1010,7 +1015,7 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 
 	t.awaitNoAggregatedServiceImport(c)
 
-	c.localDynClient.Fake.ClearActions()
+	c.localDynClientFake.ClearActions()
 
 	// Ensure the service's EndpointSlices are no longer being watched by creating a EndpointSlice and verifying the
 	// exported EndpointSlice isn't recreated.

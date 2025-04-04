@@ -117,7 +117,7 @@ var _ = Describe("Service export failures", func() {
 		JustBeforeEach(func() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 
-			fake.FailOnAction(&t.cluster1.localDynClient.Fake, "endpointslices", "delete-collection", nil, true)
+			fake.FailOnAction(t.cluster1.localDynClientFake, "endpointslices", "delete-collection", nil, true)
 		})
 
 		It("should eventually unexport the service", func() {
