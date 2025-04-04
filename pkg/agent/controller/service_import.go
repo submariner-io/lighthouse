@@ -141,7 +141,11 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		<-stopCh
 
 		c.endpointControllers.Range(func(_, value interface{}) bool {
-			value.(*ServiceEndpointSliceController).stop()
+			err := value.(*ServiceEndpointSliceController).stop(context.TODO())
+			if err != nil {
+				logger.Warningf("Error stopping service EndpointSlice controller: %s", err)
+			}
+
 			return true
 		})
 
@@ -267,18 +271,24 @@ func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
 	})
 }
 
-func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a1.ServiceImport) error {
+func (c *ServiceImportController) startEndpointsController(ctx context.Context, serviceImport *mcsv1a1.ServiceImport) error {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 
-	if obj, found := c.endpointControllers.LoadAndDelete(key); found {
-		logger.V(log.DEBUG).Infof("Stopping previous endpoints controller for %q", key)
-		obj.(*ServiceEndpointSliceController).stop()
+	if obj, found := c.endpointControllers.Load(key); found {
+		logger.V(log.DEBUG).Infof("Stopping previous EndpointSlice controller for %q", key)
+
+		err := obj.(*ServiceEndpointSliceController).stop(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "failed to stop previous EndpointSlice controller for %q", key)
+		}
+
+		c.endpointControllers.Delete(key)
 	}
 
 	endpointController, err := startEndpointSliceController(c.localClient, c.restMapper, c.converter.scheme,
 		serviceImport, c.clusterID, c.globalIngressIPCache, c.localLHEndpointSliceLister)
 	if err != nil {
-		return errors.Wrapf(err, "failed to start endpoints controller for %q", key)
+		return errors.Wrapf(err, "failed to start EndpointSlice controller for %q", key)
 	}
 
 	c.endpointControllers.Store(key, endpointController)
@@ -288,12 +298,16 @@ func (c *ServiceImportController) startEndpointsController(serviceImport *mcsv1a
 
 func (c *ServiceImportController) stopEndpointsController(ctx context.Context, key string) (bool, error) {
 	if obj, found := c.endpointControllers.Load(key); found {
-		endpointController := obj.(*ServiceEndpointSliceController)
-		endpointController.stop()
+		var err error
 
-		found, err := endpointController.cleanup(ctx)
+		endpointController := obj.(*ServiceEndpointSliceController)
+		err = endpointController.stop(ctx)
+
 		if err == nil {
-			c.endpointControllers.Delete(key)
+			found, err = endpointController.cleanup(ctx)
+			if err == nil {
+				c.endpointControllers.Delete(key)
+			}
 		}
 
 		return found, err
@@ -460,7 +474,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 		},
 	})
 	if err == nil && !typeConflict {
-		err = c.startEndpointsController(localServiceImport)
+		err = c.startEndpointsController(ctx, localServiceImport)
 	}
 
 	if err != nil {

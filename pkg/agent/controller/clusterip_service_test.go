@@ -108,7 +108,7 @@ func testClusterIPServiceInOneCluster() {
 			t.cluster1.createService()
 			t.cluster1.createServiceExport()
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
-			t.cluster1.localDynClient.Fake.ClearActions()
+			t.cluster1.localDynClientFake.ClearActions()
 
 			By("Deleting the service")
 			t.cluster1.deleteService()
@@ -442,7 +442,7 @@ func testClusterIPServiceInOneCluster() {
 		}
 
 		BeforeEach(func() {
-			fake.AddVerifyNamespaceReactor(&t.cluster2.localDynClient.Fake, "serviceimports", "endpointslices")
+			fake.AddVerifyNamespaceReactor(t.cluster2.localDynClientFake, "serviceimports", "endpointslices")
 
 			createNamespace(t.cluster2.localDynClient, test.LocalNamespace)
 		})

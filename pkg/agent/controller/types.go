@@ -20,6 +20,7 @@ package controller
 
 import (
 	"sync"
+	"time"
 
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/ipam"
@@ -121,6 +122,7 @@ type ServiceEndpointSliceController struct {
 	globalIngressIPCache     *globalIngressIPCache
 	epsSyncer                syncer.Interface
 	federator                federate.Federator
+	awaitStoppedTimeout      time.Duration
 }
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
