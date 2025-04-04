@@ -120,7 +120,7 @@ var _ = Describe("Reconciliation", func() {
 			brokerDynClient := t.syncerConfig.BrokerClient.(*fake.FakeDynamicClient)
 
 			// Use the broker client for cluster1 to simulate the broker being on the same cluster.
-			t.cluster1.init(t.syncerConfig, brokerDynClient)
+			t.cluster1.init(t.syncerConfig, brokerDynClient, &brokerDynClient.Fake)
 
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)

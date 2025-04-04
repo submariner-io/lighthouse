@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -43,6 +44,8 @@ import (
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
+
+var AwaitStoppedTimeout = time.Second * 5
 
 func startEndpointSliceController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
 	serviceImport *mcsv1a1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
@@ -66,6 +69,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		localClient:              localClient.Resource(endpointSliceGVR).Namespace(serviceNamespace),
 		ingressIPClient:          localClient.Resource(*globalIngressIPGVR),
 		federator:                federate.NewCreateOrUpdateFederator(localClient, restMapper, serviceNamespace, ""),
+		awaitStoppedTimeout:      AwaitStoppedTimeout,
 	}
 
 	var err error
@@ -118,11 +122,17 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 	return controller, nil
 }
 
-func (c *ServiceEndpointSliceController) stop() {
+func (c *ServiceEndpointSliceController) stop(ctx context.Context) error {
 	c.stopOnce.Do(func() {
 		close(c.stopCh)
-		c.epsSyncer.AwaitStopped()
 	})
+
+	timedCtx, cancel := context.WithTimeout(ctx, c.awaitStoppedTimeout)
+	defer cancel()
+
+	err := c.epsSyncer.AwaitStopped(timedCtx)
+
+	return errors.Wrapf(err, "error stopping EndpointSlice syncer for %s/%s", c.serviceNamespace, c.serviceName)
 }
 
 func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) (bool, error) {

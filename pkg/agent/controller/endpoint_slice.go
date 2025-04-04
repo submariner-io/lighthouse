@@ -94,7 +94,7 @@ func (c *EndpointSliceController) start(stopCh <-chan struct{}) error {
 		return errors.Wrap(err, "error starting EndpointSlice syncer")
 	}
 
-	c.conflictCheckWorkQueue.Run(stopCh, c.checkForConflicts)
+	c.conflictCheckWorkQueue.Run(c.checkForConflicts)
 
 	go func() {
 		<-stopCh

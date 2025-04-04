@@ -112,7 +112,7 @@ func (c *Controller) Start(client dynamic.Interface) error {
 		return errors.New("failed to wait for informer cache to sync")
 	}
 
-	go c.queue.Run(c.stopCh, c.processNextGateway)
+	go c.queue.Run(c.processNextGateway)
 
 	return nil
 }
