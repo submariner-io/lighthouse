@@ -39,6 +39,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Show target branch
+        run: echo ${GITHUB_BASE_REF}
       - name: Check that no dependencies include unmerged commits
         run: make check-non-release-versions
 
