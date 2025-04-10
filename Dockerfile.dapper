@@ -1,0 +1,17 @@
+ARG SHIPYARD_REPO=quay.io/submariner
+ARG SHIPYARD_TAG=devel
+FROM ${SHIPYARD_REPO}/shipyard-dapper-base:${SHIPYARD_TAG}
+
+ARG PROJECT
+ENV DAPPER_ENV="CI QUAY_USERNAME QUAY_PASSWORD MAKEFLAGS PLUGIN TEST_ARGS E2E_TESTDIR GITHUB_BASE_REF GITHUB_USER GITHUB_TOKEN USING" \
+    DAPPER_SOURCE=/go/src/github.com/${ORG}/${PROJECT} DAPPER_DOCKER_SOCKET=true
+ENV OVN_DIR=${DAPPER_SOURCE}/ovn-kubernetes
+ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
+
+WORKDIR ${DAPPER_SOURCE}
+
+RUN git config --global --add safe.directory ${DAPPER_SOURCE}
+RUN git config --global --add safe.directory ${OVN_DIR}
+
+ENTRYPOINT ["/opt/shipyard/scripts/entry"]
+CMD ["sh"]
