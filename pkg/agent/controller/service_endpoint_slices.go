@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -173,7 +174,8 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 		logLevel = log.TRACE
 	}
 
-	logger.V(logLevel).Infof("Service EndpointSlice %s/%s %sd", serviceEPS.Namespace, serviceEPS.Name, op)
+	logger.V(logLevel).Infof("Service %s EndpointSlice \"%s/%s\" %sd",
+		serviceEPS.AddressType, serviceEPS.Namespace, serviceEPS.Name, op)
 
 	var returnEPS *discovery.EndpointSlice
 
@@ -187,7 +189,7 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 		return nil, false
 	}
 
-	logger.V(logLevel).Infof("Returning EndpointSlice %s/%s: %s", serviceEPS.Namespace, returnEPS.GenerateName,
+	logger.V(logLevel).Infof("Returning EndpointSlice \"%s/%s\": %s", serviceEPS.Namespace, returnEPS.GenerateName,
 		endpointSliceStringer{returnEPS})
 
 	return returnEPS, false
@@ -196,10 +198,20 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 func (c *ServiceEndpointSliceController) clusterIPEndpointSliceFrom(serviceEPS *discovery.EndpointSlice) *discovery.EndpointSlice {
 	endpointSlice := c.newEndpointSliceFrom(serviceEPS)
 
+	var serviceIP string
+
+	for _, ip := range c.serviceImportSpec.IPs {
+		if (serviceEPS.AddressType == discovery.AddressTypeIPv4 && k8snet.IPFamilyOfString(ip) == k8snet.IPv4) ||
+			(serviceEPS.AddressType == discovery.AddressTypeIPv6 && k8snet.IPFamilyOfString(ip) == k8snet.IPv6) {
+			serviceIP = ip
+			break
+		}
+	}
+
 	endpointSlice.Endpoints = []discovery.Endpoint{{
-		Addresses: []string{c.serviceImportSpec.IPs[0]},
+		Addresses: []string{serviceIP},
 		Conditions: discovery.EndpointConditions{
-			Ready: ptr.To(c.getReadyAddressCount() > 0),
+			Ready: ptr.To(c.getReadyAddressCount(serviceEPS.AddressType) > 0),
 		},
 	}}
 
@@ -215,17 +227,21 @@ func (c *ServiceEndpointSliceController) clusterIPEndpointSliceFrom(serviceEPS *
 	return endpointSlice
 }
 
-func (c *ServiceEndpointSliceController) getReadyAddressCount() int {
+func (c *ServiceEndpointSliceController) getReadyAddressCount(addrType discovery.AddressType) int {
 	list := c.epsSyncer.ListResources()
 
 	readyCount := 0
 
 	for _, o := range list {
-		endpoints := o.(*discovery.EndpointSlice).Endpoints
-		for i := range endpoints {
+		eps := o.(*discovery.EndpointSlice)
+		if eps.AddressType != addrType {
+			continue
+		}
+
+		for i := range eps.Endpoints {
 			// Note: we're treating nil as ready to be on the safe side as the EndpointConditions doc states
 			// "In most cases consumers should interpret this unknown state (ie nil) as ready".
-			if endpoints[i].Conditions.Ready == nil || *endpoints[i].Conditions.Ready {
+			if eps.Endpoints[i].Conditions.Ready == nil || *eps.Endpoints[i].Conditions.Ready {
 				readyCount++
 			}
 		}
@@ -247,7 +263,8 @@ func (c *ServiceEndpointSliceController) headlessEndpointSliceFrom(serviceEPS *d
 
 	for i := range serviceEPS.Endpoints {
 		endpointSlice.Endpoints[i] = serviceEPS.Endpoints[i]
-		endpointSlice.Endpoints[i].Addresses = c.getHeadlessEndpointAddresses(serviceEPS.Name, &serviceEPS.Endpoints[i])
+		endpointSlice.Endpoints[i].Addresses = c.getHeadlessEndpointAddresses(serviceEPS.Name, serviceEPS.AddressType,
+			&serviceEPS.Endpoints[i])
 
 		if len(endpointSlice.Endpoints[i].Addresses) == 0 {
 			return nil
@@ -276,6 +293,10 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 		AddressType: serviceEPS.AddressType,
 	}
 
+	if eps.AddressType == discovery.AddressTypeIPv6 {
+		eps.GenerateName += "v6-"
+	}
+
 	for k, v := range serviceEPS.Labels {
 		if !strings.Contains(k, "kubernetes.io/") {
 			eps.Labels[k] = v
@@ -289,8 +310,10 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 	return eps
 }
 
-func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(name string, endpoint *discovery.Endpoint) []string {
-	if c.globalIngressIPCache == nil {
+func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(name string, addrType discovery.AddressType,
+	endpoint *discovery.Endpoint,
+) []string {
+	if c.globalIngressIPCache == nil || addrType != discovery.AddressTypeIPv4 {
 		return endpoint.Addresses
 	}
 

@@ -70,11 +70,12 @@ var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
 		t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
 		t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 
-		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
 
 		t.justBeforeEach()
+
+		t.cluster1.createServiceEndpointSlices()
 	})
 
 	AfterEach(func() {
@@ -97,7 +98,6 @@ func testLegacyServiceImportMigration() {
 	BeforeEach(func() {
 		t = newTestDiver()
 
-		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 
 		legacyServiceImport = t.newLegacyServiceImport(t.cluster1.clusterID)
@@ -143,6 +143,8 @@ func testLegacyServiceImportMigration() {
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
+
+		t.cluster1.createServiceEndpointSlices()
 	})
 
 	AfterEach(func() {

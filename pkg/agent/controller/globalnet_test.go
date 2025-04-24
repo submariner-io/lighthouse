@@ -53,7 +53,10 @@ var _ = Describe("Globalnet enabled", func() {
 
 		BeforeEach(func() {
 			ingressIP = t.cluster1.newGlobalIngressIP(t.cluster1.service.Name, globalIP1)
-			t.cluster1.serviceIP = globalIP1
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.expectedClusterIPEndpoints[0].Addresses[0] = globalIP1
 		})
 
 		Context("and it has a global IP", func() {

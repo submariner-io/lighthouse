@@ -52,12 +52,12 @@ func testClusterIPServiceInOneCluster() {
 
 	BeforeEach(func() {
 		t = newTestDiver()
-
-		t.cluster1.createServiceEndpointSlices()
 	})
 
 	JustBeforeEach(func() {
 		t.justBeforeEach()
+
+		t.cluster1.createServiceEndpointSlices()
 	})
 
 	AfterEach(func() {
@@ -176,7 +176,7 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
 			}
 
-			t.cluster1.hasReadyEndpoints = false
+			t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
 
 			t.cluster1.updateServiceEndpointSlices()
 			t.ensureEndpointSlice(&t.cluster1)
@@ -348,7 +348,7 @@ func testClusterIPServiceInOneCluster() {
 					Namespace: "other-service-ns",
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP: "10.253.9.2",
+					ClusterIPs: []string{"10.253.9.2"},
 				},
 			}
 
@@ -400,7 +400,7 @@ func testClusterIPServiceInOneCluster() {
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
 					{
-						Addresses:  []string{service.Spec.ClusterIP},
+						Addresses:  []string{service.Spec.ClusterIPs[0]},
 						Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 					},
 				},
@@ -518,21 +518,21 @@ func testClusterIPServiceInTwoClusters() {
 	})
 
 	JustBeforeEach(func() {
+		t.cluster1.start(t, *t.syncerConfig)
+
 		t.cluster1.createServiceEndpointSlices()
 		t.cluster1.createService()
 		t.cluster1.createServiceExport()
-
-		t.cluster1.start(t, *t.syncerConfig)
 
 		// Sleep a little before starting the second cluster to ensure its resource CreationTimestamps will be
 		// later than the first cluster to ensure conflict checking is deterministic.
 		time.Sleep(100 * time.Millisecond)
 
+		t.cluster2.start(t, *t.syncerConfig)
+
 		t.cluster2.createServiceEndpointSlices()
 		t.cluster2.createService()
 		t.cluster2.createServiceExport()
-
-		t.cluster2.start(t, *t.syncerConfig)
 	})
 
 	AfterEach(func() {
@@ -643,7 +643,7 @@ func testClusterIPServiceInTwoClusters() {
 			It("should export the service in both clusters", func() {
 				t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(controller.TypeConflictReason))
 
-				t.cluster2.service.Spec.ClusterIP = t.cluster2.serviceIP
+				t.cluster2.service.Spec.ClusterIP = t.cluster2.expectedClusterIPEndpoints[0].Addresses[0]
 				t.cluster2.updateService()
 
 				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
@@ -930,7 +930,8 @@ func testClusterIPServiceWithMultipleEPS() {
 	Specify("the exported EndpointSlice should be correctly updated as backend service EndpointSlices are created/updated/deleted", func() {
 		By("Creating initial service EndpointSlice with no ready endpoints")
 
-		t.cluster1.hasReadyEndpoints = false
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+
 		t.cluster1.serviceEndpointSlices[0].Endpoints = []discovery.Endpoint{
 			{
 				Addresses:  []string{epIP1},
@@ -943,7 +944,8 @@ func testClusterIPServiceWithMultipleEPS() {
 
 		By("Creating service EndpointSlice with ready endpoint")
 
-		t.cluster1.hasReadyEndpoints = true
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(true)}
+
 		t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf("%s-%s2", serviceName, clusterID1),
@@ -965,7 +967,7 @@ func testClusterIPServiceWithMultipleEPS() {
 
 		t.cluster1.deleteEndpointSlice(t.cluster1.serviceEndpointSlices[1].Name)
 
-		t.cluster1.hasReadyEndpoints = false
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
 		t.cluster1.serviceEndpointSlices = t.cluster1.serviceEndpointSlices[:1]
 
 		t.ensureEndpointSlice(&t.cluster1)

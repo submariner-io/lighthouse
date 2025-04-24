@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
 	"sort"
@@ -54,6 +55,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -63,6 +65,8 @@ const (
 	clusterID2       = "west"
 	serviceName      = "nginx"
 	serviceNamespace = "service-ns"
+	ipV4ServiceIP1   = "10.253.9.1"
+	ipV4ServiceIP2   = "10.253.10.1"
 	globalIP1        = "242.254.1.1"
 	globalIP2        = "242.254.1.2"
 	globalIP3        = "242.254.1.3"
@@ -118,22 +122,21 @@ func TestController(t *testing.T) {
 }
 
 type cluster struct {
-	agentSpec                 controller.AgentSpecification
-	localDynClient            dynamic.Interface
-	localDynClientFake        *k8stesting.Fake
-	localServiceExportClient  dynamic.ResourceInterface
-	localServiceImportClient  dynamic.NamespaceableResourceInterface
-	localIngressIPClient      dynamic.ResourceInterface
-	localEndpointSliceClient  dynamic.ResourceInterface
-	localServiceImportReactor *fake.FailingReactor
-	agentController           *controller.Controller
-	service                   *corev1.Service
-	serviceIP                 string
-	serviceExport             *mcsv1a1.ServiceExport
-	serviceEndpointSlices     []discovery.EndpointSlice
-	clusterID                 string
-	headlessEndpointAddresses [][]discovery.Endpoint
-	hasReadyEndpoints         bool
+	agentSpec                  controller.AgentSpecification
+	localDynClient             dynamic.Interface
+	localDynClientFake         *k8stesting.Fake
+	localServiceExportClient   dynamic.ResourceInterface
+	localServiceImportClient   dynamic.NamespaceableResourceInterface
+	localIngressIPClient       dynamic.ResourceInterface
+	localEndpointSliceClient   dynamic.ResourceInterface
+	localServiceImportReactor  *fake.FailingReactor
+	agentController            *controller.Controller
+	service                    *corev1.Service
+	expectedClusterIPEndpoints []discovery.Endpoint
+	serviceExport              *mcsv1a1.ServiceExport
+	serviceEndpointSlices      []discovery.EndpointSlice
+	clusterID                  string
+	headlessEndpointAddresses  [][]discovery.Endpoint
 }
 
 type testDriver struct {
@@ -188,7 +191,9 @@ func newTestDiver() *testDriver {
 					},
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP:       "10.253.9.1",
+					ClusterIP:       ipV4ServiceIP1,
+					ClusterIPs:      []string{ipV4ServiceIP1},
+					IPFamilies:      []corev1.IPFamily{corev1.IPv4Protocol},
 					Selector:        map[string]string{"app": "test"},
 					Ports:           []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
 					SessionAffinity: corev1.ServiceAffinityNone,
@@ -252,7 +257,6 @@ func newTestDiver() *testDriver {
 					},
 				},
 			},
-			hasReadyEndpoints: true,
 		},
 		cluster2: cluster{
 			clusterID: clusterID2,
@@ -267,7 +271,9 @@ func newTestDiver() *testDriver {
 					Namespace: serviceNamespace,
 				},
 				Spec: corev1.ServiceSpec{
-					ClusterIP:       "10.253.10.1",
+					ClusterIP:       ipV4ServiceIP2,
+					ClusterIPs:      []string{ipV4ServiceIP2},
+					IPFamilies:      []corev1.IPFamily{corev1.IPv4Protocol},
 					Selector:        map[string]string{"app": "test"},
 					Ports:           []corev1.ServicePort{toServicePort(port1), toServicePort(port2)},
 					SessionAffinity: corev1.ServiceAffinityNone,
@@ -295,7 +301,6 @@ func newTestDiver() *testDriver {
 					},
 				},
 			},
-			hasReadyEndpoints: true,
 		},
 		syncerConfig: &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
@@ -342,11 +347,7 @@ func (t *testDriver) afterEach() {
 }
 
 func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Interface, dynClientFake *k8stesting.Fake) {
-	for k, v := range c.service.Labels {
-		c.serviceEndpointSlices[0].Labels[k] = v
-	}
-
-	c.serviceIP = c.service.Spec.ClusterIP
+	c.expectedClusterIPEndpoints = nil
 
 	if dynClient == nil {
 		fakeDynClient := dynamicfake.NewSimpleDynamicClient(syncerConfig.Scheme)
@@ -385,6 +386,19 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
+	for i := range c.serviceEndpointSlices {
+		for k, v := range c.service.Labels {
+			c.serviceEndpointSlices[i].Labels[k] = v
+		}
+	}
+
+	for _, ip := range c.service.Spec.ClusterIPs {
+		c.expectedClusterIPEndpoints = append(c.expectedClusterIPEndpoints, discovery.Endpoint{
+			Addresses:  []string{ip},
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		})
+	}
+
 	syncerConfig.LocalClient = c.localDynClient
 	bigint, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	Expect(err).To(Succeed())
@@ -749,60 +763,40 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 
 	sortSlices(expected)
 
-	var endpointSlice *discovery.EndpointSlice
+	Eventually(func(g Gomega) {
+		var endpointSlice *discovery.EndpointSlice
 
-	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
-		endpointSlice = nil
-
-		//nolint:contextcheck // Ignore Function `findEndpointSlice` should pass the context parameter
 		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[constants.MCSLabelSourceCluster])
 
-		if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
-			for _, eps := range slices {
+		for _, eps := range slices {
+			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
 				if eps.Labels[constants.LabelSourceName] == expected.Name {
 					endpointSlice = eps
 					break
 				}
+			} else if eps.AddressType == expected.AddressType {
+				endpointSlice = eps
+				break
 			}
-		} else if len(slices) == 1 {
-			endpointSlice = slices[0]
 		}
 
-		if endpointSlice == nil {
-			return false, nil
-		}
+		g.Expect(endpointSlice).NotTo(BeNil(), "EndpointSlice not found: %s", resource.ToJSON(expected))
 
 		sortSlices(endpointSlice)
 
-		return reflect.DeepEqual(expected.Endpoints, endpointSlice.Endpoints) &&
-			reflect.DeepEqual(expected.Ports, endpointSlice.Ports), nil
-	})
+		maps.DeleteFunc(endpointSlice.Labels, func(k, _ string) bool {
+			return strings.HasPrefix(k, "submariner-io/")
+		})
 
-	if !wait.Interrupted(err) {
-		Expect(err).To(Succeed())
-	}
+		g.Expect(endpointSlice.Labels).To(Equal(expected.Labels), "%s EndpointSlice", expected.AddressType)
 
-	if endpointSlice == nil {
-		Fail(fmt.Sprintf("EndpointSlice for %s/%s not found", expected.Namespace, expected.Name))
-	}
-
-	actualLabels := map[string]string{}
-
-	for k, v := range endpointSlice.Labels {
-		if !strings.HasPrefix(k, "submariner-io/") {
-			actualLabels[k] = v
+		for k, v := range expected.Annotations {
+			g.Expect(endpointSlice.Annotations).To(HaveKeyWithValue(k, v), "%s EndpointSlice", expected.AddressType)
 		}
-	}
 
-	Expect(actualLabels).To(Equal(expected.Labels))
-
-	for k, v := range expected.Annotations {
-		Expect(endpointSlice.Annotations).To(HaveKeyWithValue(k, v))
-	}
-
-	Expect(endpointSlice.AddressType).To(Equal(expected.AddressType))
-	Expect(endpointSlice.Endpoints).To(Equal(expected.Endpoints))
-	Expect(endpointSlice.Ports).To(Equal(expected.Ports))
+		g.Expect(endpointSlice.Endpoints).To(Equal(expected.Endpoints), "%s EndpointSlice", expected.AddressType)
+		g.Expect(endpointSlice.Ports).To(Equal(expected.Ports), "%s EndpointSlice", expected.AddressType)
+	}).ProbeEvery(time.Millisecond * 50).Within(time.Second * 5).Should(Succeed())
 }
 
 func awaitNoEndpointSlice(client dynamic.ResourceInterface, ns, name, clusterID string) {
@@ -908,23 +902,26 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 			expected = append(expected, *eps)
 		}
 	} else {
-		epsTemplate.Endpoints = []discovery.Endpoint{
-			{
-				Addresses:  []string{c.serviceIP},
-				Conditions: discovery.EndpointConditions{Ready: ptr.To(c.hasReadyEndpoints)},
-			},
-		}
+		for i := range c.expectedClusterIPEndpoints {
+			eps := epsTemplate.DeepCopy()
 
-		for i := range c.service.Spec.Ports {
-			epsTemplate.Ports = append(epsTemplate.Ports, discovery.EndpointPort{
-				Name:        &c.service.Spec.Ports[i].Name,
-				Protocol:    &c.service.Spec.Ports[i].Protocol,
-				Port:        &c.service.Spec.Ports[i].Port,
-				AppProtocol: c.service.Spec.Ports[i].AppProtocol,
-			})
-		}
+			eps.Endpoints = []discovery.Endpoint{c.expectedClusterIPEndpoints[i]}
 
-		expected = []discovery.EndpointSlice{*epsTemplate}
+			if k8snet.IPFamilyOfString(c.expectedClusterIPEndpoints[i].Addresses[0]) == k8snet.IPv6 {
+				eps.AddressType = discovery.AddressTypeIPv6
+			}
+
+			for i := range c.service.Spec.Ports {
+				eps.Ports = append(eps.Ports, discovery.EndpointPort{
+					Name:        &c.service.Spec.Ports[i].Name,
+					Protocol:    &c.service.Spec.Ports[i].Protocol,
+					Port:        &c.service.Spec.Ports[i].Port,
+					AppProtocol: c.service.Spec.Ports[i].AppProtocol,
+				})
+			}
+
+			expected = append(expected, *eps)
+		}
 	}
 
 	for i := range expected {

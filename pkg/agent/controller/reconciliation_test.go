@@ -132,11 +132,12 @@ var _ = Describe("Reconciliation", func() {
 
 			restoreBrokerResources()
 
-			t.cluster1.createServiceEndpointSlices()
 			t.cluster1.createService()
 
 			t.cluster1.start(t, *t.syncerConfig)
 			t.cluster2.start(t, *t.syncerConfig)
+
+			t.cluster1.createServiceEndpointSlices()
 
 			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "endpointslices", "delete")
 
@@ -163,11 +164,15 @@ var _ = Describe("Reconciliation", func() {
 			t = newTestDiver()
 
 			restoreBrokerResources()
+
 			test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
+
 			t.cluster1.createService()
-			t.cluster1.createServiceEndpointSlices()
+
 			t.cluster1.start(t, *t.syncerConfig)
+
+			t.cluster1.createServiceEndpointSlices()
 
 			t.awaitServiceUnexported(&t.cluster1)
 		})

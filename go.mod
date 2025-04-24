@@ -7,8 +7,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.21.1
-	github.com/submariner-io/admiral v0.21.0-m1
+	github.com/prometheus/client_golang v1.22.0
+	github.com/submariner-io/admiral v0.21.0-m1.0.20250424144538-5dbf909f057c
 	github.com/submariner-io/shipyard v0.21.0-m1
 	k8s.io/api v0.32.1
 	k8s.io/apimachinery v0.32.1
@@ -42,7 +42,6 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect

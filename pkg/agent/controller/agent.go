@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -276,7 +278,13 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	}
 
 	if svcType == mcsv1a1.ClusterSetIP {
-		if a.globalnetEnabled {
+		serviceImport.Spec.IPs = svc.Spec.ClusterIPs
+
+		ipv4Index := slices.IndexFunc(svc.Spec.ClusterIPs, func(ip string) bool {
+			return k8snet.IPFamilyOfString(ip) == k8snet.IPv4
+		})
+
+		if a.globalnetEnabled && ipv4Index >= 0 {
 			ingressIP := a.getIngressIP(svc.Name, svc.Namespace)
 			if ingressIP.allocatedIP == "" {
 				logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
@@ -289,9 +297,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 				return nil, false
 			}
 
-			serviceImport.Spec.IPs = []string{ingressIP.allocatedIP}
-		} else {
-			serviceImport.Spec.IPs = []string{svc.Spec.ClusterIP}
+			serviceImport.Spec.IPs[ipv4Index] = ingressIP.allocatedIP
 		}
 
 		serviceImport.Spec.Ports = a.getPortsForService(svc)
