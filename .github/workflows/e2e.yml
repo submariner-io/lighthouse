@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        deploytool: ['operator']
+        ip_family: ['', 'dual-stack']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
         k8s_version: ['1.32']
@@ -63,7 +63,7 @@ jobs:
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           k8s_version: ${{ matrix.k8s_version }}
-          using: ${{ matrix.deploytool }} ${{ matrix.globalnet }}
+          using: ${{ matrix.ip_family }} ${{ matrix.globalnet }}
 
       - name: Post mortem
         if: failure()
