@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -57,7 +58,7 @@ func testClusterIPServiceInOneCluster() {
 	Context("and no specific cluster is requested", func() {
 		It("should consistently return its DNS record", func() {
 			for range 5 {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, expDNSRecord)
 			}
 		})
 	})
@@ -65,7 +66,7 @@ func testClusterIPServiceInOneCluster() {
 	Context("and the cluster is requested", func() {
 		It("should consistently return its DNS record", func() {
 			for range 5 {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 			}
 		})
 	})
@@ -76,12 +77,12 @@ func testClusterIPServiceInOneCluster() {
 		})
 
 		It("should return no DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false)
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
 		})
 
 		Context("and the cluster is requested", func() {
 			It("should still return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 			})
 		})
 	})
@@ -92,12 +93,12 @@ func testClusterIPServiceInOneCluster() {
 		})
 
 		It("should return no DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false)
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
 		})
 
 		Context("and the cluster is requested", func() {
 			It("should still return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 			})
 		})
 	})
@@ -108,7 +109,7 @@ func testClusterIPServiceInOneCluster() {
 		})
 
 		It("should return the correct DNS record information", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP2,
 				Ports:       []mcsv1a1.ServicePort{port2},
 				ClusterName: clusterID1,
@@ -165,14 +166,14 @@ func testClusterIPServiceInTwoClusters() {
 		Context("and no specific cluster is requested", func() {
 			It("should consistently return the DNS record of the connected cluster", func() {
 				for range 10 {
-					t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
+					t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, expDNSRecord)
 				}
 			})
 		})
 
 		Context("and the disconnected cluster is requested", func() {
 			It("should still return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 					IP:          serviceIP1,
 					Ports:       []mcsv1a1.ServicePort{port1},
 					ClusterName: clusterID1,
@@ -182,7 +183,7 @@ func testClusterIPServiceInTwoClusters() {
 
 		Context("and the connected cluster is requested", func() {
 			It("should return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, expDNSRecord)
 			})
 		})
 	})
@@ -193,7 +194,7 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should return no DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false)
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
 		})
 	})
 
@@ -211,14 +212,14 @@ func testClusterIPServiceInTwoClusters() {
 		Context("and no specific cluster is requested", func() {
 			It("should consistently return the DNS record of the healthy cluster", func() {
 				for range 10 {
-					t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
+					t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, expDNSRecord)
 				}
 			})
 		})
 
 		Context("and the unhealthy cluster is requested", func() {
 			It("should still return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, resolver.DNSRecord{
+				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, resolver.DNSRecord{
 					IP:          serviceIP2,
 					Ports:       []mcsv1a1.ServicePort{port1},
 					ClusterName: clusterID2,
@@ -228,7 +229,7 @@ func testClusterIPServiceInTwoClusters() {
 
 		Context("and the healthy cluster is requested", func() {
 			It("should return its DNS record", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 			})
 		})
 	})
@@ -246,7 +247,7 @@ func testClusterIPServiceInTwoClusters() {
 
 		It("should consistently return the DNS record of the remaining cluster", func() {
 			for range 10 {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, expDNSRecord)
 			}
 		})
 	})
@@ -294,7 +295,7 @@ func testClusterIPServiceInThreeClusters() {
 
 		It("should consistently return its DNS record", func() {
 			for range 10 {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", false, expDNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, expDNSRecord)
 			}
 		})
 	})
@@ -356,13 +357,13 @@ func testClusterIPServiceMisc() {
 		})
 
 		It("should return the correct DNS record for each namespace", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
 				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 
-			t.assertDNSRecordsFound(namespace2, service1, clusterID1, "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace2, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP2,
 				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
@@ -380,7 +381,7 @@ func testClusterIPServiceMisc() {
 			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
 			t.putEndpointSlice(es)
 
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
 				Ports:       []mcsv1a1.ServicePort{},
 				ClusterName: clusterID1,
@@ -465,7 +466,7 @@ func testClusterSetIP() {
 
 	Context("and no specific cluster is requested", func() {
 		It("should return the clusterset IP DNS record", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:    clusterSetIP,
 				Ports: []mcsv1a1.ServicePort{port1, port2},
 			})
@@ -474,7 +475,7 @@ func testClusterSetIP() {
 
 	Context("and a cluster is requested", func() {
 		It("should return its DNS record", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", false, resolver.DNSRecord{
+			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
 				Ports:       []mcsv1a1.ServicePort{port1},
 				ClusterName: clusterID1,

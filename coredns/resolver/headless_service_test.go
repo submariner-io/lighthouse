@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -110,7 +111,7 @@ func testHeadlessService() {
 
 		Context("and the publish-not-ready-addresses annotation is not present", func() {
 			It("should return DNS records for only the ready addresses", func() {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 					endpoint1DNSRecord,
 					endpoint3DNSRecord,
 				)
@@ -123,7 +124,7 @@ func testHeadlessService() {
 			})
 
 			It("should return DNS records for only the ready addresses", func() {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 					endpoint1DNSRecord,
 					endpoint3DNSRecord,
 				)
@@ -136,7 +137,7 @@ func testHeadlessService() {
 			})
 
 			It("should return all the DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 					endpoint1DNSRecord,
 					endpoint2DNSRecord,
 					endpoint3DNSRecord,
@@ -214,7 +215,7 @@ func testHeadlessService() {
 			})
 
 			It("should return the local DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
 					endpoint2DNSRecord,
 					endpoint3DNSRecord)
 			})
@@ -226,7 +227,7 @@ func testHeadlessService() {
 			})
 
 			It("should return the global DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpoint1DNSRecord)
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpoint1DNSRecord)
 			})
 		})
 	})
@@ -267,7 +268,7 @@ func testHeadlessService() {
 		})
 
 		It("should return DNS records with unique addresses", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 				endpoint1DNSRecord,
 				endpoint2DNSRecord,
 				endpoint3DNSRecord,
@@ -360,24 +361,25 @@ func testHeadlessServiceInMultipleClusters() {
 
 	Context("and no specific cluster is requested", func() {
 		It("should return all the DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, "", "", true, cluster1DNSRecord,
-				cluster2DNSRecord, cluster3DNSRecord1, cluster3DNSRecord2, cluster3DNSRecord3, cluster3DNSRecord4)
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
+				cluster1DNSRecord, cluster2DNSRecord, cluster3DNSRecord1, cluster3DNSRecord2, cluster3DNSRecord3, cluster3DNSRecord4)
 		})
 	})
 
 	Context("and a specific cluster is requested", func() {
 		It("should return all its DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", true,
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", k8snet.IPv4, true,
 				cluster3DNSRecord1, cluster3DNSRecord2, cluster3DNSRecord3, cluster3DNSRecord4)
 		})
 	})
 
 	Context("and a specific cluster and host name is requested", func() {
 		It("should return its host name DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, true,
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, k8snet.IPv4, true,
 				cluster3DNSRecord1, cluster3DNSRecord2)
 
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName2, true, cluster3DNSRecord4)
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName2, k8snet.IPv4, true,
+				cluster3DNSRecord4)
 		})
 	})
 
@@ -388,17 +390,17 @@ func testHeadlessServiceInMultipleClusters() {
 
 		Context("and no specific cluster is requested", func() {
 			It("should return the connected clusters' DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 					cluster1DNSRecord, cluster2DNSRecord)
 			})
 		})
 
 		Context("and the disconnected cluster is requested", func() {
 			It("should still return its DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", true,
+				t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", k8snet.IPv4, true,
 					cluster3DNSRecord1, cluster3DNSRecord2, cluster3DNSRecord3, cluster3DNSRecord4)
 
-				t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, true,
+				t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, k8snet.IPv4, true,
 					cluster3DNSRecord1, cluster3DNSRecord2)
 			})
 		})
@@ -411,7 +413,7 @@ func testHeadlessServiceInMultipleClusters() {
 
 		Context("and no specific cluster is requested", func() {
 			It("should return the remaining clusters' DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
+				t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, true,
 					cluster1DNSRecord, cluster2DNSRecord)
 			})
 		})
@@ -458,12 +460,14 @@ func testHeadlessServiceInMultipleClusters() {
 		})
 
 		It("should return the updated DNS records", func() {
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", true,
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, "", k8snet.IPv4, true,
 				expDNSRecord1, expDNSRecord2, expDNSRecord3)
 
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, true, expDNSRecord1)
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName1, k8snet.IPv4, true,
+				expDNSRecord1)
 
-			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName2, true, expDNSRecord2, expDNSRecord3)
+			t.assertDNSRecordsFound(namespace1, service1, clusterID3, hostName2, k8snet.IPv4, true,
+				expDNSRecord2, expDNSRecord3)
 		})
 	})
 

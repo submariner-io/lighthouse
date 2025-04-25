@@ -25,6 +25,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
+	v1 "k8s.io/api/discovery/v1"
 )
 
 const PluginName = "lighthouse"
@@ -67,7 +68,8 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
 	r *dns.Msg, pReq *recordRequest,
 ) (int, error) {
-	dnsRecords, isHeadless, found := lh.Resolver.GetDNSRecords(pReq.namespace, pReq.service, pReq.cluster, pReq.hostname)
+	dnsRecords, isHeadless, found := lh.Resolver.GetDNSRecords(pReq.namespace, pReq.service, pReq.cluster, pReq.hostname,
+		v1.AddressTypeIPv4)
 	if !found {
 		log.Debugf("No record found for %q", state.QName())
 		return lh.nextOrFailure(ctx, state, r, dns.RcodeNameError)

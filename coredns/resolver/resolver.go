@@ -19,7 +19,9 @@ limitations under the License.
 package resolver
 
 import (
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/client-go/dynamic"
+	k8snet "k8s.io/utils/net"
 )
 
 func New(clusterStatus ClusterStatus, client dynamic.Interface) *Interface {
@@ -30,7 +32,7 @@ func New(clusterStatus ClusterStatus, client dynamic.Interface) *Interface {
 	}
 }
 
-func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) ([]DNSRecord, bool, bool) {
+func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string, ipFamily k8snet.IPFamily) ([]DNSRecord, bool, bool) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -39,24 +41,40 @@ func (i *Interface) GetDNSRecords(namespace, name, clusterID, hostname string) (
 		return nil, false, false
 	}
 
-	if !serviceInfo.isHeadless() {
-		record, found := i.getClusterIPRecord(serviceInfo, clusterID)
-		if record != nil {
-			return []DNSRecord{*record}, false, true
-		}
+	if serviceInfo.isHeadless() {
+		records, found := i.getHeadlessRecords(serviceInfo, ipFamily, clusterID, hostname)
 
-		return nil, false, found
+		return records, true, found
 	}
 
-	records, found := i.getHeadlessRecords(serviceInfo, clusterID, hostname)
+	var record *DNSRecord
 
-	return records, true, found
+	if ipFamily == k8snet.IPv4 {
+		record, found = i.getClusterIPRecord(serviceInfo, discovery.AddressTypeIPv4, clusterID)
+	} else if ipFamily == k8snet.IPv6 {
+		record, found = i.getClusterIPRecord(serviceInfo, discovery.AddressTypeIPv6, clusterID)
+	} else {
+		for _, addrType := range []discovery.AddressType{discovery.AddressTypeIPv4, discovery.AddressTypeIPv6} {
+			record, found = i.getClusterIPRecord(serviceInfo, addrType, clusterID)
+			if record != nil {
+				break
+			}
+		}
+	}
+
+	if record != nil {
+		return []DNSRecord{*record}, false, true
+	}
+
+	return nil, false, found
 }
 
-func (i *Interface) getClusterIPRecord(serviceInfo *serviceInfo, clusterID string) (*DNSRecord, bool) {
+func (i *Interface) getClusterIPRecord(serviceInfo *serviceInfo, addrType discovery.AddressType, clusterID string) (*DNSRecord, bool) {
+	ipFamilyInfo := serviceInfo.getIPFamilyInfo(addrType)
+
 	// If a clusterID is specified, we supply it even if the service is not healthy.
 	if clusterID != "" {
-		clusterInfo, found := serviceInfo.clusters[clusterID]
+		clusterInfo, found := ipFamilyInfo.clusters[clusterID]
 		if !found {
 			return nil, false
 		}
@@ -74,30 +92,51 @@ func (i *Interface) getClusterIPRecord(serviceInfo *serviceInfo, clusterID strin
 	// If we are aware of the local cluster and we found some accessible IP, we shall return it.
 	localClusterID := i.clusterStatus.GetLocalClusterID()
 	if localClusterID != "" {
-		clusterInfo, found := serviceInfo.clusters[localClusterID]
+		clusterInfo, found := ipFamilyInfo.clusters[localClusterID]
 		if found && clusterInfo.endpointsHealthy {
-			return serviceInfo.newRecordFrom(&clusterInfo.endpointRecords[0]), true
+			return ipFamilyInfo.newRecordFrom(&clusterInfo.endpointRecords[0]), true
 		}
 	}
 
 	// Fall back to selected load balancer (weighted/RR/etc) if service is not present in the local cluster
-	record := serviceInfo.selectIP(i.clusterStatus.IsConnected)
+	record := ipFamilyInfo.selectIP(i.clusterStatus.IsConnected)
 
 	if record != nil {
-		return serviceInfo.newRecordFrom(record), true
+		return ipFamilyInfo.newRecordFrom(record), true
 	}
 
 	return nil, true
 }
 
-func (i *Interface) getHeadlessRecords(serviceInfo *serviceInfo, clusterID, hostname string) ([]DNSRecord, bool) {
-	clusterInfo, clusterFound := serviceInfo.clusters[clusterID]
+func (i *Interface) getHeadlessRecords(serviceInfo *serviceInfo, ipFamily k8snet.IPFamily, clusterID, hostname string) ([]DNSRecord, bool) {
+	var (
+		records []DNSRecord
+		found   bool
+	)
+
+	if ipFamily == k8snet.IPv4 {
+		records, found = i.getHeadlessRecordsForIPFamily(&serviceInfo.ipv4Info, clusterID, hostname)
+	} else if ipFamily == k8snet.IPv6 {
+		records, found = i.getHeadlessRecordsForIPFamily(&serviceInfo.ipv6Info, clusterID, hostname)
+	} else {
+		for _, ipFamilyInfo := range []*IPFamilyInfo{&serviceInfo.ipv4Info, &serviceInfo.ipv6Info} {
+			r, f := i.getHeadlessRecordsForIPFamily(ipFamilyInfo, clusterID, hostname)
+			records = append(records, r...)
+			found = found || f
+		}
+	}
+
+	return records, found
+}
+
+func (i *Interface) getHeadlessRecordsForIPFamily(ipFamilyInfo *IPFamilyInfo, clusterID, hostname string) ([]DNSRecord, bool) {
+	clusterInfo, clusterFound := ipFamilyInfo.clusters[clusterID]
 
 	switch {
 	case clusterID == "":
 		records := make([]DNSRecord, 0)
 
-		for id, info := range serviceInfo.clusters {
+		for id, info := range ipFamilyInfo.clusters {
 			if i.clusterStatus.IsConnected(id) {
 				records = append(records, info.endpointRecords...)
 			}

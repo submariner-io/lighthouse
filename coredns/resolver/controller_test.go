@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -52,13 +53,13 @@ var _ = Describe("Controller", func() {
 		Context("before the ServiceImport", func() {
 			Specify("GetDNSRecords should eventually return its DNS record", func() {
 				Consistently(func() bool {
-					_, _, found := t.resolver.GetDNSRecords(namespace1, service1, "", "")
+					_, _, found := t.resolver.GetDNSRecords(namespace1, service1, "", "", k8snet.IPv4)
 					return found
 				}).Should(BeFalse())
 
 				t.createServiceImport(newAggregatedServiceImport(namespace1, service1))
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 			})
 		})
 
@@ -69,14 +70,14 @@ var _ = Describe("Controller", func() {
 
 			Context("and then the EndpointSlice is deleted", func() {
 				JustBeforeEach(func() {
-					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 
 					err := t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 					Expect(err).To(Succeed())
 				})
 
 				Specify("GetDNSRecords should eventually return no DNS record", func() {
-					t.awaitDNSRecordsFound(namespace1, service1, "", "", false)
+					t.awaitDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
 				})
 
 				Specify("GetDNSRecords should eventually return not found after the ServiceImport is deleted", func() {
@@ -89,12 +90,12 @@ var _ = Describe("Controller", func() {
 
 			Context("and then the ServiceImport is deleted", func() {
 				Specify("GetDNSRecords should eventually return not found after the EndpointSlice is deleted", func() {
-					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 
 					err := t.serviceImports.Namespace(namespace1).Delete(context.TODO(), service1, metav1.DeleteOptions{})
 					Expect(err).To(Succeed())
 
-					t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+					t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 
 					err = t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 					Expect(err).To(Succeed())
@@ -105,12 +106,12 @@ var _ = Describe("Controller", func() {
 
 			Context("and then the EndpointSlice is updated to unhealthy", func() {
 				Specify("GetDNSRecords should eventually return no DNS record", func() {
-					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, expDNSRecord)
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 
 					endpointSlice.Endpoints[0].Conditions.Ready = ptr.To(false)
 					test.UpdateResource(t.endpointSlices.Namespace(namespace1), endpointSlice)
 
-					t.awaitDNSRecordsFound(namespace1, service1, "", "", false)
+					t.awaitDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
 				})
 			})
 		})
@@ -154,7 +155,7 @@ var _ = Describe("Controller", func() {
 		})
 
 		Specify("GetDNSRecords should return their DNS record", func() {
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true,
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
 				resolver.DNSRecord{
 					IP:          endpointIP1,
 					Ports:       []mcsv1a1.ServicePort{port1},
@@ -187,7 +188,7 @@ var _ = Describe("Controller", func() {
 
 				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), epsName1, metav1.DeleteOptions{})).To(Succeed())
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true,
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
 					resolver.DNSRecord{
 						IP:          endpointIP3,
 						Ports:       []mcsv1a1.ServicePort{port2},
