@@ -21,11 +21,12 @@ package lighthouse
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
-	v1 "k8s.io/api/discovery/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 const PluginName = "lighthouse"
@@ -68,8 +69,19 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
 	r *dns.Msg, pReq *recordRequest,
 ) (int, error) {
-	dnsRecords, isHeadless, found := lh.Resolver.GetDNSRecords(pReq.namespace, pReq.service, pReq.cluster, pReq.hostname,
-		v1.AddressTypeIPv4)
+	ipFamily := k8snet.IPFamilyUnknown
+	if state.QType() == dns.TypeA {
+		ipFamily = k8snet.IPv4
+	} else if state.QType() == dns.TypeAAAA {
+		ipFamily = k8snet.IPv6
+	}
+
+	if ipFamily != k8snet.IPFamilyUnknown && !slices.Contains(lh.SupportedIPFamilies, ipFamily) {
+		log.Debugf("IPv%s records not supported", ipFamily)
+		return lh.emptyResponse(state)
+	}
+
+	dnsRecords, isHeadless, found := lh.Resolver.GetDNSRecords(pReq.namespace, pReq.service, pReq.cluster, pReq.hostname, ipFamily)
 	if !found {
 		log.Debugf("No record found for %q", state.QName())
 		return lh.nextOrFailure(ctx, state, r, dns.RcodeNameError)
@@ -77,11 +89,6 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 
 	if len(dnsRecords) == 0 {
 		log.Debugf("Couldn't find a connected cluster or valid IPs for %q", state.QName())
-		return lh.emptyResponse(state)
-	}
-
-	if state.QType() == dns.TypeAAAA {
-		log.Debugf("Returning empty response for TypeAAAA query")
 		return lh.emptyResponse(state)
 	}
 
@@ -93,9 +100,12 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 
 	records := make([]dns.RR, 0)
 
-	if state.QType() == dns.TypeA {
+	switch state.QType() {
+	case dns.TypeA:
 		records = lh.createARecords(dnsRecords, state)
-	} else if state.QType() == dns.TypeSRV {
+	case dns.TypeAAAA:
+		records = lh.createAAAARecords(dnsRecords, state)
+	case dns.TypeSRV:
 		records = lh.createSRVRecords(dnsRecords, state, pReq, zone, isHeadless)
 	}
 

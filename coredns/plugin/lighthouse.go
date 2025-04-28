@@ -25,6 +25,7 @@ import (
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -40,12 +41,13 @@ var errInvalidRequest = errors.New("invalid query name")
 var log = clog.NewWithPlugin(PluginName)
 
 type Lighthouse struct {
-	Next          plugin.Handler
-	Fall          fall.F
-	Zones         []string
-	TTL           uint32
-	ClusterStatus resolver.ClusterStatus
-	Resolver      *resolver.Interface
+	Next                plugin.Handler
+	Fall                fall.F
+	Zones               []string
+	TTL                 uint32
+	ClusterStatus       resolver.ClusterStatus
+	Resolver            *resolver.Interface
+	SupportedIPFamilies []k8snet.IPFamily
 }
 
 var _ plugin.Handler = &Lighthouse{}

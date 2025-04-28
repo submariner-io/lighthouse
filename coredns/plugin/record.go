@@ -43,6 +43,20 @@ func (lh *Lighthouse) createARecords(dnsrecords []resolver.DNSRecord, state *req
 	return records
 }
 
+func (lh *Lighthouse) createAAAARecords(dnsrecords []resolver.DNSRecord, state *request.Request) []dns.RR {
+	records := make([]dns.RR, 0)
+
+	for _, record := range dnsrecords {
+		dnsRecord := &dns.AAAA{Hdr: dns.RR_Header{
+			Name: state.QName(), Rrtype: dns.TypeAAAA, Class: state.QClass(),
+			Ttl: lh.TTL,
+		}, AAAA: net.ParseIP(record.IP).To16()}
+		records = append(records, dnsRecord)
+	}
+
+	return records
+}
+
 func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *request.Request, pReq *recordRequest, zone string,
 	isHeadless bool,
 ) []dns.RR {
