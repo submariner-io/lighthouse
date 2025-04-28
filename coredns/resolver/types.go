@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/client-go/dynamic"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -35,7 +36,7 @@ type Interface struct {
 }
 
 type ClusterStatus interface {
-	IsConnected(clusterID string) bool
+	IsConnected(clusterID string, ipFamily k8snet.IPFamily) bool
 	GetLocalClusterID() string
 }
 

@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -109,7 +110,7 @@ func testWithoutFallback() {
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
-		t.mockCs.ConnectClusterID(clusterID)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
@@ -322,7 +323,7 @@ func testWithFallback() {
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
-		t.mockCs.ConnectClusterID(clusterID)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
 		t.mockCs.SetLocalClusterID(clusterID)
 
 		t.lh.Fall = fall.F{Zones: []string{"clusterset.local."}}
@@ -452,8 +453,8 @@ func testClusterStatus() {
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
-		t.mockCs.ConnectClusterID(clusterID)
-		t.mockCs.ConnectClusterID(clusterID2)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
+		t.mockCs.ConnectClusterID(clusterID2, net.IPv4)
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
@@ -495,7 +496,7 @@ func testClusterStatus() {
 
 	When("a service is in two clusters and only one is connected", func() {
 		JustBeforeEach(func() {
-			t.mockCs.DisconnectClusterID(clusterID)
+			t.mockCs.DisconnectClusterID(clusterID, net.IPv4)
 		})
 
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
@@ -525,7 +526,7 @@ func testClusterStatus() {
 
 	When("a service is present in two clusters and both are disconnected", func() {
 		JustBeforeEach(func() {
-			t.mockCs.DisconnectAll()
+			t.mockCs.DisconnectAll(net.IPv4)
 		})
 
 		qname := fmt.Sprintf("%s.%s.svc.clusterset.local.", service1, namespace1)
@@ -551,7 +552,7 @@ func testClusterStatus() {
 
 	When("a service is present in one cluster and it is disconnected", func() {
 		JustBeforeEach(func() {
-			t.mockCs.DisconnectClusterID(clusterID)
+			t.mockCs.DisconnectClusterID(clusterID, net.IPv4)
 
 			t.lh.Resolver.RemoveEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{}))
 		})
@@ -590,7 +591,7 @@ func testHeadlessService() {
 
 		t = newHandlerTestDriver()
 
-		t.mockCs.ConnectClusterID(clusterID)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.Headless))
 
@@ -739,7 +740,7 @@ func testHeadlessService() {
 
 			endpoints = append(endpoints, newEndpoint(endpointIP, hostName1, true))
 
-			t.mockCs.ConnectClusterID(clusterID2)
+			t.mockCs.ConnectClusterID(clusterID2, net.IPv4)
 		})
 
 		Context("and no cluster is requested", func() {
@@ -783,8 +784,8 @@ func testLocalService() {
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
-		t.mockCs.ConnectClusterID(clusterID)
-		t.mockCs.ConnectClusterID(clusterID2)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
+		t.mockCs.ConnectClusterID(clusterID2, net.IPv4)
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 
@@ -894,7 +895,7 @@ func testSRVMultiplePorts() {
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
-		t.mockCs.ConnectClusterID(clusterID)
+		t.mockCs.ConnectClusterID(clusterID, net.IPv4)
 
 		t.lh.Resolver.PutServiceImport(newServiceImport(namespace1, service1, mcsv1a1.ClusterSetIP))
 

@@ -137,7 +137,7 @@ func (i *Interface) getHeadlessRecordsForIPFamily(ipFamilyInfo *IPFamilyInfo, cl
 		records := make([]DNSRecord, 0)
 
 		for id, info := range ipFamilyInfo.clusters {
-			if i.clusterStatus.IsConnected(id) {
+			if i.clusterStatus.IsConnected(id, ipFamilyInfo.getNetIPFamily()) {
 				records = append(records, info.endpointRecords...)
 			}
 		}

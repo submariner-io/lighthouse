@@ -22,6 +22,8 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/slices"
+	discovery "k8s.io/api/discovery/v1"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -73,13 +75,13 @@ func (i *IPFamilyInfo) newRecordFrom(from *DNSRecord) *DNSRecord {
 	return &r
 }
 
-func (i *IPFamilyInfo) selectIP(checkCluster func(string) bool) *DNSRecord {
+func (i *IPFamilyInfo) selectIP(checkCluster func(string, k8snet.IPFamily) bool) *DNSRecord {
 	queueLength := i.balancer.ItemCount()
 	for range queueLength {
 		clusterID := i.balancer.Next().(string)
 		clusterInfo := i.clusters[clusterID]
 
-		if checkCluster(clusterID) && clusterInfo.endpointsHealthy {
+		if checkCluster(clusterID, i.getNetIPFamily()) && clusterInfo.endpointsHealthy {
 			return &clusterInfo.endpointRecords[0]
 		}
 
@@ -88,4 +90,12 @@ func (i *IPFamilyInfo) selectIP(checkCluster func(string) bool) *DNSRecord {
 	}
 
 	return nil
+}
+
+func (i *IPFamilyInfo) getNetIPFamily() k8snet.IPFamily {
+	if i.addrType == discovery.AddressTypeIPv6 {
+		return k8snet.IPv6
+	}
+
+	return k8snet.IPv4
 }

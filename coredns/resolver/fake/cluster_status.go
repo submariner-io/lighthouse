@@ -22,18 +22,22 @@ import (
 	"sync"
 	"sync/atomic"
 
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
 type ClusterStatus struct {
 	mutex               sync.Mutex
-	connectedClusterIDs set.Set[string]
+	connectedClusterIDs map[k8snet.IPFamily]set.Set[string]
 	localClusterID      atomic.Value
 }
 
 func NewClusterStatus(localClusterID string, isConnected ...string) *ClusterStatus {
 	c := &ClusterStatus{
-		connectedClusterIDs: set.New(isConnected...),
+		connectedClusterIDs: map[k8snet.IPFamily]set.Set[string]{
+			k8snet.IPv4: set.New(isConnected...),
+			k8snet.IPv6: set.New[string](),
+		},
 	}
 
 	c.localClusterID.Store(localClusterID)
@@ -41,11 +45,11 @@ func NewClusterStatus(localClusterID string, isConnected ...string) *ClusterStat
 	return c
 }
 
-func (c *ClusterStatus) IsConnected(clusterID string) bool {
+func (c *ClusterStatus) IsConnected(clusterID string, ipFamily k8snet.IPFamily) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	return c.connectedClusterIDs.Has(clusterID)
+	return c.connectedClusterIDs[ipFamily].Has(clusterID)
 }
 
 func (c *ClusterStatus) SetLocalClusterID(clusterID string) {
@@ -56,23 +60,23 @@ func (c *ClusterStatus) GetLocalClusterID() string {
 	return c.localClusterID.Load().(string)
 }
 
-func (c *ClusterStatus) DisconnectAll() {
+func (c *ClusterStatus) DisconnectAll(ipFamily k8snet.IPFamily) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.connectedClusterIDs = set.New[string]()
+	c.connectedClusterIDs[ipFamily] = set.New[string]()
 }
 
-func (c *ClusterStatus) DisconnectClusterID(clusterID string) {
+func (c *ClusterStatus) DisconnectClusterID(clusterID string, ipFamily k8snet.IPFamily) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.connectedClusterIDs.Delete(clusterID)
+	c.connectedClusterIDs[ipFamily].Delete(clusterID)
 }
 
-func (c *ClusterStatus) ConnectClusterID(clusterID string) {
+func (c *ClusterStatus) ConnectClusterID(clusterID string, ipFamily k8snet.IPFamily) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.connectedClusterIDs.Insert(clusterID)
+	c.connectedClusterIDs[ipFamily].Insert(clusterID)
 }

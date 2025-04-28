@@ -385,7 +385,7 @@ func testHeadlessServiceInMultipleClusters() {
 
 	Context("and one becomes disconnected", func() {
 		JustBeforeEach(func() {
-			t.clusterStatus.DisconnectClusterID(clusterID3)
+			t.clusterStatus.DisconnectClusterID(clusterID3, k8snet.IPv4)
 		})
 
 		Context("and no specific cluster is requested", func() {

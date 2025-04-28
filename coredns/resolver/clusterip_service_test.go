@@ -73,7 +73,7 @@ func testClusterIPServiceInOneCluster() {
 
 	Context("and it becomes disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.DisconnectAll()
+			t.clusterStatus.DisconnectAll(k8snet.IPv4)
 		})
 
 		It("should return no DNS records", func() {
@@ -160,7 +160,7 @@ func testClusterIPServiceInTwoClusters() {
 		}
 
 		BeforeEach(func() {
-			t.clusterStatus.DisconnectClusterID(clusterID1)
+			t.clusterStatus.DisconnectClusterID(clusterID1, k8snet.IPv4)
 		})
 
 		Context("and no specific cluster is requested", func() {
@@ -190,7 +190,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("and both become disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.DisconnectAll()
+			t.clusterStatus.DisconnectAll(k8snet.IPv4)
 		})
 
 		It("should return no DNS records", func() {
@@ -302,7 +302,7 @@ func testClusterIPServiceInThreeClusters() {
 
 	Context("and one becomes disconnected", func() {
 		BeforeEach(func() {
-			t.clusterStatus.DisconnectClusterID(clusterID3)
+			t.clusterStatus.DisconnectClusterID(clusterID3, k8snet.IPv4)
 		})
 
 		It("should consistently return the connected clusters' DNS records round-robin", func() {
@@ -334,7 +334,7 @@ func testClusterIPServiceInThreeClusters() {
 
 	Context("and one becomes disconnected and one becomes unhealthy", func() {
 		BeforeEach(func() {
-			t.clusterStatus.DisconnectClusterID(clusterID2)
+			t.clusterStatus.DisconnectClusterID(clusterID2, k8snet.IPv4)
 			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID3, serviceIP3, false, port1))
 		})
 
