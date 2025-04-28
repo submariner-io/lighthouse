@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -86,6 +87,36 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		ResourceType: &discovery.EndpointSlice{},
 		Transform:    controller.onServiceEndpointSlice,
 		Scheme:       scheme,
+		ResourcesEquivalent: func(obj1, obj2 *unstructured.Unstructured) bool {
+			eps1 := resource.MustFromUnstructured(obj1, &discovery.EndpointSlice{})
+			eps2 := resource.MustFromUnstructured(obj2, &discovery.EndpointSlice{})
+
+			labelsEq := reflect.DeepEqual(eps1.Labels, eps2.Labels)
+			labelStr := ""
+
+			if !labelsEq {
+				labelStr = fmt.Sprintf("Old: %s\nNew: %s", resource.ToJSON(eps1.Labels), resource.ToJSON(eps2.Labels))
+			}
+
+			annEq := reflect.DeepEqual(eps1.Annotations, eps2.Annotations)
+			annStr := ""
+
+			if !annEq {
+				annStr = fmt.Sprintf("Old: %s\nNew: %s", resource.ToJSON(eps1.Annotations), resource.ToJSON(eps2.Annotations))
+			}
+
+			epEq := reflect.DeepEqual(eps1.Endpoints, eps2.Endpoints)
+			epStr := ""
+
+			if !epEq {
+				epStr = fmt.Sprintf("Old: %s\nNew: %s", resource.ToJSON(eps1.Endpoints), resource.ToJSON(eps2.Endpoints))
+			}
+
+			logger.Infof("ResourcesEquivalent for service EPS \"%s/%s\": Labels: %v - %s, Ann: %v - %s, Endpoints: %v - %s",
+				eps1.Namespace, eps1.Name, labelsEq, labelStr, annEq, annStr, epEq, epStr)
+
+			return false
+		},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Endpoints syncer")

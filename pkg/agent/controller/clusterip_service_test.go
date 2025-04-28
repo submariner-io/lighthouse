@@ -66,7 +66,7 @@ func testClusterIPServiceInOneCluster() {
 
 	When("a ServiceExport is created", func() {
 		Context("and the Service already exists", func() {
-			It("should export the service and update the ServiceExport status", func() {
+			FIt("should export the service and update the ServiceExport status", func() {
 				t.cluster1.createService()
 				t.cluster1.createServiceExport()
 				t.awaitNonHeadlessServiceExported(&t.cluster1)

@@ -27,6 +27,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -56,6 +57,9 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 		aggregatedServiceImportGetter: aggregatedServiceImportGetter,
 	}
 
+	brokerWQConfig := workqueue.DefaultConfig()
+	brokerWQConfig.MaxVerbosity = log.DEBUG
+
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
 	syncerConfig.LocalClusterID = spec.ClusterID
 	syncerConfig.ResourceConfigs = []broker.ResourceConfig{
@@ -73,6 +77,7 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 				c.enqueueForConflictCheck(context.TODO(), obj.(*discovery.EndpointSlice), op)
 				return false
 			},
+			BrokerWorkQueueConfig: &brokerWQConfig,
 		},
 	}
 
@@ -154,8 +159,14 @@ func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[constants.MCSLabelSourceCluster])
 }
 
-func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
+
+	logger.Infof("Remote EndpointSlice \"%s/%s\" for service %q %sd from broker %q: %s",
+		endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace], endpointSlice.Name,
+		endpointSlice.Labels[mcsv1a1.LabelServiceName], op, endpointSlice.Namespace,
+		resource.ToJSON(endpointSlice.Endpoints))
+
 	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
 
 	return endpointSlice, false
