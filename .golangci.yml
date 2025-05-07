@@ -195,6 +195,10 @@ linters:
           - unparam
           - wrapcheck
         path: _test\.go|test/|fake/
+      # Allow corev1.Endpoints and related types, they are not going away (https://github.com/kubernetes/kubernetes/pull/130098)
+      - linters:
+          - staticcheck
+        text: "SA1019: (core)?v1.Endpoint"
     paths:
       - third_party$
       - builtin$
