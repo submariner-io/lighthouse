@@ -24,6 +24,7 @@ import (
 
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	"k8s.io/utils/set"
 	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -68,13 +69,13 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 		if pReq.port == "" {
 			reqPorts = dnsRecord.Ports
 		} else {
-			log.Debugf("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
+			logger.V(log.TRACE).Infof("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
 
 			for _, port := range dnsRecord.Ports {
 				name := strings.ToLower(port.Name)
 				protocol := strings.ToLower(string(port.Protocol))
 
-				log.Debugf("Checking port %q, protocol %q", name, protocol)
+				logger.V(log.TRACE).Infof("Checking port %q, protocol %q", name, protocol)
 
 				if name == pReq.port && protocol == pReq.protocol {
 					reqPorts = append(reqPorts, port)

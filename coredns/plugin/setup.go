@@ -20,7 +20,6 @@ package lighthouse
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -143,7 +142,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		for i, str := range lh.Zones {
 			hosts := plugin.Host(str).NormalizeExact()
 			if hosts == nil {
-				log.Infof("Failed to normalize zone %q", str)
+				logger.Infof("Failed to normalize zone %q", str)
 
 				lh.Zones[i] = ""
 
@@ -178,7 +177,11 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 func determineSupportedAddressTypes() []k8snet.IPFamily {
 	var ipFamilies []k8snet.IPFamily
 
-	for _, cidr := range strings.Split(os.Getenv("SUBMARINER_CLUSTERCIDR"), ",") {
+	cidrEnvVar := os.Getenv("SUBMARINER_CLUSTERCIDR")
+
+	logger.Infof("SUBMARINER_CLUSTERCIDR env: %q", cidrEnvVar)
+
+	for _, cidr := range strings.Split(cidrEnvVar, ",") {
 		s := strings.TrimSpace(cidr)
 		if s != "" {
 			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
@@ -189,7 +192,7 @@ func determineSupportedAddressTypes() []k8snet.IPFamily {
 		ipFamilies = []k8snet.IPFamily{k8snet.IPv4}
 	}
 
-	fmt.Fprintf(os.Stderr, "Supported IP families: %v\n", ipFamilies)
+	logger.Infof("Supported IP families: %v\n", ipFamilies)
 
 	return ipFamilies
 }
