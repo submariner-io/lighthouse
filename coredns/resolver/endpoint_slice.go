@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -160,24 +162,23 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 				continue
 			}
 
-			var (
-				records  []DNSRecord
-				hostname string
-			)
-
-			switch {
-			case endpoint.Hostname != nil && *endpoint.Hostname != "":
-				hostname = *endpoint.Hostname
-			case endpoint.TargetRef != nil && strings.EqualFold(endpoint.TargetRef.Kind, "pod"):
-				hostname = endpoint.TargetRef.Name
-			}
-
 			for _, address := range endpoint.Addresses {
 				if allAddresses.Has(address) {
 					continue
 				}
 
 				allAddresses.Insert(address)
+
+				var hostname string
+
+				switch {
+				case ptr.Deref(endpoint.Hostname, "") != "":
+					hostname = *endpoint.Hostname
+				case k8snet.IsIPv4String(address):
+					hostname = strings.ReplaceAll(address, ".", "-")
+				case k8snet.IsIPv6String(address):
+					hostname = strings.ReplaceAll(address, ":", "-")
+				}
 
 				record := DNSRecord{
 					IP:          address,
@@ -186,14 +187,10 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 					HostName:    hostname,
 				}
 
-				records = append(records, record)
-			}
+				clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, record)
 
-			if hostname != "" {
-				clusterInfo.endpointRecordsByHost[hostname] = records
+				clusterInfo.endpointRecordsByHost[hostname] = append(clusterInfo.endpointRecordsByHost[hostname], record)
 			}
-
-			clusterInfo.endpointRecords = append(clusterInfo.endpointRecords, records...)
 		}
 	}
 

@@ -41,6 +41,34 @@ var _ = Describe("GetDNSRecords", func() {
 func testHeadlessService() {
 	t := newTestDriver()
 
+	endpoint1DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP1,
+		Ports:       []mcsv1a1.ServicePort{port1},
+		ClusterName: clusterID1,
+		HostName:    endpointHostname1,
+	}
+
+	endpoint2DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP2,
+		Ports:       []mcsv1a1.ServicePort{port1},
+		ClusterName: clusterID1,
+		HostName:    endpointHostname2,
+	}
+
+	endpoint3DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP3,
+		Ports:       []mcsv1a1.ServicePort{port1},
+		ClusterName: clusterID1,
+		HostName:    endpointHostname3,
+	}
+
+	endpoint4DNSRecord := resolver.DNSRecord{
+		IP:          endpointIP4,
+		Ports:       []mcsv1a1.ServicePort{port1},
+		ClusterName: clusterID1,
+		HostName:    endpointHostname4,
+	}
+
 	var (
 		endpointSlice *discovery.EndpointSlice
 		annotations   map[string]string
@@ -83,16 +111,8 @@ func testHeadlessService() {
 		Context("and the publish-not-ready-addresses annotation is not present", func() {
 			It("should return DNS records for only the ready addresses", func() {
 				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
-					resolver.DNSRecord{
-						IP:          endpointIP1,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						IP:          endpointIP3,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
+					endpoint1DNSRecord,
+					endpoint3DNSRecord,
 				)
 			})
 		})
@@ -104,16 +124,8 @@ func testHeadlessService() {
 
 			It("should return DNS records for only the ready addresses", func() {
 				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
-					resolver.DNSRecord{
-						IP:          endpointIP1,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						IP:          endpointIP3,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
+					endpoint1DNSRecord,
+					endpoint3DNSRecord,
 				)
 			})
 		})
@@ -125,26 +137,10 @@ func testHeadlessService() {
 
 			It("should return all the DNS records", func() {
 				t.assertDNSRecordsFound(namespace1, service1, "", "", true,
-					resolver.DNSRecord{
-						IP:          endpointIP1,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						IP:          endpointIP2,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						IP:          endpointIP3,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						IP:          endpointIP4,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
+					endpoint1DNSRecord,
+					endpoint2DNSRecord,
+					endpoint3DNSRecord,
+					endpoint4DNSRecord,
 				)
 			})
 		})
@@ -219,16 +215,8 @@ func testHeadlessService() {
 
 			It("should return the local DNS records", func() {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
-					resolver.DNSRecord{
-						IP:          endpointIP2,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					},
-					resolver.DNSRecord{
-						Ports:       []mcsv1a1.ServicePort{port1},
-						IP:          endpointIP3,
-						ClusterName: clusterID1,
-					})
+					endpoint2DNSRecord,
+					endpoint3DNSRecord)
 			})
 		})
 
@@ -238,12 +226,7 @@ func testHeadlessService() {
 			})
 
 			It("should return the global DNS records", func() {
-				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true,
-					resolver.DNSRecord{
-						IP:          endpointIP1,
-						Ports:       []mcsv1a1.ServicePort{port1},
-						ClusterName: clusterID1,
-					})
+				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpoint1DNSRecord)
 			})
 		})
 	})
@@ -285,26 +268,10 @@ func testHeadlessService() {
 
 		It("should return DNS records with unique addresses", func() {
 			t.assertDNSRecordsFound(namespace1, service1, "", "", true,
-				resolver.DNSRecord{
-					IP:          endpointIP1,
-					Ports:       []mcsv1a1.ServicePort{port1},
-					ClusterName: clusterID1,
-				},
-				resolver.DNSRecord{
-					IP:          endpointIP2,
-					Ports:       []mcsv1a1.ServicePort{port1},
-					ClusterName: clusterID1,
-				},
-				resolver.DNSRecord{
-					IP:          endpointIP3,
-					Ports:       []mcsv1a1.ServicePort{port1},
-					ClusterName: clusterID1,
-				},
-				resolver.DNSRecord{
-					IP:          endpointIP4,
-					Ports:       []mcsv1a1.ServicePort{port1},
-					ClusterName: clusterID1,
-				},
+				endpoint1DNSRecord,
+				endpoint2DNSRecord,
+				endpoint3DNSRecord,
+				endpoint4DNSRecord,
 			)
 		})
 	})
@@ -317,12 +284,14 @@ func testHeadlessServiceInMultipleClusters() {
 		IP:          endpointIP1,
 		Ports:       []mcsv1a1.ServicePort{port1},
 		ClusterName: clusterID1,
+		HostName:    endpointHostname1,
 	}
 
 	cluster2DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP2,
 		Ports:       []mcsv1a1.ServicePort{port2},
 		ClusterName: clusterID2,
+		HostName:    endpointHostname2,
 	}
 
 	cluster3DNSRecord1 := resolver.DNSRecord{
@@ -343,6 +312,7 @@ func testHeadlessServiceInMultipleClusters() {
 		IP:          endpointIP5,
 		Ports:       []mcsv1a1.ServicePort{port3, port4},
 		ClusterName: clusterID3,
+		HostName:    endpointHostname5,
 	}
 
 	cluster3DNSRecord4 := resolver.DNSRecord{
@@ -378,10 +348,11 @@ func testHeadlessServiceInMultipleClusters() {
 			},
 			discovery.Endpoint{
 				Addresses: []string{endpointIP6},
+				Hostname:  &hostName2,
 				NodeName:  &nodeName3,
 				TargetRef: &corev1.ObjectReference{
 					Kind: "Pod",
-					Name: hostName2,
+					Name: "pod-host",
 				},
 			},
 		))

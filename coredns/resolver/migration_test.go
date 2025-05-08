@@ -121,18 +121,21 @@ func testHeadlessServiceMigration() {
 		IP:          endpointIP1,
 		Ports:       []mcsv1a1.ServicePort{port1},
 		ClusterName: clusterID1,
+		HostName:    endpointHostname1,
 	}
 
 	endpointIP2DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP2,
 		Ports:       []mcsv1a1.ServicePort{port2},
 		ClusterName: clusterID1,
+		HostName:    endpointHostname2,
 	}
 
 	endpointIP3DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP3,
 		Ports:       []mcsv1a1.ServicePort{port3},
 		ClusterName: clusterID1,
+		HostName:    endpointHostname3,
 	}
 
 	var legacyEndpointSlice *discovery.EndpointSlice

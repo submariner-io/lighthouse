@@ -357,6 +357,10 @@ func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex
 	}, framework.NoopCheckResult)
 }
 
+func addrToHostname(addr string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(addr, ":", "-"), ".", "-")
+}
+
 func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	namespace string, count int,
 ) ([]string, []string) {
@@ -382,13 +386,14 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 					continue
 				}
 
-				ipList = append(ipList, ep.Addresses...)
+				for _, addr := range ep.Addresses {
+					ipList = append(ipList, addr)
 
-				switch {
-				case ptr.Deref(ep.Hostname, "") != "":
-					hostNameList = append(hostNameList, *ep.Hostname)
-				case ep.TargetRef != nil:
-					hostNameList = append(hostNameList, ep.TargetRef.Name)
+					if ptr.Deref(ep.Hostname, "") != "" {
+						hostNameList = append(hostNameList, *ep.Hostname)
+					} else {
+						hostNameList = append(hostNameList, addrToHostname(addr))
+					}
 				}
 			}
 		}
@@ -414,15 +419,16 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 		ingressIPName := "pod-" + podList.Items[i].Name
 		ingressIP := f.Framework.AwaitGlobalIngressIP(targetCluster, ingressIPName, svc.Namespace)
 
+		ip := ingressIP
 		if isLocal {
-			ipList = append(ipList, podList.Items[i].Status.PodIP)
-		} else {
-			ipList = append(ipList, ingressIP)
+			ip = podList.Items[i].Status.PodIP
 		}
+
+		ipList = append(ipList, ip)
 
 		hostname := podList.Items[i].Spec.Hostname
 		if hostname == "" {
-			hostname = podList.Items[i].Name
+			hostname = addrToHostname(ip)
 		}
 
 		hostNameList = append(hostNameList, hostname)
@@ -442,7 +448,7 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 }
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
-	return f.AwaitPodIPs(targetCluster, service, anyCount, isLocal)
+	return f.AwaitPodIPs(targetCluster, service, 1, isLocal)
 }
 
 func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {

@@ -61,11 +61,17 @@ const (
 	serviceIP2          = "192.168.56.22"
 	serviceIP3          = "192.168.56.23"
 	endpointIP1         = "100.96.157.101"
+	endpointHostname1   = "100-96-157-101"
 	endpointIP2         = "100.96.157.102"
+	endpointHostname2   = "100-96-157-102"
 	endpointIP3         = "100.96.157.103"
+	endpointHostname3   = "100-96-157-103"
 	endpointIP4         = "100.96.157.104"
+	endpointHostname4   = "100-96-157-104"
 	endpointIP5         = "100.96.157.105"
+	endpointHostname5   = "100-96-157-105"
 	endpointIP6         = "100.96.157.106"
+	endpointHostname6   = "100-96-157-106"
 )
 
 var (

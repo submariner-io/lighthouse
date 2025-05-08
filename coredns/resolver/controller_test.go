@@ -159,21 +159,25 @@ var _ = Describe("Controller", func() {
 					IP:          endpointIP1,
 					Ports:       []mcsv1a1.ServicePort{port1},
 					ClusterName: clusterID1,
+					HostName:    endpointHostname1,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP2,
 					Ports:       []mcsv1a1.ServicePort{port1},
 					ClusterName: clusterID1,
+					HostName:    endpointHostname2,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP3,
 					Ports:       []mcsv1a1.ServicePort{port2},
 					ClusterName: clusterID1,
+					HostName:    endpointHostname3,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP4,
 					Ports:       []mcsv1a1.ServicePort{port2},
 					ClusterName: clusterID1,
+					HostName:    endpointHostname4,
 				})
 		})
 
@@ -188,11 +192,13 @@ var _ = Describe("Controller", func() {
 						IP:          endpointIP3,
 						Ports:       []mcsv1a1.ServicePort{port2},
 						ClusterName: clusterID1,
+						HostName:    endpointHostname3,
 					},
 					resolver.DNSRecord{
 						IP:          endpointIP4,
 						Ports:       []mcsv1a1.ServicePort{port2},
 						ClusterName: clusterID1,
+						HostName:    endpointHostname4,
 					})
 			})
 		})
