@@ -44,7 +44,7 @@ var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(TestLabel
 		}
 	})
 
-	When("a pod tries to resolve a dual-stack service in a remote cluster", func() {
+	When("a pod tries to resolve a dual-stack ClusterIP service in a remote cluster", func() {
 		It("should be able to discover the remote service via either IPv4 or IPv6", func() {
 			RunDualStackServiceDiscoveryTest(f)
 		})
@@ -52,6 +52,7 @@ var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(TestLabel
 })
 
 func RunDualStackServiceDiscoveryTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
@@ -74,4 +75,14 @@ func RunDualStackServiceDiscoveryTest(f *lhframework.Framework) {
 	Expect(slices.IndexFunc(epsList.Items, func(eps discovery.EndpointSlice) bool {
 		return eps.AddressType == discovery.AddressTypeIPv6
 	})).To(BeNumerically(">=", 0), "IPv6 EndpointSlice not found")
+
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains,
+		"", f.GetServiceIP(framework.ClusterB, nginxServiceClusterB, corev1.IPv4Protocol), true)
+
+	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains,
+		"", f.GetServiceIP(framework.ClusterB, nginxServiceClusterB, corev1.IPv6Protocol), true)
 }

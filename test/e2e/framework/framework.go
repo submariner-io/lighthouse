@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	goslices "slices"
 	"strings"
 	"sync/atomic"
 
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
@@ -689,7 +691,7 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	domains []string, clusterName string, shouldContain bool,
 ) {
-	serviceIP := f.GetServiceIP(targetCluster, service)
+	serviceIP := f.GetServiceIP(targetCluster, service, v1.IPFamilyUnknown)
 	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
 }
 
@@ -707,6 +709,10 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 	domains []string, clusterName, serviceIP string, shouldContain bool,
 ) {
 	cmd := []string{"dig", "+short"}
+
+	if k8snet.IPFamilyOfString(serviceIP) == k8snet.IPv6 {
+		cmd = append(cmd, "AAAA")
+	}
 
 	for i := range domains {
 		cmd = append(cmd, BuildServiceDNSName(clusterName, service.Name, f.Namespace, domains[i]))
@@ -805,12 +811,24 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 	})
 }
 
-func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service) string {
+func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service, ipFamily v1.IPFamily) string {
 	Expect(service.Spec.Type).To(Equal(v1.ServiceTypeClusterIP))
 
-	if !framework.TestContext.GlobalnetEnabled {
-		return service.Spec.ClusterIP
+	var serviceIP string
+
+	if ipFamily == v1.IPFamilyUnknown {
+		Expect(ptr.Deref(service.Spec.IPFamilyPolicy, v1.IPFamilyPolicySingleStack)).To(Equal(v1.IPFamilyPolicySingleStack))
+		serviceIP = service.Spec.ClusterIP
+	} else {
+		index := goslices.Index(service.Spec.IPFamilies, ipFamily)
+		Expect(index).To(BeNumerically(">=", 0))
+
+		serviceIP = service.Spec.ClusterIPs[index]
 	}
 
-	return f.Framework.AwaitGlobalIngressIP(svcCluster, service.Name, service.Namespace)
+	if framework.TestContext.GlobalnetEnabled && k8snet.IPFamilyOfString(serviceIP) == k8snet.IPv4 {
+		serviceIP = f.Framework.AwaitGlobalIngressIP(svcCluster, service.Name, service.Namespace)
+	}
+
+	return serviceIP
 }
