@@ -28,6 +28,7 @@ import (
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Test Headless Service Discovery Across Clusters", Label(TestLabel), func() {
@@ -317,15 +318,23 @@ func RunHeadlessDiscoveryClusterNameTest(f *lhframework.Framework) {
 		clusterBName, false, true, true)
 }
 
-//nolint:gocognit // This really isn't that complex and would be awkward to refactor.
 func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
 	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool,
+) {
+	verifyHeadlessSRVRecordsWithDigByFamily(f, cluster, service, targetPod, hostNameList, domains, clusterName, withPort, withcluster,
+		shouldContain, k8snet.IPv4)
+}
+
+//nolint:gocognit // This really isn't that complex and would be awkward to refactor.
+func verifyHeadlessSRVRecordsWithDigByFamily(f *framework.Framework, cluster framework.ClusterIndex, service *corev1.Service,
+	targetPod *corev1.PodList, hostNameList, domains []string, clusterName string, withPort, withcluster, shouldContain bool,
+	ipFamily k8snet.IPFamily,
 ) {
 	ports := service.Spec.Ports
 	for i := range domains {
 		for j := range ports {
 			port := &ports[j]
-			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster)
+			cmd, domainName := createSRVQuery(f, port, service, domains[i], clusterName, withPort, withcluster, ipFamily)
 			op := "are"
 
 			if !shouldContain {
@@ -378,9 +387,15 @@ func verifyHeadlessSRVRecordsWithDig(f *framework.Framework, cluster framework.C
 }
 
 func createSRVQuery(f *framework.Framework, port *corev1.ServicePort, service *corev1.Service,
-	domain string, clusterName string, withPort, withcluster bool,
+	domain string, clusterName string, withPort, withcluster bool, ipFamily k8snet.IPFamily,
 ) ([]string, string) {
-	cmd := []string{"dig", "+short", "SRV"}
+	cmd := []string{"dig", "+short"}
+
+	if ipFamily == k8snet.IPv6 {
+		cmd = append(cmd, "AAAA")
+	}
+
+	cmd = append(cmd, "SRV")
 
 	domainName := lhframework.BuildServiceDNSName("", service.Name, f.Namespace, domain)
 	clusterDNSName := domainName

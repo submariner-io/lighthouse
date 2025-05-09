@@ -280,7 +280,7 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 }
 
 func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol v1.Protocol,
-	labelsMap map[string]string, cluster framework.ClusterIndex,
+	labelsMap map[string]string, cluster framework.ClusterIndex, ipFamilyPolicy *v1.IPFamilyPolicy,
 ) *v1.Service {
 	var port int32 = 80
 
@@ -289,8 +289,9 @@ func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol 
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{
-			Type:      "ClusterIP",
-			ClusterIP: v1.ClusterIPNone,
+			Type:           v1.ServiceTypeClusterIP,
+			ClusterIP:      v1.ClusterIPNone,
+			IPFamilyPolicy: ipFamilyPolicy,
 			Ports: []v1.ServicePort{
 				{
 					Port:     port,
@@ -316,12 +317,11 @@ func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol 
 
 func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
 	return f.NewHeadlessServiceWithParams("nginx-headless", "http", v1.ProtocolTCP,
-		map[string]string{"app": "nginx-demo"}, cluster)
+		map[string]string{"app": "nginx-demo"}, cluster, nil)
 }
 
 func (f *Framework) NewHeadlessServiceEndpointIP(cluster framework.ClusterIndex) *v1.Service {
-	return f.NewHeadlessServiceWithParams("ep-headless", "http", v1.ProtocolTCP,
-		map[string]string{}, cluster)
+	return f.NewHeadlessServiceWithParams("ep-headless", "http", v1.ProtocolTCP, map[string]string{}, cluster, nil)
 }
 
 func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex, svc *v1.Service) {
@@ -363,8 +363,8 @@ func addrToHostname(addr string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(addr, ":", "-"), ".", "-")
 }
 
-func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
-	namespace string, count int,
+func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string, count int,
+	addrType discovery.AddressType,
 ) ([]string, []string) {
 	var ipList, hostNameList []string
 
@@ -382,6 +382,10 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 
 		epsList := result.(*discovery.EndpointSliceList).Items
 		for i := range epsList {
+			if epsList[i].AddressType != addrType {
+				continue
+			}
+
 			for j := range epsList[i].Endpoints {
 				ep := &epsList[i].Endpoints[j]
 				if !ptr.Deref(ep.Conditions.Ready, true) {
@@ -446,7 +450,7 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 		return f.AwaitPodIngressIPs(targetCluster, svc, count, isLocal)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count, discovery.AddressTypeIPv4)
 }
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
@@ -482,7 +486,7 @@ func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1
 		return f.AwaitEndpointIngressIPs(targetCluster, svc)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount, discovery.AddressTypeIPv4)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
@@ -758,7 +762,17 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool,
 ) {
+	f.VerifyIPsWithDigByFamily(cluster, service, targetPod, ipList, domains, clusterName, shouldContain, k8snet.IPv4)
+}
+
+func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
+	ipList, domains []string, clusterName string, shouldContain bool, ipFamily k8snet.IPFamily,
+) {
 	cmd := []string{"dig", "+short"}
+
+	if ipFamily == k8snet.IPv6 {
+		cmd = append(cmd, "AAAA")
+	}
 
 	var clusterDNSName string
 	if clusterName != "" {

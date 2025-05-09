@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -46,12 +47,18 @@ var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(TestLabel
 
 	When("a pod tries to resolve a dual-stack ClusterIP service in a remote cluster", func() {
 		It("should be able to discover the remote service via either IPv4 or IPv6", func() {
-			RunDualStackServiceDiscoveryTest(f)
+			RunDualStackClusterIPDiscoveryTest(f)
+		})
+	})
+
+	When("a pod tries to resolve a dual-stack headless service in a remote cluster", func() {
+		It("should resolve the backing IPv4 and IPv6 pod IPs from the remote cluster", func() {
+			RunDualStackHeadlessDiscoveryTest(f)
 		})
 	})
 })
 
-func RunDualStackServiceDiscoveryTest(f *lhframework.Framework) {
+func RunDualStackClusterIPDiscoveryTest(f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
@@ -85,4 +92,41 @@ func RunDualStackServiceDiscoveryTest(f *lhframework.Framework) {
 
 	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains,
 		"", f.GetServiceIP(framework.ClusterB, nginxServiceClusterB, corev1.IPv6Protocol), true)
+}
+
+func RunDualStackHeadlessDiscoveryTest(f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
+	f.NewNginxDeployment(framework.ClusterB)
+
+	nginxHeadlessClusterB := f.NewHeadlessServiceWithParams("nginx-headless", "http", corev1.ProtocolTCP,
+		map[string]string{"app": "nginx-demo"}, framework.ClusterB, ptr.To(corev1.IPFamilyPolicyRequireDualStack))
+
+	f.NewServiceExport(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
+
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
+
+	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+
+	framework.By("Verifying IPv4")
+
+	ipList, hostNameList := f.GetPodIPs(framework.ClusterB, nginxHeadlessClusterB, false)
+
+	f.VerifyIPsWithDig(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true)
+	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList, checkedDomains,
+		clusterBName, true, false, true)
+
+	framework.By("Verifying IPv6")
+
+	ipList, hostNameList = f.AwaitEndpointIPs(framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace, 1,
+		discovery.AddressTypeIPv6)
+
+	f.VerifyIPsWithDigByFamily(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true, k8snet.IPv6)
+	verifyHeadlessSRVRecordsWithDigByFamily(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList,
+		checkedDomains, clusterBName, true, false, true, k8snet.IPv6)
 }
