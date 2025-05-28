@@ -90,7 +90,7 @@ linters:
     # - forbidigo # We don't forbid any statements
     # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
     #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
-    # - funcorder # TODO sort the functions
+    - funcorder
     # - funlen # gocyclo is enabled which is generally a better metric than simply LOC.
     - ginkgolinter
     - gocheckcompilerdirectives

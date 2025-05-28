@@ -123,6 +123,14 @@ func (c *Controller) Stop() {
 	logger.Infof("Gateway status Controller stopped")
 }
 
+func (c *Controller) IsConnected(clusterID string) bool {
+	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
+}
+
+func (c *Controller) GetLocalClusterID() string {
+	return c.localClusterID.Load().(string)
+}
+
 func (c *Controller) processNextGateway(key, _, _ string) (bool, error) {
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
@@ -286,13 +294,4 @@ func copyMap(src map[string]bool) map[string]bool {
 	}
 
 	return m
-}
-
-// Public API.
-func (c *Controller) IsConnected(clusterID string) bool {
-	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
-}
-
-func (c *Controller) GetLocalClusterID() string {
-	return c.localClusterID.Load().(string)
 }
