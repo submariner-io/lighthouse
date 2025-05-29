@@ -13,3 +13,4 @@ ignore: |
   /coredns/vendor
   # Correcting breaks `make e2e using=helm`
   /scripts/resources/coredns-cm.yaml
+  /.tekton
