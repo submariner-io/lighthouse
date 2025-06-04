@@ -1,6 +1,6 @@
 module github.com/submariner-io/lighthouse/coredns
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/coredns/caddy v1.1.1
@@ -90,15 +90,15 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
