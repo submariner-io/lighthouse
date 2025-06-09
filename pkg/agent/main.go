@@ -108,7 +108,7 @@ func main() {
 
 	util.AddCertificateErrorHandler(agentSpec.HaltOnCertError)
 
-	err = mcsv1a1.AddToScheme(scheme.Scheme)
+	err = mcsv1a1.Install(scheme.Scheme)
 	exitOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
