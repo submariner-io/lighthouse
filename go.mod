@@ -16,7 +16,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/controller-runtime v0.20.4
-	sigs.k8s.io/mcs-api v0.1.0
+	sigs.k8s.io/mcs-api v0.1.1-0.20250224121229-6c631f4730d0
 )
 
 require (

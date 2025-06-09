@@ -25,8 +25,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"github.com/submariner-io/lighthouse/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -54,7 +54,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, ""))
 			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)
@@ -68,7 +68,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, controller.ExportFailedReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
 
 			t.brokerServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -81,7 +81,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, controller.ExportFailedReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
 
 			t.brokerServiceImportReactor.SetFailOnUpdate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -132,7 +132,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionFalse, controller.ExportFailedReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
 
 			t.brokerEndpointSliceReactor.SetFailOnList(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)

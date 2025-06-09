@@ -333,13 +333,13 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	if op == syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			newServiceExportCondition(constants.ServiceExportReady,
-				corev1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
+				metav1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
 
 		return obj, false
 	} else if op == syncer.Create {
 		c.serviceExportClient.tryUpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			false, newServiceExportCondition(constants.ServiceExportReady,
-				corev1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
+				metav1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
 
 	return obj, false
@@ -410,17 +410,17 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 			if localServiceImport.Spec.Type != existing.Spec.Type {
 				typeConflict = true
 				conflictCondition := newServiceExportCondition(
-					mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, TypeConflictReason,
+					mcsv1a1.ServiceExportConflict, metav1.ConditionTrue, TypeConflictReason,
 					fmt.Sprintf("The local service type (%q) does not match the type (%q) of the existing exported service",
 						localServiceImport.Spec.Type, existing.Spec.Type))
 
 				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conflictCondition,
 					newServiceExportCondition(constants.ServiceExportReady,
-						corev1.ConditionFalse, ExportFailedReason, "Unable to export due to an irresolvable conflict"))
+						metav1.ConditionFalse, ExportFailedReason, "Unable to export due to an irresolvable conflict"))
 			} else {
 				if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, TypeConflictReason) {
 					c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, newServiceExportCondition(
-						mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, TypeConflictReason, ""))
+						mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, TypeConflictReason, ""))
 				}
 
 				if existing.Annotations == nil {
@@ -480,7 +480,7 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	if err != nil {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
 			newServiceExportCondition(constants.ServiceExportReady,
-				corev1.ConditionFalse, ExportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
+				metav1.ConditionFalse, ExportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
 
 		if clusterSetIP != "" {
 			_ = c.clustersetIPPool.Release(clusterSetIP)
@@ -624,7 +624,7 @@ func (c *ServiceImportController) allocateClusterSetIPIfNeeded(existingIP string
 }
 
 func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated, local *mcsv1a1.ServiceImport, useClusterSetIP *bool) {
-	var conditions []mcsv1a1.ServiceExportCondition
+	var conditions []metav1.Condition
 
 	serviceName := local.Labels[mcsv1a1.LabelServiceName]
 	serviceNamespace := local.Labels[constants.LabelSourceNamespace]
@@ -632,7 +632,7 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 	precedentCluster := findClusterWithOldestTimestamp(aggregated.Annotations)
 
 	if local.Spec.SessionAffinity != aggregated.Spec.SessionAffinity {
-		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, metav1.ConditionTrue,
 			SessionAffinityConflictReason,
 			fmt.Sprintf("The local service SessionAffinity %q conflicts with other constituent clusters. "+
 				"Using SessionAffinity %q from the oldest exported service in cluster %q.",
@@ -640,11 +640,11 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 	} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 		SessionAffinityConflictReason) {
 		conditions = append(conditions, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, SessionAffinityConflictReason, ""))
+			mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, SessionAffinityConflictReason, ""))
 	}
 
 	if !reflect.DeepEqual(local.Spec.SessionAffinityConfig, aggregated.Spec.SessionAffinityConfig) {
-		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+		conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, metav1.ConditionTrue,
 			SessionAffinityConfigConflictReason,
 			fmt.Sprintf("The local service SessionAffinityConfig %q conflicts with other constituent clusters. "+
 				"Using SessionAffinityConfig %q from the oldest exported service in cluster %q.",
@@ -653,7 +653,7 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 	} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 		SessionAffinityConfigConflictReason) {
 		conditions = append(conditions, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, SessionAffinityConfigConflictReason, ""))
+			mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, SessionAffinityConfigConflictReason, ""))
 	}
 
 	if aggregated.Spec.Type == mcsv1a1.ClusterSetIP && useClusterSetIP != nil {
@@ -663,7 +663,7 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 				clusterName = precedentCluster
 			}
 
-			conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, corev1.ConditionTrue,
+			conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, metav1.ConditionTrue,
 				ClusterSetIPEnablementConflictReason,
 				fmt.Sprintf("The local service clusterset IP enablement setting %q conflicts with the enablement setting %q"+
 					" determined by the first exporting cluster %q.",
@@ -671,7 +671,7 @@ func (c *ServiceImportController) checkConflicts(ctx context.Context, aggregated
 		} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict,
 			ClusterSetIPEnablementConflictReason) {
 			conditions = append(conditions, newServiceExportCondition(
-				mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, ClusterSetIPEnablementConflictReason, ""))
+				mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, ClusterSetIPEnablementConflictReason, ""))
 		}
 	}
 

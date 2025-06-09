@@ -190,7 +190,7 @@ func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.Cluste
 
 		for i := range se.Status.Conditions {
 			if se.Status.Conditions[i].Type == constants.ServiceExportReady {
-				if se.Status.Conditions[i].Status != v1.ConditionTrue {
+				if se.Status.Conditions[i].Status != metav1.ConditionTrue {
 					out, _ := json.MarshalIndent(se.Status.Conditions[i], "", "  ")
 					return false, fmt.Sprintf("ServiceExport %s condition status is %s", constants.ServiceExportReady, out), nil
 				}

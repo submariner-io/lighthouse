@@ -74,7 +74,7 @@ var _ = Describe("Globalnet enabled", func() {
 		Context("and it does not initially have a global IP", func() {
 			Context("due to missing GlobalIngressIP", func() {
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 					By("Creating GlobalIngressIP")
 					t.cluster1.createGlobalIngressIP(ingressIP)
@@ -90,7 +90,7 @@ var _ = Describe("Globalnet enabled", func() {
 				})
 
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "ServiceGlobalIPUnavailable"))
 
 					By("Updating GlobalIngressIP")
 					setIngressAllocatedIP(ingressIP, globalIP1)
@@ -115,8 +115,8 @@ var _ = Describe("Globalnet enabled", func() {
 			})
 
 			It("should update the ServiceExport status with the condition details", func() {
-				c := newServiceExportValidCondition(corev1.ConditionFalse, condition.Reason)
-				c.Message = &condition.Message
+				c := newServiceExportValidCondition(metav1.ConditionFalse, condition.Reason)
+				c.Message = condition.Message
 				t.cluster1.awaitServiceExportCondition(c)
 			})
 		})

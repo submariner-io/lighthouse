@@ -32,7 +32,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,11 +187,11 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 		err = c.serviceImportAggregator.updateOnCreateOrUpdate(ctx, serviceName, serviceNamespace)
 		if err != nil {
 			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionFalse, ExportFailedReason,
+				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionFalse, ExportFailedReason,
 					fmt.Sprintf("Unable to export: %v", err)))
 		} else {
 			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, corev1.ConditionTrue, "",
+				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, "",
 					"Service was successfully exported to the broker"))
 
 			c.enqueueForConflictCheck(ctx, endpointSlice, op)
@@ -288,14 +287,14 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 		}
 
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionTrue, PortConflictReason,
+			mcsv1a1.ServiceExportConflict, metav1.ConditionTrue, PortConflictReason,
 			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
 				"The service will expose the %s of all the ports: %s",
 				fmt.Sprintf("[%s]", strings.Join(clusterNames.UnsortedList(), ", ")), exposedOp,
 				servicePortsToString(exposedPorts))))
 	} else if c.serviceExportClient.hasCondition(name, namespace, mcsv1a1.ServiceExportConflict, PortConflictReason) {
 		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, corev1.ConditionFalse, PortConflictReason, ""))
+			mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, PortConflictReason, ""))
 	}
 
 	return false, nil
