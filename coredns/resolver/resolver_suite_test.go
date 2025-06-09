@@ -114,7 +114,7 @@ var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 
 	Expect(discovery.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(mcsv1a1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(mcsv1a1.Install(scheme.Scheme)).To(Succeed())
 })
 
 func TestResolver(t *testing.T) {
