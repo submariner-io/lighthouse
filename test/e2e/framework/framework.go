@@ -442,7 +442,7 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 }
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
-	return f.AwaitPodIPs(targetCluster, service, anyCount, isLocal)
+	return f.AwaitPodIPs(targetCluster, service, 1, isLocal)
 }
 
 func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {
