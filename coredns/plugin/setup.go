@@ -20,7 +20,9 @@ package lighthouse
 
 import (
 	"flag"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -98,9 +101,10 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	}
 
 	lh := &Lighthouse{
-		TTL:           defaultTTL,
-		ClusterStatus: gwController,
-		Resolver:      resolver.New(gwController, localClient),
+		TTL:                 defaultTTL,
+		ClusterStatus:       gwController,
+		Resolver:            resolver.New(gwController, localClient),
+		SupportedIPFamilies: determineSupportedAddressTypes(),
 	}
 
 	err = gwController.Start(localClient)
@@ -138,7 +142,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		for i, str := range lh.Zones {
 			hosts := plugin.Host(str).NormalizeExact()
 			if hosts == nil {
-				log.Infof("Failed to normalize zone %q", str)
+				logger.Infof("Failed to normalize zone %q", str)
 
 				lh.Zones[i] = ""
 
@@ -168,6 +172,29 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	}
 
 	return lh, nil
+}
+
+func determineSupportedAddressTypes() []k8snet.IPFamily {
+	var ipFamilies []k8snet.IPFamily
+
+	cidrEnvVar := os.Getenv("SUBMARINER_CLUSTERCIDR")
+
+	logger.Infof("SUBMARINER_CLUSTERCIDR env: %q", cidrEnvVar)
+
+	for _, cidr := range strings.Split(cidrEnvVar, ",") {
+		s := strings.TrimSpace(cidr)
+		if s != "" {
+			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
+		}
+	}
+
+	if len(ipFamilies) == 0 {
+		ipFamilies = []k8snet.IPFamily{k8snet.IPv4}
+	}
+
+	logger.Infof("Supported IP families: %v\n", ipFamilies)
+
+	return ipFamilies
 }
 
 func parseTTL(c *caddy.Controller) (uint32, error) {

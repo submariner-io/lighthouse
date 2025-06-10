@@ -20,6 +20,7 @@ package resolver
 
 import (
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
+	discovery "k8s.io/api/discovery/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -39,8 +40,16 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 
 	if !found {
 		svcInfo = &serviceInfo{
-			clusters: make(map[string]*clusterInfo),
-			balancer: loadbalancer.NewSmoothWeightedRR(),
+			ipv4Info: IPFamilyInfo{
+				addrType: discovery.AddressTypeIPv4,
+				clusters: make(map[string]*clusterInfo),
+				balancer: loadbalancer.NewSmoothWeightedRR(),
+			},
+			ipv6Info: IPFamilyInfo{
+				addrType: discovery.AddressTypeIPv6,
+				clusters: make(map[string]*clusterInfo),
+				balancer: loadbalancer.NewSmoothWeightedRR(),
+			},
 		}
 
 		i.serviceMap[key] = svcInfo
@@ -61,15 +70,15 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 
 	clusterName := serviceImport.Labels["lighthouse.submariner.io/sourceCluster"]
 
-	clusterInfo := svcInfo.ensureClusterInfo(clusterName)
+	clusterInfo := svcInfo.ipv4Info.ensureClusterInfo(clusterName)
 	clusterInfo.endpointRecords = []DNSRecord{{
 		IP:          serviceImport.Spec.IPs[0],
 		Ports:       serviceImport.Spec.Ports,
 		ClusterName: clusterName,
 	}}
 
-	svcInfo.mergePorts()
-	svcInfo.resetLoadBalancing()
+	svcInfo.ipv4Info.mergePorts()
+	svcInfo.ipv4Info.resetLoadBalancing()
 }
 
 func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
@@ -89,10 +98,10 @@ func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 
 	svcInfo, found := i.serviceMap[key]
 	if found {
-		if len(svcInfo.clusters) == 0 {
+		svcInfo.isExported = false
+
+		if svcInfo.canBeDeleted() {
 			delete(i.serviceMap, key)
-		} else {
-			svcInfo.isExported = false
 		}
 	}
 }

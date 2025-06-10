@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -61,51 +62,54 @@ var _ = Describe("Gateway controller", func() {
 
 		When("IsConnected is called for the local cluster ID", func() {
 			It("should return true", func() {
-				t.awaitIsNotConnected(localClusterID)
+				t.ensureIsNotConnected(localClusterID, k8snet.IPv4)
 				t.createGateway()
-				t.awaitIsConnected(localClusterID)
+				t.awaitIsConnected(localClusterID, k8snet.IPv4)
 			})
 		})
 	})
 
 	When("an active Gateway is created with remote cluster connections", func() {
 		BeforeEach(func() {
-			t.addGatewayStatusConnection(remoteClusterID1, "connected")
-			t.addGatewayStatusConnection(remoteClusterID2, "connecting")
+			t.addGatewayStatusConnection(remoteClusterID1, "connected", k8snet.IPv4)
+			t.addGatewayStatusConnection(remoteClusterID2, "connecting", k8snet.IPv4)
+			t.addGatewayStatusConnection(remoteClusterID2, "connected", k8snet.IPv6)
 		})
 
-		When("IsConnected is called for the remote clusters", func() {
-			It("should return the appropriate response", func() {
-				t.createGateway()
-				t.awaitIsConnected(remoteClusterID1)
-				t.awaitIsConnected(localClusterID)
-				t.awaitIsNotConnected(remoteClusterID2)
-			})
+		Specify("IsConnected should return the appropriate response", func() {
+			t.createGateway()
+			t.awaitIsConnected(remoteClusterID1, k8snet.IPv4)
+			t.awaitIsConnected(localClusterID, k8snet.IPv4)
+			t.awaitIsConnected(localClusterID, k8snet.IPv6)
+			t.ensureIsNotConnected(remoteClusterID2, k8snet.IPv4)
+			t.awaitIsConnected(remoteClusterID2, k8snet.IPv6)
 		})
 	})
 
 	When("the connection status for remote clusters are updated for an active Gateway", func() {
-		When("IsConnected is called for the remote clusters", func() {
-			It("should return the appropriate response", func() {
-				t.createGateway()
-				t.awaitIsConnected(localClusterID)
+		Specify("IsConnected should return the appropriate response", func() {
+			t.createGateway()
+			t.awaitIsConnected(localClusterID, k8snet.IPv4)
 
-				t.addGatewayStatusConnection(remoteClusterID1, "connected")
-				t.updateGateway()
-				t.awaitIsConnected(remoteClusterID1)
+			t.addGatewayStatusConnection(remoteClusterID1, "connected", k8snet.IPv4)
+			t.addGatewayStatusConnection(remoteClusterID1, "connected", k8snet.IPv6)
+			t.updateGateway()
+			t.awaitIsConnected(remoteClusterID1, k8snet.IPv4)
+			t.awaitIsConnected(remoteClusterID1, k8snet.IPv6)
 
-				t.addGatewayStatusConnection(remoteClusterID1, "error")
-				t.addGatewayStatusConnection(remoteClusterID2, "connected")
-				t.updateGateway()
-				t.awaitIsNotConnected(remoteClusterID1)
-				t.awaitIsConnected(remoteClusterID2)
+			t.addGatewayStatusConnection(remoteClusterID1, "error", k8snet.IPv4)
+			t.addGatewayStatusConnection(remoteClusterID2, "connected", k8snet.IPv4)
+			t.updateGateway()
+			t.awaitIsNotConnected(remoteClusterID1, k8snet.IPv4)
+			t.awaitIsConnected(remoteClusterID2, k8snet.IPv4)
 
-				t.addGatewayStatusConnection(remoteClusterID1, "connected")
-				t.addGatewayStatusConnection(remoteClusterID2, "error")
-				t.updateGateway()
-				t.awaitIsConnected(remoteClusterID1)
-				t.awaitIsNotConnected(remoteClusterID2)
-			})
+			t.addGatewayStatusConnection(remoteClusterID1, "connected", k8snet.IPv4)
+			t.addGatewayStatusConnection(remoteClusterID1, "error", k8snet.IPv6)
+			t.addGatewayStatusConnection(remoteClusterID2, "error", k8snet.IPv4)
+			t.updateGateway()
+			t.awaitIsConnected(remoteClusterID1, k8snet.IPv4)
+			t.awaitIsNotConnected(remoteClusterID1, k8snet.IPv6)
+			t.awaitIsNotConnected(remoteClusterID2, k8snet.IPv4)
 		})
 	})
 
@@ -129,14 +133,14 @@ var _ = Describe("Gateway controller", func() {
 		When("IsConnected is called for the local cluster ID", func() {
 			It("should return true", func() {
 				t.createGateway()
-				t.awaitIsConnected(localClusterID)
+				t.awaitIsConnected(localClusterID, k8snet.IPv4)
 			})
 		})
 	})
 
 	When("IsConnected is called for a non-existent cluster ID", func() {
 		It("should return false", func() {
-			Expect(t.controller.IsConnected(remoteClusterID1)).To(BeFalse())
+			Expect(t.controller.IsConnected(remoteClusterID1, k8snet.IPv4)).To(BeFalse())
 		})
 	})
 
@@ -147,8 +151,8 @@ var _ = Describe("Gateway controller", func() {
 
 		When("IsConnected is called", func() {
 			It("should return true", func() {
-				t.awaitIsConnected(localClusterID)
-				t.awaitIsConnected(remoteClusterID1)
+				t.awaitIsConnected(localClusterID, k8snet.IPv4)
+				t.awaitIsConnected(remoteClusterID1, k8snet.IPv4)
 			})
 		})
 	})
@@ -160,8 +164,8 @@ var _ = Describe("Gateway controller", func() {
 
 		When("IsConnected is called", func() {
 			It("should return true", func() {
-				t.awaitIsConnected(localClusterID)
-				t.awaitIsConnected(remoteClusterID1)
+				t.awaitIsConnected(localClusterID, k8snet.IPv4)
+				t.awaitIsConnected(remoteClusterID1, k8snet.IPv4)
 			})
 		})
 	})
@@ -225,16 +229,22 @@ func newTestDiver() *testDriver {
 	return t
 }
 
-func (t *testDriver) awaitIsConnected(clusterID string) {
+func (t *testDriver) awaitIsConnected(clusterID string, ipFamily k8snet.IPFamily) {
 	Eventually(func() bool {
-		return t.controller.IsConnected(clusterID)
+		return t.controller.IsConnected(clusterID, ipFamily)
 	}, 5).Should(BeTrue())
 }
 
-func (t *testDriver) awaitIsNotConnected(clusterID string) {
+func (t *testDriver) awaitIsNotConnected(clusterID string, ipFamily k8snet.IPFamily) {
 	Eventually(func() bool {
-		return t.controller.IsConnected(clusterID)
+		return t.controller.IsConnected(clusterID, ipFamily)
 	}, 5).Should(BeFalse())
+}
+
+func (t *testDriver) ensureIsNotConnected(clusterID string, ipFamily k8snet.IPFamily) {
+	Consistently(func() bool {
+		return t.controller.IsConnected(clusterID, ipFamily)
+	}).Should(BeFalse())
 }
 
 func (t *testDriver) localClusterIDValidationTest(localClusterID string) {
@@ -273,13 +283,20 @@ func (t *testDriver) setGatewayLocalClusterID(clusterID string) {
 	Expect(unstructured.SetNestedField(t.gatewayObj.Object, clusterID, "status", "localEndpoint", "cluster_id")).To(Succeed())
 }
 
-func (t *testDriver) addGatewayStatusConnection(clusterID, status string) {
+func (t *testDriver) addGatewayStatusConnection(clusterID, status string, ipFamily k8snet.IPFamily) {
 	current, _, err := unstructured.NestedSlice(t.gatewayObj.Object, "status", "connections")
 	Expect(err).To(Succeed())
 
 	conn := map[string]interface{}{}
 	Expect(unstructured.SetNestedField(conn, status, "status")).To(Succeed())
 	Expect(unstructured.SetNestedField(conn, clusterID, "endpoint", "cluster_id")).To(Succeed())
+
+	ip := "1.2.3.4"
+	if ipFamily == k8snet.IPv6 {
+		ip = "fc00:2001::6757"
+	}
+
+	Expect(unstructured.SetNestedField(conn, ip, "usingIP")).To(Succeed())
 
 	Expect(unstructured.SetNestedSlice(t.gatewayObj.Object, append(current, conn), "status", "connections")).To(Succeed())
 }

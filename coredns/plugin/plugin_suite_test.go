@@ -19,16 +19,23 @@ limitations under the License.
 package lighthouse_test
 
 import (
+	"flag"
 	"testing"
 
-	"github.com/coredns/coredns/plugin/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 )
 
 func init() {
-	log.D.Set()
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	_ = flags.Parse([]string{"-v=4"})
 }
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
 
 func TestPlugin(t *testing.T) {
 	RegisterFailHandler(Fail)

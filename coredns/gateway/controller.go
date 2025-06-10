@@ -20,11 +20,13 @@ package gateway
 
 import (
 	"context"
+	"maps"
 	"os"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,10 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Gateway")}
+
+type clusterStatusMapType map[k8snet.IPFamily]map[string]bool
 
 type Controller struct {
 	informer         cache.Controller
@@ -58,7 +63,10 @@ func NewController() *Controller {
 		gatewayAvailable: true,
 	}
 
-	controller.clusterStatusMap.Store(make(map[string]bool))
+	controller.clusterStatusMap.Store(clusterStatusMapType{
+		k8snet.IPv4: {},
+		k8snet.IPv6: {},
+	})
 
 	localClusterID := os.Getenv("SUBMARINER_CLUSTERID")
 
@@ -123,8 +131,8 @@ func (c *Controller) Stop() {
 	logger.Infof("Gateway status Controller stopped")
 }
 
-func (c *Controller) IsConnected(clusterID string) bool {
-	return !c.gatewayAvailable || c.getClusterStatusMap()[clusterID]
+func (c *Controller) IsConnected(clusterID string, ipFamily k8snet.IPFamily) bool {
+	return !c.gatewayAvailable || c.getClusterStatusMap()[ipFamily][clusterID]
 }
 
 func (c *Controller) GetLocalClusterID() string {
@@ -158,7 +166,7 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 }
 
 func (c *Controller) updateClusterStatusMap(connections []interface{}) {
-	var newMap map[string]bool
+	var newMap clusterStatusMapType
 
 	currentMap := c.getClusterStatusMap()
 
@@ -167,38 +175,46 @@ func (c *Controller) updateClusterStatusMap(connections []interface{}) {
 
 		status, found, err := unstructured.NestedString(connectionMap, "status")
 		if err != nil || !found {
-			logger.Errorf(nil, "status field not found in %#v", connectionMap)
+			logger.Errorf(nil, "status field not found in %s", resource.ToJSON(connectionMap))
 		}
 
 		clusterID, found, err := unstructured.NestedString(connectionMap, "endpoint", "cluster_id")
 		if !found || err != nil {
-			logger.Errorf(nil, "cluster_id field not found in %#v", connectionMap)
+			logger.Errorf(nil, "cluster_id field not found in %s", resource.ToJSON(connectionMap))
 			continue
 		}
 
+		usingIP, found, err := unstructured.NestedString(connectionMap, "usingIP")
+		if !found || err != nil {
+			logger.Errorf(nil, "usingIP field not found in %s", resource.ToJSON(connectionMap))
+			continue
+		}
+
+		ipFamily := k8snet.IPFamilyOfString(usingIP)
+
 		if status == "connected" {
-			_, found := currentMap[clusterID]
+			_, found := currentMap[ipFamily][clusterID]
 			if !found {
 				if newMap == nil {
-					newMap = copyMap(currentMap)
+					newMap = copyClusterStatusMap(currentMap)
 				}
 
-				newMap[clusterID] = true
+				newMap[ipFamily][clusterID] = true
 			}
 		} else {
-			_, found = currentMap[clusterID]
+			_, found = currentMap[ipFamily][clusterID]
 			if found {
 				if newMap == nil {
-					newMap = copyMap(currentMap)
+					newMap = copyClusterStatusMap(currentMap)
 				}
 
-				delete(newMap, clusterID)
+				delete(newMap[ipFamily], clusterID)
 			}
 		}
 	}
 
 	if newMap != nil {
-		logger.Infof("Updating the gateway status %#v ", newMap)
+		logger.Infof("Updating the gateway status %s", resource.ToJSON(newMap))
 		c.clusterStatusMap.Store(newMap)
 	}
 }
@@ -227,8 +243,17 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bo
 
 		localClusterID = ""
 	} else {
+		// Add connection entries for IPv4 and IPv6, distinguished by the "usingIP" field. Note, we use any address
+		// as only IP family is relevant.
 		connections = append(connections, map[string]interface{}{
-			"status": "connected",
+			"status":  "connected",
+			"usingIP": "127.0.0.0",
+			"endpoint": map[string]interface{}{
+				"cluster_id": localClusterID,
+			},
+		}, map[string]interface{}{
+			"status":  "connected",
+			"usingIP": "::1",
 			"endpoint": map[string]interface{}{
 				"cluster_id": localClusterID,
 			},
@@ -255,8 +280,8 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bo
 	return connections, localClusterID, true
 }
 
-func (c *Controller) getClusterStatusMap() map[string]bool {
-	return c.clusterStatusMap.Load().(map[string]bool)
+func (c *Controller) getClusterStatusMap() clusterStatusMapType {
+	return c.clusterStatusMap.Load().(clusterStatusMapType)
 }
 
 func (c *Controller) getCheckedClientset(client dynamic.Interface) (dynamic.ResourceInterface, error) {
@@ -287,11 +312,9 @@ func (c *Controller) getCheckedClientset(client dynamic.Interface) (dynamic.Reso
 	return gwClient, nil
 }
 
-func copyMap(src map[string]bool) map[string]bool {
-	m := make(map[string]bool)
-	for k, v := range src {
-		m[k] = v
+func copyClusterStatusMap(src clusterStatusMapType) clusterStatusMapType {
+	return clusterStatusMapType{
+		k8snet.IPv4: maps.Clone(src[k8snet.IPv4]),
+		k8snet.IPv6: maps.Clone(src[k8snet.IPv6]),
 	}
-
-	return m
 }

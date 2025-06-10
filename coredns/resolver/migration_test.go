@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -74,7 +75,7 @@ func testClusterIPServiceMigration() {
 
 	Context("with a legacy per-cluster ServiceImport and EndpointSlice", func() {
 		Specify("should add its DNS records", func() {
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, cluster1DNSRecord)
 		})
 
 		Context("that are subsequently deleted", func() {
@@ -98,8 +99,8 @@ func testClusterIPServiceMigration() {
 		})
 
 		Specify("the DNS records should be correct before and after the legacy cluster is upgraded", func() {
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, cluster1DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, cluster2DNSRecord)
 			Eventually(func() string {
 				return t.getNonHeadlessDNSRecord(namespace1, service1, "").IP
 			}).Should(Equal(serviceIP1))
@@ -107,8 +108,8 @@ func testClusterIPServiceMigration() {
 			t.resolver.RemoveServiceImport(legacyServiceImport)
 			t.createEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
 
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", false, cluster1DNSRecord)
-			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", false, cluster2DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, cluster1DNSRecord)
+			t.awaitDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, cluster2DNSRecord)
 			t.testRoundRobin(namespace1, service1, serviceIP1, serviceIP2)
 		})
 	})
@@ -175,6 +176,7 @@ func testHeadlessServiceMigration() {
 		})
 	})
 
+	//nolint:dupl // Ignore 180-207 lines are duplicate of `migration_test.go:261-288
 	Context("with a pre-0.15 version EndpointSlice", func() {
 		JustBeforeEach(func() {
 			delete(legacyEndpointSlice.Labels, constants.LabelIsHeadless)
@@ -186,7 +188,7 @@ func testHeadlessServiceMigration() {
 			})
 
 			Specify("should add its DNS records", func() {
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP1DNSRecord)
 			})
 
 			Context("that is subsequently deleted", func() {
@@ -204,7 +206,7 @@ func testHeadlessServiceMigration() {
 				})
 
 				Specify("should add the local service DNS records", func() {
-					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP2DNSRecord)
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP2DNSRecord)
 				})
 			})
 		})
@@ -219,18 +221,18 @@ func testHeadlessServiceMigration() {
 						Conditions: discovery.EndpointConditions{Ready: &ready},
 					}))
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Creating pre-0.15 EndpointSlice")
 
 				t.createEndpointSlice(legacyEndpointSlice)
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Deleting pre-0.15 EndpointSlice")
 
 				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
 					metav1.DeleteOptions{})).To(Succeed())
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 			})
 		})
 
@@ -239,7 +241,7 @@ func testHeadlessServiceMigration() {
 				By("Creating pre-0.15 EndpointSlice")
 
 				t.createEndpointSlice(legacyEndpointSlice)
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP1DNSRecord)
 
 				By("Creating post-0.15 EndpointSlice")
 
@@ -249,17 +251,18 @@ func testHeadlessServiceMigration() {
 						Conditions: discovery.EndpointConditions{Ready: &ready},
 					}))
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Deleting pre-0.15 EndpointSlice")
 
 				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
 					metav1.DeleteOptions{})).To(Succeed())
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 			})
 		})
 	})
 
+	//nolint:dupl // Ignore 262-289 lines are duplicate of `migration_test.go:181-208`
 	Context("with a 0.15 version EndpointSlice", func() {
 		Context("and no post-0.15 EndpointSlices", func() {
 			JustBeforeEach(func() {
@@ -267,7 +270,7 @@ func testHeadlessServiceMigration() {
 			})
 
 			Specify("should add its DNS records", func() {
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP1DNSRecord)
 			})
 
 			Context("that is subsequently deleted", func() {
@@ -285,7 +288,7 @@ func testHeadlessServiceMigration() {
 				})
 
 				Specify("should add the local service endpoints", func() {
-					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP2DNSRecord)
+					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP2DNSRecord)
 				})
 			})
 		})
@@ -300,18 +303,18 @@ func testHeadlessServiceMigration() {
 						Conditions: discovery.EndpointConditions{Ready: &ready},
 					}))
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Creating 0.15 EndpointSlice")
 
 				t.createEndpointSlice(legacyEndpointSlice)
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Deleting 0.15 EndpointSlice")
 
 				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
 					metav1.DeleteOptions{})).To(Succeed())
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 			})
 		})
 
@@ -320,7 +323,7 @@ func testHeadlessServiceMigration() {
 				By("Creating 0.15 EndpointSlice")
 
 				t.createEndpointSlice(legacyEndpointSlice)
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP1DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP1DNSRecord)
 
 				By("Creating post-0.15 EndpointSlice")
 
@@ -330,13 +333,13 @@ func testHeadlessServiceMigration() {
 						Conditions: discovery.EndpointConditions{Ready: &ready},
 					}))
 
-				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 
 				By("Deleting 0.15 EndpointSlice")
 
 				Expect(t.endpointSlices.Namespace(namespace1).Delete(context.Background(), legacyEndpointSlice.Name,
 					metav1.DeleteOptions{})).To(Succeed())
-				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", true, endpointIP3DNSRecord)
+				t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, endpointIP3DNSRecord)
 			})
 		})
 	})

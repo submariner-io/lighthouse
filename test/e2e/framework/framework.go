@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	goslices "slices"
 	"strings"
 	"sync/atomic"
 
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
@@ -278,7 +280,7 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 }
 
 func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol v1.Protocol,
-	labelsMap map[string]string, cluster framework.ClusterIndex,
+	labelsMap map[string]string, cluster framework.ClusterIndex, ipFamilyPolicy *v1.IPFamilyPolicy,
 ) *v1.Service {
 	var port int32 = 80
 
@@ -287,8 +289,9 @@ func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol 
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{
-			Type:      "ClusterIP",
-			ClusterIP: v1.ClusterIPNone,
+			Type:           v1.ServiceTypeClusterIP,
+			ClusterIP:      v1.ClusterIPNone,
+			IPFamilyPolicy: ipFamilyPolicy,
 			Ports: []v1.ServicePort{
 				{
 					Port:     port,
@@ -314,12 +317,11 @@ func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol 
 
 func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
 	return f.NewHeadlessServiceWithParams("nginx-headless", "http", v1.ProtocolTCP,
-		map[string]string{"app": "nginx-demo"}, cluster)
+		map[string]string{"app": "nginx-demo"}, cluster, nil)
 }
 
 func (f *Framework) NewHeadlessServiceEndpointIP(cluster framework.ClusterIndex) *v1.Service {
-	return f.NewHeadlessServiceWithParams("ep-headless", "http", v1.ProtocolTCP,
-		map[string]string{}, cluster)
+	return f.NewHeadlessServiceWithParams("ep-headless", "http", v1.ProtocolTCP, map[string]string{}, cluster, nil)
 }
 
 func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex, svc *v1.Service) {
@@ -361,8 +363,8 @@ func addrToHostname(addr string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(addr, ":", "-"), ".", "-")
 }
 
-func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
-	namespace string, count int,
+func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name, namespace string, count int,
+	addrType discovery.AddressType,
 ) ([]string, []string) {
 	var ipList, hostNameList []string
 
@@ -380,6 +382,10 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 
 		epsList := result.(*discovery.EndpointSliceList).Items
 		for i := range epsList {
+			if epsList[i].AddressType != addrType {
+				continue
+			}
+
 			for j := range epsList[i].Endpoints {
 				ep := &epsList[i].Endpoints[j]
 				if !ptr.Deref(ep.Conditions.Ready, true) {
@@ -444,7 +450,7 @@ func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Se
 		return f.AwaitPodIngressIPs(targetCluster, svc, count, isLocal)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count, discovery.AddressTypeIPv4)
 }
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
@@ -480,7 +486,7 @@ func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1
 		return f.AwaitEndpointIngressIPs(targetCluster, svc)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount, discovery.AddressTypeIPv4)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
@@ -689,7 +695,7 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 func (f *Framework) VerifyServiceIPWithDig(srcCluster, targetCluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	domains []string, clusterName string, shouldContain bool,
 ) {
-	serviceIP := f.GetServiceIP(targetCluster, service)
+	serviceIP := f.GetServiceIP(targetCluster, service, v1.IPFamilyUnknown)
 	f.VerifyIPWithDig(srcCluster, service, targetPod, domains, clusterName, serviceIP, shouldContain)
 }
 
@@ -707,6 +713,10 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 	domains []string, clusterName, serviceIP string, shouldContain bool,
 ) {
 	cmd := []string{"dig", "+short"}
+
+	if k8snet.IPFamilyOfString(serviceIP) == k8snet.IPv6 {
+		cmd = append(cmd, "AAAA")
+	}
 
 	for i := range domains {
 		cmd = append(cmd, BuildServiceDNSName(clusterName, service.Name, f.Namespace, domains[i]))
@@ -752,7 +762,17 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool,
 ) {
+	f.VerifyIPsWithDigByFamily(cluster, service, targetPod, ipList, domains, clusterName, shouldContain, k8snet.IPv4)
+}
+
+func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
+	ipList, domains []string, clusterName string, shouldContain bool, ipFamily k8snet.IPFamily,
+) {
 	cmd := []string{"dig", "+short"}
+
+	if ipFamily == k8snet.IPv6 {
+		cmd = append(cmd, "AAAA")
+	}
 
 	var clusterDNSName string
 	if clusterName != "" {
@@ -805,12 +825,24 @@ func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1
 	})
 }
 
-func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service) string {
+func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.Service, ipFamily v1.IPFamily) string {
 	Expect(service.Spec.Type).To(Equal(v1.ServiceTypeClusterIP))
 
-	if !framework.TestContext.GlobalnetEnabled {
-		return service.Spec.ClusterIP
+	var serviceIP string
+
+	if ipFamily == v1.IPFamilyUnknown {
+		Expect(ptr.Deref(service.Spec.IPFamilyPolicy, v1.IPFamilyPolicySingleStack)).To(Equal(v1.IPFamilyPolicySingleStack))
+		serviceIP = service.Spec.ClusterIP
+	} else {
+		index := goslices.Index(service.Spec.IPFamilies, ipFamily)
+		Expect(index).To(BeNumerically(">=", 0))
+
+		serviceIP = service.Spec.ClusterIPs[index]
 	}
 
-	return f.Framework.AwaitGlobalIngressIP(svcCluster, service.Name, service.Namespace)
+	if framework.TestContext.GlobalnetEnabled && k8snet.IPFamilyOfString(serviceIP) == k8snet.IPv4 {
+		serviceIP = f.Framework.AwaitGlobalIngressIP(svcCluster, service.Name, service.Namespace)
+	}
+
+	return serviceIP
 }
