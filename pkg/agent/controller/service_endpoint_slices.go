@@ -99,9 +99,9 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 	if controller.isHeadless() {
 		controller.epsSyncer.Reconcile(func() []runtime.Object {
 			list := localLHEndpointSliceLister(k8slabels.SelectorFromSet(map[string]string{
-				constants.LabelSourceNamespace:  serviceNamespace,
-				mcsv1a1.LabelServiceName:        serviceName,
-				constants.MCSLabelSourceCluster: clusterID,
+				constants.LabelSourceNamespace: serviceNamespace,
+				mcsv1a1.LabelServiceName:       serviceName,
+				mcsv1a1.LabelSourceCluster:     clusterID,
 			}))
 
 			retList := make([]runtime.Object, 0, len(list))
@@ -139,10 +139,10 @@ func (c *ServiceEndpointSliceController) stop(ctx context.Context) error {
 func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) (bool, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
-			discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-			constants.LabelSourceNamespace:  c.serviceNamespace,
-			constants.MCSLabelSourceCluster: c.clusterID,
-			mcsv1a1.LabelServiceName:        c.serviceName,
+			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+			constants.LabelSourceNamespace: c.serviceNamespace,
+			mcsv1a1.LabelSourceCluster:     c.clusterID,
+			mcsv1a1.LabelServiceName:       c.serviceName,
 		}).String(),
 	}
 
@@ -279,11 +279,11 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: c.serviceName + "-",
 			Labels: map[string]string{
-				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-				constants.LabelSourceNamespace:  c.serviceNamespace,
-				constants.MCSLabelSourceCluster: c.clusterID,
-				mcsv1a1.LabelServiceName:        c.serviceName,
-				constants.LabelIsHeadless:       strconv.FormatBool(c.isHeadless()),
+				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+				constants.LabelSourceNamespace: c.serviceNamespace,
+				mcsv1a1.LabelSourceCluster:     c.clusterID,
+				mcsv1a1.LabelServiceName:       c.serviceName,
+				constants.LabelIsHeadless:      strconv.FormatBool(c.isHeadless()),
 			},
 			Annotations: map[string]string{
 				constants.PublishNotReadyAddresses: c.publishNotReadyAddresses,
@@ -367,7 +367,7 @@ func (c *ServiceEndpointSliceController) Distribute(ctx context.Context, obj run
 	} else {
 		identifyingLabels[mcsv1a1.LabelServiceName] = labels[mcsv1a1.LabelServiceName]
 		identifyingLabels[constants.LabelSourceNamespace] = labels[constants.LabelSourceNamespace]
-		identifyingLabels[constants.MCSLabelSourceCluster] = labels[constants.MCSLabelSourceCluster]
+		identifyingLabels[mcsv1a1.LabelSourceCluster] = labels[mcsv1a1.LabelSourceCluster]
 	}
 
 	_, _, err := util.CreateOrUpdateWithOptions[*unstructured.Unstructured](ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{

@@ -111,9 +111,9 @@ func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bo
 
 func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*discovery.EndpointSlice {
 	list := c.resourceWatcher.ListResources(&discovery.EndpointSlice{}, labels.SelectorFromSet(map[string]string{
-		constants.LabelSourceNamespace:  forEPS.Labels[constants.LabelSourceNamespace],
-		mcsv1a1.LabelServiceName:        forEPS.Labels[mcsv1a1.LabelServiceName],
-		constants.MCSLabelSourceCluster: forEPS.Labels[constants.MCSLabelSourceCluster],
+		constants.LabelSourceNamespace: forEPS.Labels[constants.LabelSourceNamespace],
+		mcsv1a1.LabelServiceName:       forEPS.Labels[mcsv1a1.LabelServiceName],
+		mcsv1a1.LabelSourceCluster:     forEPS.Labels[mcsv1a1.LabelSourceCluster],
 	}))
 
 	var epSlices []*discovery.EndpointSlice
@@ -166,5 +166,5 @@ func isOnBroker(eps *discovery.EndpointSlice) bool {
 
 func isLegacyEndpointSlice(eps *discovery.EndpointSlice) bool {
 	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
-	return strings.HasSuffix(eps.Name, "-"+eps.Labels[constants.MCSLabelSourceCluster])
+	return strings.HasSuffix(eps.Name, "-"+eps.Labels[mcsv1a1.LabelSourceCluster])
 }

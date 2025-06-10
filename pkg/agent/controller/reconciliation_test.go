@@ -294,7 +294,7 @@ var _ = Describe("Reconciliation", func() {
 				// Create a remote EPS for the same service and ensure it's not deleted.
 				remoteEndpointSlice := localEndpointSlice.DeepCopy()
 				remoteEndpointSlice.Name = "remote-eps"
-				remoteEndpointSlice.Labels[constants.MCSLabelSourceCluster] = t.cluster2.clusterID
+				remoteEndpointSlice.Labels[mcsv1a1.LabelSourceCluster] = t.cluster2.clusterID
 				remoteEndpointSlice.Labels[federate.ClusterIDLabelKey] = t.cluster2.clusterID
 				test.CreateResource(t.cluster1.localEndpointSliceClient, remoteEndpointSlice)
 
@@ -358,9 +358,9 @@ var _ = Describe("EndpointSlice migration", func() {
 					Name:      epsName,
 					Namespace: serviceNamespace,
 					Labels: map[string]string{
-						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-						constants.MCSLabelSourceCluster: clusterID1,
-						mcsv1a1.LabelServiceName:        "nginx",
+						discovery.LabelManagedBy:   constants.LabelValueManagedBy,
+						mcsv1a1.LabelSourceCluster: clusterID1,
+						mcsv1a1.LabelServiceName:   "nginx",
 					},
 				},
 			}
@@ -386,10 +386,10 @@ var _ = Describe("EndpointSlice migration", func() {
 					Name:      epsName,
 					Namespace: serviceNamespace,
 					Labels: map[string]string{
-						discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-						constants.MCSLabelSourceCluster: clusterID1,
-						mcsv1a1.LabelServiceName:        "nginx",
-						constants.LabelIsHeadless:       strconv.FormatBool(true),
+						discovery.LabelManagedBy:   constants.LabelValueManagedBy,
+						mcsv1a1.LabelSourceCluster: clusterID1,
+						mcsv1a1.LabelServiceName:   "nginx",
+						constants.LabelIsHeadless:  strconv.FormatBool(true),
 					},
 				},
 			}

@@ -149,7 +149,7 @@ func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
 
 func sourceClusterName(serviceImport *mcsv1a1.ServiceImport) string {
 	// This function also checks the legacy source cluster label for migration.
-	name, ok := serviceImport.Labels[constants.MCSLabelSourceCluster]
+	name, ok := serviceImport.Labels[mcsv1a1.LabelSourceCluster]
 	if ok {
 		return name
 	}

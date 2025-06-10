@@ -111,10 +111,10 @@ func testLegacyServiceImportMigration() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s-%s", t.cluster1.service.Name, t.cluster1.service.Namespace, t.cluster1.clusterID),
 				Labels: map[string]string{
-					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-					constants.MCSLabelSourceCluster: t.cluster1.clusterID,
-					mcsv1a1.LabelServiceName:        t.cluster1.service.Name,
-					constants.LabelSourceNamespace:  t.cluster1.service.Namespace,
+					discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+					mcsv1a1.LabelSourceCluster:     t.cluster1.clusterID,
+					mcsv1a1.LabelServiceName:       t.cluster1.service.Name,
+					constants.LabelSourceNamespace: t.cluster1.service.Namespace,
 				},
 			},
 			AddressType: discovery.AddressTypeIPv4,

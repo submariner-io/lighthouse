@@ -224,9 +224,9 @@ var _ = Describe("Controller", func() {
 					Name:      "test",
 					Namespace: test.RemoteNamespace,
 					Labels: map[string]string{
-						constants.MCSLabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:        "test",
-						constants.LabelSourceNamespace:  namespace1,
+						mcsv1a1.LabelSourceCluster:     "test",
+						mcsv1a1.LabelServiceName:       "test",
+						constants.LabelSourceNamespace: namespace1,
 					},
 				},
 			})

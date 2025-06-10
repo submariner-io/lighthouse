@@ -37,8 +37,8 @@ var _ = Describe("PutEndpointSlices", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
-						constants.LabelSourceNamespace:  "test",
-						constants.MCSLabelSourceCluster: "test",
+						constants.LabelSourceNamespace: "test",
+						mcsv1a1.LabelSourceCluster:     "test",
 					},
 				},
 			})
@@ -48,8 +48,8 @@ var _ = Describe("PutEndpointSlices", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
-						constants.MCSLabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:        "test",
+						mcsv1a1.LabelSourceCluster: "test",
+						mcsv1a1.LabelServiceName:   "test",
 					},
 				},
 			})
@@ -77,8 +77,8 @@ var _ = Describe("RemoveEndpointSlice", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
-						constants.LabelSourceNamespace:  "test",
-						constants.MCSLabelSourceCluster: "test",
+						constants.LabelSourceNamespace: "test",
+						mcsv1a1.LabelSourceCluster:     "test",
 					},
 				},
 			})
@@ -106,9 +106,9 @@ var _ = Describe("RemoveEndpointSlice", func() {
 					Name:      "test",
 					Namespace: test.RemoteNamespace,
 					Labels: map[string]string{
-						constants.MCSLabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:        "test",
-						constants.LabelSourceNamespace:  namespace1,
+						mcsv1a1.LabelSourceCluster:     "test",
+						mcsv1a1.LabelServiceName:       "test",
+						constants.LabelSourceNamespace: namespace1,
 					},
 				},
 			})

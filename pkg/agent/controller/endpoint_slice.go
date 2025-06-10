@@ -150,7 +150,7 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 
 func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
-	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[constants.MCSLabelSourceCluster])
+	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[mcsv1a1.LabelSourceCluster])
 }
 
 func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
@@ -210,9 +210,9 @@ func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *di
 		serviceNS := endpointSlice.Labels[constants.LabelSourceNamespace]
 
 		list := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
-			constants.LabelSourceNamespace:  serviceNS,
-			mcsv1a1.LabelServiceName:        endpointSlice.Labels[mcsv1a1.LabelServiceName],
-			constants.MCSLabelSourceCluster: endpointSlice.Labels[constants.MCSLabelSourceCluster],
+			constants.LabelSourceNamespace: serviceNS,
+			mcsv1a1.LabelServiceName:       endpointSlice.Labels[mcsv1a1.LabelServiceName],
+			mcsv1a1.LabelSourceCluster:     endpointSlice.Labels[mcsv1a1.LabelSourceCluster],
 		}))
 
 		count := 0
@@ -255,11 +255,11 @@ func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (
 	for _, o := range epsList {
 		eps := o.(*discovery.EndpointSlice)
 
-		if clusterNames.Has(eps.Labels[constants.MCSLabelSourceCluster]) {
+		if clusterNames.Has(eps.Labels[mcsv1a1.LabelSourceCluster]) {
 			continue
 		}
 
-		clusterNames.Insert(eps.Labels[constants.MCSLabelSourceCluster])
+		clusterNames.Insert(eps.Labels[mcsv1a1.LabelSourceCluster])
 
 		servicePorts := c.serviceExportClient.toServicePorts(eps.Ports)
 		if prevServicePorts == nil {

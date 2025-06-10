@@ -94,7 +94,7 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	err = deleteResources(ctx, a.endpointSliceController.syncer.GetBrokerClient().Resource(endpointSliceGVR),
 		a.endpointSliceController.syncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
-			LabelSelector: labels.Set(map[string]string{constants.MCSLabelSourceCluster: a.clusterID}).String(),
+			LabelSelector: labels.Set(map[string]string{mcsv1a1.LabelSourceCluster: a.clusterID}).String(),
 		})
 
 	return errors.Wrap(err, "error deleting remote EndpointSlices")

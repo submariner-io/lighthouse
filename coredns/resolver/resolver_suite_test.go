@@ -327,11 +327,11 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 			Name:      fmt.Sprintf("%s-%s", name, utilrand.String(5)),
 			Namespace: namespace,
 			Labels: map[string]string{
-				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-				constants.LabelSourceNamespace:  namespace,
-				constants.MCSLabelSourceCluster: clusterID,
-				mcsv1a1.LabelServiceName:        name,
-				constants.LabelIsHeadless:       strconv.FormatBool(true),
+				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+				constants.LabelSourceNamespace: namespace,
+				mcsv1a1.LabelSourceCluster:     clusterID,
+				mcsv1a1.LabelServiceName:       name,
+				constants.LabelIsHeadless:      strconv.FormatBool(true),
 			},
 			Annotations: map[string]string{
 				constants.GlobalnetEnabled: strconv.FormatBool(false),

@@ -379,9 +379,9 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 			Name:        a.getObjectNameWithClusterID(name, namespace),
 			Annotations: map[string]string{},
 			Labels: map[string]string{
-				mcsv1a1.LabelServiceName:        name,
-				constants.LabelSourceNamespace:  namespace,
-				constants.MCSLabelSourceCluster: a.clusterID,
+				mcsv1a1.LabelServiceName:       name,
+				constants.LabelSourceNamespace: namespace,
+				mcsv1a1.LabelSourceCluster:     a.clusterID,
 			},
 		},
 	}

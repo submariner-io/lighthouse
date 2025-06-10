@@ -739,7 +739,7 @@ func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clust
 	for i := range list.Items {
 		if list.Items[i].GetLabels()[mcsv1a1.LabelServiceName] == name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace &&
-			list.Items[i].GetLabels()[constants.MCSLabelSourceCluster] == clusterID {
+			list.Items[i].GetLabels()[mcsv1a1.LabelSourceCluster] == clusterID {
 			eps := &discovery.EndpointSlice{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], eps, nil)).To(Succeed())
 
@@ -766,7 +766,7 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 	Eventually(func(g Gomega) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[constants.MCSLabelSourceCluster])
+		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
 
 		for _, eps := range slices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
@@ -872,11 +872,11 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: c.service.Namespace,
 			Labels: map[string]string{
-				discovery.LabelManagedBy:        constants.LabelValueManagedBy,
-				constants.MCSLabelSourceCluster: c.clusterID,
-				mcsv1a1.LabelServiceName:        c.service.Name,
-				constants.LabelSourceNamespace:  c.service.Namespace,
-				constants.LabelIsHeadless:       strconv.FormatBool(isHeadless),
+				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+				mcsv1a1.LabelSourceCluster:     c.clusterID,
+				mcsv1a1.LabelServiceName:       c.service.Name,
+				constants.LabelSourceNamespace: c.service.Namespace,
+				constants.LabelIsHeadless:      strconv.FormatBool(isHeadless),
 			},
 			Annotations: map[string]string{},
 		},

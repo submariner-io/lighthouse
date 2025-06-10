@@ -21,7 +21,6 @@ package constants
 const (
 	LabelValueManagedBy      = "lighthouse-agent.submariner.io"
 	LabelSourceNamespace     = "lighthouse.submariner.io/sourceNamespace"
-	MCSLabelSourceCluster    = "multicluster.kubernetes.io/source-cluster"
 	LabelIsHeadless          = "lighthouse.submariner.io/is-headless"
 	PublishNotReadyAddresses = "lighthouse.submariner.io/publish-not-ready-addresses"
 	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"

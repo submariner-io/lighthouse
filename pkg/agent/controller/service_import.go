@@ -562,9 +562,9 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 	// Check for conflicts with the local ServiceImport
 
 	siList := c.localSyncer.ListResourcesBySelector(k8slabels.SelectorFromSet(map[string]string{
-		mcsv1a1.LabelServiceName:        aggregatedServiceImport.Name,
-		constants.LabelSourceNamespace:  aggregatedServiceImport.Namespace,
-		constants.MCSLabelSourceCluster: c.clusterID,
+		mcsv1a1.LabelServiceName:       aggregatedServiceImport.Name,
+		constants.LabelSourceNamespace: aggregatedServiceImport.Namespace,
+		mcsv1a1.LabelSourceCluster:     c.clusterID,
 	}))
 
 	if len(siList) == 0 {

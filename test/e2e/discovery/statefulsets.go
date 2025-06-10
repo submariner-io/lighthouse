@@ -23,11 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/lighthouse/pkg/constants"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const httpPortName = "http"
@@ -132,7 +132,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[constants.MCSLabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
@@ -180,7 +180,7 @@ func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[constants.MCSLabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
@@ -199,7 +199,7 @@ func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.Clus
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
-		sourceCluster := endpointSlice.Labels[constants.MCSLabelSourceCluster]
+		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
 			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,

@@ -68,9 +68,9 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s-%s", serviceName, serviceNamespace, clusterID1),
 				Labels: map[string]string{
-					mcsv1a1.LabelServiceName:        serviceName,
-					constants.LabelSourceNamespace:  serviceNamespace,
-					constants.MCSLabelSourceCluster: clusterID1,
+					mcsv1a1.LabelServiceName:       serviceName,
+					constants.LabelSourceNamespace: serviceNamespace,
+					mcsv1a1.LabelSourceCluster:     clusterID1,
 				},
 			},
 		}
@@ -111,9 +111,9 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s-%s", serviceName, serviceNamespace2, clusterID1),
 				Labels: map[string]string{
-					mcsv1a1.LabelServiceName:        serviceName,
-					constants.LabelSourceNamespace:  serviceNamespace2,
-					constants.MCSLabelSourceCluster: clusterID1,
+					mcsv1a1.LabelServiceName:       serviceName,
+					constants.LabelSourceNamespace: serviceNamespace2,
+					mcsv1a1.LabelSourceCluster:     clusterID1,
 				},
 			},
 		}
@@ -174,8 +174,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-ns1" + clusterID1,
 				Labels: map[string]string{
-					constants.MCSLabelSourceCluster: clusterID1,
-					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+					mcsv1a1.LabelSourceCluster: clusterID1,
+					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
 		}
@@ -192,8 +192,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-ns3" + clusterID2,
 				Labels: map[string]string{
-					constants.MCSLabelSourceCluster: clusterID2,
-					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+					mcsv1a1.LabelSourceCluster: clusterID2,
+					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
 		}
@@ -206,8 +206,8 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx2-" + clusterID2,
 				Labels: map[string]string{
-					constants.MCSLabelSourceCluster: clusterID2,
-					discovery.LabelManagedBy:        constants.LabelValueManagedBy,
+					mcsv1a1.LabelSourceCluster: clusterID2,
+					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
 		}

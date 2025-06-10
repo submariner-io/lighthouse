@@ -287,9 +287,9 @@ func getKeyInfoFrom(es *discovery.EndpointSlice) (string, string, bool) {
 		return "", "", false
 	}
 
-	clusterID, ok := es.Labels[constants.MCSLabelSourceCluster]
+	clusterID, ok := es.Labels[mcsv1a1.LabelSourceCluster]
 	if !ok {
-		logger.Warningf("EndpointSlice missing label %q: %#v", constants.MCSLabelSourceCluster, es.ObjectMeta)
+		logger.Warningf("EndpointSlice missing label %q: %#v", mcsv1a1.LabelSourceCluster, es.ObjectMeta)
 		return "", "", false
 	}
 

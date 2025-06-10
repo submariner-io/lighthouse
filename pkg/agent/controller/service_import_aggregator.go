@@ -82,7 +82,7 @@ func (a *ServiceImportAggregator) setServicePorts(ctx context.Context, si *mcsv1
 
 	for i := range list.Items {
 		eps := a.converter.toEndpointSlice(&list.Items[i])
-		portsByCluster[eps.Labels[constants.MCSLabelSourceCluster]] = a.converter.toServicePorts(eps.Ports)
+		portsByCluster[eps.Labels[mcsv1a1.LabelSourceCluster]] = a.converter.toServicePorts(eps.Ports)
 	}
 
 	// Sort the clusters by their ServiceExport timestamps stored in the ServiceImport annotations so conflicting ports are
