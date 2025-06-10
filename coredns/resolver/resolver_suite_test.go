@@ -19,7 +19,6 @@ limitations under the License.
 package resolver_test
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"reflect"
@@ -41,10 +40,10 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -170,7 +169,9 @@ func (t *testDriver) createEndpointSlice(es *discovery.EndpointSlice) {
 	test.CreateResource(t.endpointSlices.Namespace(es.Namespace), es)
 }
 
-func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, expIsHeadless bool, expRecords ...resolver.DNSRecord) {
+func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, ipFamily k8snet.IPFamily, expIsHeadless bool,
+	expRecords ...resolver.DNSRecord,
+) {
 	sortRecords := func(r []resolver.DNSRecord) {
 		sort.SliceStable(r, func(i, j int) bool {
 			return r[i].IP < r[j].IP
@@ -179,43 +180,38 @@ func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, ex
 
 	sortRecords(expRecords)
 
-	var records []resolver.DNSRecord
-	var found, isHeadless bool
+	Eventually(func(g Gomega) {
+		records, isHeadless, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname, ipFamily)
+		sortRecords(records)
 
-	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
-		func(_ context.Context) (bool, error) {
-			records, isHeadless, found = t.resolver.GetDNSRecords(ns, name, cluster, hostname)
-			sortRecords(records)
+		g.Expect(found).To(BeTrue())
+		g.Expect(isHeadless).To(Equal(expIsHeadless))
 
-			return found && isHeadless == expIsHeadless && reflect.DeepEqual(records, expRecords), nil
-		})
-	if err == nil {
-		return
-	}
+		t.assertDNSRecords(g, records, expRecords...)
+	}).ProbeEvery(50 * time.Millisecond).Within(5 * time.Second).Should(Succeed())
+}
+
+func (t *testDriver) assertDNSRecordsFound(ns, name, cluster, hostname string, ipFamily k8snet.IPFamily, expIsHeadless bool,
+	expRecords ...resolver.DNSRecord,
+) {
+	records, isHeadless, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname, ipFamily)
 
 	Expect(found).To(BeTrue())
 	Expect(isHeadless).To(Equal(expIsHeadless))
 
-	t.assertDNSRecords(records, expRecords...)
+	t.assertDNSRecords(Default, records, expRecords...)
 }
 
-func (t *testDriver) assertDNSRecordsFound(ns, name, cluster, hostname string, expIsHeadless bool, expRecords ...resolver.DNSRecord) {
-	records, isHeadless, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname)
-
-	Expect(found).To(BeTrue())
-	Expect(isHeadless).To(Equal(expIsHeadless))
-
-	t.assertDNSRecords(records, expRecords...)
-}
-
-func (t *testDriver) ensureDNSRecordsFound(ns, name, cluster, hostname string, expIsHeadless bool, expRecords ...resolver.DNSRecord) {
+func (t *testDriver) ensureDNSRecordsFound(ns, name, cluster, hostname string, ipFamily k8snet.IPFamily, expIsHeadless bool,
+	expRecords ...resolver.DNSRecord,
+) {
 	Consistently(func() bool {
-		t.assertDNSRecordsFound(ns, name, cluster, hostname, expIsHeadless, expRecords...)
+		t.assertDNSRecordsFound(ns, name, cluster, hostname, ipFamily, expIsHeadless, expRecords...)
 		return true
-	}, time.Millisecond*200).Should(BeTrue())
+	}).Within(time.Millisecond * 200).Should(BeTrue())
 }
 
-func (t *testDriver) assertDNSRecords(records []resolver.DNSRecord, expRecords ...resolver.DNSRecord) {
+func (t *testDriver) assertDNSRecords(g Gomega, records []resolver.DNSRecord, expRecords ...resolver.DNSRecord) {
 	recordFound := func(r resolver.DNSRecord) bool {
 		for i := range expRecords {
 			if reflect.DeepEqual(r, expRecords[i]) {
@@ -227,20 +223,16 @@ func (t *testDriver) assertDNSRecords(records []resolver.DNSRecord, expRecords .
 	}
 
 	for i := range records {
-		if !recordFound(records[i]) {
-			Fail(fmt.Sprintf("Unexpected DNS record returned: %s\nExpected:\n%s",
-				format.Object(records[i], 1), format.Object(expRecords, 1)))
-		}
+		g.Expect(recordFound(records[i])).To(BeTrue(), "Unexpected DNS record returned: %s\nExpected:\n%s",
+			format.Object(records[i], 1), format.Object(expRecords, 1))
 	}
 
-	if len(records) != len(expRecords) {
-		Fail(fmt.Sprintf("Expected %d DNS record returned, received %d.\nActual: %s\nExpected:\n%s",
-			len(expRecords), len(records), format.Object(records, 1), format.Object(expRecords, 1)))
-	}
+	g.Expect(records).To(HaveLen(len(expRecords)), "Expected %d DNS record returned, received %d.\nActual: %s\nExpected:\n%s",
+		len(expRecords), len(records), format.Object(records, 1), format.Object(expRecords, 1))
 }
 
 func (t *testDriver) getNonHeadlessDNSRecord(ns, name, cluster string) *resolver.DNSRecord {
-	records, isHeadless, found := t.resolver.GetDNSRecords(ns, name, cluster, "")
+	records, isHeadless, found := t.resolver.GetDNSRecords(ns, name, cluster, "", k8snet.IPv4)
 
 	Expect(found).To(BeTrue())
 	Expect(isHeadless).To(BeFalse())
@@ -250,13 +242,13 @@ func (t *testDriver) getNonHeadlessDNSRecord(ns, name, cluster string) *resolver
 }
 
 func (t *testDriver) assertDNSRecordsNotFound(ns, name, cluster, hostname string) {
-	_, _, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname)
+	_, _, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname, k8snet.IPv4)
 	Expect(found).To(BeFalse())
 }
 
 func (t *testDriver) awaitDNSRecords(ns, name, cluster, hostname string, expFound bool) {
 	Eventually(func() bool {
-		_, _, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname)
+		_, _, found := t.resolver.GetDNSRecords(ns, name, cluster, hostname, k8snet.IPv4)
 		return found
 	}).Should(Equal(expFound))
 }

@@ -120,7 +120,7 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 
 	for i := range list {
 		eps := list[i].(*discovery.EndpointSlice)
-		if !isOnBroker(eps) && !isLegacyEndpointSlice(eps) {
+		if eps.AddressType == forEPS.AddressType && !isOnBroker(eps) && !isLegacyEndpointSlice(eps) {
 			epSlices = append(epSlices, eps)
 		}
 	}

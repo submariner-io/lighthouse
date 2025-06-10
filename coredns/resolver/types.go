@@ -22,7 +22,9 @@ import (
 	"sync"
 
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/client-go/dynamic"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -34,7 +36,7 @@ type Interface struct {
 }
 
 type ClusterStatus interface {
-	IsConnected(clusterID string) bool
+	IsConnected(clusterID string, ipFamily k8snet.IPFamily) bool
 	GetLocalClusterID() string
 }
 
@@ -52,10 +54,16 @@ type clusterInfo struct {
 	endpointsHealthy      bool
 }
 
+type IPFamilyInfo struct {
+	addrType discovery.AddressType
+	clusters map[string]*clusterInfo
+	balancer loadbalancer.Interface
+	ports    []mcsv1a1.ServicePort
+}
+
 type serviceInfo struct {
-	clusters   map[string]*clusterInfo
-	balancer   loadbalancer.Interface
+	ipv4Info   IPFamilyInfo
+	ipv6Info   IPFamilyInfo
 	isExported bool
-	ports      []mcsv1a1.ServicePort
 	spec       mcsv1a1.ServiceImportSpec
 }

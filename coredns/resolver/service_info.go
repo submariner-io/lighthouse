@@ -19,77 +19,22 @@ limitations under the License.
 package resolver
 
 import (
-	"fmt"
-
-	"github.com/submariner-io/admiral/pkg/slices"
-	"k8s.io/utils/ptr"
+	discovery "k8s.io/api/discovery/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (si *serviceInfo) resetLoadBalancing() {
-	si.balancer.RemoveAll()
-
-	for name, info := range si.clusters {
-		err := si.balancer.Add(name, info.weight)
-		if err != nil {
-			logger.Error(err, "Error adding load balancer info")
-		}
-	}
-}
-
-func (si *serviceInfo) mergePorts() {
-	si.ports = nil
-
-	for _, info := range si.clusters {
-		if si.ports == nil {
-			si.ports = info.endpointRecords[0].Ports
-		} else {
-			si.ports = slices.Intersect(si.ports, info.endpointRecords[0].Ports, func(p mcsv1a1.ServicePort) string {
-				return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
-			})
-		}
-	}
-}
-
-func (si *serviceInfo) ensureClusterInfo(name string) *clusterInfo {
-	info, ok := si.clusters[name]
-
-	if !ok {
-		info = &clusterInfo{
-			endpointRecordsByHost: make(map[string][]DNSRecord),
-			weight:                1,
-		}
-
-		si.clusters[name] = info
+func (si *serviceInfo) getIPFamilyInfo(addrType discovery.AddressType) *IPFamilyInfo {
+	if addrType == discovery.AddressTypeIPv6 {
+		return &si.ipv6Info
 	}
 
-	return info
-}
-
-func (si *serviceInfo) newRecordFrom(from *DNSRecord) *DNSRecord {
-	r := *from
-	r.Ports = si.ports
-
-	return &r
-}
-
-func (si *serviceInfo) selectIP(checkCluster func(string) bool) *DNSRecord {
-	queueLength := si.balancer.ItemCount()
-	for range queueLength {
-		clusterID := si.balancer.Next().(string)
-		clusterInfo := si.clusters[clusterID]
-
-		if checkCluster(clusterID) && clusterInfo.endpointsHealthy {
-			return &clusterInfo.endpointRecords[0]
-		}
-
-		// Will Skip the cluster until a full "round" of the items is done
-		si.balancer.Skip(clusterID)
-	}
-
-	return nil
+	return &si.ipv4Info
 }
 
 func (si *serviceInfo) isHeadless() bool {
 	return si.spec.Type == mcsv1a1.Headless
+}
+
+func (si *serviceInfo) canBeDeleted() bool {
+	return !si.isExported && len(si.ipv4Info.clusters) == 0 && len(si.ipv6Info.clusters) == 0
 }

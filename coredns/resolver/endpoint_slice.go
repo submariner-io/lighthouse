@@ -51,7 +51,7 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		return false
 	}
 
-	logger.Infof("Put EndpointSlices for %q on cluster %q", key, clusterID)
+	logger.Infof("Put %s EndpointSlices for %q on cluster %q", endpointSlices[0].AddressType, key, clusterID)
 
 	localClusterID := i.clusterStatus.GetLocalClusterID()
 
@@ -70,7 +70,7 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	serviceInfo, found := i.serviceMap[key]
+	svcInfo, found := i.serviceMap[key]
 	if !found {
 		// This means we haven't observed a ServiceImport yet for the service. Return true for the controller to re-queue it.
 		logger.Infof("Service not found for EndpointSlice %q - requeuing", key)
@@ -78,8 +78,10 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		return true
 	}
 
-	if !serviceInfo.isHeadless() {
-		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], serviceInfo)
+	ipFamilyInfo := svcInfo.getIPFamilyInfo(endpointSlices[0].AddressType)
+
+	if !svcInfo.isHeadless() {
+		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], ipFamilyInfo)
 	}
 
 	if localEndpointSliceErr != nil {
@@ -92,17 +94,17 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		endpointSlices = localEndpointSlices
 	}
 
-	i.putHeadlessEndpointSlices(key, clusterID, endpointSlices, serviceInfo)
+	i.putHeadlessEndpointSlices(key, clusterID, endpointSlices, ipFamilyInfo)
 
 	return false
 }
 
-func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, serviceInfo *serviceInfo,
+func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, ipFamilyInfo *IPFamilyInfo,
 ) bool {
 	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
 	if !found {
 		// This is a legacy pre-0.15 EndpointSlice.
-		clusterInfo, found := serviceInfo.clusters[clusterID]
+		clusterInfo, found := ipFamilyInfo.clusters[clusterID]
 		if !found {
 			logger.Infof("Cluster %q not found for EndpointSlice %q - requeuing", clusterID, key)
 			return true
@@ -121,7 +123,7 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 		return false
 	}
 
-	clusterInfo := serviceInfo.ensureClusterInfo(clusterID)
+	clusterInfo := ipFamilyInfo.ensureClusterInfo(clusterID)
 	clusterInfo.endpointRecords = []DNSRecord{{
 		IP:          endpointSlice.Endpoints[0].Addresses[0],
 		Ports:       mcsServicePortsFrom(endpointSlice.Ports),
@@ -130,21 +132,24 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 
 	clusterInfo.endpointsHealthy = endpointSlice.Endpoints[0].Conditions.Ready == nil || *endpointSlice.Endpoints[0].Conditions.Ready
 
-	serviceInfo.mergePorts()
-	serviceInfo.resetLoadBalancing()
+	ipFamilyInfo.mergePorts()
+	ipFamilyInfo.resetLoadBalancing()
 
-	logger.Infof("Added DNSRecord with service IP %q for EndpointSlice %q on cluster %q, endpointsHealthy: %v, ports: %#v",
-		clusterInfo.endpointRecords[0].IP, key, clusterID, clusterInfo.endpointsHealthy, clusterInfo.endpointRecords[0].Ports)
+	logger.Infof("Added %s DNSRecord with service IP %q for EndpointSlice %q on cluster %q, endpointsHealthy: %v, ports: %#v",
+		endpointSlice.AddressType, clusterInfo.endpointRecords[0].IP, key, clusterID, clusterInfo.endpointsHealthy,
+		clusterInfo.endpointRecords[0].Ports)
 
 	return false
 }
 
-func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSlices []*discovery.EndpointSlice, serviceInfo *serviceInfo) {
+func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSlices []*discovery.EndpointSlice,
+	ipFamilyInfo *IPFamilyInfo,
+) {
 	clusterInfo := &clusterInfo{
 		endpointRecordsByHost: make(map[string][]DNSRecord),
 	}
 
-	serviceInfo.clusters[clusterID] = clusterInfo
+	ipFamilyInfo.clusters[clusterID] = clusterInfo
 
 	allAddresses := sets.New[string]()
 
@@ -195,11 +200,11 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 	}
 
 	if len(clusterInfo.endpointRecords) <= maxRecordsToLog {
-		logger.Infof("Added records for headless EndpointSlice %q from cluster %q: %s",
-			key, clusterID, resource.ToJSON(clusterInfo.endpointRecords))
+		logger.Infof("Added %s records for headless EndpointSlice %q from cluster %q: %s",
+			ipFamilyInfo.addrType, key, clusterID, resource.ToJSON(clusterInfo.endpointRecords))
 	} else {
-		logger.Infof("Added records for headless EndpointSlice %q from cluster %q (showing %d/%d): %s",
-			key, clusterID, maxRecordsToLog, len(clusterInfo.endpointRecords),
+		logger.Infof("Added %s records for headless EndpointSlice %q from cluster %q (showing %d/%d): %s",
+			ipFamilyInfo.addrType, key, clusterID, maxRecordsToLog, len(clusterInfo.endpointRecords),
 			resource.ToJSON(clusterInfo.endpointRecords[:maxRecordsToLog]))
 	}
 }
@@ -247,23 +252,25 @@ func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) 
 		return
 	}
 
-	logger.Infof("Remove EndpointSlice %q on cluster %q", key, clusterID)
+	logger.Infof("Remove %s EndpointSlice %q on cluster %q", endpointSlice.AddressType, key, clusterID)
 
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	serviceInfo, found := i.serviceMap[key]
+	svcInfo, found := i.serviceMap[key]
 	if !found {
 		return
 	}
 
-	delete(serviceInfo.clusters, clusterID)
+	ipFamilyInfo := svcInfo.getIPFamilyInfo(endpointSlice.AddressType)
 
-	if len(serviceInfo.clusters) == 0 && !serviceInfo.isExported {
+	delete(ipFamilyInfo.clusters, clusterID)
+
+	if svcInfo.canBeDeleted() {
 		delete(i.serviceMap, key)
-	} else if !serviceInfo.isHeadless() {
-		serviceInfo.mergePorts()
-		serviceInfo.resetLoadBalancing()
+	} else if !svcInfo.isHeadless() {
+		ipFamilyInfo.mergePorts()
+		ipFamilyInfo.resetLoadBalancing()
 	}
 }
 
@@ -320,5 +327,6 @@ func shouldRetrieveLocalEndpointSlicesFor(endpointSlice *discovery.EndpointSlice
 		return isHeadless(endpointSlice)
 	}
 
-	return isHeadless(endpointSlice) && globalnetEnabled == strconv.FormatBool(true)
+	return endpointSlice.AddressType == discovery.AddressTypeIPv4 &&
+		isHeadless(endpointSlice) && globalnetEnabled == strconv.FormatBool(true)
 }

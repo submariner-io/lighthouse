@@ -21,6 +21,7 @@ package lighthouse
 import (
 	"context"
 	"errors"
+	"os"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -35,6 +36,7 @@ import (
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -50,6 +52,8 @@ func (f *fakeHandler) Name() string {
 
 var _ = Describe("Plugin setup", func() {
 	BeforeEach(func() {
+		os.Unsetenv("SUBMARINER_CLUSTERCIDR")
+
 		gatewaysGVR := schema.GroupVersionResource{
 			Group:    "submariner.io",
 			Version:  "v1",
@@ -157,6 +161,32 @@ func testCorrectConfig() {
 		Expect(lh.Fall).Should(Equal(fall.F{}))
 		Expect(lh.Zones).Should(BeEmpty())
 		Expect(lh.TTL).Should(Equal(defaultTTL))
+	})
+
+	When("no cluster CIDRs are specified", func() {
+		It("should default to supported address type IPv4", func() {
+			Expect(lh.SupportedIPFamilies).To(Equal([]k8snet.IPFamily{k8snet.IPv4}))
+		})
+	})
+
+	When("an IPv6 cluster CIDR is specified", func() {
+		BeforeEach(func() {
+			os.Setenv("SUBMARINER_CLUSTERCIDR", "2001:0:0:1234::/64")
+		})
+
+		It("should set the supported address type IPv6", func() {
+			Expect(lh.SupportedIPFamilies).To(Equal([]k8snet.IPFamily{k8snet.IPv6}))
+		})
+	})
+
+	When("dual-stack cluster CIDRs are specified", func() {
+		BeforeEach(func() {
+			os.Setenv("SUBMARINER_CLUSTERCIDR", "2001:0:0:1234::/64, 10.253.1.0/16")
+		})
+
+		It("should set the supported address types to IPv4 and IPv6", func() {
+			Expect(lh.SupportedIPFamilies).To(ContainElements(k8snet.IPv4, k8snet.IPv6))
+		})
 	})
 }
 
