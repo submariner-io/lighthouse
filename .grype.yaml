@@ -10,3 +10,7 @@ ignore:
   - vulnerability: CVE-2021-22570
     package:
       name: google.golang.org/protobuf
+  # We can ignore this CVE since it's related to QUIC which we don't use.
+  - vulnerability: GHSA-cvx7-x8pj-x2gw
+    package:
+      name: github.com/coredns/coredns
