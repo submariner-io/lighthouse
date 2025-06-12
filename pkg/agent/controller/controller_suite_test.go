@@ -45,7 +45,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,7 +106,7 @@ func init() {
 	flags.Parse([]string{"-v=2"})
 	kzerolog.InitK8sLogging()
 
-	err := mcsv1a1.Install(scheme.Scheme)
+	err := mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		panic(err)
 	}
@@ -158,7 +157,7 @@ func newTestDiver() *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
-	Expect(mcsv1a1.Install(syncerScheme)).To(Succeed())
+	Expect(mcsv1a1.AddToScheme(syncerScheme)).To(Succeed())
 
 	syncerScheme.AddKnownTypeWithName(schema.GroupVersionKind{
 		Group:   "submariner.io",
@@ -499,20 +498,21 @@ func (c *cluster) newGlobalIngressIP(name, ip string) *unstructured.Unstructured
 	return ingressIP
 }
 
-func (c *cluster) retrieveServiceExportCondition(se *mcsv1a1.ServiceExport, condType string) *metav1.Condition {
+func (c *cluster) retrieveServiceExportCondition(se *mcsv1a1.ServiceExport, condType mcsv1a1.ServiceExportConditionType,
+) *mcsv1a1.ServiceExportCondition {
 	obj, err := serviceExportClientFor(c.localDynClient, se.Namespace).Get(context.TODO(), se.Name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
-	return meta.FindStatusCondition(toServiceExport(obj).Status.Conditions, condType)
+	return controller.FindServiceExportStatusCondition(toServiceExport(obj).Status.Conditions, condType)
 }
 
-func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
-	conditionsEqual := func(actual, expected *metav1.Condition) bool {
+func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExportCondition) {
+	conditionsEqual := func(actual, expected *mcsv1a1.ServiceExportCondition) bool {
 		return actual != nil && actual.Type == expected.Type && actual.Status == expected.Status &&
 			reflect.DeepEqual(actual.Reason, expected.Reason)
 	}
 
-	actual := make([]*metav1.Condition, len(expected))
+	actual := make([]*mcsv1a1.ServiceExportCondition, len(expected))
 	lastIndex := -1
 
 	for i := range len(expected) - 1 {
@@ -528,8 +528,8 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 					continue
 				}
 
-				actual[i] = meta.FindStatusCondition(toServiceExport(a.(k8stesting.UpdateActionImpl).Object).Status.Conditions,
-					expected[i].Type)
+				actual[i] = controller.FindServiceExportStatusCondition(
+					toServiceExport(a.(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected[i].Type)
 
 				if conditionsEqual(actual[i], expected[i]) {
 					lastIndex = j
@@ -549,7 +549,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 		Expect(err).To(Succeed())
 		se := toServiceExport(obj)
 
-		c := meta.FindStatusCondition(se.Status.Conditions, expected[last].Type)
+		c := controller.FindServiceExportStatusCondition(se.Status.Conditions, expected[last].Type)
 		if conditionsEqual(c, expected[last]) {
 			actual[last] = c
 			return c
@@ -563,7 +563,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 	}
 }
 
-func (c *cluster) ensureLastServiceExportCondition(expected *metav1.Condition) {
+func (c *cluster) ensureLastServiceExportCondition(expected *mcsv1a1.ServiceExportCondition) {
 	indexOfLastCondition := func() int {
 		actions := c.localDynClientFake.Actions()
 		for i := len(actions) - 1; i >= 0; i-- {
@@ -571,7 +571,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected *metav1.Condition) {
 				continue
 			}
 
-			actual := meta.FindStatusCondition(
+			actual := controller.FindServiceExportStatusCondition(
 				toServiceExport(actions[i].(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected.Type)
 
 			if actual != nil {
@@ -591,7 +591,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected *metav1.Condition) {
 	}).Should(Equal(initialIndex), "Expected ServiceExport condition to not change: "+resource.ToJSON(expected))
 }
 
-func (c *cluster) ensureNoServiceExportCondition(condType string, serviceExports ...*mcsv1a1.ServiceExport) {
+func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {
 	if len(serviceExports) == 0 {
 		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
 	}
@@ -604,7 +604,7 @@ func (c *cluster) ensureNoServiceExportCondition(condType string, serviceExports
 }
 
 func (c *cluster) awaitServiceUnavailableStatus() {
-	c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "ServiceUnavailable"))
+	c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse, "ServiceUnavailable"))
 }
 
 func (c *cluster) findLocalServiceImport() *mcsv1a1.ServiceImport {
@@ -963,15 +963,17 @@ func endpointSliceClientFor(client dynamic.Interface, namespace string) dynamic.
 	return client.Resource(discovery.SchemeGroupVersion.WithResource("endpointslices")).Namespace(namespace)
 }
 
-func assertEquivalentConditions(actual, expected *metav1.Condition) {
+func assertEquivalentConditions(actual, expected *mcsv1a1.ServiceExportCondition) {
 	out := resource.ToJSON(actual)
 
 	Expect(actual.Status).To(Equal(expected.Status), "Actual: %s", out)
 	Expect(actual.LastTransitionTime).To(Not(BeNil()), "Actual: %s", out)
-	Expect(actual.Reason).To(Equal(expected.Reason), "Actual: %s", out)
+	Expect(actual.Reason).To(Not(BeNil()), "Actual: %s", out)
+	Expect(*actual.Reason).To(Equal(*expected.Reason), "Actual: %s", out)
+	Expect(actual.Message).To(Not(BeNil()), "Actual: %s", out)
 
-	if expected.Message != "" {
-		Expect(actual.Message).To(ContainSubstring(expected.Message), "Actual: %s", out)
+	if expected.Message != nil {
+		Expect(*actual.Message).To(ContainSubstring(*expected.Message), "Actual: %s", out)
 	}
 }
 
@@ -1003,8 +1005,8 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 	for _, c := range clusters {
 		t.awaitEndpointSlice(c)
 
-		c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, ""))
-		c.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportReadyCondition(corev1.ConditionTrue, ""))
 	}
 }
 
@@ -1032,27 +1034,27 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 	Expect(epsClient.Delete(context.Background(), "dummy", metav1.DeleteOptions{})).To(Succeed())
 }
 
-func newServiceExportValidCondition(status metav1.ConditionStatus, reason string) *metav1.Condition {
-	return &metav1.Condition{
+func newServiceExportValidCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+	return &mcsv1a1.ServiceExportCondition{
 		Type:   mcsv1a1.ServiceExportValid,
 		Status: status,
-		Reason: reason,
+		Reason: &reason,
 	}
 }
 
-func newServiceExportReadyCondition(status metav1.ConditionStatus, reason string) *metav1.Condition {
-	return &metav1.Condition{
+func newServiceExportReadyCondition(status corev1.ConditionStatus, reason string) *mcsv1a1.ServiceExportCondition {
+	return &mcsv1a1.ServiceExportCondition{
 		Type:   constants.ServiceExportReady,
 		Status: status,
-		Reason: reason,
+		Reason: &reason,
 	}
 }
 
-func newServiceExportConflictCondition(reason string) *metav1.Condition {
-	return &metav1.Condition{
+func newServiceExportConflictCondition(reason string) *mcsv1a1.ServiceExportCondition {
+	return &mcsv1a1.ServiceExportCondition{
 		Type:   mcsv1a1.ServiceExportConflict,
-		Status: metav1.ConditionTrue,
-		Reason: reason,
+		Status: corev1.ConditionTrue,
+		Reason: &reason,
 	}
 }
 
