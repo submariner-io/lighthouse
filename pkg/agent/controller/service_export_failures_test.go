@@ -54,7 +54,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, ""))
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
 			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)

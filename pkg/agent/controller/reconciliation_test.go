@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
+	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -189,7 +190,7 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.createServiceExport()
 			t.cluster1.start(t, *t.syncerConfig)
 
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.NoServiceImportReason))
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})

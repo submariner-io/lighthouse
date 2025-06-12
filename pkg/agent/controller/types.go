@@ -38,12 +38,17 @@ import (
 )
 
 const (
+	ExportValidReason                    = "ServiceExportValid"
 	ExportFailedReason                   = "ExportFailed"
+	ServiceExportedReason                = "ServiceExported"
+	NoServiceImportReason                = "NoServiceImport"
+	AwaitingExportReason                 = "AwaitingExport"
 	TypeConflictReason                   = "ConflictingType"
 	PortConflictReason                   = "ConflictingPorts"
 	SessionAffinityConflictReason        = "ConflictingSessionAffinity"
 	SessionAffinityConfigConflictReason  = "ConflictingSessionAffinityConfig"
 	ClusterSetIPEnablementConflictReason = "ConflictingClusterSetIPEnablement"
+	NoConflictsReason                    = "NoConflicts"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object

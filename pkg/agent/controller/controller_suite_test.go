@@ -523,7 +523,7 @@ func (c *cluster) retrieveServiceExportCondition(se *mcsv1a1.ServiceExport, cond
 func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 	conditionsEqual := func(actual, expected *metav1.Condition) bool {
 		return actual != nil && actual.Type == expected.Type && actual.Status == expected.Status &&
-			reflect.DeepEqual(actual.Reason, expected.Reason)
+			actual.Reason == expected.Reason
 	}
 
 	actual := make([]*metav1.Condition, len(expected))
@@ -564,6 +564,11 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 		se := toServiceExport(obj)
 
 		c := meta.FindStatusCondition(se.Status.Conditions, expected[last].Type)
+
+		if c != nil {
+			Expect(c.Reason).NotTo(BeEmpty(), resource.ToJSON(c))
+		}
+
 		if conditionsEqual(c, expected[last]) {
 			actual[last] = c
 			return c
@@ -1000,8 +1005,8 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 	for _, c := range clusters {
 		t.awaitEndpointSlice(c)
 
-		c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, ""))
-		c.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue, ""))
+		c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
+		c.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue, controller.ServiceExportedReason))
 	}
 }
 

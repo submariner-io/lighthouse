@@ -191,7 +191,7 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 					fmt.Sprintf("Unable to export: %v", err)))
 		} else {
 			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, "",
+				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, ServiceExportedReason,
 					"Service was successfully exported to the broker"))
 
 			c.enqueueForConflictCheck(ctx, endpointSlice, op)

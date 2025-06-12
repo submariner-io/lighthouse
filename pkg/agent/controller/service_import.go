@@ -333,13 +333,13 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 	if op == syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			newServiceExportCondition(constants.ServiceExportReady,
-				metav1.ConditionFalse, "NoServiceImport", "ServiceImport was deleted"))
+				metav1.ConditionFalse, NoServiceImportReason, "ServiceImport was deleted"))
 
 		return obj, false
 	} else if op == syncer.Create {
 		c.serviceExportClient.tryUpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			false, newServiceExportCondition(constants.ServiceExportReady,
-				metav1.ConditionFalse, "AwaitingExport", fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
+				metav1.ConditionFalse, AwaitingExportReason, fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
 
 	return obj, false

@@ -305,7 +305,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	}
 
 	a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-		newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionTrue, "", ""))
+		newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionTrue, ExportValidReason, ""))
 
 	logger.V(log.DEBUG).Infof("Returning ServiceImport %s/%s: %s", svcExport.Namespace, svcExport.Name,
 		serviceImportStringer{serviceImport})

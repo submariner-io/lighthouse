@@ -121,6 +121,9 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 
 	if to.Reason != "" {
 		reasons = strings.Split(to.Reason, ",")
+		reasons = goslices.DeleteFunc(reasons, func(s string) bool {
+			return s == NoConflictsReason
+		})
 	}
 
 	if to.Message != "" {
@@ -155,6 +158,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	if to.Reason != "" {
 		to.Status = metav1.ConditionTrue
 	} else {
+		to.Reason = NoConflictsReason
 		to.Status = metav1.ConditionFalse
 	}
 

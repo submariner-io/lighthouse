@@ -70,8 +70,8 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.createService()
 				t.cluster1.createServiceExport()
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
-				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, "AwaitingExport"),
-					newServiceExportReadyCondition(metav1.ConditionTrue, ""))
+				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.AwaitingExportReason),
+					newServiceExportReadyCondition(metav1.ConditionTrue, controller.ServiceExportedReason))
 				t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 
 				By(fmt.Sprintf("Ensure cluster %q does not try to update the status for a non-existent ServiceExport",
@@ -113,7 +113,7 @@ func testClusterIPServiceInOneCluster() {
 			By("Deleting the service")
 			t.cluster1.deleteService()
 			t.cluster1.awaitServiceUnavailableStatus()
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.NoServiceImportReason))
 			t.awaitServiceUnexported(&t.cluster1)
 
 			By("Re-creating the service")
@@ -132,7 +132,7 @@ func testClusterIPServiceInOneCluster() {
 			t.cluster1.updateService()
 
 			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "UnsupportedServiceType"))
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, "NoServiceImport"))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.NoServiceImportReason))
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
@@ -507,6 +507,7 @@ func testClusterIPServiceInTwoClusters() {
 	noConflictCondition := &metav1.Condition{
 		Type:   mcsv1a1.ServiceExportConflict,
 		Status: metav1.ConditionFalse,
+		Reason: controller.NoConflictsReason,
 	}
 
 	var t *testDriver
@@ -553,8 +554,9 @@ func testClusterIPServiceInTwoClusters() {
 
 		It("should export the service in both clusters", func() {
 			t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
-			t.cluster1.ensureLastServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue, ""))
-			t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, ""))
+			t.cluster1.ensureLastServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue,
+				controller.ServiceExportedReason))
+			t.cluster1.ensureLastServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
 			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
 

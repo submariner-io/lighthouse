@@ -173,7 +173,7 @@ var _ = Describe("ServiceExportClient", func() {
 
 				actual = meta.FindStatusCondition(getServiceExport().Status.Conditions, cond.Type)
 				Expect(actual.Status).To(Equal(metav1.ConditionFalse))
-				Expect(actual.Reason).To(BeEmpty())
+				Expect(actual.Reason).To(Equal(controller.NoConflictsReason))
 				Expect(actual.Message).To(BeEmpty())
 			}
 
