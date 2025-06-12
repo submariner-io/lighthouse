@@ -18,6 +18,10 @@ limitations under the License.
 
 package constants
 
+import (
+	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+)
+
 const (
 	LabelSourceNamespace     = "lighthouse.submariner.io/sourceNamespace"
 	LabelValueManagedBy      = "lighthouse-agent.submariner.io"
@@ -30,4 +34,4 @@ const (
 	ClustersetIPAllocatedBy  = "lighthouse.submariner.io/clusterset-ip-allocated-by"
 )
 
-const ServiceExportReady = "Ready"
+const ServiceExportReady v1alpha1.ServiceExportConditionType = "Ready"
