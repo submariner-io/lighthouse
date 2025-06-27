@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ip_family: ['', 'dual-stack']
+        ip_family: ['', 'dual-stack', 'ipv6-stack']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
         k8s_version: ['1.32']
