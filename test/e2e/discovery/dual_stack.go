@@ -115,8 +115,8 @@ func RunDualStackHeadlessDiscoveryTest(f *lhframework.Framework) {
 
 	ipList, hostNameList := f.GetPodIPs(framework.ClusterB, nginxHeadlessClusterB, false)
 
-	f.VerifyIPsWithDig(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
-		"", true)
+	f.VerifyIPsWithDigByFamily(framework.ClusterA, nginxHeadlessClusterB, netshootPodList, ipList, checkedDomains,
+		"", true, k8snet.IPv4)
 	verifyHeadlessSRVRecordsWithDig(f.Framework, framework.ClusterA, nginxHeadlessClusterB, netshootPodList, hostNameList, checkedDomains,
 		clusterBName, true, false, true)
 

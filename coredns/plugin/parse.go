@@ -119,7 +119,7 @@ func (r *recordRequest) String() string {
 func parseSegments(segs []string, count int, r *recordRequest, qType uint16) (*recordRequest, error) {
 	// Because of ambiguity we check the labels left: 1: a cluster. 2: hostname and cluster.
 	// Anything else is a query that is too long to answer and can safely be delegated to return an nxdomain.
-	if qType == dns.TypeA {
+	if qType == dns.TypeA || qType == dns.TypeAAAA {
 		switch count {
 		case 0: // cluster only
 			r.cluster = segs[count]
