@@ -77,6 +77,12 @@ jobs:
       fail-fast: false
       matrix:
         using: ['clusterset-ip', '']
+        ip-family: ['', 'ipv6-stack', 'dual-stack']
+        exclude:
+          - using: clusterset-ip
+            ip-family: ipv6-stack
+          - using: clusterset-ip
+            ip-family: dual-stack
     steps:
       - name: Check out the repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -84,14 +90,14 @@ jobs:
       - name: Check out the mcs-api repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: 0f775a3eff97b49d354a1dbf29fbfbbc2baff4b2
+          ref: 4b9911b73f1420acd6d4801c0009a691abfdb291
           repository: kubernetes-sigs/mcs-api
           path: mcs-api
 
       - name: Deploy Submariner
         shell: bash
         run: |
-          make deploy using="${{ matrix.using }}"
+          make deploy using="${{ matrix.using }} ${{ matrix.ip-family }}"
 
       - name: Run conformance tests
         shell: bash
