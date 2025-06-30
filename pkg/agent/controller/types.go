@@ -49,6 +49,7 @@ const (
 	SessionAffinityConfigConflictReason  = "ConflictingSessionAffinityConfig"
 	ClusterSetIPEnablementConflictReason = "ConflictingClusterSetIPEnablement"
 	NoConflictsReason                    = "NoConflicts"
+	UnsupportedIPFamilyReason            = "UnsupportedIPFamily"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object

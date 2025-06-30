@@ -20,6 +20,7 @@ package discovery
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +28,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -34,7 +36,7 @@ import (
 var _ = Describe("Test Service Discovery Across Clusters", Label(ClusterSetIPTestLabel), func() {
 	f := lhframework.NewFramework("discovery")
 
-	When("clusterset IP is enabled for an exported service", func() {
+	When("clusterset IP is enabled for an exported IPv4-only service", func() {
 		It("should resolve the allocated clusterset IP", func() {
 			RunClusterSetIPTest(f)
 		})
@@ -59,6 +61,12 @@ func RunClusterSetIPTest(f *lhframework.Framework) {
 			Annotations: map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)},
 		},
 	})
+
+	if slices.Contains(nginxServiceClusterB.Spec.IPFamilies, corev1.IPv6Protocol) {
+		f.AwaitServiceNotExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+
+		return
+	}
 
 	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
