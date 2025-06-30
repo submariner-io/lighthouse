@@ -19,7 +19,12 @@ limitations under the License.
 package controller_test
 
 import (
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,6 +98,19 @@ var _ = Describe("Dual-stack", func() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
 		})
+
+		Context("with clusterset IP enabled", func() {
+			BeforeEach(func() {
+				t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+			})
+
+			It("should not export it", func() {
+				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
+				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
+					controller.UnsupportedIPFamilyReason))
+				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
+			})
+		})
 	})
 
 	When("an IPv6 ClusterIP service is exported", func() {
@@ -113,6 +131,19 @@ var _ = Describe("Dual-stack", func() {
 
 			It("should not try to retrieve a global IP for the IPv6 EndpointSlice", func() {
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			})
+		})
+
+		Context("with clusterset IP enabled", func() {
+			BeforeEach(func() {
+				t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
+			})
+
+			It("should not export it", func() {
+				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
+				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
+					controller.UnsupportedIPFamilyReason))
+				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
 			})
 		})
 	})
