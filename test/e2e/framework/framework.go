@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -181,31 +182,11 @@ func (f *Framework) CreateServiceExport(cluster framework.ClusterIndex, serviceE
 }
 
 func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
-	framework.By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
+	f.awaitServiceExportedStatusCondition(cluster, name, namespace, metav1.ConditionTrue)
+}
 
-	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
-
-	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
-		return se.Get(context.TODO(), name, metav1.GetOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		se := result.(*mcsv1a1.ServiceExport)
-
-		for i := range se.Status.Conditions {
-			if se.Status.Conditions[i].Type == constants.ServiceExportReady {
-				if se.Status.Conditions[i].Status != metav1.ConditionTrue {
-					out, _ := json.MarshalIndent(se.Status.Conditions[i], "", "  ")
-					return false, fmt.Sprintf("ServiceExport %s condition status is %s", constants.ServiceExportReady, out), nil
-				}
-
-				return true, "", nil
-			}
-		}
-
-		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
-
-		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
-			constants.ServiceExportReady, out), nil
-	})
+func (f *Framework) AwaitServiceNotExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
+	f.awaitServiceExportedStatusCondition(cluster, name, namespace, metav1.ConditionFalse)
 }
 
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {
@@ -369,7 +350,7 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 	var ipList, hostNameList []string
 
 	client := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
-	framework.By(fmt.Sprintf("Retrieving Endpoints for %s on %q", name, framework.TestContext.ClusterIDs[targetCluster]))
+	framework.By(fmt.Sprintf("Retrieving %s Endpoints for %s on %q", addrType, name, framework.TestContext.ClusterIDs[targetCluster]))
 	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
 		return client.List(context.Background(), metav1.ListOptions{
 			LabelSelector: labels.SelectorFromSet(map[string]string{
@@ -446,11 +427,16 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 func (f *Framework) AwaitPodIPs(targetCluster framework.ClusterIndex, svc *v1.Service, count int,
 	isLocal bool,
 ) ([]string, []string) {
-	if framework.TestContext.GlobalnetEnabled {
+	addrType := discovery.AddressTypeIPv4
+	if svc.Spec.IPFamilies[0] == v1.IPv6Protocol {
+		addrType = discovery.AddressTypeIPv6
+	}
+
+	if framework.TestContext.GlobalnetEnabled && addrType == discovery.AddressTypeIPv4 {
 		return f.AwaitPodIngressIPs(targetCluster, svc, count, isLocal)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count, discovery.AddressTypeIPv4)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, count, addrType)
 }
 
 func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.Service, isLocal bool) ([]string, []string) {
@@ -482,11 +468,16 @@ func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex
 }
 
 func (f *Framework) GetEndpointIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {
-	if framework.TestContext.GlobalnetEnabled {
+	addrType := discovery.AddressTypeIPv4
+	if svc.Spec.IPFamilies[0] == v1.IPv6Protocol {
+		addrType = discovery.AddressTypeIPv6
+	}
+
+	if framework.TestContext.GlobalnetEnabled && addrType == discovery.AddressTypeIPv4 {
 		return f.AwaitEndpointIngressIPs(targetCluster, svc)
 	}
 
-	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount, discovery.AddressTypeIPv4)
+	return f.AwaitEndpointIPs(targetCluster, svc.Name, svc.Namespace, anyCount, addrType)
 }
 
 func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uint32) *appsv1.Deployment {
@@ -637,14 +628,16 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (string
 				var found bool
 				var err error
 
-				healthCheckIP, found, err = unstructured.NestedString(endpoint.Object, "spec", "healthCheckIP")
+				healthCheckIPs, found, err := unstructured.NestedStringSlice(endpoint.Object, "spec", "healthCheckIPs")
 				if err != nil {
 					return false, "", err
 				}
 
-				if !found {
-					return false, fmt.Sprintf("HealthcheckIP not found in %#v ", endpoint), nil
+				if !found || len(healthCheckIPs) == 0 {
+					return false, "HealthcheckIPs not found in " + resource.ToJSON(endpoint), nil
 				}
+
+				healthCheckIP = healthCheckIPs[0]
 			}
 		}
 
@@ -762,7 +755,12 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 func (f *Framework) VerifyIPsWithDig(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
 	ipList, domains []string, clusterName string, shouldContain bool,
 ) {
-	f.VerifyIPsWithDigByFamily(cluster, service, targetPod, ipList, domains, clusterName, shouldContain, k8snet.IPv4)
+	family := k8snet.IPv4
+	if service.Spec.IPFamilies[0] == v1.IPv6Protocol {
+		family = k8snet.IPv6
+	}
+
+	f.VerifyIPsWithDigByFamily(cluster, service, targetPod, ipList, domains, clusterName, shouldContain, family)
 }
 
 func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, service *v1.Service, targetPod *v1.PodList,
@@ -845,4 +843,34 @@ func (f *Framework) GetServiceIP(svcCluster framework.ClusterIndex, service *v1.
 	}
 
 	return serviceIP
+}
+
+func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string,
+	status metav1.ConditionStatus,
+) {
+	framework.By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
+
+	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
+
+	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
+		return se.Get(context.TODO(), name, metav1.GetOptions{})
+	}, func(result interface{}) (bool, string, error) {
+		se := result.(*mcsv1a1.ServiceExport)
+
+		cond := meta.FindStatusCondition(se.Status.Conditions, constants.ServiceExportReady)
+		if cond != nil {
+			if cond.Status != status {
+				out, _ := json.MarshalIndent(cond, "", "  ")
+				return false, fmt.Sprintf("ServiceExport %s condition status is %s. Expected %s",
+					constants.ServiceExportReady, out, status), nil
+			}
+
+			return true, "", nil
+		}
+
+		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
+
+		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
+			constants.ServiceExportReady, out), nil
+	})
 }
