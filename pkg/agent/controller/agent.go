@@ -307,6 +307,16 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
 		newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionTrue, ExportValidReason, ""))
 
+	if a.serviceImportController.determineUseClusterSetIP(serviceImport) &&
+		slices.Contains(svc.Spec.IPFamilies, corev1.IPv6Protocol) {
+		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
+			newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionFalse, UnsupportedIPFamilyReason,
+				fmt.Sprintf("Service has IP families %v and clusterset IP is enabled but only IPv4 is supported",
+					svc.Spec.IPFamilies)))
+
+		return nil, false
+	}
+
 	logger.V(log.DEBUG).Infof("Returning ServiceImport %s/%s: %s", svcExport.Namespace, svcExport.Name,
 		serviceImportStringer{serviceImport})
 
