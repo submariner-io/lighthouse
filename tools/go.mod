@@ -1,6 +1,6 @@
 module github.com/submariner-io/lighthouse/tools
 
-go 1.21
+go 1.24.0
 
 require github.com/uw-labs/lichen v0.1.7
 
