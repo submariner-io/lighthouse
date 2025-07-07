@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -88,15 +87,6 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local ServiceImport syncer")
-	}
-
-	controller.serviceImportMigrator = &ServiceImportMigrator{
-		clusterID:                          spec.ClusterID,
-		localNamespace:                     spec.Namespace,
-		brokerClient:                       brokerClient.Resource(serviceImportGVR).Namespace(brokerNamespace),
-		listLocalServiceImports:            controller.localSyncer.ListResources,
-		converter:                          converter{scheme: syncerConfig.Scheme},
-		deletedLocalServiceImportsOnBroker: set.New[string](),
 	}
 
 	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -323,8 +313,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 
 	serviceName := serviceImportSourceName(serviceImport)
 
-	sourceCluster := sourceClusterName(serviceImport)
-	if sourceCluster != c.clusterID {
+	if serviceImport.Labels[mcsv1a1.LabelSourceCluster] != c.clusterID {
 		return nil, false
 	}
 
@@ -519,11 +508,7 @@ func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object
 			localServiceImport.Labels[constants.LabelSourceNamespace])
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return c.serviceImportMigrator.onLocalServiceImportDeleted(ctx, localServiceImport)
+	return err
 }
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
@@ -541,13 +526,11 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 		return serviceImport, false
 	}
 
-	return c.serviceImportMigrator.onRemoteServiceImport(serviceImport)
+	return nil, false
 }
 
 func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Object, op syncer.Operation) bool {
 	ctx := context.TODO()
-
-	retry := c.serviceImportMigrator.onSuccessfulSyncFromBroker(synced, op)
 
 	aggregatedServiceImport := synced.(*mcsv1a1.ServiceImport)
 
@@ -556,7 +539,7 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 			_ = c.clustersetIPPool.Release(aggregatedServiceImport.Spec.IPs[0])
 		}
 
-		return retry
+		return false
 	}
 
 	// Check for conflicts with the local ServiceImport
@@ -569,7 +552,7 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 
 	if len(siList) == 0 {
 		// Service not exported locally.
-		return retry
+		return false
 	}
 
 	localServiceImport := siList[0].(*mcsv1a1.ServiceImport)
@@ -594,7 +577,7 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 
 	c.checkConflicts(ctx, aggregatedServiceImport, localServiceImport, nil)
 
-	return retry
+	return false
 }
 
 func (c *ServiceImportController) determineUseClusterSetIP(localServiceImport *mcsv1a1.ServiceImport) bool {
@@ -700,8 +683,7 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 	for _, obj := range siList {
 		si := obj.(*mcsv1a1.ServiceImport)
 
-		clusterID := sourceClusterName(si)
-		if clusterID != c.clusterID {
+		if si.Labels[mcsv1a1.LabelSourceCluster] != c.clusterID {
 			continue
 		}
 
@@ -738,4 +720,8 @@ func sanitizeClusterID(clusterID string) string {
 	}
 
 	return resource.EnsureValidName(clusterID)
+}
+
+func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
+	return serviceImport.Labels[mcsv1a1.LabelServiceName]
 }

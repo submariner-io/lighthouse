@@ -81,7 +81,8 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 	ipFamilyInfo := svcInfo.getIPFamilyInfo(endpointSlices[0].AddressType)
 
 	if !svcInfo.isHeadless() {
-		return i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], ipFamilyInfo)
+		i.putClusterIPEndpointSlice(key, clusterID, endpointSlices[0], ipFamilyInfo)
+		return false
 	}
 
 	if localEndpointSliceErr != nil {
@@ -99,28 +100,12 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 	return false
 }
 
-func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, ipFamilyInfo *IPFamilyInfo,
-) bool {
-	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
-	if !found {
-		// This is a legacy pre-0.15 EndpointSlice.
-		clusterInfo, found := ipFamilyInfo.clusters[clusterID]
-		if !found {
-			logger.Infof("Cluster %q not found for EndpointSlice %q - requeuing", clusterID, key)
-			return true
-		}
-
-		// For a ClusterIPService we really only care if there are any backing endpoints.
-		clusterInfo.endpointsHealthy = len(endpointSlice.Endpoints) > 0
-
-		return false
-	}
-
+func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSlice *discovery.EndpointSlice, ipFamilyInfo *IPFamilyInfo) {
 	if len(endpointSlice.Endpoints) == 0 {
 		// This shouldn't happen - we expect the service IP endpoint to always be present.
 		logger.Errorf(nil, "Missing service IP endpoint in EndpointSlice %q", key)
 
-		return false
+		return
 	}
 
 	clusterInfo := ipFamilyInfo.ensureClusterInfo(clusterID)
@@ -138,8 +123,6 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 	logger.Infof("Added %s DNSRecord with service IP %q for EndpointSlice %q on cluster %q, endpointsHealthy: %v, ports: %#v",
 		endpointSlice.AddressType, clusterInfo.endpointRecords[0].IP, key, clusterID, clusterInfo.endpointsHealthy,
 		clusterInfo.endpointRecords[0].Ports)
-
-	return false
 }
 
 func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSlices []*discovery.EndpointSlice,
@@ -315,18 +298,6 @@ func isHeadless(endpointSlice *discovery.EndpointSlice) bool {
 }
 
 func shouldRetrieveLocalEndpointSlicesFor(endpointSlice *discovery.EndpointSlice) bool {
-	_, found := endpointSlice.Labels[constants.LabelIsHeadless]
-	if !found {
-		// This is a legacy pre-0.15 EndpointSlice. We don't know if it's headless or if globalnet is enabled.
-		return true
-	}
-
-	globalnetEnabled, found := endpointSlice.Annotations[constants.GlobalnetEnabled]
-	if !found {
-		// This is a legacy 0.15 EndpointSlice. We don't know if globalnet is enabled.
-		return isHeadless(endpointSlice)
-	}
-
 	return endpointSlice.AddressType == discovery.AddressTypeIPv4 &&
-		isHeadless(endpointSlice) && globalnetEnabled == strconv.FormatBool(true)
+		isHeadless(endpointSlice) && endpointSlice.Annotations[constants.GlobalnetEnabled] == strconv.FormatBool(true)
 }

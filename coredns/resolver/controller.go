@@ -19,8 +19,6 @@ limitations under the License.
 package resolver
 
 import (
-	"strings"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -102,7 +100,7 @@ func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bo
 		return false
 	}
 
-	if !isHeadless(endpointSlice) || isLegacyEndpointSlice(endpointSlice) {
+	if !isHeadless(endpointSlice) {
 		return c.resolver.PutEndpointSlices(endpointSlice)
 	}
 
@@ -120,7 +118,7 @@ func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*di
 
 	for i := range list {
 		eps := list[i].(*discovery.EndpointSlice)
-		if eps.AddressType == forEPS.AddressType && !isOnBroker(eps) && !isLegacyEndpointSlice(eps) {
+		if eps.AddressType == forEPS.AddressType && !isOnBroker(eps) {
 			epSlices = append(epSlices, eps)
 		}
 	}
@@ -157,14 +155,9 @@ func (c *controller) onServiceImportDelete(obj runtime.Object, _ int) bool {
 }
 
 func (c *controller) ignoreEndpointSlice(eps *discovery.EndpointSlice) bool {
-	return isOnBroker(eps) || (isLegacyEndpointSlice(eps) && len(c.getAllEndpointSlices(eps)) > 0)
+	return isOnBroker(eps)
 }
 
 func isOnBroker(eps *discovery.EndpointSlice) bool {
 	return eps.Namespace != eps.Labels[constants.LabelSourceNamespace]
-}
-
-func isLegacyEndpointSlice(eps *discovery.EndpointSlice) bool {
-	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
-	return strings.HasSuffix(eps.Name, "-"+eps.Labels[mcsv1a1.LabelSourceCluster])
 }
