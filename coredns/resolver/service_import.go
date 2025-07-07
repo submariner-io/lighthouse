@@ -29,7 +29,7 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 		return
 	}
 
-	key, isLegacy := getServiceImportKey(serviceImport)
+	key := keyFunc(serviceImport.Namespace, serviceImport.Name)
 
 	logger.Infof("Put ServiceImport %q", key)
 
@@ -55,30 +55,8 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 		i.serviceMap[key] = svcInfo
 	}
 
-	if !isLegacy {
-		svcInfo.spec = serviceImport.Spec
-	}
-
+	svcInfo.spec = serviceImport.Spec
 	svcInfo.isExported = true
-
-	if svcInfo.isHeadless() || !isLegacy {
-		return
-	}
-
-	// This is a legacy pre-0.15 remote cluster ServiceImport - initialize the cluster info to maintain backwards compatibility
-	// while roling upgrade is in progress.
-
-	clusterName := serviceImport.Labels["lighthouse.submariner.io/sourceCluster"]
-
-	clusterInfo := svcInfo.ipv4Info.ensureClusterInfo(clusterName)
-	clusterInfo.endpointRecords = []DNSRecord{{
-		IP:          serviceImport.Spec.IPs[0],
-		Ports:       serviceImport.Spec.Ports,
-		ClusterName: clusterName,
-	}}
-
-	svcInfo.ipv4Info.mergePorts()
-	svcInfo.ipv4Info.resetLoadBalancing()
 }
 
 func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
@@ -86,10 +64,7 @@ func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 		return
 	}
 
-	key, isLegacy := getServiceImportKey(serviceImport)
-	if isLegacy {
-		return
-	}
+	key := keyFunc(serviceImport.Namespace, serviceImport.Name)
 
 	logger.Infof("Remove ServiceImport %q", key)
 
@@ -104,15 +79,6 @@ func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 			delete(i.serviceMap, key)
 		}
 	}
-}
-
-func getServiceImportKey(from *mcsv1a1.ServiceImport) (string, bool) {
-	name, ok := from.Annotations["origin-name"]
-	if ok {
-		return keyFunc(from.Annotations["origin-namespace"], name), true
-	}
-
-	return keyFunc(from.Namespace, from.Name), false
 }
 
 func ignoreServiceImport(serviceImport *mcsv1a1.ServiceImport) bool {
