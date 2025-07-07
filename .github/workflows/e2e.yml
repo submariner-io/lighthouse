@@ -47,14 +47,14 @@ jobs:
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.29']
+        k8s_version: ['k8s-latest']
         include:
           # Oldest Kubernetes version thought to work with SubM's Service Discovery.
           # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:
           # https://submariner.io/development/building-testing/ci-maintenance/
           - k8s_version: '1.21'
           # Bottom of supported K8s version range
-          - k8s_version: '1.26'
+          - k8s_version: 'k8s-oldest-supported'
     steps:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
