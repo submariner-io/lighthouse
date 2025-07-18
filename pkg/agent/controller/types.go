@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	"github.com/submariner-io/admiral/pkg/workqueue"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -132,13 +131,10 @@ type ServiceEndpointSliceController struct {
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
 type EndpointSliceController struct {
-	clusterID                     string
-	syncer                        *broker.Syncer
-	aggregatedServiceImportGetter AggregatedServiceImportGetterFn
-	serviceImportAggregator       *ServiceImportAggregator
-	serviceExportClient           *ServiceExportClient
-	serviceSyncer                 syncer.Interface
-	conflictCheckWorkQueue        workqueue.Interface
+	clusterID           string
+	syncer              *broker.Syncer
+	serviceExportClient *ServiceExportClient
+	serviceSyncer       syncer.Interface
 }
 
 type ServiceExportClient struct {

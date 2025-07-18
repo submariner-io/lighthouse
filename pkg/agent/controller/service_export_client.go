@@ -204,7 +204,6 @@ func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1a1.
 	return obj.(*mcsv1a1.ServiceExport)
 }
 
-//nolint:unparam // Ignore `condType` always receives `mcsv1a1.ServiceExportConflict`
 func (c *ServiceExportClient) hasCondition(name, namespace, condType, reason string) bool {
 	se := c.getLocalInstance(name, namespace)
 	if se == nil {

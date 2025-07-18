@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/testing"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -141,19 +139,7 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.createServiceEndpointSlices()
 
 			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "endpointslices", "delete")
-
-			// For migration cleanup, it may attempt to delete a local legacy ServiceImport from the broker so ignore it.
-			Consistently(func() bool {
-				siActions := brokerDynClient.Fake.Actions()
-				for i := range siActions {
-					if siActions[i].GetResource().Resource == "serviceimports" && siActions[i].GetVerb() == "delete" &&
-						!strings.Contains(siActions[i].(testing.DeleteAction).GetName(), t.cluster1.clusterID) {
-						return true
-					}
-				}
-
-				return false
-			}).Should(BeFalse())
+			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "serviceimports", "delete")
 
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})

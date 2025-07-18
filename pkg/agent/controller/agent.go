@@ -44,7 +44,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	validations "k8s.io/apimachinery/pkg/util/validation"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -125,16 +124,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 	agentController.serviceExportClient.localSyncer = agentController.serviceExportSyncer
 
 	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient,
-		agentController.serviceSyncer, func(serviceName string, serviceNamespace string) *mcsv1a1.ServiceImport {
-			obj, found, _ := agentController.serviceImportController.remoteSyncer.GetResource(
-				brokerAggregatedServiceImportName(serviceName, serviceNamespace),
-				agentController.endpointSliceController.syncer.GetBrokerNamespace())
-			if !found {
-				return nil
-			}
-
-			return obj.(*mcsv1a1.ServiceImport)
-		})
+		agentController.serviceSyncer)
 	if err != nil {
 		return nil, err
 	}
@@ -258,6 +248,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 	serviceImport.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(svc.Spec.PublishNotReadyAddresses)
+	serviceImport.Annotations[constants.ServiceExportTimestamp] = strconv.FormatInt(svcExport.CreationTimestamp.UTC().UnixNano(), 10)
 
 	if svcExport.Annotations[constants.UseClustersetIP] != "" {
 		serviceImport.Annotations[constants.UseClustersetIP] = svcExport.Annotations[constants.UseClustersetIP]
@@ -467,27 +458,6 @@ func (c converter) toUnstructured(obj runtime.Object) *unstructured.Unstructured
 func (c converter) toServiceExport(obj runtime.Object) *mcsv1a1.ServiceExport {
 	to := &mcsv1a1.ServiceExport{}
 	utilruntime.Must(c.scheme.Convert(obj, to, nil))
-
-	return to
-}
-
-func (c converter) toEndpointSlice(obj runtime.Object) *discovery.EndpointSlice {
-	to := &discovery.EndpointSlice{}
-	utilruntime.Must(c.scheme.Convert(obj, to, nil))
-
-	return to
-}
-
-func (c converter) toServicePorts(from []discovery.EndpointPort) []mcsv1a1.ServicePort {
-	to := make([]mcsv1a1.ServicePort, len(from))
-	for i := range from {
-		to[i] = mcsv1a1.ServicePort{
-			Name:        ptr.Deref(from[i].Name, ""),
-			Protocol:    ptr.Deref(from[i].Protocol, ""),
-			Port:        ptr.Deref(from[i].Port, 0),
-			AppProtocol: from[i].AppProtocol,
-		}
-	}
 
 	return to
 }

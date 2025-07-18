@@ -125,17 +125,4 @@ var _ = Describe("Service export failures", func() {
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})
-
-	When("listing the broker EndpointSlices initially fails", func() {
-		BeforeEach(func() {
-			t.brokerEndpointSliceReactor.SetFailOnList(errors.New("mock list error"))
-		})
-
-		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
-
-			t.brokerEndpointSliceReactor.SetFailOnList(nil)
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
-		})
-	})
 })
