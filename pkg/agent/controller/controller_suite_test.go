@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -526,13 +527,17 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 			actual.Reason == expected.Reason
 	}
 
-	actual := make([]*metav1.Condition, len(expected))
 	lastIndex := -1
 
 	for i := range len(expected) - 1 {
 		j := lastIndex + 1
 
-		Eventually(func() interface{} {
+		Eventually(func(g Gomega) {
+			var (
+				found *metav1.Condition
+				all   []*metav1.Condition
+			)
+
 			actions := c.localDynClientFake.Actions()
 			for j < len(actions) {
 				a := actions[j]
@@ -542,44 +547,37 @@ func (c *cluster) awaitServiceExportCondition(expected ...*metav1.Condition) {
 					continue
 				}
 
-				actual[i] = meta.FindStatusCondition(toServiceExport(a.(k8stesting.UpdateActionImpl).Object).Status.Conditions,
+				found = meta.FindStatusCondition(toServiceExport(a.(k8stesting.UpdateActionImpl).Object).Status.Conditions,
 					expected[i].Type)
 
-				if conditionsEqual(actual[i], expected[i]) {
-					lastIndex = j
+				if found != nil {
+					all = append(all, found)
+				}
 
-					return actual[i]
+				if conditionsEqual(found, expected[i]) {
+					lastIndex = j
+					break
 				}
 			}
 
-			return nil
-		}).ShouldNot(BeNil(), "ServiceExport condition not received. Expected: "+resource.ToJSON(expected[i]))
+			g.Expect(found).NotTo(BeNil(), "ServiceExport condition not received. Expected: %s\nActual: %s",
+				resource.ToJSON(expected[i]), resource.ToJSON(all))
+			assertEquivalentConditions(g, found, expected[i])
+		}).Should(Succeed())
 	}
 
 	last := len(expected) - 1
 
-	Eventually(func() interface{} {
+	Eventually(func(g Gomega) {
 		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 		se := toServiceExport(obj)
 
 		c := meta.FindStatusCondition(se.Status.Conditions, expected[last].Type)
 
-		if c != nil {
-			Expect(c.Reason).NotTo(BeEmpty(), resource.ToJSON(c))
-		}
-
-		if conditionsEqual(c, expected[last]) {
-			actual[last] = c
-			return c
-		}
-
-		return nil
-	}).ShouldNot(BeNil(), "ServiceExport condition not found. Expected: "+resource.ToJSON(expected[last]))
-
-	for i := range expected {
-		assertEquivalentConditions(actual[i], expected[i])
-	}
+		g.Expect(c).NotTo(BeNil(), "ServiceExport condition not found for type %q", expected[last].Type)
+		assertEquivalentConditions(g, c, expected[last])
+	}).Should(Succeed())
 }
 
 func (c *cluster) ensureLastServiceExportCondition(expected *metav1.Condition) {
@@ -594,7 +592,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected *metav1.Condition) {
 				toServiceExport(actions[i].(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected.Type)
 
 			if actual != nil {
-				assertEquivalentConditions(actual, expected)
+				assertEquivalentConditions(Default, actual, expected)
 				return i
 			}
 		}
@@ -965,15 +963,16 @@ func endpointSliceClientFor(client dynamic.Interface, namespace string) dynamic.
 	return client.Resource(discovery.SchemeGroupVersion.WithResource("endpointslices")).Namespace(namespace)
 }
 
-func assertEquivalentConditions(actual, expected *metav1.Condition) {
+func assertEquivalentConditions(g Gomega, actual, expected *metav1.Condition) {
 	out := resource.ToJSON(actual)
 
-	Expect(actual.Status).To(Equal(expected.Status), "Actual: %s", out)
-	Expect(actual.LastTransitionTime).To(Not(BeNil()), "Actual: %s", out)
-	Expect(actual.Reason).To(Equal(expected.Reason), "Actual: %s", out)
+	g.Expect(actual.Status).To(Equal(expected.Status), "Condition Status differs. Actual: %s", out)
+	g.Expect(actual.LastTransitionTime).To(Not(BeNil()), "Condition LastTransitionTime. Actual: %s", out)
+	Expect(actual.Reason).NotTo(BeEmpty(), "Condition Reason cannot be empty. Actual: %s", out)
+	g.Expect(actual.Reason).To(Equal(expected.Reason), "Condition Reason differs. Actual: %s", out)
 
 	if expected.Message != "" {
-		Expect(actual.Message).To(ContainSubstring(expected.Message), "Actual: %s", out)
+		g.Expect(actual.Message).To(ContainSubstring(expected.Message), "Condition Message differs. Actual: %s", out)
 	}
 }
 
@@ -1003,6 +1002,18 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 	t.awaitAggregatedServiceImport(sType, t.cluster1.service.Name, t.cluster1.service.Namespace, clusters...)
 
 	for _, c := range clusters {
+		Eventually(func(g Gomega) {
+			list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: k8slabels.Set(map[string]string{
+					mcsv1a1.LabelServiceName:       t.cluster1.service.Name,
+					constants.LabelSourceNamespace: t.cluster1.service.Namespace,
+					mcsv1a1.LabelSourceCluster:     c.clusterID,
+				}).String(),
+			})
+			Expect(err).To(Succeed())
+			g.Expect(list.Items).To(HaveLen(1), "Local ServiceImport for %q on the broker", c.clusterID)
+		}).Should(Succeed())
+
 		t.awaitEndpointSlice(c)
 
 		c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))

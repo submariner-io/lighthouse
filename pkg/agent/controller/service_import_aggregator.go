@@ -20,21 +20,15 @@ package controller
 
 import (
 	"context"
-	goslices "slices"
-	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/util"
-	"github.com/submariner-io/lighthouse/pkg/constants"
-	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
@@ -51,56 +45,6 @@ func newServiceImportAggregator(brokerClient dynamic.Interface, brokerNamespace,
 	}
 }
 
-func (a *ServiceImportAggregator) updateOnCreateOrUpdate(ctx context.Context, name, namespace string) error {
-	return a.update(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
-		return a.setServicePorts(ctx, existing)
-	})
-}
-
-func (a *ServiceImportAggregator) setServicePorts(ctx context.Context, si *mcsv1a1.ServiceImport) error {
-	// We don't set the port info for headless services.
-	if si.Spec.Type != mcsv1a1.ClusterSetIP {
-		return nil
-	}
-
-	serviceName := si.Annotations[mcsv1a1.LabelServiceName]
-	serviceNamespace := si.Annotations[constants.LabelSourceNamespace]
-
-	list, err := a.brokerClient.Resource(endpointSliceGVR).Namespace(a.brokerNamespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
-			constants.LabelSourceNamespace: serviceNamespace,
-			mcsv1a1.LabelServiceName:       serviceName,
-		}).String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
-			serviceNamespace, serviceName)
-	}
-
-	portsByCluster := map[string][]mcsv1a1.ServicePort{}
-
-	for i := range list.Items {
-		eps := a.converter.toEndpointSlice(&list.Items[i])
-		portsByCluster[eps.Labels[mcsv1a1.LabelSourceCluster]] = a.converter.toServicePorts(eps.Ports)
-	}
-
-	// Sort the clusters by their ServiceExport timestamps stored in the ServiceImport annotations so conflicting ports are
-	// resolved by taking the oldest as per the MCS spec's conflict resolution policy.
-
-	si.Spec.Ports = make([]mcsv1a1.ServicePort, 0)
-	for _, clusterName := range getClusterNamesOrderedByTimestamp(si.Annotations) {
-		ports := portsByCluster[clusterName]
-		si.Spec.Ports = slices.Union(si.Spec.Ports, ports, func(p mcsv1a1.ServicePort) string {
-			return p.Name
-		})
-	}
-
-	logger.V(log.DEBUG).Infof("Calculated ports for aggregated ServiceImport %q: %s", si.Name, servicePortsToString(si.Spec.Ports))
-
-	return nil
-}
-
 func (a *ServiceImportAggregator) updateOnDelete(ctx context.Context, name, namespace string) error {
 	return a.update(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
 		var removed bool
@@ -114,9 +58,7 @@ func (a *ServiceImportAggregator) updateOnDelete(ctx context.Context, name, name
 		logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
 			a.clusterID, existing.Name, existing.Status.Clusters)
 
-		delete(existing.Annotations, makeTimestampAnnotationKey(a.clusterID))
-
-		return a.setServicePorts(ctx, existing)
+		return nil
 	})
 }
 
@@ -163,47 +105,4 @@ func (a *ServiceImportAggregator) brokerServiceImportClient() dynamic.ResourceIn
 
 func clusterStatusKey(c mcsv1a1.ClusterStatus) string {
 	return c.Cluster
-}
-
-type clusterSortInfo struct {
-	name      string
-	timestamp int64
-}
-
-func getClusterNamesOrderedByTimestamp(from map[string]string) []string {
-	info := make([]clusterSortInfo, 0, len(from))
-
-	for k, v := range from {
-		cluster, found := strings.CutPrefix(k, timestampAnnotationPrefix)
-		if !found {
-			continue
-		}
-
-		t, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			logger.Warningf("Invalid timestamp annotation value %q for cluster %q", v, cluster)
-			continue
-		}
-
-		info = append(info, clusterSortInfo{name: cluster, timestamp: t})
-	}
-
-	goslices.SortFunc(info, func(a, b clusterSortInfo) int {
-		if a.timestamp == b.timestamp {
-			return strings.Compare(a.name, b.name)
-		}
-
-		if a.timestamp < b.timestamp {
-			return -1
-		}
-
-		return 1
-	})
-
-	sortedNames := make([]string, len(info))
-	for i := range info {
-		sortedNames[i] = info[i].name
-	}
-
-	return sortedNames
 }

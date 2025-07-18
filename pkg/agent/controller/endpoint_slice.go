@@ -20,39 +20,29 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/ptr"
-	"k8s.io/utils/set"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
-	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface, aggregatedServiceImportGetter AggregatedServiceImportGetterFn,
+	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
-		clusterID:                     spec.ClusterID,
-		serviceExportClient:           serviceExportClient,
-		serviceSyncer:                 serviceSyncer,
-		conflictCheckWorkQueue:        workqueue.New("ConflictChecker"),
-		aggregatedServiceImportGetter: aggregatedServiceImportGetter,
+		clusterID:           spec.ClusterID,
+		serviceExportClient: serviceExportClient,
+		serviceSyncer:       serviceSyncer,
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -68,10 +58,6 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 			OnSuccessfulSyncToBroker: c.onLocalEndpointSliceSynced,
 			BrokerResourceType:       &discovery.EndpointSlice{},
 			TransformBrokerToLocal:   c.onRemoteEndpointSlice,
-			OnSuccessfulSyncFromBroker: func(obj runtime.Object, op syncer.Operation) bool {
-				c.enqueueForConflictCheck(context.TODO(), obj.(*discovery.EndpointSlice), op)
-				return false
-			},
 		},
 	}
 
@@ -82,9 +68,6 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 		return nil, errors.Wrap(err, "error creating EndpointSlice syncer")
 	}
 
-	c.serviceImportAggregator = newServiceImportAggregator(c.syncer.GetBrokerClient(), c.syncer.GetBrokerNamespace(),
-		spec.ClusterID, syncerConfig.Scheme)
-
 	return c, nil
 }
 
@@ -93,11 +76,8 @@ func (c *EndpointSliceController) start(stopCh <-chan struct{}) error {
 		return errors.Wrap(err, "error starting EndpointSlice syncer")
 	}
 
-	c.conflictCheckWorkQueue.Run(c.checkForConflicts)
-
 	go func() {
 		<-stopCh
-		c.conflictCheckWorkQueue.ShutDown()
 	}()
 
 	return nil
@@ -177,157 +157,11 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 		return false
 	}
 
-	var err error
-
-	if op == syncer.Delete {
-		if c.hasNoRemainingEndpointSlices(endpointSlice) {
-			err = c.serviceImportAggregator.updateOnDelete(ctx, serviceName, serviceNamespace)
-		}
-	} else {
-		err = c.serviceImportAggregator.updateOnCreateOrUpdate(ctx, serviceName, serviceNamespace)
-		if err != nil {
-			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionFalse, ExportFailedReason,
-					fmt.Sprintf("Unable to export: %v", err)))
-		} else {
-			c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-				newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, ServiceExportedReason,
-					"Service was successfully exported to the broker"))
-
-			c.enqueueForConflictCheck(ctx, endpointSlice, op)
-		}
+	if op != syncer.Delete {
+		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
+			newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, ServiceExportedReason,
+				"Service was successfully exported to the broker"))
 	}
 
-	if err != nil {
-		logger.Errorf(err, "Error processing %sd EndpointSlice for service \"%s/%s\"", op, serviceNamespace, serviceName)
-	}
-
-	return err != nil
-}
-
-func (c *EndpointSliceController) hasNoRemainingEndpointSlices(endpointSlice *discovery.EndpointSlice) bool {
-	if endpointSlice.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
-		serviceNS := endpointSlice.Labels[constants.LabelSourceNamespace]
-
-		list := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
-			constants.LabelSourceNamespace: serviceNS,
-			mcsv1a1.LabelServiceName:       endpointSlice.Labels[mcsv1a1.LabelServiceName],
-			mcsv1a1.LabelSourceCluster:     endpointSlice.Labels[mcsv1a1.LabelSourceCluster],
-		}))
-
-		count := 0
-
-		for _, eps := range list {
-			// Make sure we don't count ones in the broker namespace is co-located on the same cluster.
-			if eps.(*discovery.EndpointSlice).Namespace == serviceNS {
-				count++
-			}
-		}
-
-		return count == 0
-	}
-
-	return true
-}
-
-func (c *EndpointSliceController) checkForConflicts(_, name, namespace string) (bool, error) {
-	ctx := context.TODO()
-
-	localServiceExport := c.serviceExportClient.getLocalInstance(name, namespace)
-	if localServiceExport == nil {
-		return false, nil
-	}
-
-	epsList := c.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, k8slabels.SelectorFromSet(map[string]string{
-		constants.LabelSourceNamespace: namespace,
-		mcsv1a1.LabelServiceName:       name,
-	}))
-
-	servicePortKey := func(p mcsv1a1.ServicePort) string {
-		return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
-	}
-
-	var prevServicePorts []mcsv1a1.ServicePort
-	var intersectedServicePorts []mcsv1a1.ServicePort
-	clusterNames := set.New[string]()
-	conflict := false
-
-	for _, o := range epsList {
-		eps := o.(*discovery.EndpointSlice)
-
-		if clusterNames.Has(eps.Labels[mcsv1a1.LabelSourceCluster]) {
-			continue
-		}
-
-		clusterNames.Insert(eps.Labels[mcsv1a1.LabelSourceCluster])
-
-		servicePorts := c.serviceExportClient.toServicePorts(eps.Ports)
-		if prevServicePorts == nil {
-			prevServicePorts = servicePorts
-			intersectedServicePorts = servicePorts
-		} else if !slices.Equivalent(prevServicePorts, servicePorts, servicePortKey) {
-			conflict = true
-		}
-
-		intersectedServicePorts = slices.Intersect(intersectedServicePorts, servicePorts, servicePortKey)
-	}
-
-	if conflict {
-		aggregatedSI := c.aggregatedServiceImportGetter(name, namespace)
-		if aggregatedSI == nil {
-			return true, nil
-		}
-
-		exposedOp := "intersection"
-		exposedPorts := intersectedServicePorts
-
-		if len(aggregatedSI.Spec.IPs) > 0 {
-			exposedPorts = aggregatedSI.Spec.Ports
-			exposedOp = "union"
-		}
-
-		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, metav1.ConditionTrue, PortConflictReason,
-			fmt.Sprintf("The service ports conflict between the constituent clusters %s. "+
-				"The service will expose the %s of all the ports: %s",
-				fmt.Sprintf("[%s]", strings.Join(clusterNames.UnsortedList(), ", ")), exposedOp,
-				servicePortsToString(exposedPorts))))
-	} else if c.serviceExportClient.hasCondition(name, namespace, mcsv1a1.ServiceExportConflict, PortConflictReason) {
-		c.serviceExportClient.UpdateStatusConditions(ctx, name, namespace, newServiceExportCondition(
-			mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, PortConflictReason, ""))
-	}
-
-	return false, nil
-}
-
-func (c *EndpointSliceController) enqueueForConflictCheck(ctx context.Context, eps *discovery.EndpointSlice, op syncer.Operation) {
-	if eps.Labels[constants.LabelIsHeadless] != "false" {
-		return
-	}
-
-	// Since the conflict checking works off of the local cache for efficiency, wait a little bit here for the local cache to be updated
-	// with the latest state of the EndpointSlice.
-	_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 100*time.Millisecond, true,
-		func(_ context.Context) (bool, error) {
-			_, found, _ := c.syncer.GetLocalResource(eps.Name, eps.Namespace, eps)
-			return (op == syncer.Delete && !found) || (op != syncer.Delete && found), nil
-		},
-	)
-
-	c.conflictCheckWorkQueue.Enqueue(&discovery.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      eps.Labels[mcsv1a1.LabelServiceName],
-			Namespace: eps.Labels[constants.LabelSourceNamespace],
-		},
-	})
-}
-
-func servicePortsToString(p []mcsv1a1.ServicePort) string {
-	s := make([]string, len(p))
-	for i := range p {
-		s[i] = fmt.Sprintf("[name: %s, protocol: %s, port: %v, appProtocol: %q]", p[i].Name, p[i].Protocol, p[i].Port,
-			ptr.Deref(p[i].AppProtocol, ""))
-	}
-
-	return strings.Join(s, ", ")
+	return false
 }

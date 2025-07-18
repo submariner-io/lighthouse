@@ -84,7 +84,7 @@ jobs:
       - name: Check out the mcs-api repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: efcb2f8996f0a58f21f8b0c855bfdd3cf04d214b
+          ref: 20de0ebd811cde518944ff211372d6bd8b6b8152
           repository: kubernetes-sigs/mcs-api
           path: mcs-api
 

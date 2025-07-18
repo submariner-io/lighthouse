@@ -40,6 +40,7 @@ var _ = Describe("Cleanup", func() {
 	var (
 		t                                          *testDriver
 		localServiceImport1                        *mcsv1a1.ServiceImport
+		localServiceImport1OnBroker                *mcsv1a1.ServiceImport
 		localAggregatedServiceImport1              *mcsv1a1.ServiceImport
 		aggregatedServiceImportOnRemoteBroker1     *mcsv1a1.ServiceImport
 		localServiceImport2                        *mcsv1a1.ServiceImport
@@ -76,6 +77,15 @@ var _ = Describe("Cleanup", func() {
 		}
 
 		test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1)
+
+		localServiceImport1OnBroker = &mcsv1a1.ServiceImport{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "localServiceImport1OnBroker",
+				Labels: localServiceImport1.Labels,
+			},
+		}
+
+		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker)
 
 		localAggregatedServiceImport1 = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -233,6 +243,7 @@ var _ = Describe("Cleanup", func() {
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1.Name)
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1.Name)
 		test.AwaitNoResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker1.Name)
+		test.AwaitNoResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker.Name)
 
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2.Name)
 		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport2.Name)
