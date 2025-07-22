@@ -31,10 +31,6 @@ ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-RUN dnf -y update && \
-    dnf -y install --nodocs shadow-utils && \
-    dnf clean all
-
 RUN adduser -r -l -u 1001010000 lighthouse
 
 WORKDIR /var/submariner
