@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,12 +68,38 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		globalIngressIPCache:     globalIngressIPCache,
 		localClient:              localClient.Resource(endpointSliceGVR).Namespace(serviceNamespace),
 		ingressIPClient:          localClient.Resource(*globalIngressIPGVR),
-		federator: federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+		awaitStoppedTimeout:      AwaitStoppedTimeout,
+	}
+
+	var federator federate.Federator
+	if controller.isHeadless() {
+		federator = federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
 			Client:          localClient,
 			RestMapper:      restMapper,
 			TargetNamespace: serviceNamespace,
-		}),
-		awaitStoppedTimeout: AwaitStoppedTimeout,
+			IdentifyingLabels: []string{
+				constants.LabelSourceName,
+				constants.LabelSourceNamespace,
+				mcsv1a1.LabelSourceCluster,
+			},
+		})
+	} else {
+		f := federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+			Client:          localClient,
+			RestMapper:      restMapper,
+			TargetNamespace: serviceNamespace,
+			IdentifyingLabels: []string{
+				mcsv1a1.LabelServiceName,
+				constants.LabelSourceNamespace,
+				mcsv1a1.LabelSourceCluster,
+			},
+		})
+		federator = &federate.FederatorFuncs{
+			DistributeFunc: f.Distribute,
+			// For a non-headless service, we never delete the single exported EPS - we update its endpoint condition based on
+			// the backend service EPS's as they are created/updated/deleted.
+			DeleteFunc: f.Distribute,
+		}
 	}
 
 	var err error
@@ -87,7 +112,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 			discovery.LabelServiceName: serviceName,
 		}).String(),
 		RestMapper:   restMapper,
-		Federator:    controller,
+		Federator:    federator,
 		ResourceType: &discovery.EndpointSlice{},
 		Transform:    controller.onServiceEndpointSlice,
 		Scheme:       scheme,
@@ -359,56 +384,6 @@ func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(name strin
 
 func (c *ServiceEndpointSliceController) isHeadless() bool {
 	return c.serviceImportSpec.Type == mcsv1a1.Headless
-}
-
-func (c *ServiceEndpointSliceController) Distribute(ctx context.Context, obj runtime.Object) error {
-	toDistribute := resource.MustToUnstructured(obj)
-	labels := toDistribute.GetLabels()
-
-	identifyingLabels := map[string]string{}
-	if c.isHeadless() {
-		identifyingLabels[constants.LabelSourceName] = labels[constants.LabelSourceName]
-	} else {
-		identifyingLabels[mcsv1a1.LabelServiceName] = labels[mcsv1a1.LabelServiceName]
-		identifyingLabels[constants.LabelSourceNamespace] = labels[constants.LabelSourceNamespace]
-		identifyingLabels[mcsv1a1.LabelSourceCluster] = labels[mcsv1a1.LabelSourceCluster]
-	}
-
-	_, _, err := util.CreateOrUpdateWithOptions[*unstructured.Unstructured](ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
-		Client: resource.ForDynamic(c.localClient),
-		Obj:    toDistribute,
-		MutateOnUpdate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			return util.CopyImmutableMetadata(obj, toDistribute), nil
-		},
-		IdentifyingLabels: identifyingLabels,
-	})
-
-	return err
-}
-
-func (c *ServiceEndpointSliceController) Delete(ctx context.Context, obj runtime.Object) error {
-	if c.isHeadless() {
-		list, err := c.localClient.List(ctx, metav1.ListOptions{
-			LabelSelector: k8slabels.Set(map[string]string{
-				constants.LabelSourceName: resource.MustToMeta(obj).GetLabels()[constants.LabelSourceName],
-			}).String(),
-		})
-		if err != nil {
-			return errors.Wrap(err, "error listing EndpointSlice resources for delete")
-		}
-
-		if len(list.Items) == 0 {
-			logger.V(log.DEBUG).Infof("Existing EndpointSlice not found for service EPS %q",
-				resource.MustToMeta(obj).GetLabels()[constants.LabelSourceName])
-			return nil
-		}
-
-		return c.localClient.Delete(ctx, list.Items[0].GetName(), metav1.DeleteOptions{}) //nolint:wrapcheck // No need to wrap here
-	}
-
-	// For a non-headless service, we never delete the single exported EPS - we update its endpoint condition based on
-	// the backend service EPS's as they are created/updated/deleted.
-	return c.Distribute(ctx, obj)
 }
 
 type endpointSliceStringer struct {

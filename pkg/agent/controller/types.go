@@ -119,7 +119,6 @@ type ServiceEndpointSliceController struct {
 	ingressIPClient          dynamic.NamespaceableResourceInterface
 	globalIngressIPCache     *globalIngressIPCache
 	epsSyncer                syncer.Interface
-	federator                federate.Federator
 	awaitStoppedTimeout      time.Duration
 }
 
