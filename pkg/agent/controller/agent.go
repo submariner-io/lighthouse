@@ -73,8 +73,11 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 		globalnetEnabled: spec.GlobalnetEnabled,
 	}
 
-	agentController.localServiceImportFederator = federate.NewCreateOrUpdateFederator(syncerConf.LocalClient, syncerConf.RestMapper,
-		spec.Namespace, "")
+	agentController.localServiceImportFederator = federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+		Client:          syncerConf.LocalClient,
+		RestMapper:      syncerConf.RestMapper,
+		TargetNamespace: spec.Namespace,
+	})
 
 	var err error
 

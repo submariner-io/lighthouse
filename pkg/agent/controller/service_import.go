@@ -86,11 +86,15 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 	}
 
 	controller.remoteSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:              "Remote ServiceImport",
-		SourceClient:      brokerClient,
-		SourceNamespace:   brokerNamespace,
-		RestMapper:        syncerConfig.RestMapper,
-		Federator:         federate.NewCreateOrUpdateFederator(syncerConfig.LocalClient, syncerConfig.RestMapper, corev1.NamespaceAll, ""),
+		Name:            "Remote ServiceImport",
+		SourceClient:    brokerClient,
+		SourceNamespace: brokerNamespace,
+		RestMapper:      syncerConfig.RestMapper,
+		Federator: federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+			Client:          syncerConfig.LocalClient,
+			RestMapper:      syncerConfig.RestMapper,
+			TargetNamespace: corev1.NamespaceAll,
+		}),
 		ResourceType:      &mcsv1a1.ServiceImport{},
 		Transform:         controller.onRemoteServiceImport,
 		OnSuccessfulSync:  controller.onSuccessfulSyncFromBroker,

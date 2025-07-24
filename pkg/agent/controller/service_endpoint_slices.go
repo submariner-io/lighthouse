@@ -69,8 +69,12 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		globalIngressIPCache:     globalIngressIPCache,
 		localClient:              localClient.Resource(endpointSliceGVR).Namespace(serviceNamespace),
 		ingressIPClient:          localClient.Resource(*globalIngressIPGVR),
-		federator:                federate.NewCreateOrUpdateFederator(localClient, restMapper, serviceNamespace, ""),
-		awaitStoppedTimeout:      AwaitStoppedTimeout,
+		federator: federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+			Client:          localClient,
+			RestMapper:      restMapper,
+			TargetNamespace: serviceNamespace,
+		}),
+		awaitStoppedTimeout: AwaitStoppedTimeout,
 	}
 
 	var err error
