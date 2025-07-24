@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
-	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -53,11 +52,12 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
 		localClient:                syncerConfig.LocalClient,
+		brokerClient:               brokerClient,
+		brokerNamespace:            brokerNamespace,
 		restMapper:                 syncerConfig.RestMapper,
 		clusterID:                  spec.ClusterID,
 		localNamespace:             spec.Namespace,
 		converter:                  converter{scheme: syncerConfig.Scheme},
-		serviceImportAggregator:    newServiceImportAggregator(brokerClient, brokerNamespace, spec.ClusterID, syncerConfig.Scheme),
 		serviceExportClient:        serviceExportClient,
 		localLHEndpointSliceLister: localLHEndpointSliceLister,
 		clustersetIPPool:           agentConfig.IPPool,
@@ -193,38 +193,6 @@ func (c *ServiceImportController) reserveAggregatedServiceImportIPs() error {
 	return nil
 }
 
-func (c *ServiceImportController) reconcileRemoteAggregatedServiceImports() {
-	c.localSyncer.Reconcile(func() []runtime.Object {
-		siList := c.remoteSyncer.ListResources()
-		retList := make([]runtime.Object, 0, len(siList))
-
-		for i := range siList {
-			si := c.converter.toServiceImport(siList[i])
-
-			serviceName, ok := si.Annotations[mcsv1a1.LabelServiceName]
-			if !ok {
-				// This is not an aggregated ServiceImport.
-				continue
-			}
-
-			if slices.IndexOf(si.Status.Clusters, c.clusterID, clusterStatusKey) < 0 {
-				continue
-			}
-
-			si.Name = serviceName + "-" + si.Annotations[constants.LabelSourceNamespace] + "-" + c.clusterID
-			si.Namespace = c.localNamespace
-			si.Labels = map[string]string{
-				mcsv1a1.LabelServiceName:       serviceName,
-				constants.LabelSourceNamespace: si.Annotations[constants.LabelSourceNamespace],
-			}
-
-			retList = append(retList, si)
-		}
-
-		return retList
-	})
-}
-
 func (c *ServiceImportController) reconcileLocalServiceImportsOnBroker() {
 	c.localSyncer.Reconcile(func() []runtime.Object {
 		siList := c.remoteSyncer.ListResources()
@@ -241,39 +209,6 @@ func (c *ServiceImportController) reconcileLocalServiceImportsOnBroker() {
 
 			si.Namespace = c.localNamespace
 			si.Name = si.Labels[mcsv1a1.LabelServiceName] + "-" + si.Labels[constants.LabelSourceNamespace] + "-" + c.clusterID
-
-			retList = append(retList, si)
-		}
-
-		return retList
-	})
-}
-
-func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
-	c.remoteSyncer.Reconcile(func() []runtime.Object {
-		siList, err := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			logger.Error(err, "Error listing ServiceImports")
-			return nil
-		}
-
-		retList := make([]runtime.Object, 0, len(siList.Items))
-
-		for i := range siList.Items {
-			si := c.converter.toServiceImport(&siList.Items[i])
-
-			if serviceImportSourceName(si) != "" || si.Annotations[mcsv1a1.LabelServiceName] != "" {
-				// This is not a local aggregated ServiceImport.
-				continue
-			}
-
-			si.Annotations = map[string]string{
-				mcsv1a1.LabelServiceName:       si.Name,
-				constants.LabelSourceNamespace: si.Namespace,
-			}
-
-			si.Name = fmt.Sprintf("%s-%s", si.Name, si.Namespace)
-			si.Namespace = c.serviceImportAggregator.brokerNamespace
 
 			retList = append(retList, si)
 		}
@@ -361,107 +296,9 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 
 	logger.V(log.DEBUG).Infof("Distribute for local ServiceImport %q", key)
 
-	serviceName := serviceImportSourceName(localServiceImport)
-	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
-
-	aggregate := &mcsv1a1.ServiceImport{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: brokerAggregatedServiceImportName(serviceName, serviceNamespace),
-			Annotations: map[string]string{
-				mcsv1a1.LabelServiceName:       serviceName,
-				constants.LabelSourceNamespace: serviceNamespace,
-			},
-		},
-		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  localServiceImport.Spec.Type,
-			Ports: []mcsv1a1.ServicePort{},
-		},
-		Status: mcsv1a1.ServiceImportStatus{
-			Clusters: []mcsv1a1.ClusterStatus{
-				{
-					Cluster: c.clusterID,
-				},
-			},
-		},
-	}
-
-	typeConflict := false
-	clusterSetIP := ""
-
-	useClusterSetIP := c.determineUseClusterSetIP(localServiceImport)
-
-	// Create the aggregated ServiceImport on the broker or update the existing instance with our local service info.
-	result, newAggregate, err := util.CreateOrUpdateWithOptions(ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
-		Client: resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
-		Obj:    c.converter.toUnstructured(aggregate),
-		MutateOnUpdate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			existing := c.converter.toServiceImport(obj)
-
-			if localServiceImport.Spec.Type != existing.Spec.Type {
-				typeConflict = true
-				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-					newServiceExportCondition(constants.ServiceExportReady,
-						metav1.ConditionFalse, ExportFailedReason, "Unable to export due to an irresolvable conflict"))
-			} else {
-				if existing.Annotations == nil {
-					existing.Annotations = map[string]string{}
-				}
-
-				if _, found := existing.Annotations[constants.UseClustersetIP]; !found {
-					// This will happen on migration from pre-clusterset IP version
-					existing.Annotations[constants.UseClustersetIP] = strconv.FormatBool(false)
-				}
-
-				var added bool
-
-				existing.Status.Clusters, added = slices.AppendIfNotPresent(existing.Status.Clusters,
-					mcsv1a1.ClusterStatus{Cluster: c.clusterID}, clusterStatusKey)
-
-				if added {
-					logger.V(log.DEBUG).Infof("Added cluster name %q to aggregated ServiceImport %q. New status: %#v",
-						c.clusterID, existing.Name, existing.Status.Clusters)
-				}
-			}
-
-			return c.converter.toUnstructured(existing), nil
-		},
-		MutateOnCreate: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			si := c.converter.toServiceImport(obj)
-
-			if si.Spec.Type != mcsv1a1.ClusterSetIP {
-				return obj, nil
-			}
-
-			var err error
-
-			if useClusterSetIP {
-				clusterSetIP, err = c.allocateClusterSetIPIfNeeded(clusterSetIP)
-
-				si.Spec.IPs = []string{clusterSetIP}
-				si.Annotations[constants.ClustersetIPAllocatedBy] = c.clusterID
-			}
-
-			si.Annotations[constants.UseClustersetIP] = strconv.FormatBool(useClusterSetIP)
-
-			return c.converter.toUnstructured(si), err
-		},
-	})
-	if err == nil && !typeConflict {
+	exportable, err := c.createOrUpdateAggregate(ctx, localServiceImport)
+	if err == nil && exportable {
 		err = c.startEndpointsController(ctx, localServiceImport)
-	}
-
-	if err != nil {
-		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-			newServiceExportCondition(constants.ServiceExportReady,
-				metav1.ConditionFalse, ExportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
-
-		if clusterSetIP != "" {
-			_ = c.clustersetIPPool.Release(clusterSetIP)
-		}
-	}
-
-	if result == util.OperationResultCreated {
-		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(newAggregate))
 	}
 
 	if err == nil {
@@ -469,10 +306,6 @@ func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Ob
 	}
 
 	return err
-}
-
-func brokerAggregatedServiceImportName(serviceName, serviceNamespace string) string {
-	return fmt.Sprintf("%s-%s", serviceName, serviceNamespace)
 }
 
 func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object) error {
@@ -486,13 +319,13 @@ func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object
 		return err
 	}
 
-	err = c.serviceImportAggregator.updateOnDelete(ctx, serviceImportSourceName(localServiceImport),
+	err = c.updateAggregateOnDelete(ctx, serviceImportSourceName(localServiceImport),
 		localServiceImport.Labels[constants.LabelSourceNamespace])
 	if err != nil {
 		return err
 	}
 
-	list, err := c.serviceImportAggregator.brokerServiceImportClient().List(ctx, metav1.ListOptions{
+	list, err := c.brokerServiceImportClient().List(ctx, metav1.ListOptions{
 		LabelSelector: k8slabels.Set(map[string]string{
 			mcsv1a1.LabelServiceName:       localServiceImport.Labels[mcsv1a1.LabelServiceName],
 			constants.LabelSourceNamespace: localServiceImport.Labels[constants.LabelSourceNamespace],
@@ -507,7 +340,7 @@ func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object
 		return nil
 	}
 
-	return errors.Wrapf(c.serviceImportAggregator.brokerServiceImportClient().Delete(ctx, list.Items[0].GetName(), metav1.DeleteOptions{}),
+	return errors.Wrapf(c.brokerServiceImportClient().Delete(ctx, list.Items[0].GetName(), metav1.DeleteOptions{}),
 		"error deleting ServiceImport %q on the broker", list.Items[0].GetName())
 }
 
@@ -524,7 +357,7 @@ func (c *ServiceImportController) createLocalServiceImportOnBroker(ctx context.C
 	localServiceImport.Status = mcsv1a1.ServiceImportStatus{}
 
 	result, si, err := util.CreateOrUpdateWithOptions(ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
-		Client: resource.ForDynamic(c.serviceImportAggregator.brokerServiceImportClient()),
+		Client: resource.ForDynamic(c.brokerServiceImportClient()),
 		Obj:    c.converter.toUnstructured(localServiceImport),
 		IdentifyingLabels: map[string]string{
 			mcsv1a1.LabelServiceName:       localServiceImport.Labels[mcsv1a1.LabelServiceName],
@@ -567,7 +400,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 		return nil, false
 	}
 
-	aggregatedObj, err := c.serviceImportAggregator.brokerServiceImportClient().Get(ctx,
+	aggregatedObj, err := c.brokerServiceImportClient().Get(ctx,
 		brokerAggregatedServiceImportName(serviceName, serviceNamespace), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, false
@@ -592,7 +425,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 
 	isPrecedentCluster := precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster] == c.clusterID
 	if isPrecedentCluster {
-		err = c.serviceImportAggregator.update(ctx, serviceName, serviceNamespace,
+		err = c.updateAggregate(ctx, serviceName, serviceNamespace,
 			func(aggregated *mcsv1a1.ServiceImport) error {
 				aggregated.Spec.SessionAffinity = precedentServiceImport.Spec.SessionAffinity
 				aggregated.Spec.SessionAffinityConfig = precedentServiceImport.Spec.SessionAffinityConfig

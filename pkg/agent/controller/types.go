@@ -84,20 +84,14 @@ type AgentSpecification struct {
 	Debug               bool
 }
 
-type ServiceImportAggregator struct {
-	clusterID       string
-	converter       converter
-	brokerClient    dynamic.Interface
-	brokerNamespace string
-}
-
 // The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports
 // from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
 // aggregated ServiceImports from the broker to the local service namespace. It also creates a ServiceEndpointSliceController.
 type ServiceImportController struct {
 	localClient                dynamic.Interface
+	brokerClient               dynamic.Interface
+	brokerNamespace            string
 	restMapper                 meta.RESTMapper
-	serviceImportAggregator    *ServiceImportAggregator
 	serviceExportClient        *ServiceExportClient
 	localSyncer                syncer.Interface
 	remoteSyncer               syncer.Interface

@@ -56,7 +56,7 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	list, err := listResources(ctx, siClient, metav1.NamespaceAll,
 		&metav1.ListOptions{
 			FieldSelector: fields.OneTermNotEqualSelector("metadata.namespace",
-				a.serviceImportController.serviceImportAggregator.brokerNamespace).String(),
+				a.serviceImportController.brokerNamespace).String(),
 		})
 	if err != nil {
 		return errors.Wrap(err, "error listing local ServiceImports")
@@ -83,7 +83,7 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	err = deleteResources(ctx, a.endpointSliceController.syncer.GetLocalClient().Resource(endpointSliceGVR), metav1.NamespaceAll,
 		&metav1.ListOptions{
 			FieldSelector: fields.OneTermNotEqualSelector("metadata.namespace",
-				a.serviceImportController.serviceImportAggregator.brokerNamespace).String(),
+				a.serviceImportController.brokerNamespace).String(),
 			LabelSelector: labels.Set(map[string]string{discovery.LabelManagedBy: constants.LabelValueManagedBy}).String(),
 		})
 	if err != nil {
