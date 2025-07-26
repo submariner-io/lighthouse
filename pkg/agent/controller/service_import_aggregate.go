@@ -39,7 +39,12 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, localServiceImport *mcsv1a1.ServiceImport) (bool, error) {
+func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, obj runtime.Object) error {
+	localServiceImport := c.converter.toServiceImport(obj)
+	key := localEndpointsControllerKey(localServiceImport)
+
+	logger.V(log.DEBUG).Infof("Create/update aggregate for local ServiceImport %q", key)
+
 	serviceName := serviceImportSourceName(localServiceImport)
 	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
 
@@ -125,6 +130,10 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, l
 			return c.converter.toUnstructured(si), err
 		},
 	})
+	if err == nil && !typeConflict {
+		err = c.startEndpointsController(ctx, localServiceImport)
+	}
+
 	if err != nil {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
 			newServiceExportCondition(constants.ServiceExportReady,
@@ -139,24 +148,35 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, l
 		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(newAggregate))
 	}
 
-	return !typeConflict, err //nolint:wrapcheck // No need to wrap
+	return err
 }
 
-func (c *ServiceImportController) updateAggregateOnDelete(ctx context.Context, name, namespace string) error {
-	return c.updateAggregate(ctx, name, namespace, func(existing *mcsv1a1.ServiceImport) error {
-		var removed bool
+func (c *ServiceImportController) updateAggregateOnDelete(ctx context.Context, obj runtime.Object) error {
+	localServiceImport := c.converter.toServiceImport(obj)
+	key := localEndpointsControllerKey(localServiceImport)
 
-		existing.Status.Clusters, removed = slices.Remove(existing.Status.Clusters, mcsv1a1.ClusterStatus{Cluster: c.clusterID},
-			clusterStatusKey)
-		if !removed {
+	logger.V(log.DEBUG).Infof("Update aggregate on delete of local ServiceImport %q", key)
+
+	err := c.stopEndpointsController(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	return c.updateAggregate(ctx, serviceImportSourceName(localServiceImport),
+		localServiceImport.Labels[constants.LabelSourceNamespace], func(existing *mcsv1a1.ServiceImport) error {
+			var removed bool
+
+			existing.Status.Clusters, removed = slices.Remove(existing.Status.Clusters, mcsv1a1.ClusterStatus{Cluster: c.clusterID},
+				clusterStatusKey)
+			if !removed {
+				return nil
+			}
+
+			logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
+				c.clusterID, existing.Name, existing.Status.Clusters)
+
 			return nil
-		}
-
-		logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
-			c.clusterID, existing.Name, existing.Status.Clusters)
-
-		return nil
-	})
+		})
 }
 
 func (c *ServiceImportController) updateAggregate(ctx context.Context, name, namespace string, mutate func(*mcsv1a1.ServiceImport) error,

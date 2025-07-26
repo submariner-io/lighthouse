@@ -31,14 +31,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -64,6 +61,23 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		clustersetIPEnabled:        spec.ClustersetIPEnabled,
 	}
 
+	localToBrokerFederator := federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+		Client:          brokerClient,
+		RestMapper:      syncerConfig.RestMapper,
+		TargetNamespace: brokerNamespace,
+		IdentifyingLabels: []string{
+			mcsv1a1.LabelServiceName,
+			constants.LabelSourceNamespace,
+			mcsv1a1.LabelSourceCluster,
+		},
+	})
+	localToBrokerFederator.LogEvents("local -> broker")
+
+	controller.localFederator = federate.NewCompositeFederator(&federate.FederatorFuncs{
+		DistributeFunc: controller.createOrUpdateAggregate,
+		DeleteFunc:     controller.updateAggregateOnDelete,
+	}, localToBrokerFederator)
+
 	var err error
 
 	controller.localSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -72,7 +86,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		SourceNamespace: controller.localNamespace,
 		Direction:       syncer.LocalToRemote,
 		RestMapper:      syncerConfig.RestMapper,
-		Federator:       controller,
+		Federator:       controller.localFederator,
 		ResourceType:    &mcsv1a1.ServiceImport{},
 		Transform:       controller.onLocalServiceImport,
 		Scheme:          syncerConfig.Scheme,
@@ -222,7 +236,7 @@ func (c *ServiceImportController) reconcileLocalServiceImportsOnBroker() {
 }
 
 func (c *ServiceImportController) startEndpointsController(ctx context.Context, serviceImport *mcsv1a1.ServiceImport) error {
-	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
+	key := localEndpointsControllerKey(serviceImport)
 
 	if obj, found := c.endpointControllers.Load(key); found {
 		logger.V(log.DEBUG).Infof("Stopping previous EndpointSlice controller for %q", key)
@@ -246,7 +260,7 @@ func (c *ServiceImportController) startEndpointsController(ctx context.Context, 
 	return nil
 }
 
-func (c *ServiceImportController) stopEndpointsController(ctx context.Context, key string) (bool, error) {
+func (c *ServiceImportController) stopEndpointsController(ctx context.Context, key string) error {
 	if obj, found := c.endpointControllers.Load(key); found {
 		var err error
 
@@ -254,16 +268,16 @@ func (c *ServiceImportController) stopEndpointsController(ctx context.Context, k
 		err = endpointController.stop(ctx)
 
 		if err == nil {
-			found, err = endpointController.cleanup(ctx)
+			err = endpointController.cleanup(ctx)
 			if err == nil {
 				c.endpointControllers.Delete(key)
 			}
 		}
 
-		return found, err
+		return err
 	}
 
-	return false, nil
+	return nil
 }
 
 func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
@@ -283,101 +297,28 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			newServiceExportCondition(constants.ServiceExportReady,
 				metav1.ConditionFalse, NoServiceImportReason, "ServiceImport was deleted"))
-
-		return obj, false
 	} else if op == syncer.Create {
 		c.serviceExportClient.tryUpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
 			false, newServiceExportCondition(constants.ServiceExportReady,
 				metav1.ConditionFalse, AwaitingExportReason, fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
 
-	return obj, false
+	return c.transformLocalToBroker(serviceImport), false
 }
 
-func (c *ServiceImportController) Distribute(ctx context.Context, obj runtime.Object) error {
-	localServiceImport := c.converter.toServiceImport(obj)
-	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
+func (c *ServiceImportController) transformLocalToBroker(serviceImport *mcsv1a1.ServiceImport) *mcsv1a1.ServiceImport {
+	// Prepare the local ServiceImport for sync to the broker.
+	serviceImport.Name = ""
+	serviceImport.GenerateName = serviceImportSourceName(serviceImport) + "-"
+	serviceImport.Status = mcsv1a1.ServiceImportStatus{}
 
-	logger.V(log.DEBUG).Infof("Distribute for local ServiceImport %q", key)
-
-	exportable, err := c.createOrUpdateAggregate(ctx, localServiceImport)
-	if err == nil && exportable {
-		err = c.startEndpointsController(ctx, localServiceImport)
+	if serviceImport.Annotations == nil {
+		serviceImport.Annotations = map[string]string{}
 	}
 
-	if err == nil {
-		err = c.createLocalServiceImportOnBroker(ctx, localServiceImport)
-	}
+	serviceImport.Annotations[constants.UseClustersetIP] = strconv.FormatBool(c.determineUseClusterSetIP(serviceImport))
 
-	return err
-}
-
-func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object) error {
-	localServiceImport := c.converter.toServiceImport(obj)
-	key, _ := cache.MetaNamespaceKeyFunc(localServiceImport)
-
-	logger.V(log.DEBUG).Infof("Delete for local ServiceImport %q", key)
-
-	_, err := c.stopEndpointsController(ctx, key)
-	if err != nil {
-		return err
-	}
-
-	err = c.updateAggregateOnDelete(ctx, serviceImportSourceName(localServiceImport),
-		localServiceImport.Labels[constants.LabelSourceNamespace])
-	if err != nil {
-		return err
-	}
-
-	list, err := c.brokerServiceImportClient().List(ctx, metav1.ListOptions{
-		LabelSelector: k8slabels.Set(map[string]string{
-			mcsv1a1.LabelServiceName:       localServiceImport.Labels[mcsv1a1.LabelServiceName],
-			constants.LabelSourceNamespace: localServiceImport.Labels[constants.LabelSourceNamespace],
-			mcsv1a1.LabelSourceCluster:     localServiceImport.Labels[mcsv1a1.LabelSourceCluster],
-		}).String(),
-	})
-	if err != nil {
-		return errors.Wrap(err, "error listing ServiceImport resources for delete")
-	}
-
-	if len(list.Items) == 0 {
-		return nil
-	}
-
-	return errors.Wrapf(c.brokerServiceImportClient().Delete(ctx, list.Items[0].GetName(), metav1.DeleteOptions{}),
-		"error deleting ServiceImport %q on the broker", list.Items[0].GetName())
-}
-
-func (c *ServiceImportController) createLocalServiceImportOnBroker(ctx context.Context, localServiceImport *mcsv1a1.ServiceImport) error {
-	useClusterSetIP := c.determineUseClusterSetIP(localServiceImport)
-
-	localServiceImport.ObjectMeta = metav1.ObjectMeta{
-		GenerateName: serviceImportSourceName(localServiceImport) + "-",
-		Labels:       localServiceImport.Labels,
-		Annotations:  localServiceImport.Annotations,
-	}
-
-	localServiceImport.Annotations[constants.UseClustersetIP] = strconv.FormatBool(useClusterSetIP)
-	localServiceImport.Status = mcsv1a1.ServiceImportStatus{}
-
-	result, si, err := util.CreateOrUpdateWithOptions(ctx, util.CreateOrUpdateOptions[*unstructured.Unstructured]{
-		Client: resource.ForDynamic(c.brokerServiceImportClient()),
-		Obj:    c.converter.toUnstructured(localServiceImport),
-		IdentifyingLabels: map[string]string{
-			mcsv1a1.LabelServiceName:       localServiceImport.Labels[mcsv1a1.LabelServiceName],
-			constants.LabelSourceNamespace: localServiceImport.Labels[constants.LabelSourceNamespace],
-			mcsv1a1.LabelSourceCluster:     localServiceImport.Labels[mcsv1a1.LabelSourceCluster],
-		},
-		MutateOnUpdate: func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			return util.CopyImmutableMetadata(existing, c.converter.toUnstructured(localServiceImport)), nil
-		},
-	})
-
-	if result == util.OperationResultCreated {
-		logger.V(log.DEBUG).Infof("Created local ServiceImport %q on the broker", si.GetName())
-	}
-
-	return err //nolint:wrapcheck // No need to wrap
+	return serviceImport
 }
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
@@ -503,4 +444,8 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 
 func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
 	return serviceImport.Labels[mcsv1a1.LabelServiceName]
+}
+
+func localEndpointsControllerKey(si *mcsv1a1.ServiceImport) string {
+	return si.Labels[constants.LabelSourceNamespace] + "/" + si.Labels[mcsv1a1.LabelServiceName]
 }

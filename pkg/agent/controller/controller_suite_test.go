@@ -803,9 +803,10 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 }
 
 func awaitNoEndpointSlice(client dynamic.ResourceInterface, ns, name, clusterID string) {
-	Eventually(func() int {
-		return len(findEndpointSlices(client, ns, name, clusterID))
-	}).Should(BeZero(), "Unexpected EndpointSlice found for %s/%s", ns, name)
+	Eventually(func(g Gomega) {
+		eps := findEndpointSlices(client, ns, name, clusterID)
+		g.Expect(eps).To(BeEmpty(), "Unexpected EndpointSlice found")
+	}).Should(Succeed())
 }
 
 func (c *cluster) dynamicServiceClientFor() dynamic.NamespaceableResourceInterface {
@@ -1025,6 +1026,19 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 	t.awaitNoEndpointSlice(c)
 
 	t.awaitNoAggregatedServiceImport(c)
+
+	Eventually(func(g Gomega) {
+		list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(k8slabels.Set(map[string]string{
+				mcsv1a1.LabelServiceName:       c.service.Name,
+				constants.LabelSourceNamespace: c.service.Namespace,
+				mcsv1a1.LabelSourceCluster:     c.clusterID,
+			})).String(),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		g.Expect(list.Items).To(BeEmpty(), "Found unexpected ServiceImport on the broker")
+	}).Within(time.Second * 3).Should(Succeed())
 
 	c.localDynClientFake.ClearActions()
 

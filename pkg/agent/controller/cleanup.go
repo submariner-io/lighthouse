@@ -65,9 +65,10 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	for i := range list {
 		_, ok := list[i].GetLabels()[mcsv1a1.LabelServiceName]
 		if ok {
-			err = a.serviceImportController.Delete(ctx, &list[i])
+			err = a.serviceImportController.localFederator.Delete(ctx, a.serviceImportController.transformLocalToBroker(
+				a.serviceImportController.converter.toServiceImport(&list[i])))
 			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+				return err //nolint:wrapcheck // No need to wrap
 			}
 		}
 

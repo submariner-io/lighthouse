@@ -80,8 +80,9 @@ var _ = Describe("Cleanup", func() {
 
 		localServiceImport1OnBroker = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   "localServiceImport1OnBroker",
-				Labels: localServiceImport1.Labels,
+				Name:         "localServiceImport1OnBroker",
+				GenerateName: serviceName + "-",
+				Labels:       localServiceImport1.Labels,
 			},
 		}
 
