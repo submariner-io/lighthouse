@@ -165,7 +165,7 @@ func (c *ServiceEndpointSliceController) stop(ctx context.Context) error {
 	return errors.Wrapf(err, "error stopping EndpointSlice syncer for %s/%s", c.serviceNamespace, c.serviceName)
 }
 
-func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) (bool, error) {
+func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
@@ -177,22 +177,22 @@ func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) (bool, err
 
 	list, err := c.localClient.List(ctx, listOptions)
 	if err != nil {
-		return false, errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
+		return errors.Wrapf(err, "error listing the EndpointSlices associated with service %s/%s",
 			c.serviceNamespace, c.serviceName)
 	}
 
 	if len(list.Items) == 0 {
-		return false, nil
+		return nil
 	}
 
 	err = c.localClient.DeleteCollection(ctx, metav1.DeleteOptions{}, listOptions)
 
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, errors.Wrapf(err, "error deleting the EndpointSlices associated with service %s/%s",
+		return errors.Wrapf(err, "error deleting the EndpointSlices associated with service %s/%s",
 			c.serviceNamespace, c.serviceName)
 	}
 
-	return true, nil
+	return nil
 }
 
 func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {

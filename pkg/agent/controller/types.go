@@ -95,6 +95,7 @@ type ServiceImportController struct {
 	serviceExportClient        *ServiceExportClient
 	localSyncer                syncer.Interface
 	remoteSyncer               syncer.Interface
+	localFederator             federate.Federator
 	endpointControllers        sync.Map
 	clusterID                  string
 	localNamespace             string
