@@ -26,12 +26,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
+	"github.com/submariner-io/lighthouse/test/e2e/labels"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	k8snet "k8s.io/utils/net"
 )
 
-var _ = Describe("Test Headless Service Discovery Across Clusters", Label(TestLabel), func() {
+var _ = Describe("Test Headless Service Discovery Across Clusters", Label(labels.ServiceDiscovery), func() {
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a headless service in a remote cluster", func() {

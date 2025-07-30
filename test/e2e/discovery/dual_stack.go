@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
+	"github.com/submariner-io/lighthouse/test/e2e/labels"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -32,7 +33,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(TestLabel), func() {
+var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(labels.ServiceDiscovery), func() {
 	f := lhframework.NewFramework("discovery")
 
 	BeforeEach(func() {
