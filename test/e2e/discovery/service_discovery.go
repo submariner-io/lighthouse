@@ -28,19 +28,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	lhframework "github.com/submariner-io/lighthouse/test/e2e/framework"
+	"github.com/submariner-io/lighthouse/test/e2e/labels"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	TestLabel             = "service-discovery"
-	ClusterSetIPTestLabel = "clusterset-ip"
-)
-
 var checkedDomains = lhframework.CheckedDomains
 
-var _ = Describe("Test Service Discovery Across Clusters", Label(TestLabel), func() {
+var _ = Describe("Test Service Discovery Across Clusters", Label(labels.ServiceDiscovery), func() {
 	f := lhframework.NewFramework("discovery")
 
 	BeforeEach(func() {
