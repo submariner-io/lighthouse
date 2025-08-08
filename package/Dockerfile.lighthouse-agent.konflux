@@ -19,7 +19,7 @@ RUN git config --global --add safe.directory ${SOURCE}
 
 WORKDIR ${SOURCE}
 
-RUN CGO_ENABLED=0 GOARCH=${TARGETPLATFORM##*/} go build \
+RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
     -X main.version=${BASE_BRANCH}" \
     -tags "${BUILD_TAGS}" \
