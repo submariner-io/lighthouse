@@ -31,19 +31,21 @@ ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-RUN adduser -r -l -u 1001010000 lighthouse
+RUN adduser -r -l -u 1001 -G root lighthouse
 
 COPY --from=builder \
     ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-coredns \
     /usr/local/bin/
 
-RUN chown 0:0 /usr/local/bin/lighthouse-coredns && \
-    chmod 500 /usr/local/bin/lighthouse-coredns && \
-    setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/lighthouse-coredns
+RUN chown -Rc lighthouse:root /usr/local/bin
+RUN chmod -Rc 775 /usr/local/bin
+
+# Linux capability for enabling port 53
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/lighthouse-coredns
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
-USER 1001010000
+USER lighthouse
 
 EXPOSE 53 53/udp
 
