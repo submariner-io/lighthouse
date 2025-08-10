@@ -31,7 +31,7 @@ ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-RUN adduser -r -l -u 1001010000 lighthouse
+RUN adduser -r -l -u 1001 -G root lighthouse
 
 WORKDIR /var/submariner
 
@@ -39,12 +39,12 @@ COPY --from=builder \
     ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-agent \
     /usr/local/bin/
 
-RUN chown 0:0 /usr/local/bin/* && \
-    chmod 500 /usr/local/bin/lighthouse-agent
+RUN chown -Rc lighthouse:root /usr/local/bin
+RUN chmod -Rc 775 /usr/local/bin
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
-USER 1001010000
+USER lighthouse
 
 ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtderr"]
 
