@@ -46,7 +46,7 @@ COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
 USER lighthouse
 
-ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtderr"]
+ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
 
 LABEL com.redhat.component="lighthouse-agent-container" \
       name="rhacm2/lighthouse-agent-rhel9" \
