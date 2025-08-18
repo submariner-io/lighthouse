@@ -19,6 +19,8 @@ limitations under the License.
 package lighthouse
 
 import (
+	"strings"
+
 	"github.com/coredns/coredns/plugin/pkg/dnsutil"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -151,9 +153,5 @@ func parseSegments(segs []string, count int, r *recordRequest, qType uint16) (*r
 
 // stripUnderscore removes a prefixed underscore from s.
 func stripUnderscore(s string) string {
-	if s[0] != '_' {
-		return s
-	}
-
-	return s[1:]
+	return strings.TrimPrefix(s, "_")
 }
