@@ -218,10 +218,12 @@ func sortServiceImportsByTimestamp(siList []runtime.Object, aggregatedType mcsv1
 		tsA := parseTimestamp(siA)
 		tsB := parseTimestamp(siB)
 
-		if tsA == tsB {
-			return strings.Compare(siA.Labels[mcsv1a1.LabelSourceCluster], siB.Labels[mcsv1a1.LabelSourceCluster])
+		if tsA < tsB {
+			return -1
+		} else if tsA > tsB {
+			return 1
 		}
 
-		return int(tsA - tsB)
+		return strings.Compare(siA.Labels[mcsv1a1.LabelSourceCluster], siB.Labels[mcsv1a1.LabelSourceCluster])
 	})
 }
