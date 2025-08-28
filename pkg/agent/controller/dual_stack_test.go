@@ -29,6 +29,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("Dual-stack", func() {
@@ -105,9 +106,10 @@ var _ = Describe("Dual-stack", func() {
 			})
 
 			It("should not export it", func() {
-				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
+				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue,
+					mcsv1a1.ServiceExportReasonValid))
 				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
-					controller.UnsupportedIPFamilyReason))
+					controller.ServiceExportReasonUnsupportedIPFamily))
 				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
 			})
 		})
@@ -140,9 +142,10 @@ var _ = Describe("Dual-stack", func() {
 			})
 
 			It("should not export it", func() {
-				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
+				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue,
+					mcsv1a1.ServiceExportReasonValid))
 				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
-					controller.UnsupportedIPFamilyReason))
+					controller.ServiceExportReasonUnsupportedIPFamily))
 				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
 			})
 		})

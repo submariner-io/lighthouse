@@ -48,11 +48,6 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-const (
-	serviceUnavailable = "ServiceUnavailable"
-	invalidServiceType = "UnsupportedServiceType"
-)
-
 type AgentConfig struct {
 	ServiceImportCounterName string
 	ServiceExportCounterName string
@@ -213,8 +208,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	if err != nil {
 		// some other error. Log and requeue
 		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-			newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionUnknown, "ServiceRetrievalFailed",
-				fmt.Sprintf("Error retrieving the Service: %v", err)))
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionUnknown,
+				ServiceExportReasonRetrievalFailed, fmt.Sprintf("Error retrieving the Service: %v", err)))
 		logger.Errorf(err, "Error retrieving Service %s/%s", svcExport.Namespace, svcExport.Name)
 
 		return nil, true
@@ -223,8 +218,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	if !found {
 		logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-			newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionFalse, serviceUnavailable,
-				"Service to be exported doesn't exist"))
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionFalse,
+				mcsv1a1.ServiceExportReasonNoService, "Service to be exported doesn't exist"))
 
 		return nil, false
 	}
@@ -235,8 +230,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	if !ok {
 		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-			newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionFalse, invalidServiceType,
-				fmt.Sprintf("Service of type %v not supported", svc.Spec.Type)))
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionFalse,
+				mcsv1a1.ServiceExportReasonInvalidServiceType, fmt.Sprintf("Service of type %v not supported", svc.Spec.Type)))
 		logger.Errorf(nil, "Service type %q not supported for Service (%s/%s)", svc.Spec.Type, svcExport.Namespace, svcExport.Name)
 
 		err = a.localServiceImportFederator.Delete(ctx, a.newServiceImport(svcExport.Name, svcExport.Namespace))
@@ -286,8 +281,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 					svcExport.Namespace, svcExport.Name)
 				// Globalnet enabled but service doesn't have globalIp yet - update the status.
 				a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-					newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionFalse, ingressIP.unallocatedReason,
-						ingressIP.unallocatedMsg))
+					mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionFalse,
+						ingressIP.unallocatedReason, ingressIP.unallocatedMsg))
 
 				return nil, false
 			}
@@ -299,12 +294,12 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	}
 
 	a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-		newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionTrue, ExportValidReason, ""))
+		mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid, ""))
 
-	if a.serviceImportController.determineUseClusterSetIP(serviceImport) &&
-		slices.Contains(svc.Spec.IPFamilies, corev1.IPv6Protocol) {
+	if a.serviceImportController.determineUseClusterSetIP(serviceImport) && slices.Contains(svc.Spec.IPFamilies, corev1.IPv6Protocol) {
 		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
-			newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionFalse, UnsupportedIPFamilyReason,
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady, metav1.ConditionFalse,
+				ServiceExportReasonUnsupportedIPFamily,
 				fmt.Sprintf("Service has IP families %v and clusterset IP is enabled but only IPv4 is supported",
 					svc.Spec.IPFamilies)))
 
@@ -335,8 +330,8 @@ func (a *Controller) shouldProcessServiceExportUpdate(oldObj, newObj *unstructur
 		return true
 	}
 
-	oldValidCond := meta.FindStatusCondition(a.toServiceExport(oldObj).Status.Conditions, mcsv1a1.ServiceExportValid)
-	newValidCond := meta.FindStatusCondition(a.toServiceExport(newObj).Status.Conditions, mcsv1a1.ServiceExportValid)
+	oldValidCond := meta.FindStatusCondition(a.toServiceExport(oldObj).Status.Conditions, string(mcsv1a1.ServiceExportConditionValid))
+	newValidCond := meta.FindStatusCondition(a.toServiceExport(newObj).Status.Conditions, string(mcsv1a1.ServiceExportConditionValid))
 
 	if newValidCond != nil && !reflect.DeepEqual(oldValidCond, newValidCond) && newValidCond.Status == metav1.ConditionFalse {
 		return true
@@ -371,8 +366,8 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, _ int, op 
 
 	// Update the status and requeue
 	a.serviceExportClient.UpdateStatusConditions(context.Background(), svc.Name, svc.Namespace,
-		newServiceExportCondition(mcsv1a1.ServiceExportValid, metav1.ConditionFalse, serviceUnavailable,
-			"Service to be exported doesn't exist"))
+		mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionFalse,
+			mcsv1a1.ServiceExportReasonNoService, "Service to be exported doesn't exist"))
 
 	return serviceImport, false
 }
@@ -422,7 +417,7 @@ func (a *Controller) getIngressIP(name, namespace string) *IngressIP {
 	if ret == nil {
 		ret = &IngressIP{
 			namespace:         namespace,
-			unallocatedReason: defaultReasonIPUnavailable,
+			unallocatedReason: ServiceExportReasonGlobalIPUnavailable,
 			unallocatedMsg:    defaultMsgIPUnavailable,
 		}
 	}
@@ -432,16 +427,6 @@ func (a *Controller) getIngressIP(name, namespace string) *IngressIP {
 
 func (a *Controller) toServiceExport(obj runtime.Object) *mcsv1a1.ServiceExport {
 	return a.serviceImportController.converter.toServiceExport(obj)
-}
-
-func newServiceExportCondition(condType string, status metav1.ConditionStatus, reason, msg string) metav1.Condition {
-	return metav1.Condition{
-		Type:               condType,
-		Status:             status,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            msg,
-	}
 }
 
 func (c converter) toServiceImport(obj runtime.Object) *mcsv1a1.ServiceImport {
