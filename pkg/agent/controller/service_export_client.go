@@ -26,7 +26,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/lighthouse/pkg/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +41,7 @@ func NewServiceExportClient(client dynamic.Interface, scheme *runtime.Scheme) *S
 		NamespaceableResourceInterface: client.Resource(schema.GroupVersionResource{
 			Group:    mcsv1a1.GroupVersion.Group,
 			Version:  mcsv1a1.GroupVersion.Version,
-			Resource: "serviceexports",
+			Resource: mcsv1a1.ServiceExportPluralName,
 		}),
 		converter: converter{scheme: scheme},
 	}
@@ -59,29 +58,16 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 		return
 	}
 
-	findStatusCondition := func(conditions []metav1.Condition, condType string,
-	) *metav1.Condition {
-		cond := meta.FindStatusCondition(conditions, condType)
-
-		// TODO - this handles migration of the Synced type to Ready which can be removed once we no longer support a version
-		// prior to the introduction of Ready.
-		if cond == nil && condType == constants.ServiceExportReady {
-			cond = meta.FindStatusCondition(conditions, "Synced")
-		}
-
-		return cond
-	}
-
 	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
 			condition := &conditions[i]
 
-			prevCond := findStatusCondition(toUpdate.Status.Conditions, condition.Type)
+			prevCond := meta.FindStatusCondition(toUpdate.Status.Conditions, condition.Type)
 
 			if prevCond == nil {
-				if condition.Type == mcsv1a1.ServiceExportConflict && condition.Status == metav1.ConditionFalse {
+				if condition.Type == string(mcsv1a1.ServiceExportConditionConflict) && condition.Status == metav1.ConditionFalse {
 					// The caller intends to clear the Conflict condition so don't add it.
 					continue
 				}
@@ -91,7 +77,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
 				updated = true
-			} else if condition.Type == mcsv1a1.ServiceExportConflict {
+			} else if condition.Type == string(mcsv1a1.ServiceExportConditionConflict) {
 				condUpdated := c.mergeConflictCondition(prevCond, condition)
 				if condUpdated {
 					logger.V(log.DEBUG).Infof(
@@ -122,7 +108,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	if to.Reason != "" {
 		reasons = strings.Split(to.Reason, ",")
 		reasons = goslices.DeleteFunc(reasons, func(s string) bool {
-			return s == NoConflictsReason
+			return s == string(mcsv1a1.ServiceExportReasonNoConflicts)
 		})
 	}
 
@@ -158,7 +144,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	if to.Reason != "" {
 		to.Status = metav1.ConditionTrue
 	} else {
-		to.Reason = NoConflictsReason
+		to.Reason = string(mcsv1a1.ServiceExportReasonNoConflicts)
 		to.Status = metav1.ConditionFalse
 	}
 
@@ -204,15 +190,17 @@ func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1a1.
 	return obj.(*mcsv1a1.ServiceExport)
 }
 
-func (c *ServiceExportClient) hasCondition(name, namespace, condType, reason string) bool {
+func (c *ServiceExportClient) hasCondition(name, namespace string, condType mcsv1a1.ServiceExportConditionType,
+	reason mcsv1a1.ServiceExportConditionReason,
+) bool {
 	se := c.getLocalInstance(name, namespace)
 	if se == nil {
 		return false
 	}
 
-	cond := meta.FindStatusCondition(se.Status.Conditions, condType)
+	cond := meta.FindStatusCondition(se.Status.Conditions, string(condType))
 
-	return cond != nil && strings.Contains(cond.Reason, reason)
+	return cond != nil && strings.Contains(cond.Reason, string(reason))
 }
 
 func serviceExportConditionEqual(c1, c2 *metav1.Condition) bool {

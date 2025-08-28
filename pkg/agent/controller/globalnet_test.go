@@ -21,11 +21,13 @@ package controller_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -74,7 +76,8 @@ var _ = Describe("Globalnet enabled", func() {
 		Context("and it does not initially have a global IP", func() {
 			Context("due to missing GlobalIngressIP", func() {
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse,
+						controller.ServiceExportReasonGlobalIPUnavailable))
 
 					By("Creating GlobalIngressIP")
 					t.cluster1.createGlobalIngressIP(ingressIP)
@@ -90,7 +93,8 @@ var _ = Describe("Globalnet enabled", func() {
 				})
 
 				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, "ServiceGlobalIPUnavailable"))
+					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse,
+						controller.ServiceExportReasonGlobalIPUnavailable))
 
 					By("Updating GlobalIngressIP")
 					setIngressAllocatedIP(ingressIP, globalIP1)
@@ -115,7 +119,7 @@ var _ = Describe("Globalnet enabled", func() {
 			})
 
 			It("should update the ServiceExport status with the condition details", func() {
-				c := newServiceExportValidCondition(metav1.ConditionFalse, condition.Reason)
+				c := newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportConditionReason(condition.Reason))
 				c.Message = condition.Message
 				t.cluster1.awaitServiceExportCondition(c)
 			})

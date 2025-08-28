@@ -37,18 +37,11 @@ import (
 )
 
 const (
-	ExportValidReason                    = "ServiceExportValid"
-	ExportFailedReason                   = "ExportFailed"
-	ServiceExportedReason                = "ServiceExported"
-	NoServiceImportReason                = "NoServiceImport"
-	AwaitingExportReason                 = "AwaitingExport"
-	TypeConflictReason                   = "ConflictingType"
-	PortConflictReason                   = "ConflictingPorts"
-	SessionAffinityConflictReason        = "ConflictingSessionAffinity"
-	SessionAffinityConfigConflictReason  = "ConflictingSessionAffinityConfig"
-	ClusterSetIPEnablementConflictReason = "ConflictingClusterSetIPEnablement"
-	NoConflictsReason                    = "NoConflicts"
-	UnsupportedIPFamilyReason            = "UnsupportedIPFamily"
+	ServiceExportReasonNoServiceImport                mcsv1a1.ServiceExportConditionReason = "NoServiceImport"
+	ServiceExportReasonRetrievalFailed                mcsv1a1.ServiceExportConditionReason = "ServiceRetrievalFailed"
+	ServiceExportReasonClusterSetIPEnablementConflict mcsv1a1.ServiceExportConditionReason = "ClusterSetIPEnablementConflict"
+	ServiceExportReasonUnsupportedIPFamily            mcsv1a1.ServiceExportConditionReason = "UnsupportedIPFamily"
+	ServiceExportReasonGlobalIPUnavailable            mcsv1a1.ServiceExportConditionReason = "ServiceGlobalIPUnavailable"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object

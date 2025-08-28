@@ -159,8 +159,8 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 
 	if op != syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-			newServiceExportCondition(constants.ServiceExportReady, metav1.ConditionTrue, ServiceExportedReason,
-				"Service was successfully exported to the broker"))
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady, metav1.ConditionTrue,
+				mcsv1a1.ServiceExportReasonExported, "Service was successfully exported to the broker"))
 	}
 
 	return false

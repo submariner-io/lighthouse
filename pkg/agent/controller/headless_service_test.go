@@ -119,8 +119,8 @@ var _ = Describe("Headless Service export", func() {
 
 			t.awaitHeadlessServiceExported(&t.cluster1, &t.cluster2)
 
-			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
-			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionConflict)
+			t.cluster2.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionConflict)
 		})
 	})
 

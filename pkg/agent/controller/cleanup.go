@@ -38,7 +38,7 @@ var (
 	serviceImportGVR = schema.GroupVersionResource{
 		Group:    mcsv1a1.GroupName,
 		Version:  mcsv1a1.GroupVersion.Version,
-		Resource: "serviceimports",
+		Resource: mcsv1a1.ServiceImportPluralName,
 	}
 
 	endpointSliceGVR = schema.GroupVersionResource{

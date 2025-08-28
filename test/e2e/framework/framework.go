@@ -853,12 +853,12 @@ func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.Cluste
 	}, func(result interface{}) (bool, string, error) {
 		se := result.(*mcsv1a1.ServiceExport)
 
-		cond := meta.FindStatusCondition(se.Status.Conditions, constants.ServiceExportReady)
+		cond := meta.FindStatusCondition(se.Status.Conditions, string(mcsv1a1.ServiceExportConditionReady))
 		if cond != nil {
 			if cond.Status != status {
 				out, _ := json.MarshalIndent(cond, "", "  ")
 				return false, fmt.Sprintf("ServiceExport %s condition status is %s. Expected %s",
-					constants.ServiceExportReady, out, status), nil
+					mcsv1a1.ServiceExportConditionReady, out, status), nil
 			}
 
 			return true, "", nil
@@ -867,6 +867,6 @@ func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.Cluste
 		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
 
 		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
-			constants.ServiceExportReady, out), nil
+			mcsv1a1.ServiceExportConditionReady, out), nil
 	})
 }
