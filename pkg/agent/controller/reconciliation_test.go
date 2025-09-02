@@ -139,7 +139,7 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.createServiceEndpointSlices()
 
 			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "endpointslices", "delete")
-			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "serviceimports", "delete")
+			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, mcsv1a1.ServiceImportPluralName, "delete")
 
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
@@ -176,7 +176,8 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.createServiceExport()
 			t.cluster1.start(t, *t.syncerConfig)
 
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.NoServiceImportReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
+				controller.ServiceExportReasonNoServiceImport))
 			t.awaitServiceUnexported(&t.cluster1)
 		})
 	})

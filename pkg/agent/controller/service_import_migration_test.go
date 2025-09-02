@@ -74,6 +74,6 @@ var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
 	It("should update the existing aggregated ServiceImport and not create any Conflict conditions", func() {
 		t.awaitNonHeadlessServiceExported(&t.cluster1)
 
-		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConflict)
+		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionConflict)
 	})
 })

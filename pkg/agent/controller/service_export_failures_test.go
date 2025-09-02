@@ -23,11 +23,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/fake"
-	"github.com/submariner-io/lighthouse/pkg/agent/controller"
-	"github.com/submariner-io/lighthouse/pkg/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("Service export failures", func() {
@@ -54,8 +53,8 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, controller.ExportValidReason))
-			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -68,7 +67,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
@@ -81,7 +80,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, controller.ExportFailedReason))
+			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnUpdate(nil)
 			t.awaitNonHeadlessServiceExported(&t.cluster1)

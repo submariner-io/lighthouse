@@ -21,20 +21,20 @@ package controller
 import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const (
-	ClusterIPService           = "ClusterIPService"
-	HeadlessServicePod         = "HeadlessServicePod"
-	HeadlessServiceEndpoints   = "HeadlessServiceEndpoints"
-	defaultReasonIPUnavailable = "ServiceGlobalIPUnavailable"
-	defaultMsgIPUnavailable    = "Service doesn't have a global IP yet"
+	ClusterIPService         = "ClusterIPService"
+	HeadlessServicePod       = "HeadlessServicePod"
+	HeadlessServiceEndpoints = "HeadlessServiceEndpoints"
+	defaultMsgIPUnavailable  = "Service doesn't have a global IP yet"
 )
 
 type IngressIP struct {
 	namespace         string
 	allocatedIP       string
-	unallocatedReason string
+	unallocatedReason mcsv1a1.ServiceExportConditionReason
 	unallocatedMsg    string
 }
 
@@ -45,13 +45,13 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 	gip.allocatedIP, _, _ = unstructured.NestedString(obj.Object, "status", "allocatedIP")
 	if gip.allocatedIP == "" {
 		gip.unallocatedMsg = defaultMsgIPUnavailable
-		gip.unallocatedReason = defaultReasonIPUnavailable
+		gip.unallocatedReason = ServiceExportReasonGlobalIPUnavailable
 
 		conditions := util.ConditionsFromUnstructured(obj, "status", "conditions")
 		for i := range conditions {
 			if conditions[i].Type == "Allocated" {
 				gip.unallocatedMsg = "Unable to obtain global IP: " + conditions[i].Message
-				gip.unallocatedReason = conditions[i].Reason
+				gip.unallocatedReason = mcsv1a1.ServiceExportConditionReason(conditions[i].Reason)
 
 				break
 			}

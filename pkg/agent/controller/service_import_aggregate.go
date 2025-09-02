@@ -84,8 +84,8 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 			if localServiceImport.Spec.Type != existing.Spec.Type {
 				typeConflict = true
 				c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-					newServiceExportCondition(constants.ServiceExportReady,
-						metav1.ConditionFalse, ExportFailedReason, "Unable to export due to an irresolvable conflict"))
+					mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady,
+						metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed, "Unable to export due to an irresolvable conflict"))
 			} else {
 				if existing.Annotations == nil {
 					existing.Annotations = map[string]string{}
@@ -136,8 +136,8 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 
 	if err != nil {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-			newServiceExportCondition(constants.ServiceExportReady,
-				metav1.ConditionFalse, ExportFailedReason, fmt.Sprintf("Unable to export: %v", err)))
+			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady,
+				metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed, fmt.Sprintf("Unable to export: %v", err)))
 
 		if clusterSetIP != "" {
 			_ = c.clustersetIPPool.Release(clusterSetIP)

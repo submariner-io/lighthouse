@@ -107,24 +107,24 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 		return fmt.Sprintf("[%s]", strings.Join(names.UnsortedList(), ", "))
 	}
 
-	addConflictCondition := func(conflict bool, reason string, message func() string) {
+	addConflictCondition := func(conflict bool, reason mcsv1a1.ServiceExportConditionReason, message func() string) {
 		if conflict {
-			conditions = append(conditions, newServiceExportCondition(mcsv1a1.ServiceExportConflict, metav1.ConditionTrue,
+			conditions = append(conditions, mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionConflict, metav1.ConditionTrue,
 				reason, message()))
-		} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConflict, reason) {
-			conditions = append(conditions, newServiceExportCondition(
-				mcsv1a1.ServiceExportConflict, metav1.ConditionFalse, reason, ""))
+		} else if c.serviceExportClient.hasCondition(serviceName, serviceNamespace, mcsv1a1.ServiceExportConditionConflict, reason) {
+			conditions = append(conditions, mcsv1a1.NewServiceExportCondition(
+				mcsv1a1.ServiceExportConditionConflict, metav1.ConditionFalse, reason, ""))
 		}
 	}
 
-	addConflictCondition(len(conflictingServiceTypeClusters) > 0, TypeConflictReason, func() string {
+	addConflictCondition(len(conflictingServiceTypeClusters) > 0, mcsv1a1.ServiceExportReasonTypeConflict, func() string {
 		return fmt.Sprintf("The service type conflicts between the constituent clusters %s. "+
 			"Using the setting %q determined by the first exporting cluster %q (clusters %s disagree).",
 			toStringClusterNames(exportingClusters), aggregatedServiceImport.Spec.Type,
 			aggregatedServiceImport.Status.Clusters[0].Cluster, toStringClusterNames(conflictingServiceTypeClusters))
 	})
 
-	addConflictCondition(portConflict, PortConflictReason, func() string {
+	addConflictCondition(portConflict, mcsv1a1.ServiceExportReasonPortConflict, func() string {
 		exposedOp := "intersection"
 		exposedPorts := intersectionOfServicePorts
 
@@ -138,31 +138,33 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 			servicePortsToString(exposedPorts))
 	})
 
-	addConflictCondition(len(conflictingSessionAffinityClusters) > 0, SessionAffinityConflictReason, func() string {
+	addConflictCondition(len(conflictingSessionAffinityClusters) > 0, mcsv1a1.ServiceExportReasonSessionAffinityConflict, func() string {
 		return fmt.Sprintf("The service SessionAffinity conflicts between the constituent clusters %s. "+
 			"Using SessionAffinity %q from the oldest exporting service in cluster %q (clusters %s disagree).",
 			toStringClusterNames(exportingClusters), precedentServiceImport.Spec.SessionAffinity,
 			precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingSessionAffinityClusters))
 	})
 
-	addConflictCondition(len(conflictingSessionAffinityConfigClusters) > 0, SessionAffinityConfigConflictReason, func() string {
-		return fmt.Sprintf("The service SessionAffinityConfig conflicts between the constituent clusters %s. "+
-			"Using SessionAffinityConfig %q from the oldest exporting service in cluster %q (clusters %s disagree).",
-			toStringClusterNames(exportingClusters), toSessionAffinityConfigString(precedentServiceImport.Spec.SessionAffinityConfig),
-			precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingSessionAffinityConfigClusters))
-	})
+	addConflictCondition(len(conflictingSessionAffinityConfigClusters) > 0, mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict,
+		func() string {
+			return fmt.Sprintf("The service SessionAffinityConfig conflicts between the constituent clusters %s. "+
+				"Using SessionAffinityConfig %q from the oldest exporting service in cluster %q (clusters %s disagree).",
+				toStringClusterNames(exportingClusters), toSessionAffinityConfigString(precedentServiceImport.Spec.SessionAffinityConfig),
+				precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingSessionAffinityConfigClusters))
+		})
 
-	addConflictCondition(len(conflictingClusterSetIPEnablementClusters) > 0, ClusterSetIPEnablementConflictReason, func() string {
-		clusterName := aggregatedServiceImport.Annotations[constants.ClustersetIPAllocatedBy]
-		if clusterName == "" {
-			clusterName = precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster]
-		}
+	addConflictCondition(len(conflictingClusterSetIPEnablementClusters) > 0, ServiceExportReasonClusterSetIPEnablementConflict,
+		func() string {
+			clusterName := aggregatedServiceImport.Annotations[constants.ClustersetIPAllocatedBy]
+			if clusterName == "" {
+				clusterName = precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster]
+			}
 
-		return fmt.Sprintf("The service clusterset IP enablement setting conflicts between the constituent clusters %s. "+
-			"Using the setting %q determined by the first exporting cluster %q (clusters %s disagree).",
-			toStringClusterNames(exportingClusters), aggregatedServiceImport.Annotations[constants.UseClustersetIP], clusterName,
-			toStringClusterNames(conflictingClusterSetIPEnablementClusters))
-	})
+			return fmt.Sprintf("The service clusterset IP enablement setting conflicts between the constituent clusters %s. "+
+				"Using the setting %q determined by the first exporting cluster %q (clusters %s disagree).",
+				toStringClusterNames(exportingClusters), aggregatedServiceImport.Annotations[constants.UseClustersetIP], clusterName,
+				toStringClusterNames(conflictingClusterSetIPEnablementClusters))
+		})
 
 	c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conditions...)
 
