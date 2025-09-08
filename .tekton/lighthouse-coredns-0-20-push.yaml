@@ -27,8 +27,17 @@ spec:
   - name: build-platforms
     value:
     - linux/x86_64
+    - linux/ppc64le
+    - linux/s390x
+    - linux/arm64
   - name: dockerfile
-    value: package/Dockerfile.lighthouse-coredns
+    value: package/Dockerfile.lighthouse-coredns.konflux
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": "."}, {"type": "gomod", "path": "coredns"}, {"type": "gomod", "path": "tools"}]'
+  - name: hermetic
+    value: "true"
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
