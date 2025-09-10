@@ -37,3 +37,5 @@ exceptions:
       licenses: ["MPL-2.0"]
     - path: "github.com/hashicorp/go-sockaddr"
       licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/go-version"
+      licenses: ["MPL-2.0"]
