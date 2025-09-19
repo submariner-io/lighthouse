@@ -57,5 +57,6 @@ LABEL com.redhat.component="lighthouse-agent-container" \
       io.k8s.description="The Lighthouse Agent handles cross-cluster service discovery." \
       io.openshift.tags="submariner, lighthouse-agent, rhacm" \
       maintainer="multi-cluster-networking@redhat.com" \
+      cpe="cpe:/a:redhat:acm:2.14::el9" \
       com.github.url="https://github.com/submariner-io/lighthouse" \
       com.github.commit="${BASE_BRANCH}"
