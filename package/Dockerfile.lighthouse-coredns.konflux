@@ -54,6 +54,7 @@ ENTRYPOINT ["/usr/local/bin/lighthouse-coredns"]
 LABEL com.redhat.component="lighthouse-coredns-container" \
       name="rhacm2/lighthouse-coredns-rhel9" \
       version="${BASE_BRANCH}" \
+      cpe="cpe:/a:redhat:acm:2.14::el9" \
       summary="Lighthouse CoreDNS" \
       description="The Lighthouse CoreDNS provides DNS resolution for cross-cluster services." \
       io.k8s.display-name="Lighthouse CoreDNS" \
