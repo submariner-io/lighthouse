@@ -124,9 +124,9 @@ func createDeployment(f *Framework, cluster framework.ClusterIndex, deployment *
 	pc := framework.KubeClients[cluster].AppsV1().Deployments(deployment.Namespace)
 	appName := deployment.Spec.Template.ObjectMeta.Labels["app"]
 
-	_ = framework.AwaitUntil("create deployment", func() (interface{}, error) {
+	_ = framework.AwaitUntil("create deployment", func() (*appsv1.Deployment, error) {
 		return pc.Create(context.TODO(), deployment, metav1.CreateOptions{})
-	}, framework.NoopCheckResult).(*appsv1.Deployment)
+	}, framework.NoopCheckResult)
 
 	return f.AwaitPodsByAppLabel(cluster, appName, deployment.Namespace, 1)
 }

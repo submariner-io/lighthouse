@@ -344,7 +344,7 @@ func verifyHeadlessSRVRecordsWithDigByFamily(f *framework.Framework, cluster fra
 
 			framework.By(fmt.Sprintf("Executing %q to verify hostNames %v for service %q %q discoverable",
 				strings.Join(cmd, " "), hostNameList, service.Name, op))
-			framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
+			framework.AwaitUntil(" service IP verification", func() (string, error) {
 				stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 					Command:       cmd,
 					Namespace:     f.Namespace,
@@ -354,11 +354,11 @@ func verifyHeadlessSRVRecordsWithDigByFamily(f *framework.Framework, cluster fra
 					CaptureStderr: true,
 				}, cluster)
 				if err != nil {
-					return nil, err
+					return "", err
 				}
 
 				return stdout, nil
-			}, func(result interface{}) (bool, string, error) {
+			}, func(result string) (bool, string, error) {
 				framework.By(fmt.Sprintf("Validating that dig result %s %q", op, result))
 
 				if len(hostNameList) == 0 && result != "" {
@@ -367,8 +367,8 @@ func verifyHeadlessSRVRecordsWithDigByFamily(f *framework.Framework, cluster fra
 
 				for _, hostName := range hostNameList {
 					hostDNS := hostName + "." + domainName
-					doesContain := strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
-						strings.Contains(result.(string), hostDNS)
+					doesContain := strings.Contains(result, strconv.Itoa(int(port.Port))) &&
+						strings.Contains(result, hostDNS)
 
 					if doesContain && !shouldContain {
 						framework.Logf("expected execution result %q not to contain %q and %d", result, hostDNS, int(port.Port))
