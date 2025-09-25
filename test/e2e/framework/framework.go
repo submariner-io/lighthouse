@@ -141,10 +141,10 @@ func IsClusterSetIPEnabled() bool {
 	gvr, _ := schema.ParseResourceArg("servicediscoveries.v1alpha1.submariner.io")
 	sdClient := framework.DynClients[0].Resource(*gvr).Namespace(framework.TestContext.SubmarinerNamespace)
 
-	framework.AwaitUntil("find service-discovery resource", func() (interface{}, error) {
+	framework.AwaitUntil("find service-discovery resource", func() (*unstructured.Unstructured, error) {
 		return sdClient.Get(context.TODO(), "service-discovery", metav1.GetOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		enabled, _, err := unstructured.NestedBool(result.(*unstructured.Unstructured).Object, "spec", "clustersetIPEnabled")
+	}, func(result *unstructured.Unstructured) (bool, string, error) {
+		enabled, _, err := unstructured.NestedBool(result.Object, "spec", "clustersetIPEnabled")
 		if err != nil {
 			return false, "", err
 		}
@@ -172,9 +172,9 @@ func (f *Framework) CreateServiceExport(cluster framework.ClusterIndex, serviceE
 	framework.By(fmt.Sprintf("Creating serviceExport %s.%s on %q", serviceExport.Name, serviceExport.Namespace,
 		framework.TestContext.ClusterIDs[cluster]))
 
-	return framework.AwaitUntil("create serviceExport", func() (interface{}, error) {
+	return framework.AwaitUntil("create serviceExport", func() (*mcsv1a1.ServiceExport, error) {
 		return se.Create(context.TODO(), serviceExport, metav1.CreateOptions{})
-	}, framework.NoopCheckResult).(*mcsv1a1.ServiceExport)
+	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) AwaitServiceExportedStatusCondition(cluster framework.ClusterIndex, name, namespace string) {
@@ -187,7 +187,7 @@ func (f *Framework) AwaitServiceNotExportedStatusCondition(cluster framework.Clu
 
 func (f *Framework) DeleteServiceExport(cluster framework.ClusterIndex, name, namespace string) {
 	framework.By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
-	framework.AwaitUntil("delete service export", func() (interface{}, error) {
+	framework.AwaitUntil("delete service export", func() (any, error) {
 		return nil, MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace).Delete(
 			context.TODO(), name, metav1.DeleteOptions{})
 	}, framework.NoopCheckResult)
@@ -203,31 +203,27 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 	framework.By(fmt.Sprintf("Retrieving ServiceImport for %q in ns %q on %q", svc.Name, svc.Namespace,
 		framework.TestContext.ClusterIDs[targetCluster]))
 
-	var si *mcsv1a1.ServiceImport
-
 	siClient := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(svc.Namespace)
 
-	framework.AwaitUntil("retrieve ServiceImport", func() (interface{}, error) {
+	return framework.AwaitUntil("retrieve ServiceImport", func() (*mcsv1a1.ServiceImport, error) {
 		obj, err := siClient.Get(context.TODO(), svc.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			return nil, nil //nolint:nilnil // Intentional
+			return nil, nil
 		}
 
 		return obj, err
-	}, func(result interface{}) (bool, string, error) {
+	}, func(si *mcsv1a1.ServiceImport) (bool, string, error) {
 		if clusterCount == 0 {
-			if result != nil {
+			if si != nil {
 				return false, "ServiceImport still exists", nil
 			}
 
 			return true, "", nil
 		}
 
-		if result == nil {
+		if si == nil {
 			return false, "ServiceImport not found", nil
 		}
-
-		si = result.(*mcsv1a1.ServiceImport)
 
 		if len(si.Status.Clusters) != clusterCount {
 			return false, fmt.Sprintf("Actual cluster count %d does not match expected %d",
@@ -252,8 +248,6 @@ func (f *Framework) AwaitAggregatedServiceImport(targetCluster framework.Cluster
 
 		return true, "", nil
 	})
-
-	return si
 }
 
 func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol v1.Protocol,
@@ -285,11 +279,10 @@ func (f *Framework) NewHeadlessServiceWithParams(name, portName string, protcol 
 	}
 
 	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)
-	service := framework.AwaitUntil("create service", func() (interface{}, error) {
-		return sc.Create(context.TODO(), &nginxService, metav1.CreateOptions{})
-	}, framework.NoopCheckResult).(*v1.Service)
 
-	return service
+	return framework.AwaitUntil("create service", func() (*v1.Service, error) {
+		return sc.Create(context.TODO(), &nginxService, metav1.CreateOptions{})
+	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) NewNginxHeadlessService(cluster framework.ClusterIndex) *v1.Service {
@@ -331,7 +324,7 @@ func (f *Framework) NewEndpointForHeadlessService(cluster framework.ClusterIndex
 	}
 
 	ec := framework.KubeClients[cluster].CoreV1().Endpoints(svc.Namespace)
-	framework.AwaitUntil("create endpoint", func() (interface{}, error) {
+	framework.AwaitUntil("create endpoint", func() (*v1.Endpoints, error) {
 		return ec.Create(context.TODO(), ep, metav1.CreateOptions{})
 	}, framework.NoopCheckResult)
 }
@@ -347,17 +340,17 @@ func (f *Framework) AwaitEndpointIPs(targetCluster framework.ClusterIndex, name,
 
 	client := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	framework.By(fmt.Sprintf("Retrieving %s Endpoints for %s on %q", addrType, name, framework.TestContext.ClusterIDs[targetCluster]))
-	framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
+	framework.AwaitUntil("retrieve Endpoints", func() (*discovery.EndpointSliceList, error) {
 		return client.List(context.Background(), metav1.ListOptions{
 			LabelSelector: labels.SelectorFromSet(map[string]string{
 				discovery.LabelServiceName: name,
 			}).String(),
 		})
-	}, func(result interface{}) (bool, string, error) {
+	}, func(result *discovery.EndpointSliceList) (bool, string, error) {
 		ipList = make([]string, 0)
 		hostNameList = make([]string, 0)
 
-		epsList := result.(*discovery.EndpointSliceList).Items
+		epsList := result.Items
 		for i := range epsList {
 			if epsList[i].AddressType != addrType {
 				continue
@@ -443,9 +436,9 @@ func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex
 	hostNameList := make([]string, 0)
 	ipList := make([]string, 0)
 
-	endpoint := framework.AwaitUntil("retrieve Endpoints", func() (interface{}, error) {
+	endpoint := framework.AwaitUntil("retrieve Endpoints", func() (*v1.Endpoints, error) {
 		return framework.KubeClients[targetCluster].CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
-	}, framework.NoopCheckResult).(*v1.Endpoints)
+	}, framework.NoopCheckResult)
 
 	for _, subset := range endpoint.Subsets {
 		for _, address := range subset.Addresses {
@@ -480,11 +473,10 @@ func (f *Framework) SetNginxReplicaSet(cluster framework.ClusterIndex, count uin
 	framework.By(fmt.Sprintf("Setting Nginx deployment replicas to %v in cluster %q", count, framework.TestContext.ClusterIDs[cluster]))
 	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
 	deployments := framework.KubeClients[cluster].AppsV1().Deployments(f.Namespace)
-	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
-		return deployments.Patch(context.TODO(), "nginx-demo", types.MergePatchType, []byte(patch), metav1.PatchOptions{})
-	}, framework.NoopCheckResult).(*appsv1.Deployment)
 
-	return result
+	return framework.AwaitUntil("set replicas", func() (*appsv1.Deployment, error) {
+		return deployments.Patch(context.TODO(), "nginx-demo", types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) NewNginxStatefulSet(cluster framework.ClusterIndex) *appsv1.StatefulSet {
@@ -540,9 +532,9 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 	pc := framework.KubeClients[cluster].AppsV1().StatefulSets(f.Namespace)
 	appName := statefulSet.Spec.Template.ObjectMeta.Labels["app"]
 
-	_ = framework.AwaitUntil("create statefulSet", func() (interface{}, error) {
+	_ = framework.AwaitUntil("create statefulSet", func() (*appsv1.StatefulSet, error) {
 		return pc.Create(context.TODO(), statefulSet, metav1.CreateOptions{})
-	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
+	}, framework.NoopCheckResult)
 
 	return f.AwaitPodsByAppLabel(cluster, appName, f.Namespace, int(*count))
 }
@@ -550,8 +542,6 @@ func create(f *Framework, cluster framework.ClusterIndex, statefulSet *appsv1.St
 func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, name, namespace string,
 	expSliceCount, expReadyCount int,
 ) *discovery.EndpointSliceList {
-	var endpointSliceList *discovery.EndpointSliceList
-
 	ep := framework.KubeClients[targetCluster].DiscoveryV1().EndpointSlices(namespace)
 	labelMap := map[string]string{
 		discovery.LabelManagedBy: constants.LabelValueManagedBy,
@@ -562,10 +552,10 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 
 	framework.By(fmt.Sprintf("Retrieving EndpointSlices for %q in ns %q on %q", name, namespace,
 		framework.TestContext.ClusterIDs[targetCluster]))
-	framework.AwaitUntil("retrieve EndpointSlices", func() (interface{}, error) {
+
+	return framework.AwaitUntil("retrieve EndpointSlices", func() (*discovery.EndpointSliceList, error) {
 		return ep.List(context.TODO(), listOptions)
-	}, func(result interface{}) (bool, string, error) {
-		endpointSliceList = result.(*discovery.EndpointSliceList)
+	}, func(endpointSliceList *discovery.EndpointSliceList) (bool, string, error) {
 		sliceCount := 0
 		readyCount := 0
 
@@ -592,30 +582,25 @@ func (f *Framework) AwaitEndpointSlices(targetCluster framework.ClusterIndex, na
 
 		return true, "", nil
 	})
-
-	return endpointSliceList
 }
 
 func (f *Framework) SetNginxStatefulSetReplicas(cluster framework.ClusterIndex, count uint32) *appsv1.StatefulSet {
 	framework.By(fmt.Sprintf("Setting Nginx statefulset replicas to %v", count))
 	patch := fmt.Sprintf(`{"spec":{"replicas":%v}}`, count)
 	ss := framework.KubeClients[cluster].AppsV1().StatefulSets(f.Namespace)
-	result := framework.AwaitUntil("set replicas", func() (interface{}, error) {
-		return ss.Patch(context.TODO(), statefulSetName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
-	}, framework.NoopCheckResult).(*appsv1.StatefulSet)
 
-	return result
+	return framework.AwaitUntil("set replicas", func() (*appsv1.StatefulSet, error) {
+		return ss.Patch(context.TODO(), statefulSetName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+	}, framework.NoopCheckResult)
 }
 
 func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (string, string) {
 	var endpointName, healthCheckIP string
 
-	framework.AwaitUntil("Get healthCheckIP", func() (interface{}, error) {
-		unstructuredEndpointList, err := EndpointClients[cluster].List(context.TODO(), metav1.ListOptions{})
-		return unstructuredEndpointList, err
-	}, func(result interface{}) (bool, string, error) {
-		unstructuredEndpointList := result.(*unstructured.UnstructuredList)
-		for _, endpoint := range unstructuredEndpointList.Items {
+	framework.AwaitUntil("Get healthCheckIP", func() (*unstructured.UnstructuredList, error) {
+		return EndpointClients[cluster].List(context.TODO(), metav1.ListOptions{})
+	}, func(result *unstructured.UnstructuredList) (bool, string, error) {
+		for _, endpoint := range result.Items {
 			framework.By(fmt.Sprintf("Getting the endpoint %s, for cluster %s", endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]))
 
 			if strings.Contains(endpoint.GetName(), framework.TestContext.ClusterIDs[cluster]) {
@@ -646,19 +631,17 @@ func (f *Framework) GetHealthCheckIPInfo(cluster framework.ClusterIndex) (string
 func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) bool {
 	var healthCheckEnabled bool
 
-	framework.AwaitUntil("Get healthCheckEnabled Configuration", func() (interface{}, error) {
+	framework.AwaitUntil("Get healthCheckEnabled Configuration", func() (*unstructured.Unstructured, error) {
 		unstructuredSubmarinerConfig, err := SubmarinerClients[cluster].Get(context.TODO(),
 			"submariner", metav1.GetOptions{})
 		return unstructuredSubmarinerConfig, err
-	}, func(result interface{}) (bool, string, error) {
-		unstructuredSubmarinerConfig := result.(*unstructured.Unstructured)
-
+	}, func(result *unstructured.Unstructured) (bool, string, error) {
 		framework.By("Getting the Submariner Config, for cluster " + framework.TestContext.ClusterIDs[cluster])
 
 		var found bool
 		var err error
 
-		healthCheckEnabled, found, err = unstructured.NestedBool(unstructuredSubmarinerConfig.Object,
+		healthCheckEnabled, found, err = unstructured.NestedBool(result.Object,
 			"spec", "connectionHealthCheck", "enabled")
 		if err != nil {
 			return false, "", err
@@ -674,7 +657,7 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 	framework.By(fmt.Sprintf("Setting health check IP cluster %q to %v", framework.TestContext.ClusterIDs[cluster], ip))
 	patch := fmt.Sprintf(`{"spec":{"healthCheckIP":%q}}`, ip)
 
-	framework.AwaitUntil("set healthCheckIP", func() (interface{}, error) {
+	framework.AwaitUntil("set healthCheckIP", func() (*unstructured.Unstructured, error) {
 		endpoint, err := EndpointClients[cluster].Patch(context.TODO(), endpointName, types.MergePatchType, []byte(patch),
 			metav1.PatchOptions{})
 		return endpoint, err
@@ -718,7 +701,7 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 
 	framework.By(fmt.Sprintf("Executing %q to verify IP %q for service %q %q discoverable", strings.Join(cmd, " "), serviceIP,
 		service.Name, op))
-	framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+	framework.AwaitUntil("verify if service IP is discoverable", func() (string, error) {
 		stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     targetPod.Items[0].Namespace,
@@ -728,12 +711,12 @@ func (f *Framework) VerifyIPWithDig(srcCluster framework.ClusterIndex, service *
 			CaptureStderr: true,
 		}, srcCluster)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		return stdout, nil
-	}, func(result interface{}) (bool, string, error) {
-		doesContain := strings.Contains(result.(string), serviceIP)
+	}, func(result string) (bool, string, error) {
+		doesContain := strings.Contains(result, serviceIP)
 		framework.By(fmt.Sprintf("Validating that dig result %q %s %q", result, op, serviceIP))
 
 		if doesContain && !shouldContain {
@@ -783,7 +766,7 @@ func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, ser
 	}
 
 	framework.By(fmt.Sprintf("Executing %q to verify IPs %v for service %q %q discoverable", strings.Join(cmd, " "), ipList, service.Name, op))
-	framework.AwaitUntil(" service IP verification", func() (interface{}, error) {
+	framework.AwaitUntil(" service IP verification", func() (string, error) {
 		stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace,
@@ -793,11 +776,11 @@ func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, ser
 			CaptureStderr: true,
 		}, cluster)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		return stdout, nil
-	}, func(result interface{}) (bool, string, error) {
+	}, func(result string) (bool, string, error) {
 		framework.By(fmt.Sprintf("Validating that dig result %s %q", op, result))
 
 		if len(ipList) == 0 && result != "" {
@@ -805,7 +788,7 @@ func (f *Framework) VerifyIPsWithDigByFamily(cluster framework.ClusterIndex, ser
 		}
 
 		for _, ip := range ipList {
-			count := strings.Count(result.(string), ip)
+			count := strings.Count(result, ip)
 			if count > 0 && !shouldContain {
 				return false, fmt.Sprintf("expected execution result %q not to contain %q", result, ip), nil
 			}
@@ -848,12 +831,10 @@ func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.Cluste
 
 	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
 
-	framework.AwaitUntil("retrieve ServiceExport", func() (interface{}, error) {
+	framework.AwaitUntil("retrieve ServiceExport", func() (*mcsv1a1.ServiceExport, error) {
 		return se.Get(context.TODO(), name, metav1.GetOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		se := result.(*mcsv1a1.ServiceExport)
-
-		cond := meta.FindStatusCondition(se.Status.Conditions, string(mcsv1a1.ServiceExportConditionReady))
+	}, func(result *mcsv1a1.ServiceExport) (bool, string, error) {
+		cond := meta.FindStatusCondition(result.Status.Conditions, string(mcsv1a1.ServiceExportConditionReady))
 		if cond != nil {
 			if cond.Status != status {
 				out, _ := json.MarshalIndent(cond, "", "  ")
@@ -864,7 +845,7 @@ func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.Cluste
 			return true, "", nil
 		}
 
-		out, _ := json.MarshalIndent(se.Status.Conditions, "", " ")
+		out, _ := json.MarshalIndent(result.Status.Conditions, "", " ")
 
 		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
 			mcsv1a1.ServiceExportConditionReady, out), nil

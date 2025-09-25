@@ -584,7 +584,7 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 
 			framework.By(fmt.Sprintf("Executing %q to verify SRV record for service %q %q discoverable", strings.Join(cmd, " "),
 				service.Name, op))
-			framework.AwaitUntil("verify if service Ports is discoverable", func() (interface{}, error) {
+			framework.AwaitUntil("verify if service Ports is discoverable", func() (string, error) {
 				stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 					Command:       cmd,
 					Namespace:     f.Namespace,
@@ -594,18 +594,18 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 					CaptureStderr: true,
 				}, srcCluster)
 				if err != nil {
-					return nil, err
+					return "", err
 				}
 
 				return stdout, nil
-			}, func(result interface{}) (bool, string, error) {
+			}, func(result string) (bool, string, error) {
 				var doesContain bool
 				if shouldContain {
-					doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) &&
-						strings.Contains(result.(string), clusterDNSName)
+					doesContain = strings.Contains(result, strconv.Itoa(int(port.Port))) &&
+						strings.Contains(result, clusterDNSName)
 				} else {
-					doesContain = strings.Contains(result.(string), strconv.Itoa(int(port.Port))) ||
-						strings.Contains(result.(string), clusterDNSName)
+					doesContain = strings.Contains(result, strconv.Itoa(int(port.Port))) ||
+						strings.Contains(result, clusterDNSName)
 				}
 
 				framework.By(fmt.Sprintf("Validating that port in dig result for SRV Record %q %s %d and the domain name %s %q", result,
@@ -642,7 +642,7 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 	var retIPs []string
 
 	for range 10 {
-		framework.AwaitUntil("verify if service IP is discoverable", func() (interface{}, error) {
+		framework.AwaitUntil("verify if service IP is discoverable", func() (string, error) {
 			stdout, _, err := f.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace,
@@ -652,13 +652,13 @@ func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.Cluste
 				CaptureStderr: true,
 			}, srcCluster)
 			if err != nil {
-				return nil, err
+				return "", err
 			}
 
 			return stdout, nil
-		}, func(result interface{}) (bool, string, error) {
+		}, func(result string) (bool, string, error) {
 			for _, serviceIP := range serviceIPList {
-				if strings.Contains(result.(string), serviceIP) {
+				if strings.Contains(result, serviceIP) {
 					serviceIPMap[serviceIP]++
 					retIPs = append(retIPs, serviceIP)
 
