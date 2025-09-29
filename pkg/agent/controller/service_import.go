@@ -27,11 +27,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -94,6 +96,8 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 			Name: agentConfig.ServiceExportCounterName,
 			Help: "Count of exported services",
 		},
+		WorkQueueConfig: workqueue.ConfigFromGlobal("local-service-import", nil),
+		MaxLogVerbosity: global.Get("local-service-import.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local ServiceImport syncer")
@@ -118,6 +122,8 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 			Name: agentConfig.ServiceImportCounterName,
 			Help: "Count of imported services",
 		},
+		WorkQueueConfig: workqueue.ConfigFromGlobal("remote-service-import", nil),
+		MaxLogVerbosity: global.Get("remote-service-import.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceImport watcher")

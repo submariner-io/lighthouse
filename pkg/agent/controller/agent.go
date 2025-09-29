@@ -27,11 +27,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -87,7 +89,9 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 		ResourcesEquivalent: func(oldObj, newObj *unstructured.Unstructured) bool {
 			return !agentController.shouldProcessServiceExportUpdate(oldObj, newObj)
 		},
-		Scheme: syncerConf.Scheme,
+		Scheme:          syncerConf.Scheme,
+		WorkQueueConfig: workqueue.ConfigFromGlobal("service-export", nil),
+		MaxLogVerbosity: global.Get("service-export.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ServiceExport syncer")
@@ -102,6 +106,8 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 		ResourceType:    &corev1.Service{},
 		Transform:       agentController.serviceToRemoteServiceImport,
 		Scheme:          syncerConf.Scheme,
+		WorkQueueConfig: workqueue.ConfigFromGlobal("service", nil),
+		MaxLogVerbosity: global.Get("service.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Service syncer")
