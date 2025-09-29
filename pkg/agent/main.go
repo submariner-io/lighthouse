@@ -22,8 +22,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/configmap"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -35,6 +38,7 @@ import (
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -122,6 +126,16 @@ func main() {
 
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
+
+	k8sClient, err := kubernetes.NewForConfig(cfg)
+	exitOnError(err, "Error creating K8s client")
+
+	configMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, agentSpec.Namespace), names.ServiceDiscoveryComponent)
+	exitOnError(err, "Error retrieving ConfigMap")
+
+	global.Init(configMap)
+
+	configmap.WatchAndSignalOnChange(ctx, k8sClient, agentSpec.Namespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
 
 	var ipPool *ipam.IPPool
 
