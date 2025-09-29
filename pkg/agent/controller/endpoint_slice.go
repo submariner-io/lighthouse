@@ -24,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/global"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/workqueue"
@@ -106,7 +105,7 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 
 	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
 
-	logger.V(log.DEBUG).Infof("Local EndpointSlice \"%s/%s\" for service %q %sd",
+	logger.Infof("Local EndpointSlice \"%s/%s\" for service %q %sd",
 		endpointSlice.Namespace, endpointSlice.Name, serviceName, op)
 
 	// Check if the associated Service exists and, if not, delete the EndpointSlice. On restart, it's possible the Service could've been
@@ -152,7 +151,7 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
 	serviceNamespace := endpointSlice.Labels[constants.LabelSourceNamespace]
 
-	logger.V(log.DEBUG).Infof("Local EndpointSlice \"%s/%s\" for service %q %sd on broker",
+	logger.Infof("Local EndpointSlice \"%s/%s\" for service %q %sd on broker",
 		endpointSlice.Namespace, endpointSlice.Name, serviceName, op)
 
 	if isLegacyEndpointSlice(endpointSlice) {

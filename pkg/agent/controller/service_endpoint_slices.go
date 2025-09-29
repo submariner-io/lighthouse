@@ -56,7 +56,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
 	serviceName := serviceImportSourceName(serviceImport)
 
-	logger.V(log.DEBUG).Infof("Starting EndpointSlice controller for service %s/%s", serviceNamespace, serviceName)
+	logger.Infof("Starting EndpointSlice controller for service %s/%s", serviceNamespace, serviceName)
 
 	globalIngressIPGVR, _ := schema.ParseResourceArg("globalingressips.v1.submariner.io")
 
@@ -202,12 +202,12 @@ func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) error {
 func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceEPS := obj.(*discovery.EndpointSlice)
 
-	logLevel := log.DEBUG
+	localLogger := logger
 	if op == syncer.Update {
-		logLevel = log.TRACE
+		localLogger = logger.V(log.DEBUG)
 	}
 
-	logger.V(logLevel).Infof("Service %s EndpointSlice \"%s/%s\" %sd",
+	localLogger.Infof("Service %s EndpointSlice \"%s/%s\" %sd",
 		serviceEPS.AddressType, serviceEPS.Namespace, serviceEPS.Name, op)
 
 	var returnEPS *discovery.EndpointSlice
@@ -222,7 +222,7 @@ func (c *ServiceEndpointSliceController) onServiceEndpointSlice(obj runtime.Obje
 		return nil, false
 	}
 
-	logger.V(logLevel).Infof("Returning EndpointSlice \"%s/%s\": %s", serviceEPS.Namespace, returnEPS.GenerateName,
+	localLogger.Infof("Returning EndpointSlice \"%s/%s\": %s", serviceEPS.Namespace, returnEPS.GenerateName,
 		endpointSliceStringer{returnEPS})
 
 	return returnEPS, false

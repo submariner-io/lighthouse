@@ -204,7 +204,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	ctx := context.Background()
 
-	logger.V(log.DEBUG).Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
+	logger.Infof("ServiceExport %s/%s %sd", svcExport.Namespace, svcExport.Name, op)
 
 	if op == syncer.Delete {
 		return a.newServiceImport(svcExport.Name, svcExport.Namespace), false
@@ -222,7 +222,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	}
 
 	if !found {
-		logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
+		logger.Infof("Service to be exported (%s/%s) doesn't exist", svcExport.Namespace, svcExport.Name)
 		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
 			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, metav1.ConditionFalse,
 				mcsv1a1.ServiceExportReasonNoService, "Service to be exported doesn't exist"))
@@ -283,7 +283,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 		if a.globalnetEnabled && ipv4Index >= 0 {
 			ingressIP := a.getIngressIP(svc.Name, svc.Namespace)
 			if ingressIP.allocatedIP == "" {
-				logger.V(log.DEBUG).Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
+				logger.Infof("Service to be exported (%s/%s) doesn't have a global IP yet",
 					svcExport.Namespace, svcExport.Name)
 				// Globalnet enabled but service doesn't have globalIp yet - update the status.
 				a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
@@ -312,7 +312,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 		return nil, false
 	}
 
-	logger.V(log.DEBUG).Infof("Returning ServiceImport %s/%s: %s", svcExport.Namespace, svcExport.Name,
+	logger.Infof("Returning ServiceImport %s/%s: %s", svcExport.Namespace, svcExport.Name,
 		serviceImportStringer{serviceImport})
 
 	return serviceImport, false
@@ -361,7 +361,7 @@ func (a *Controller) serviceToRemoteServiceImport(obj runtime.Object, _ int, op 
 		return nil, false
 	}
 
-	logger.V(log.DEBUG).Infof("Exported Service %s/%s %sd", svc.Namespace, svc.Name, op)
+	logger.Infof("Exported Service %s/%s %sd", svc.Namespace, svc.Name, op)
 
 	if op == syncer.Create || op == syncer.Update {
 		a.serviceExportSyncer.RequeueResource(svc.Name, svc.Namespace)

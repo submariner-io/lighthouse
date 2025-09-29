@@ -28,7 +28,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/global"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -245,7 +244,7 @@ func (c *ServiceImportController) startEndpointsController(ctx context.Context, 
 	key := localEndpointsControllerKey(serviceImport)
 
 	if obj, found := c.endpointControllers.Load(key); found {
-		logger.V(log.DEBUG).Infof("Stopping previous EndpointSlice controller for %q", key)
+		logger.Infof("Stopping previous EndpointSlice controller for %q", key)
 
 		err := obj.(*ServiceEndpointSliceController).stop(ctx)
 		if err != nil {
@@ -297,7 +296,7 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 		return nil, false
 	}
 
-	logger.V(log.DEBUG).Infof("Local ServiceImport %q %sd", key, op)
+	logger.Infof("Local ServiceImport %q %sd", key, op)
 
 	if op == syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
@@ -366,7 +365,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 
-	logger.V(log.DEBUG).Infof("ServiceImport %q from cluster %q %sd on broker",
+	logger.Infof("ServiceImport %q from cluster %q %sd on broker",
 		key, serviceImport.Labels[mcsv1a1.LabelSourceCluster], op)
 
 	precedentServiceImport := c.checkForConflicts(ctx, aggregatedServiceImport)

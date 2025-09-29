@@ -68,13 +68,11 @@ type Controller struct {
 type AgentSpecification struct {
 	ClusterID           string
 	Namespace           string
-	Verbosity           int
 	ClustersetIPCidr    string `split_words:"true"`
 	ClustersetIPEnabled bool   `split_words:"true"`
 	GlobalnetEnabled    bool   `split_words:"true"`
 	Uninstall           bool
 	HaltOnCertError     bool `split_words:"true"`
-	Debug               bool
 }
 
 // The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports

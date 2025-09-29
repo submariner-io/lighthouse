@@ -20,7 +20,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"syscall"
 
@@ -71,18 +70,10 @@ func exitOnError(err error, reason string) {
 }
 
 func main() {
-	agentSpec := controller.AgentSpecification{
-		Verbosity: log.DEBUG,
-	}
+	agentSpec := controller.AgentSpecification{}
+
 	err := envconfig.Process("submariner", &agentSpec)
 	exitOnError(err, "Error processing env config for agent spec")
-
-	if agentSpec.Debug {
-		agentSpec.Verbosity = log.LIBDEBUG
-	}
-
-	// Set up verbosity based on environment variables
-	os.Args = append(os.Args, fmt.Sprintf("-v=%d", agentSpec.Verbosity))
 
 	kzerolog.AddFlags(nil)
 	flag.Parse()
