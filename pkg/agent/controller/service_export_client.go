@@ -72,7 +72,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 					continue
 				}
 
-				logger.V(log.DEBUG).Infof("Add status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+				logger.Infof("Add status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 					namespace, name, condition.Type, condition.Status, condition.Reason, condition.Message)
 
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
@@ -80,7 +80,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 			} else if condition.Type == string(mcsv1a1.ServiceExportConditionConflict) {
 				condUpdated := c.mergeConflictCondition(prevCond, condition)
 				if condUpdated {
-					logger.V(log.DEBUG).Infof(
+					logger.Infof(
 						"Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 						namespace, name, condition.Type, prevCond.Status, prevCond.Reason, prevCond.Message)
 				}
@@ -90,7 +90,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 				logger.V(log.TRACE).Infof("Last ServiceExportCondition for (%s/%s) is equal - not updating status: %#v",
 					namespace, name, prevCond)
 			} else if canReplace {
-				logger.V(log.DEBUG).Infof("Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+				logger.Infof("Update status condition for ServiceExport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
 					namespace, name, condition.Type, condition.Status, condition.Reason, condition.Message)
 
 				*prevCond = *condition

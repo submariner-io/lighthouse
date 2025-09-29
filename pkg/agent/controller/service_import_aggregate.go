@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -43,7 +42,7 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 	localServiceImport := c.converter.toServiceImport(obj)
 	key := localEndpointsControllerKey(localServiceImport)
 
-	logger.V(log.DEBUG).Infof("Create/update aggregate for local ServiceImport %q", key)
+	logger.Infof("Create/update aggregate for local ServiceImport %q", key)
 
 	serviceName := serviceImportSourceName(localServiceImport)
 	serviceNamespace := localServiceImport.Labels[constants.LabelSourceNamespace]
@@ -102,7 +101,7 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 					mcsv1a1.ClusterStatus{Cluster: c.clusterID}, clusterStatusKey)
 
 				if added {
-					logger.V(log.DEBUG).Infof("Added cluster name %q to aggregated ServiceImport %q. New status: %#v",
+					logger.Infof("Added cluster name %q to aggregated ServiceImport %q. New status: %#v",
 						c.clusterID, existing.Name, existing.Status.Clusters)
 				}
 			}
@@ -145,7 +144,7 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 	}
 
 	if result == util.OperationResultCreated {
-		logger.V(log.DEBUG).Infof("Created aggregated ServiceImport %s", resource.ToJSON(newAggregate))
+		logger.Infof("Created aggregated ServiceImport %s", resource.ToJSON(newAggregate))
 	}
 
 	return err
@@ -155,7 +154,7 @@ func (c *ServiceImportController) updateAggregateOnDelete(ctx context.Context, o
 	localServiceImport := c.converter.toServiceImport(obj)
 	key := localEndpointsControllerKey(localServiceImport)
 
-	logger.V(log.DEBUG).Infof("Update aggregate on delete of local ServiceImport %q", key)
+	logger.Infof("Update aggregate on delete of local ServiceImport %q", key)
 
 	err := c.stopEndpointsController(ctx, key)
 	if err != nil {
@@ -172,7 +171,7 @@ func (c *ServiceImportController) updateAggregateOnDelete(ctx context.Context, o
 				return nil
 			}
 
-			logger.V(log.DEBUG).Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
+			logger.Infof("Removed cluster name %q from aggregated ServiceImport %q. New status: %#v",
 				c.clusterID, existing.Name, existing.Status.Clusters)
 
 			return nil
@@ -199,7 +198,7 @@ func (c *ServiceImportController) updateAggregate(ctx context.Context, name, nam
 			}
 
 			if len(existing.Status.Clusters) == 0 {
-				logger.V(log.DEBUG).Infof("Deleting aggregated ServiceImport %q", existing.Name)
+				logger.Infof("Deleting aggregated ServiceImport %q", existing.Name)
 
 				err := c.brokerServiceImportClient().Delete(ctx, existing.Name, metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{
