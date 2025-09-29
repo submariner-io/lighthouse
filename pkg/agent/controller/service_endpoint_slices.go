@@ -27,9 +27,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -111,11 +113,13 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		SourceLabelSelector: k8slabels.Set(map[string]string{
 			discovery.LabelServiceName: serviceName,
 		}).String(),
-		RestMapper:   restMapper,
-		Federator:    federator,
-		ResourceType: &discovery.EndpointSlice{},
-		Transform:    controller.onServiceEndpointSlice,
-		Scheme:       scheme,
+		RestMapper:      restMapper,
+		Federator:       federator,
+		ResourceType:    &discovery.EndpointSlice{},
+		Transform:       controller.onServiceEndpointSlice,
+		Scheme:          scheme,
+		WorkQueueConfig: workqueue.ConfigFromGlobal("service-endpoint-slices", nil),
+		MaxLogVerbosity: global.Get("service-endpoint-slices.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Endpoints syncer")

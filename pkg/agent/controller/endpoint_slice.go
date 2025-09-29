@@ -23,9 +23,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +49,7 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
 	syncerConfig.LocalClusterID = spec.ClusterID
+	syncerConfig.MaxLogVerbosity = global.Get("endpoint-slices.syncer.max-verbosity", 0)
 	syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
 			LocalSourceNamespace: metav1.NamespaceAll,
@@ -56,8 +59,10 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 			LocalResourceType:        &discovery.EndpointSlice{},
 			TransformLocalToBroker:   c.onLocalEndpointSlice,
 			OnSuccessfulSyncToBroker: c.onLocalEndpointSliceSynced,
+			LocalWorkQueueConfig:     workqueue.ConfigFromGlobal("local-endpoint-slices", nil),
 			BrokerResourceType:       &discovery.EndpointSlice{},
 			TransformBrokerToLocal:   c.onRemoteEndpointSlice,
+			BrokerWorkQueueConfig:    workqueue.ConfigFromGlobal("broker-endpoint-slices", nil),
 		},
 	}
 
