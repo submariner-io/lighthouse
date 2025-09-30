@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	lighthouse "github.com/submariner-io/lighthouse/coredns/plugin"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
@@ -84,6 +85,12 @@ var (
 )
 
 var _ = Describe("Lighthouse DNS plugin Handler", func() {
+	BeforeEach(func() {
+		global.Init(&v1.ConfigMap{
+			Data: map[string]string{"log.Handler.max-verbosity": "2"},
+		})
+	})
+
 	Context("Fallthrough not configured", testWithoutFallback)
 	Context("Fallthrough configured", testWithFallback)
 	Context("Cluster connectivity status", testClusterStatus)
