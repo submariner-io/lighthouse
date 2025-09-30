@@ -69,13 +69,13 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 		if pReq.port == "" {
 			reqPorts = dnsRecord.Ports
 		} else {
-			logger.V(log.TRACE).Infof("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
+			logger.V(log.DEBUG).Infof("Requested port %q, protocol %q for SRV", pReq.port, pReq.protocol)
 
 			for _, port := range dnsRecord.Ports {
 				name := strings.ToLower(port.Name)
 				protocol := strings.ToLower(string(port.Protocol))
 
-				logger.V(log.TRACE).Infof("Checking port %q, protocol %q", name, protocol)
+				logger.V(log.DEBUG).Infof("Checking port %q, protocol %q", name, protocol)
 
 				if name == pReq.port && protocol == pReq.protocol {
 					reqPorts = append(reqPorts, port)
