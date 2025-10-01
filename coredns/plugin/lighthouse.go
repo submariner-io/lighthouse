@@ -21,6 +21,7 @@ package lighthouse
 import (
 	"errors"
 
+	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -50,3 +51,46 @@ type Lighthouse struct {
 }
 
 var _ plugin.Handler = &Lighthouse{}
+
+func (lh *Lighthouse) configure(c *caddy.Controller) error {
+	if c.Next() {
+		lh.Zones = c.RemainingArgs()
+		if len(lh.Zones) == 0 {
+			lh.Zones = make([]string, len(c.ServerBlockKeys))
+			copy(lh.Zones, c.ServerBlockKeys)
+		}
+
+		for i, str := range lh.Zones {
+			hosts := plugin.Host(str).NormalizeExact()
+			if hosts == nil {
+				logger.Infof("Failed to normalize zone %q", str)
+
+				lh.Zones[i] = ""
+
+				continue
+			}
+
+			lh.Zones[i] = hosts[0]
+		}
+
+		for c.NextBlock() {
+			switch c.Val() {
+			case "fallthrough":
+				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
+			case "ttl":
+				t, err := parseTTL(c)
+				if err != nil {
+					return err
+				}
+
+				lh.TTL = t
+			default:
+				if c.Val() != "}" {
+					return c.Errf("unknown property '%s'", c.Val()) //nolint:wrapcheck // No need to wrap this.
+				}
+			}
+		}
+	}
+
+	return nil
+}
