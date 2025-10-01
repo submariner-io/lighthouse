@@ -14,3 +14,7 @@ ignore:
   - vulnerability: GHSA-cvx7-x8pj-x2gw
     package:
       name: github.com/coredns/coredns
+  # This requires bumping to K8s 0.34 which is incompatible.
+  - vulnerability: GHSA-93mf-426m-g6x9
+    package:
+      name: github.com/coredns/coredns
