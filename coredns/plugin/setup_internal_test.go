@@ -29,11 +29,18 @@ import (
 	"github.com/miekg/dns"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/global"
+	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8snet "k8s.io/utils/net"
@@ -51,6 +58,8 @@ func (f *fakeHandler) Name() string {
 }
 
 var _ = Describe("Plugin setup", func() {
+	os.Setenv("SUBMARINER_NAMESPACE", "submariner-operator")
+
 	BeforeEach(func() {
 		os.Unsetenv("SUBMARINER_CLUSTERCIDR")
 
@@ -66,18 +75,18 @@ var _ = Describe("Plugin setup", func() {
 			Resource: "submariners",
 		}
 
-		newDynamicClient = func(_ *rest.Config) (dynamic.Interface, error) {
+		resource.NewDynamicClient = func(_ *rest.Config) (dynamic.Interface, error) {
 			return fakeClient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
 				gatewaysGVR:    "GatewayList",
 				submarinersGVR: "SubmarinersList",
 			}), nil
 		}
 
-		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1a1.ServiceImport{})
-	})
+		newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
+			return k8sfake.NewClientset(), nil
+		}
 
-	AfterEach(func() {
-		newDynamicClient = nil
+		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1a1.ServiceImport{})
 	})
 
 	Context("Parsing correct configurations", testCorrectConfig)
@@ -186,6 +195,24 @@ func testCorrectConfig() {
 
 		It("should set the supported address types to IPv4 and IPv6", func() {
 			Expect(lh.SupportedIPFamilies).To(ContainElements(k8snet.IPv4, k8snet.IPv6))
+		})
+	})
+
+	When("the LH CoreDNS component ConfigMap exists", func() {
+		BeforeEach(func() {
+			newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
+				return k8sfake.NewClientset(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      names.LighthouseCoreDNSComponent,
+						Namespace: os.Getenv("SUBMARINER_NAMESPACE"),
+					},
+					Data: map[string]string{"foo": "bar"},
+				}), nil
+			}
+		})
+
+		It("should initialize the global config", func() {
+			Expect(global.Get("foo", "")).To(Equal("bar"))
 		})
 	})
 }

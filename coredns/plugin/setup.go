@@ -23,18 +23,24 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/configmap"
+	"github.com/submariner-io/admiral/pkg/global"
+	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/lighthouse/coredns/gateway"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -47,13 +53,11 @@ var (
 	kubeconfig string
 )
 
-// Hooks for unit tests.
 var (
 	buildKubeConfigFunc = clientcmd.BuildConfigFromFlags
 
-	newDynamicClient = func(c *rest.Config) (dynamic.Interface, error) {
-		client, err := dynamic.NewForConfig(c)
-		return client, errors.Wrap(err, "error creating a dynamic client")
+	newK8sClient = func(cfg *rest.Config) (kubernetes.Interface, error) {
+		return kubernetes.NewForConfig(cfg)
 	}
 
 	restMapper meta.RESTMapper
@@ -95,9 +99,14 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	gwController := gateway.NewController()
 
-	localClient, err := newDynamicClient(cfg)
+	localClient, err := resource.NewDynamicClient(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local client")
+	}
+
+	k8sClient, err := newK8sClient(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating K8s client")
 	}
 
 	lh := &Lighthouse{
@@ -107,12 +116,34 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		SupportedIPFamilies: determineSupportedAddressTypes(),
 	}
 
+	resolverController := resolver.NewController(lh.Resolver)
+
+	stopCh := make(chan struct{})
+	ctx := wait.ContextForChannel(stopCh)
+
+	c.OnShutdown(func() error {
+		close(stopCh)
+		gwController.Stop()
+		resolverController.Stop()
+
+		return nil
+	})
+
+	submNamespace := os.Getenv("SUBMARINER_NAMESPACE")
+
+	configMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, submNamespace), names.LighthouseCoreDNSComponent)
+	if err != nil {
+		return nil, errors.Wrap(err, "error retrieving ConfigMap")
+	}
+
+	global.Init(configMap)
+
+	configmap.WatchAndSignalOnChange(ctx, k8sClient, submNamespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
+
 	err = gwController.Start(localClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
-
-	resolverController := resolver.NewController(lh.Resolver)
 
 	err = resolverController.Start(&watcher.Config{
 		RestConfig: cfg,
@@ -123,55 +154,9 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error starting the resolver controller")
 	}
 
-	c.OnShutdown(func() error {
-		gwController.Stop()
-		resolverController.Stop()
+	err = lh.configure(c)
 
-		return nil
-	})
-
-	// Changed `for` to `if` to satisfy golint:
-	//	 SA4004: the surrounding loop is unconditionally terminated (staticcheck)
-	if c.Next() {
-		lh.Zones = c.RemainingArgs()
-		if len(lh.Zones) == 0 {
-			lh.Zones = make([]string, len(c.ServerBlockKeys))
-			copy(lh.Zones, c.ServerBlockKeys)
-		}
-
-		for i, str := range lh.Zones {
-			hosts := plugin.Host(str).NormalizeExact()
-			if hosts == nil {
-				logger.Infof("Failed to normalize zone %q", str)
-
-				lh.Zones[i] = ""
-
-				continue
-			}
-
-			lh.Zones[i] = hosts[0]
-		}
-
-		for c.NextBlock() {
-			switch c.Val() {
-			case "fallthrough":
-				lh.Fall.SetZonesFromArgs(c.RemainingArgs())
-			case "ttl":
-				t, err := parseTTL(c)
-				if err != nil {
-					return nil, err
-				}
-
-				lh.TTL = t
-			default:
-				if c.Val() != "}" {
-					return nil, c.Errf("unknown property '%s'", c.Val()) //nolint:wrapcheck // No need to wrap this.
-				}
-			}
-		}
-	}
-
-	return lh, nil
+	return lh, err
 }
 
 func determineSupportedAddressTypes() []k8snet.IPFamily {

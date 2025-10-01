@@ -297,8 +297,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/submariner-io/admiral v0.22.0-m2.0.20251014134744-5203e0e79bf9 h1:z0NazUBuNEM7MUx0vtkZFlRC9iye/0/vL7N6hdQ0kmI=
-github.com/submariner-io/admiral v0.22.0-m2.0.20251014134744-5203e0e79bf9/go.mod h1:wHfXJrUF1hzyDRsZvJ8MGB/Tc7CEwRMLMQt8C4onvNg=
+github.com/submariner-io/admiral v0.22.0-m2.0.20251020132010-7ac697e3ece9 h1:VJpxfUh5jeanWsd/orDN/0ID87NdaEqYtmf+YBKeeLM=
+github.com/submariner-io/admiral v0.22.0-m2.0.20251020132010-7ac697e3ece9/go.mod h1:w2mFuBeiXcUCtITrlEp5KiG+x55l0+F6oIK5r34jUvQ=
 github.com/tidwall/gjson v1.18.0 h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=
 github.com/tidwall/gjson v1.18.0/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
