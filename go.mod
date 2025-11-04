@@ -8,11 +8,11 @@ require (
 	github.com/onsi/gomega v1.37.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
-	github.com/submariner-io/admiral v0.21.0
-	github.com/submariner-io/shipyard v0.21.0
-	k8s.io/api v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.3
+	github.com/submariner-io/admiral v0.21.1
+	github.com/submariner-io/shipyard v0.21.1
+	k8s.io/api v0.33.5
+	k8s.io/apimachinery v0.33.5
+	k8s.io/client-go v0.33.5
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/controller-runtime v0.20.4
