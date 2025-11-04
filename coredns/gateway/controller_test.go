@@ -287,7 +287,7 @@ func (t *testDriver) addGatewayStatusConnection(clusterID, status string, ipFami
 	current, _, err := unstructured.NestedSlice(t.gatewayObj.Object, "status", "connections")
 	Expect(err).To(Succeed())
 
-	conn := map[string]interface{}{}
+	conn := map[string]any{}
 	Expect(unstructured.SetNestedField(conn, status, "status")).To(Succeed())
 	Expect(unstructured.SetNestedField(conn, clusterID, "endpoint", "cluster_id")).To(Succeed())
 

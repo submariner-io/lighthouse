@@ -609,7 +609,7 @@ func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportC
 	}
 
 	for _, se := range serviceExports {
-		Consistently(func() interface{} {
+		Consistently(func() any {
 			return c.retrieveServiceExportCondition(se, condType)
 		}).Should(BeNil(), "Unexpected ServiceExport status condition")
 	}
@@ -972,14 +972,14 @@ func assertEquivalentConditions(g Gomega, actual, expected *metav1.Condition) {
 	}
 }
 
-func toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
+func toServiceExport(obj any) *mcsv1a1.ServiceExport {
 	se := &mcsv1a1.ServiceExport{}
 	Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 	return se
 }
 
-func toServiceImport(obj interface{}) *mcsv1a1.ServiceImport {
+func toServiceImport(obj any) *mcsv1a1.ServiceImport {
 	si := &mcsv1a1.ServiceImport{}
 	Expect(scheme.Scheme.Convert(obj, si, nil)).To(Succeed())
 
@@ -1080,7 +1080,7 @@ func newServiceExportConflictCondition(reason ...mcsv1a1.ServiceExportConditionR
 func setIngressIPConditions(ingressIP *unstructured.Unstructured, conditions ...metav1.Condition) {
 	var err error
 
-	condObjs := make([]interface{}, len(conditions))
+	condObjs := make([]any, len(conditions))
 	for i := range conditions {
 		condObjs[i], err = runtime.DefaultUnstructuredConverter.ToUnstructured(&conditions[i])
 		Expect(err).To(Succeed())

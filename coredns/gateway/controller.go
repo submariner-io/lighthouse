@@ -104,10 +104,10 @@ func (c *Controller) Start(client dynamic.Interface) error {
 		ObjectType: &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: c.queue.Enqueue,
-			UpdateFunc: func(_ interface{}, newObj interface{}) {
+			UpdateFunc: func(_ any, newObj any) {
 				c.queue.Enqueue(newObj)
 			},
-			DeleteFunc: func(obj interface{}) {
+			DeleteFunc: func(obj any) {
 				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				logger.V(log.DEBUG).Infof("GatewayStatus %q deleted", key)
 			},
@@ -165,13 +165,13 @@ func (c *Controller) gatewayCreatedOrUpdated(obj *unstructured.Unstructured) {
 	c.updateClusterStatusMap(connections)
 }
 
-func (c *Controller) updateClusterStatusMap(connections []interface{}) {
+func (c *Controller) updateClusterStatusMap(connections []any) {
 	var newMap clusterStatusMapType
 
 	currentMap := c.getClusterStatusMap()
 
 	for _, connection := range connections {
-		connectionMap := connection.(map[string]interface{})
+		connectionMap := connection.(map[string]any)
 
 		status, found, err := unstructured.NestedString(connectionMap, "status")
 		if err != nil || !found {
@@ -227,7 +227,7 @@ func (c *Controller) updateLocalClusterIDIfNeeded(clusterID string) {
 	}
 }
 
-func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bool) {
+func getGatewayStatus(obj *unstructured.Unstructured) ([]any, string, bool) {
 	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
 		logger.Errorf(err, "status field not found in %#v, err was", obj)
@@ -236,7 +236,7 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bo
 
 	localClusterID, found, err := unstructured.NestedString(status, "localEndpoint", "cluster_id")
 
-	var connections []interface{}
+	var connections []any
 
 	if !found || err != nil {
 		logger.Errorf(err, "localEndpoint->cluster_id not found in %#v, err was", status)
@@ -245,16 +245,16 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]interface{}, string, bo
 	} else {
 		// Add connection entries for IPv4 and IPv6, distinguished by the "usingIP" field. Note, we use any address
 		// as only IP family is relevant.
-		connections = append(connections, map[string]interface{}{
+		connections = append(connections, map[string]any{
 			"status":  "connected",
 			"usingIP": "127.0.0.0",
-			"endpoint": map[string]interface{}{
+			"endpoint": map[string]any{
 				"cluster_id": localClusterID,
 			},
-		}, map[string]interface{}{
+		}, map[string]any{
 			"status":  "connected",
 			"usingIP": "::1",
-			"endpoint": map[string]interface{}{
+			"endpoint": map[string]any{
 				"cluster_id": localClusterID,
 			},
 		})
