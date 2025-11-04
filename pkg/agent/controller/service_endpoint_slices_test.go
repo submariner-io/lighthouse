@@ -109,8 +109,8 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 })
 
 type epsDynamicClient struct {
-	dynClient *dynamicfake.FakeDynamicClient
 	epsResourceClient
+	dynClient *dynamicfake.FakeDynamicClient
 }
 
 func (f *epsDynamicClient) Resource(gvr schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
