@@ -166,7 +166,7 @@ func determineSupportedAddressTypes() []k8snet.IPFamily {
 
 	logger.Infof("SUBMARINER_CLUSTERCIDR env: %q", cidrEnvVar)
 
-	for _, cidr := range strings.Split(cidrEnvVar, ",") {
+	for cidr := range strings.SplitSeq(cidrEnvVar, ",") {
 		s := strings.TrimSpace(cidr)
 		if s != "" {
 			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
