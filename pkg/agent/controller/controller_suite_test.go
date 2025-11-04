@@ -1063,18 +1063,18 @@ func newServiceExportReadyCondition(status metav1.ConditionStatus, reason mcsv1a
 }
 
 func newServiceExportConflictCondition(reason ...mcsv1a1.ServiceExportConditionReason) metav1.Condition {
-	joinedReason := ""
+	var joined strings.Builder
 
 	for i := range reason {
 		if i > 0 {
-			joinedReason += ","
+			joined.WriteString(",")
 		}
 
-		joinedReason += string(reason[i])
+		joined.WriteString(string(reason[i]))
 	}
 
 	return mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionConflict, metav1.ConditionTrue,
-		mcsv1a1.ServiceExportConditionReason(joinedReason), "")
+		mcsv1a1.ServiceExportConditionReason(joined.String()), "")
 }
 
 func setIngressIPConditions(ingressIP *unstructured.Unstructured, conditions ...metav1.Condition) {
