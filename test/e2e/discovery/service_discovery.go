@@ -694,7 +694,7 @@ func getClusterDomain(f *framework.Framework, cluster framework.ClusterIndex, ta
 		CaptureStdout: true,
 		CaptureStderr: true,
 	}, cluster); err == nil {
-		for _, line := range strings.Split(stdout, "\n") {
+		for line := range strings.SplitSeq(stdout, "\n") {
 			if strings.Contains(line, "search") {
 				ss := strings.Split(line, " ")
 				return ss[3]
