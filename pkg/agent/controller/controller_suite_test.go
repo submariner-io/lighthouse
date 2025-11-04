@@ -383,9 +383,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	for i := range c.serviceEndpointSlices {
-		for k, v := range c.service.Labels {
-			c.serviceEndpointSlices[i].Labels[k] = v
-		}
+		maps.Copy(c.serviceEndpointSlices[i].Labels, c.service.Labels)
 	}
 
 	for _, ip := range c.service.Spec.ClusterIPs {
@@ -882,9 +880,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		AddressType: discovery.AddressTypeIPv4,
 	}
 
-	for k, v := range c.service.Labels {
-		epsTemplate.Labels[k] = v
-	}
+	maps.Copy(epsTemplate.Labels, c.service.Labels)
 
 	var expected []discovery.EndpointSlice
 
