@@ -60,7 +60,7 @@ func (lb *smoothWeightedRR) Skip(item any) {
 	}
 }
 
-// Number of Items added.
+// ItemCount returns the number of items.
 func (lb *smoothWeightedRR) ItemCount() int {
 	return len(lb.items)
 }
