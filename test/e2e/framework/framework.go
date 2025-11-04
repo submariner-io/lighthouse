@@ -632,8 +632,7 @@ func (f *Framework) GetHealthCheckEnabledInfo(cluster framework.ClusterIndex) bo
 	var healthCheckEnabled bool
 
 	framework.AwaitUntil("Get healthCheckEnabled Configuration", func() (*unstructured.Unstructured, error) {
-		unstructuredSubmarinerConfig, err := SubmarinerClients[cluster].Get(context.TODO(),
-			"submariner", metav1.GetOptions{})
+		unstructuredSubmarinerConfig, err := SubmarinerClients[cluster].Get(context.TODO(), "submariner", metav1.GetOptions{})
 		return unstructuredSubmarinerConfig, err
 	}, func(result *unstructured.Unstructured) (bool, string, error) {
 		framework.By("Getting the Submariner Config, for cluster " + framework.TestContext.ClusterIDs[cluster])
@@ -660,6 +659,7 @@ func (f *Framework) SetHealthCheckIP(cluster framework.ClusterIndex, ip, endpoin
 	framework.AwaitUntil("set healthCheckIP", func() (*unstructured.Unstructured, error) {
 		endpoint, err := EndpointClients[cluster].Patch(context.TODO(), endpointName, types.MergePatchType, []byte(patch),
 			metav1.PatchOptions{})
+
 		return endpoint, err
 	}, framework.NoopCheckResult)
 }
@@ -838,6 +838,7 @@ func (f *Framework) awaitServiceExportedStatusCondition(cluster framework.Cluste
 		if cond != nil {
 			if cond.Status != status {
 				out, _ := json.MarshalIndent(cond, "", "  ")
+
 				return false, fmt.Sprintf("ServiceExport %s condition status is %s. Expected %s",
 					mcsv1a1.ServiceExportConditionReady, out, status), nil
 			}

@@ -565,8 +565,8 @@ func (c *cluster) awaitServiceExportCondition(expected ...metav1.Condition) {
 	Eventually(func(g Gomega) {
 		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
-		se := toServiceExport(obj)
 
+		se := toServiceExport(obj)
 		c := meta.FindStatusCondition(se.Status.Conditions, expected[last].Type)
 
 		g.Expect(c).NotTo(BeNil(), "ServiceExport condition not found for type %q", expected[last].Type)

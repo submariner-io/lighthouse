@@ -141,6 +141,7 @@ func (c *epsResourceClient) Create(ctx context.Context, obj *unstructured.Unstru
 
 	if c.firstCreate.CompareAndSwap(true, false) {
 		c.epsCreateStarted <- true
+
 		<-c.epsCreateContinue
 	}
 
