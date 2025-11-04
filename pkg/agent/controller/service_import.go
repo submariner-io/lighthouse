@@ -149,7 +149,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 	go func() {
 		<-stopCh
 
-		c.endpointControllers.Range(func(_, value interface{}) bool {
+		c.endpointControllers.Range(func(_, value any) bool {
 			err := value.(*ServiceEndpointSliceController).stop(context.TODO())
 			if err != nil {
 				logger.Warningf("Error stopping service EndpointSlice controller: %s", err)
