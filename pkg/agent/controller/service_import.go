@@ -268,10 +268,9 @@ func (c *ServiceImportController) startEndpointsController(ctx context.Context, 
 func (c *ServiceImportController) stopEndpointsController(ctx context.Context, key string) error {
 	if obj, found := c.endpointControllers.Load(key); found {
 		var err error
-
 		endpointController := obj.(*ServiceEndpointSliceController)
-		err = endpointController.stop(ctx)
 
+		err = endpointController.stop(ctx)
 		if err == nil {
 			err = endpointController.cleanup(ctx)
 			if err == nil {
