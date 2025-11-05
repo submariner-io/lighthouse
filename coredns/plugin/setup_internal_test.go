@@ -147,7 +147,7 @@ func testCorrectConfig() {
 		})
 	})
 
-	When("ttl arguments is specified", func() {
+	When("ttl argument is specified", func() {
 		BeforeEach(func() {
 			config = `lighthouse {
 			    ttl 30
@@ -159,7 +159,17 @@ func testCorrectConfig() {
 		})
 	})
 
-	It("Should handle missing optional fields", func() {
+	When("and the global config ttl setting is specified", func() {
+		BeforeEach(func() {
+			setupGlobalConfigMap(map[string]string{TTLConfigKey: "99"})
+		})
+
+		It("should set the ttl field to the global config value", func() {
+			Expect(lh.TTL).Should(Equal(uint32(99)))
+		})
+	})
+
+	It("should handle missing optional fields", func() {
 		config := `lighthouse`
 		c := caddy.NewTestController("dns", config)
 		lh, err := lighthouseParse(c)
@@ -200,15 +210,7 @@ func testCorrectConfig() {
 
 	When("the LH CoreDNS component ConfigMap exists", func() {
 		BeforeEach(func() {
-			newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
-				return k8sfake.NewClientset(&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      names.LighthouseCoreDNSComponent,
-						Namespace: os.Getenv("SUBMARINER_NAMESPACE"),
-					},
-					Data: map[string]string{"foo": "bar"},
-				}), nil
-			}
+			setupGlobalConfigMap(map[string]string{"foo": "bar"})
 		})
 
 		It("should initialize the global config", func() {
@@ -262,7 +264,7 @@ func testIncorrectConfig() {
 	When("an invalid ttl is specified", func() {
 		BeforeEach(func() {
 			config = `lighthouse {
-                ttl -10
+                ttl 4000
 		    } noplugin`
 
 			buildKubeConfigFunc = func(_, _ string) (*rest.Config, error) {
@@ -271,7 +273,7 @@ func testIncorrectConfig() {
 		})
 
 		It("should return an appropriate plugin error", func() {
-			verifyPluginError(setupErr, "ttl must be in range [0, 3600]: -10")
+			verifyPluginError(setupErr, "ttl must be in range [0, 3600]")
 		})
 	})
 
@@ -317,4 +319,16 @@ func verifyPluginError(err error, str string) {
 	Expect(err).To(HaveOccurred())
 	Expect(err.Error()).To(HavePrefix("plugin/lighthouse"))
 	Expect(err.Error()).To(ContainSubstring(str))
+}
+
+func setupGlobalConfigMap(data map[string]string) {
+	newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
+		return k8sfake.NewClientset(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      names.LighthouseCoreDNSComponent,
+				Namespace: os.Getenv("SUBMARINER_NAMESPACE"),
+			},
+			Data: data,
+		}), nil
+	}
 }
