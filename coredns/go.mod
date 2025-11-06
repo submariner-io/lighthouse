@@ -10,7 +10,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/submariner-io/admiral v0.22.0-m2.0.20251105162751-88b69fb36c13
+	github.com/submariner-io/admiral v0.22.0-m2.0.20251106072227-bef17f66c92c
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
