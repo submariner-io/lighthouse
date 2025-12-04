@@ -69,7 +69,7 @@ ls .tekton/*-pull-request.yaml | sed 's|.tekton/\(.*\)-pull-request\.yaml|\1|'
 # 4. Check repo components for violations
 # For each component identified above, check violations:
 grep -A 2 "Name: <component-name>\$" /tmp/ec-report.txt
-# Example: grep -A 2 "Name: submariner-operator-0-21\$" /tmp/ec-report.txt
+# Example: grep -A 2 "Name: lighthouse-agent-0-22\$" /tmp/ec-report.txt
 
 # 5. Tasks mentioned in violations
 grep "Term:" /tmp/ec-report.txt | awk '{print $2}' | sort -u
@@ -225,6 +225,6 @@ fi
 
 **Note:** Each component builds independently and triggers its own EC validation. The EC report shows the newly-built component plus all other components from their most recent builds (not necessarily from the same PR).
 
-Expected: The identified component shows 0 violations. Other repo components may show violations if they haven't rebuilt yet from this PR. Overall build may still fail due to other repo components (outside scope of this PR).
+Expected: The identified component (lighthouse-agent or lighthouse-coredns) shows 0 violations. The other lighthouse component may show violations if it hasn't rebuilt yet from this PR.
 
-If PR touches multiple components in the repo, repeat verification for each component's snapshot.
+If PR touches both components, repeat verification for each component's snapshot.
