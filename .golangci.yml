@@ -3,6 +3,9 @@ version: "2"
 linters:
   default: none
   settings:
+    embeddedstructfieldcheck:
+      # Checks that there is an empty space between the embedded fields and regular fields.
+      empty-line: false
     errcheck:
       exclude-functions:
         - encoding/json.Marshal
@@ -65,10 +68,12 @@ linters:
         - -QF1003
         # Allow unnecessary embedded field selectors
         - -QF1008
-    wsl:
-      # Separating explicit var declarations by blank lines seems excessive.
-      allow-cuddle-declarations: true
+    wsl_v5:
+      disable:
+        - decl
+        - expr
   enable:
+    # - arangolint # We don't use arangodb
     - asasalint
     - asciicheck
     - bidichk
@@ -84,6 +89,7 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - embeddedstructfieldcheck
     - err113
     - errcheck
     - errchkjson
@@ -108,6 +114,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - godoclint
     - godot
     # - godox #  Let's not forbid inline TODOs, FIXMEs et al
     - goheader
@@ -124,6 +131,7 @@ linters:
     - ineffassign
     # - interfacebloat # We track complexity elsewhere
     - intrange
+    - iotamixing
     # - ireturn # The argument to always "Return Concrete Types" doesn't seem compelling. It is perfectly valid to return
     #             an interface to avoid exposing the entire underlying struct
     - lll
@@ -133,6 +141,7 @@ linters:
     - mirror
     - misspell
     # - mnd # It doesn't seem useful in general to enforce constants for all numeric values
+    - modernize
     - musttag
     - nakedret
     # - nestif # This calculates cognitive complexity but we're doing that elsewhere
@@ -167,6 +176,7 @@ linters:
     # - tparallel # Not relevant for our Ginkgo UTs
     - unconvert
     - unparam
+    # - unqueryvet # We don't use SQL
     - unused
     - usestdlibvars
     - usetesting
@@ -174,7 +184,7 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-    - wsl
+    - wsl_v5
     # - zerologlint # We use zerolog indirectly so this isn't needed
   exclusions:
     generated: lax

@@ -29,7 +29,7 @@ import (
 var logger = log.Logger{Logger: logf.Log.WithName("LoadBalancer")}
 
 type weightedItem struct {
-	item            interface{}
+	item            any
 	weight          int64
 	currentWeight   int64
 	effectiveWeight int64
@@ -38,18 +38,18 @@ type weightedItem struct {
 // Smooth Weighted Round Robin load balancer implementation.
 type smoothWeightedRR struct {
 	items   []*weightedItem
-	itemMap map[interface{}]*weightedItem
+	itemMap map[any]*weightedItem
 }
 
 // NewSmoothWeightedRR returns a Smooth Weighted Round Robin load balancer.
 func NewSmoothWeightedRR() Interface {
 	return &smoothWeightedRR{
 		items:   make([]*weightedItem, 0),
-		itemMap: make(map[interface{}]*weightedItem),
+		itemMap: make(map[any]*weightedItem),
 	}
 }
 
-func (lb *smoothWeightedRR) Skip(item interface{}) {
+func (lb *smoothWeightedRR) Skip(item any) {
 	if wt, ok := lb.itemMap[item]; ok {
 		wt.effectiveWeight -= wt.weight
 		if wt.effectiveWeight < 0 {
@@ -60,13 +60,13 @@ func (lb *smoothWeightedRR) Skip(item interface{}) {
 	}
 }
 
-// Number of Items added.
+// ItemCount returns the number of items.
 func (lb *smoothWeightedRR) ItemCount() int {
 	return len(lb.items)
 }
 
 // Add - adds a new unique item to the list.
-func (lb *smoothWeightedRR) Add(item interface{}, weight int64) error {
+func (lb *smoothWeightedRR) Add(item any, weight int64) error {
 	if item == nil {
 		return errors.New("item cannot be nil")
 	}
@@ -90,11 +90,11 @@ func (lb *smoothWeightedRR) Add(item interface{}, weight int64) error {
 // RemoveAll - removes all items and reset state.
 func (lb *smoothWeightedRR) RemoveAll() {
 	lb.items = lb.items[:0]
-	lb.itemMap = make(map[interface{}]*weightedItem)
+	lb.itemMap = make(map[any]*weightedItem)
 }
 
 // Next - fetches the next item according to the smooth weighted round robin algorithm.
-func (lb *smoothWeightedRR) Next() interface{} {
+func (lb *smoothWeightedRR) Next() any {
 	i := lb.nextWeightedItem()
 	if i == nil {
 		return nil

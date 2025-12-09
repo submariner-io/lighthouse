@@ -16,7 +16,7 @@ jobs:
       issues: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@3c3b66f1f7d0900e37b71eca45b63ea9eedfce31
@@ -25,7 +25,7 @@ jobs:
 
       - name: Raise an Issue to report broken links
         if: ${{ failure() }}
-        uses: peter-evans/create-issue-from-file@e8ef132d6df98ed982188e460ebb3b5d4ef3a9cd
+        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710
         with:
           title: Broken link detected by CI
           content-filepath: .github/ISSUE_TEMPLATE/broken-link.md

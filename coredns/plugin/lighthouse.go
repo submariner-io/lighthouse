@@ -24,6 +24,7 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/fall"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	k8snet "k8s.io/utils/net"
@@ -31,9 +32,10 @@ import (
 )
 
 const (
-	Svc        = "svc"
-	Pod        = "pod"
-	defaultTTL = uint32(5)
+	Svc          = "svc"
+	Pod          = "pod"
+	TTLConfigKey = "dns.ttl"
+	defaultTTL   = uint32(5)
 )
 
 var errInvalidRequest = errors.New("invalid query name")
@@ -90,6 +92,12 @@ func (lh *Lighthouse) configure(c *caddy.Controller) error {
 				}
 			}
 		}
+	}
+
+	lh.TTL = global.Get(TTLConfigKey, lh.TTL)
+
+	if lh.TTL > 3600 {
+		return c.Errf("ttl must be in range [0, 3600]: %d", lh.TTL) //nolint:wrapcheck // No need to wrap this.
 	}
 
 	return nil

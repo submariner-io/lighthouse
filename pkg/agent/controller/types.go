@@ -97,7 +97,7 @@ type ServiceImportController struct {
 	clustersetIPEnabled        bool
 }
 
-// Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
+// ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
 // It creates LH EndpointSlices corresponding to service EndpointSlices that are distributed to other clusters.
 type ServiceEndpointSliceController struct {
 	clusterID                string

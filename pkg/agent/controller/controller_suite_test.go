@@ -383,9 +383,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	for i := range c.serviceEndpointSlices {
-		for k, v := range c.service.Labels {
-			c.serviceEndpointSlices[i].Labels[k] = v
-		}
+		maps.Copy(c.serviceEndpointSlices[i].Labels, c.service.Labels)
 	}
 
 	for _, ip := range c.service.Spec.ClusterIPs {
@@ -565,8 +563,8 @@ func (c *cluster) awaitServiceExportCondition(expected ...metav1.Condition) {
 	Eventually(func(g Gomega) {
 		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
-		se := toServiceExport(obj)
 
+		se := toServiceExport(obj)
 		c := meta.FindStatusCondition(se.Status.Conditions, expected[last].Type)
 
 		g.Expect(c).NotTo(BeNil(), "ServiceExport condition not found for type %q", expected[last].Type)
@@ -609,7 +607,7 @@ func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportC
 	}
 
 	for _, se := range serviceExports {
-		Consistently(func() interface{} {
+		Consistently(func() any {
 			return c.retrieveServiceExportCondition(se, condType)
 		}).Should(BeNil(), "Unexpected ServiceExport status condition")
 	}
@@ -882,9 +880,7 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 		AddressType: discovery.AddressTypeIPv4,
 	}
 
-	for k, v := range c.service.Labels {
-		epsTemplate.Labels[k] = v
-	}
+	maps.Copy(epsTemplate.Labels, c.service.Labels)
 
 	var expected []discovery.EndpointSlice
 
@@ -972,14 +968,14 @@ func assertEquivalentConditions(g Gomega, actual, expected *metav1.Condition) {
 	}
 }
 
-func toServiceExport(obj interface{}) *mcsv1a1.ServiceExport {
+func toServiceExport(obj any) *mcsv1a1.ServiceExport {
 	se := &mcsv1a1.ServiceExport{}
 	Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 	return se
 }
 
-func toServiceImport(obj interface{}) *mcsv1a1.ServiceImport {
+func toServiceImport(obj any) *mcsv1a1.ServiceImport {
 	si := &mcsv1a1.ServiceImport{}
 	Expect(scheme.Scheme.Convert(obj, si, nil)).To(Succeed())
 
@@ -1063,24 +1059,24 @@ func newServiceExportReadyCondition(status metav1.ConditionStatus, reason mcsv1a
 }
 
 func newServiceExportConflictCondition(reason ...mcsv1a1.ServiceExportConditionReason) metav1.Condition {
-	joinedReason := ""
+	var joined strings.Builder
 
 	for i := range reason {
 		if i > 0 {
-			joinedReason += ","
+			joined.WriteString(",")
 		}
 
-		joinedReason += string(reason[i])
+		joined.WriteString(string(reason[i]))
 	}
 
 	return mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionConflict, metav1.ConditionTrue,
-		mcsv1a1.ServiceExportConditionReason(joinedReason), "")
+		mcsv1a1.ServiceExportConditionReason(joined.String()), "")
 }
 
 func setIngressIPConditions(ingressIP *unstructured.Unstructured, conditions ...metav1.Condition) {
 	var err error
 
-	condObjs := make([]interface{}, len(conditions))
+	condObjs := make([]any, len(conditions))
 	for i := range conditions {
 		condObjs[i], err = runtime.DefaultUnstructuredConverter.ToUnstructured(&conditions[i])
 		Expect(err).To(Succeed())

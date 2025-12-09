@@ -166,7 +166,7 @@ func determineSupportedAddressTypes() []k8snet.IPFamily {
 
 	logger.Infof("SUBMARINER_CLUSTERCIDR env: %q", cidrEnvVar)
 
-	for _, cidr := range strings.Split(cidrEnvVar, ",") {
+	for cidr := range strings.SplitSeq(cidrEnvVar, ",") {
 		s := strings.TrimSpace(cidr)
 		if s != "" {
 			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
@@ -189,13 +189,9 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 		return 0, c.ArgErr() //nolint:wrapcheck // No need to wrap this.
 	}
 
-	t, err := strconv.ParseInt(args[0], 10, 32)
+	t, err := strconv.ParseUint(args[0], 10, 32)
 	if err != nil {
 		return 0, errors.Wrap(err, "error parsing TTL")
-	}
-
-	if t < 0 || t > 3600 {
-		return 0, c.Errf("ttl must be in range [0, 3600]: %d", t) //nolint:wrapcheck // No need to wrap this.
 	}
 
 	return uint32(t), nil
