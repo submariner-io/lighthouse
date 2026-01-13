@@ -388,8 +388,8 @@ func (f *Framework) AwaitPodIngressIPs(targetCluster framework.ClusterIndex, svc
 	isLocal bool,
 ) ([]string, []string) {
 	podList := f.Framework.AwaitPodsByAppLabel(targetCluster, svc.Labels["app"], svc.Namespace, count)
-	hostNameList := make([]string, 0)
-	ipList := make([]string, 0)
+	hostNameList := make([]string, 0, len(podList.Items))
+	ipList := make([]string, 0, len(podList.Items))
 
 	for i := range len(podList.Items) {
 		ingressIPName := "pod-" + podList.Items[i].Name
@@ -433,12 +433,17 @@ func (f *Framework) GetPodIPs(targetCluster framework.ClusterIndex, service *v1.
 }
 
 func (f *Framework) AwaitEndpointIngressIPs(targetCluster framework.ClusterIndex, svc *v1.Service) ([]string, []string) {
-	hostNameList := make([]string, 0)
-	ipList := make([]string, 0)
-
 	endpoint := framework.AwaitUntil("retrieve Endpoints", func() (*v1.Endpoints, error) {
 		return framework.KubeClients[targetCluster].CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	}, framework.NoopCheckResult)
+
+	capacity := 0
+	for _, subset := range endpoint.Subsets {
+		capacity += len(subset.Addresses)
+	}
+
+	hostNameList := make([]string, 0)
+	ipList := make([]string, 0, capacity)
 
 	for _, subset := range endpoint.Subsets {
 		for _, address := range subset.Addresses {

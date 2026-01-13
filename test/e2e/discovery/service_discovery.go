@@ -497,17 +497,11 @@ func RunServiceDiscoveryRoundRobinTest(f *lhframework.Framework) {
 	f.AwaitAggregatedServiceImport(framework.ClusterB, nginxServiceClusterB, 2)
 	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
-	var serviceIPList []string
-
 	serviceIPClusterB := f.GetServiceIP(framework.ClusterB, nginxServiceClusterB, corev1.IPFamilyUnknown)
-
-	serviceIPList = append(serviceIPList, serviceIPClusterB)
-
 	serviceIPClusterC := f.GetServiceIP(framework.ClusterC, nginxServiceClusterB, corev1.IPFamilyUnknown)
 
-	serviceIPList = append(serviceIPList, serviceIPClusterC)
-
-	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, serviceIPList, netshootPodList, checkedDomains)
+	verifyRoundRobinWithDig(f.Framework, framework.ClusterA, nginxServiceClusterB.Name, []string{serviceIPClusterB, serviceIPClusterC},
+		netshootPodList, checkedDomains)
 }
 
 func RunServicesClusterAvailabilityMultiClusterTest(f *lhframework.Framework) {
@@ -565,7 +559,8 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 	ports := service.Spec.Ports
 	for i := range domains {
 		for _, port := range ports {
-			cmd := []string{"dig", "+short", "SRV"}
+			cmd := make([]string, 0, 4)
+			cmd = append(cmd, "dig", "+short", "SRV")
 
 			clusterDNSName := lhframework.BuildServiceDNSName(clusterName, service.Name, f.Namespace, domains[i])
 
@@ -628,7 +623,8 @@ func verifySRVWithDig(f *framework.Framework, srcCluster framework.ClusterIndex,
 func verifyRoundRobinWithDig(f *framework.Framework, srcCluster framework.ClusterIndex, serviceName string, serviceIPList []string,
 	targetPod *corev1.PodList, domains []string,
 ) {
-	cmd := []string{"dig", "+short"}
+	cmd := make([]string, 0, 2+len(domains))
+	cmd = append(cmd, "dig", "+short")
 
 	for i := range domains {
 		cmd = append(cmd, lhframework.BuildServiceDNSName("", serviceName, f.Namespace, domains[i]))
