@@ -255,7 +255,7 @@ func (t *testDriver) awaitDNSRecords(ns, name, cluster, hostname string, expFoun
 
 func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 	ipsCount := len(serviceIPs)
-	rrIPs := make([]string, 0)
+	rrIPs := make([]string, 0, ipsCount)
 
 	for i := range ipsCount {
 		r := t.getNonHeadlessDNSRecord(ns, service, "")

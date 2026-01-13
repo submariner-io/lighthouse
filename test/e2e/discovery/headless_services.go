@@ -139,7 +139,7 @@ func RunHeadlessDiscoveryLocalAndRemoteTest(f *lhframework.Framework) {
 	ipListB, hostNameListB := f.GetPodIPs(framework.ClusterB, nginxHeadlessClusterB, false)
 	ipListA, hostNameListA := f.GetPodIPs(framework.ClusterA, nginxHeadlessClusterA, true)
 
-	var ipList []string
+	ipList := make([]string, 0, len(ipListB)+len(ipListA))
 	ipList = append(ipList, ipListB...)
 	ipList = append(ipList, ipListA...)
 

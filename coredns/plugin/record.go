@@ -31,7 +31,7 @@ import (
 )
 
 func (lh *Lighthouse) createARecords(dnsrecords []resolver.DNSRecord, state *request.Request) []dns.RR {
-	records := make([]dns.RR, 0)
+	records := make([]dns.RR, 0, len(dnsrecords))
 
 	for _, record := range dnsrecords {
 		dnsRecord := &dns.A{Hdr: dns.RR_Header{
@@ -45,7 +45,7 @@ func (lh *Lighthouse) createARecords(dnsrecords []resolver.DNSRecord, state *req
 }
 
 func (lh *Lighthouse) createAAAARecords(dnsrecords []resolver.DNSRecord, state *request.Request) []dns.RR {
-	records := make([]dns.RR, 0)
+	records := make([]dns.RR, 0, len(dnsrecords))
 
 	for _, record := range dnsrecords {
 		dnsRecord := &dns.AAAA{Hdr: dns.RR_Header{
