@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -93,14 +94,14 @@ func (c *Controller) Start(client dynamic.Interface) error {
 	logger.Infof("Starting Gateway status Controller")
 
 	c.store, c.informer = cache.NewInformerWithOptions(cache.InformerOptions{
-		ListerWatcher: &cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return gwClientset.List(context.TODO(), options)
+		ListerWatcher: cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				return gwClientset.List(ctx, options)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return gwClientset.Watch(context.TODO(), options)
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				return gwClientset.Watch(ctx, options)
 			},
-		},
+		}, client),
 		ObjectType: &unstructured.Unstructured{},
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: c.queue.Enqueue,
@@ -114,7 +115,7 @@ func (c *Controller) Start(client dynamic.Interface) error {
 		},
 	})
 
-	go c.informer.Run(c.stopCh)
+	go c.informer.RunWithContext(wait.ContextForChannel(c.stopCh))
 
 	if ok := cache.WaitForCacheSync(c.stopCh, c.informer.HasSynced); !ok {
 		return errors.New("failed to wait for informer cache to sync")

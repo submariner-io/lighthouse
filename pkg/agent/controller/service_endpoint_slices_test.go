@@ -59,7 +59,7 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 			fake.AddBasicReactors(&dynClient.Fake)
 
 			fakeEPSClient = &epsDynamicClient{
-				dynClient: dynClient,
+				FakeDynamicClient: dynClient,
 				epsResourceClient: epsResourceClient{
 					ResourceInterface: dynClient.Resource(discovery.SchemeGroupVersion.WithResource(
 						"endpointslices")).Namespace(serviceNamespace),
@@ -110,7 +110,7 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 
 type epsDynamicClient struct {
 	epsResourceClient
-	dynClient *dynamicfake.FakeDynamicClient
+	*dynamicfake.FakeDynamicClient
 }
 
 func (f *epsDynamicClient) Resource(gvr schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
@@ -118,7 +118,7 @@ func (f *epsDynamicClient) Resource(gvr schema.GroupVersionResource) dynamic.Nam
 		return &f.epsResourceClient
 	}
 
-	return f.dynClient.Resource(gvr)
+	return f.FakeDynamicClient.Resource(gvr)
 }
 
 type epsResourceClient struct {
