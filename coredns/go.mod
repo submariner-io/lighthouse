@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/coredns/caddy v1.1.4
 	github.com/coredns/coredns v1.14.1
-	github.com/miekg/dns v1.1.70
+	github.com/miekg/dns v1.1.72
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.39.0
 	github.com/pkg/errors v0.9.1
