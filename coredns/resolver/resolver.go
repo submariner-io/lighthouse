@@ -134,7 +134,13 @@ func (i *Interface) getHeadlessRecordsForIPFamily(ipFamilyInfo *IPFamilyInfo, cl
 
 	switch {
 	case clusterID == "":
-		records := make([]DNSRecord, 0)
+		// Pre-allocate capacity based on total records across all clusters
+		totalCapacity := 0
+		for _, info := range ipFamilyInfo.clusters {
+			totalCapacity += len(info.endpointRecords)
+		}
+
+		records := make([]DNSRecord, 0, totalCapacity)
 
 		for id, info := range ipFamilyInfo.clusters {
 			if i.clusterStatus.IsConnected(id, ipFamilyInfo.getNetIPFamily()) {
