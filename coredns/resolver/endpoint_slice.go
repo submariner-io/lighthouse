@@ -128,8 +128,15 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSlices []*discovery.EndpointSlice,
 	ipFamilyInfo *IPFamilyInfo,
 ) {
+	// Calculate capacity: each endpoint typically has exactly 1 address
+	totalCapacity := 0
+	for _, endpointSlice := range endpointSlices {
+		totalCapacity += len(endpointSlice.Endpoints)
+	}
+
 	clusterInfo := &clusterInfo{
 		endpointRecordsByHost: make(map[string][]DNSRecord),
+		endpointRecords:       make([]DNSRecord, 0, totalCapacity),
 	}
 
 	ipFamilyInfo.clusters[clusterID] = clusterInfo
