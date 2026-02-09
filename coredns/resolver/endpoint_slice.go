@@ -283,10 +283,10 @@ func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1a1.ServicePort {
 	mcsPorts := make([]mcsv1a1.ServicePort, len(ports))
 	for i, port := range ports {
 		mcsPorts[i] = mcsv1a1.ServicePort{
-			Name:        *port.Name,
-			Protocol:    *port.Protocol,
+			Name:        ptr.Deref(port.Name, ""),
+			Protocol:    ptr.Deref(port.Protocol, ""),
 			AppProtocol: port.AppProtocol,
-			Port:        *port.Port,
+			Port:        ptr.Deref(port.Port, 0),
 		}
 	}
 
