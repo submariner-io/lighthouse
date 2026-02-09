@@ -54,10 +54,6 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 
 	sortServiceImportsByTimestamp(siList, aggregatedServiceImport.Spec.Type)
 
-	servicePortKey := func(p mcsv1a1.ServicePort) string {
-		return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
-	}
-
 	precedentServiceImport := siList[0].(*mcsv1a1.ServiceImport)
 	intersectionOfServicePorts := precedentServiceImport.Spec.Ports
 	unionOfServicePorts := precedentServiceImport.Spec.Ports
@@ -171,6 +167,10 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 	precedentServiceImport.Spec.Ports = unionOfServicePorts
 
 	return precedentServiceImport
+}
+
+func servicePortKey(p mcsv1a1.ServicePort) string {
+	return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
 }
 
 func servicePortsToString(p []mcsv1a1.ServicePort) string {
