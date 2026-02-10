@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	k8snet "k8s.io/utils/net"
@@ -219,11 +220,12 @@ func newTestDiver() *testDriver {
 			Expect(err).To(Succeed())
 		}
 
-		Expect(t.controller.Start(t.dynClient)).To(Succeed())
-	})
+		stopCh := make(chan struct{})
+		DeferCleanup(func() {
+			close(stopCh)
+		})
 
-	AfterEach(func() {
-		t.controller.Stop()
+		Expect(t.controller.Start(wait.ContextForChannel(stopCh), t.dynClient)).To(Succeed())
 	})
 
 	return t
