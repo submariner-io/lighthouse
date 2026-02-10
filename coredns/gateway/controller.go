@@ -176,18 +176,18 @@ func (c *Controller) updateClusterStatusMap(connections []any) {
 
 		status, found, err := unstructured.NestedString(connectionMap, "status")
 		if err != nil || !found {
-			logger.Errorf(nil, "status field not found in %s", resource.ToJSON(connectionMap))
+			logger.Errorf(err, "status field not found in %s", resource.ToJSON(connectionMap))
 		}
 
 		clusterID, found, err := unstructured.NestedString(connectionMap, "endpoint", "cluster_id")
 		if !found || err != nil {
-			logger.Errorf(nil, "cluster_id field not found in %s", resource.ToJSON(connectionMap))
+			logger.Errorf(err, "cluster_id field not found in %s", resource.ToJSON(connectionMap))
 			continue
 		}
 
 		usingIP, found, err := unstructured.NestedString(connectionMap, "usingIP")
 		if !found || err != nil {
-			logger.Errorf(nil, "usingIP field not found in %s", resource.ToJSON(connectionMap))
+			logger.Errorf(err, "usingIP field not found in %s", resource.ToJSON(connectionMap))
 			continue
 		}
 
@@ -231,7 +231,7 @@ func (c *Controller) updateLocalClusterIDIfNeeded(clusterID string) {
 func getGatewayStatus(obj *unstructured.Unstructured) ([]any, string, bool) {
 	status, found, err := unstructured.NestedMap(obj.Object, "status")
 	if !found || err != nil {
-		logger.Errorf(err, "status field not found in %#v, err was", obj)
+		logger.Errorf(err, "status field not found in %s", resource.ToJSON(obj))
 		return nil, "", false
 	}
 
@@ -240,7 +240,7 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]any, string, bool) {
 	var connections []any
 
 	if !found || err != nil {
-		logger.Errorf(err, "localEndpoint->cluster_id not found in %#v, err was", status)
+		logger.Errorf(err, "localEndpoint->cluster_id not found in %s", resource.ToJSON(status))
 
 		localClusterID = ""
 	} else {
@@ -264,14 +264,14 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]any, string, bool) {
 	haStatus, found, err := unstructured.NestedString(status, "haStatus")
 
 	if !found || err != nil {
-		logger.Errorf(err, "haStatus field not found in %#v, err was", status)
+		logger.Errorf(err, "haStatus field not found in %s", resource.ToJSON(status))
 		return connections, localClusterID, true
 	}
 
 	if haStatus == "active" {
 		rconns, _, err := unstructured.NestedSlice(status, "connections")
 		if err != nil {
-			logger.Errorf(err, "connections field not found in %#v, err was", status)
+			logger.Errorf(err, "connections field not found in %s", resource.ToJSON(status))
 			return connections, localClusterID, false
 		}
 
