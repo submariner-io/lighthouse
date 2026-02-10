@@ -123,7 +123,6 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	c.OnShutdown(func() error {
 		close(stopCh)
-		gwController.Stop()
 		resolverController.Stop()
 
 		return nil
@@ -140,7 +139,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	configmap.WatchAndSignalOnChange(ctx, k8sClient, submNamespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
 
-	err = gwController.Start(localClient)
+	err = gwController.Start(ctx, localClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
