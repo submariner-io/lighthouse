@@ -172,7 +172,7 @@ func determineSupportedAddressTypes() []k8snet.IPFamily {
 	for cidr := range strings.SplitSeq(cidrEnvVar, ",") {
 		s := strings.TrimSpace(cidr)
 		if s != "" {
-			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
+			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(s))
 		}
 	}
 
