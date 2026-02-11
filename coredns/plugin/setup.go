@@ -73,6 +73,10 @@ func init() {
 		ServerType: "dns",
 		Action:     setupLighthouse,
 	})
+
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "",
+		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
@@ -194,10 +198,4 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 	}
 
 	return uint32(t), nil
-}
-
-func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "",
-		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
