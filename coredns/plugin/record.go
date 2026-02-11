@@ -84,7 +84,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 		}
 
 		if len(reqPorts) == 0 {
-			return nil
+			continue
 		}
 
 		target := pReq.service + "." + pReq.namespace + ".svc." + zone
