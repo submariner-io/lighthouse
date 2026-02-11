@@ -26,8 +26,8 @@ type Interface interface {
 	Skip(item any)
 	// Add adds a weighted item for selection, if not already present.
 	Add(item any, weight int64) (err error)
-	// RemoveAll removes all weighted items.
-	RemoveAll()
+	// Reset removes all weighted items and resets state while retaining capacity for reuse.
+	Reset()
 	// The number of items in this instance.
 	ItemCount() int
 }

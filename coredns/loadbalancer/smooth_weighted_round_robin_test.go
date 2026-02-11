@@ -141,7 +141,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("should have an empty state", func() {
 			addAllServers(roundRobinServers)
 			validateAllServersAdded(roundRobinServers)
-			lb.RemoveAll()
+			lb.Reset()
 			validateEmptyLBState()
 		})
 	})
