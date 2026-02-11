@@ -96,7 +96,7 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 	// Count records
 	localClusterID := lh.ClusterStatus.GetLocalClusterID()
 	for _, record := range dnsRecords {
-		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace, record.IP)
+		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace)
 	}
 
 	records := make([]dns.RR, 0)
