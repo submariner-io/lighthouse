@@ -113,14 +113,10 @@ func (lb *smoothWeightedRR) nextWeightedItem() *weightedItem {
 		return lb.items[0]
 	}
 
-	return nextSmoothWeightedItem(lb.items)
-}
-
-func nextSmoothWeightedItem(items []*weightedItem) *weightedItem {
 	var best *weightedItem
 	total := int64(0)
 
-	for _, item := range items {
+	for _, item := range lb.items {
 		item.currentWeight += item.effectiveWeight
 
 		if item.effectiveWeight < item.weight {
@@ -132,10 +128,6 @@ func nextSmoothWeightedItem(items []*weightedItem) *weightedItem {
 		if best == nil || item.currentWeight > best.currentWeight {
 			best = item
 		}
-	}
-
-	if best == nil {
-		return nil
 	}
 
 	best.currentWeight -= total
