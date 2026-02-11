@@ -87,8 +87,8 @@ func (lb *smoothWeightedRR) Add(item any, weight int64) error {
 	return nil
 }
 
-// RemoveAll - removes all items and reset state.
-func (lb *smoothWeightedRR) RemoveAll() {
+// Reset - removes all items and resets state while retaining slice capacity for reuse.
+func (lb *smoothWeightedRR) Reset() {
 	lb.items = lb.items[:0]
 	lb.itemMap = make(map[any]*weightedItem)
 }

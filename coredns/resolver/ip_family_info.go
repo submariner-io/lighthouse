@@ -29,7 +29,7 @@ import (
 )
 
 func (i *IPFamilyInfo) resetLoadBalancing() {
-	i.balancer.RemoveAll()
+	i.balancer.Reset()
 
 	for name, info := range i.clusters {
 		err := i.balancer.Add(name, info.weight)
