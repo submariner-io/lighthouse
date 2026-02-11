@@ -99,7 +99,7 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace, record.IP)
 	}
 
-	records := make([]dns.RR, 0)
+	var records []dns.RR
 
 	switch state.QType() {
 	case dns.TypeA:
