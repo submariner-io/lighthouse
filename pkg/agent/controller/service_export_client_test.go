@@ -101,7 +101,6 @@ var _ = Describe("ServiceExportClient", func() {
 	Context("with Conflict condition type", func() {
 		It("should aggregate the different reasons and messages", func() {
 			// The condition shouldn't be added with Status False.
-
 			serviceExportClient.UpdateStatusConditions(context.TODO(), serviceName, serviceNamespace, metav1.Condition{
 				Type:   string(mcsv1a1.ServiceExportConditionConflict),
 				Status: metav1.ConditionFalse,
