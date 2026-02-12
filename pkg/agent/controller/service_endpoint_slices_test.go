@@ -96,6 +96,7 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 			t.cluster1.updateService()
 
 			time.Sleep(time.Millisecond * 500)
+
 			fakeEPSClient.epsCreateContinue <- true
 
 			t.awaitEndpointSlice(&t.cluster1)

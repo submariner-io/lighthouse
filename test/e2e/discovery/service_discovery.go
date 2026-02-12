@@ -96,6 +96,7 @@ var _ = Describe("Test Service Discovery Across Clusters", Label(labels.ServiceD
 			}
 
 			randomIP := "192.168.1.5"
+
 			healthCheckEnabled := f.GetHealthCheckEnabledInfo(framework.ClusterC)
 			if !healthCheckEnabled {
 				Skip("Healthcheck is not enabled hence skipping the test")
