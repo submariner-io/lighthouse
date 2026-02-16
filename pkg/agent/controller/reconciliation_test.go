@@ -88,6 +88,7 @@ var _ = Describe("Reconciliation", func() {
 
 		obj, err := t.cluster1.localServiceExportClient.Get(context.Background(), t.cluster1.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
+
 		serviceExport = toServiceExport(obj)
 	})
 
