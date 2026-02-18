@@ -26,7 +26,6 @@ const (
 	srcClusterKey      = "source_cluster"
 	dstClusterKey      = "destination_cluster"
 	dstSvcNameKey      = "destination_service_name"
-	dstSvcIPKey        = "destination_service_ip"
 	dstSvcNamespaceKey = "destination_service_namespace"
 
 	ServiceDiscoveryQueryCounterName = "submariner_service_discovery_query"
@@ -42,19 +41,18 @@ func init() {
 			Name: ServiceDiscoveryQueryCounterName,
 			Help: "Count DNS queries",
 		},
-		[]string{srcClusterKey, dstClusterKey, dstSvcNameKey, dstSvcNamespaceKey, dstSvcIPKey},
+		[]string{srcClusterKey, dstClusterKey, dstSvcNameKey, dstSvcNamespaceKey},
 	)
 
 	prometheus.MustRegister(dnsQueryCounter)
 }
 
-func incDNSQueryCounter(srcCluster, dstCluster, dstSvcName, dstSvcNamespace, dstSvcIP string) {
+func incDNSQueryCounter(srcCluster, dstCluster, dstSvcName, dstSvcNamespace string) {
 	labels := prometheus.Labels{
 		srcClusterKey:      srcCluster,
 		dstClusterKey:      dstCluster,
 		dstSvcNameKey:      dstSvcName,
 		dstSvcNamespaceKey: dstSvcNamespace,
-		dstSvcIPKey:        dstSvcIP,
 	}
 
 	dnsQueryCounter.With(labels).Inc()
