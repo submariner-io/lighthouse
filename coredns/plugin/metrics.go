@@ -31,11 +31,13 @@ const (
 	ServiceDiscoveryQueryCounterName = "submariner_service_discovery_query"
 )
 
-var dnsQueryCounter *prometheus.GaugeVec
+var dnsQueryCounter *prometheus.CounterVec
 
 func init() {
-	dnsQueryCounter = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	dnsQueryCounter = prometheus.NewCounterVec(
+		//nolint:promlinter // Ignore "counter metrics should have "_total" suffix" to preserve metric name for
+		// backward compatibility after changing from Gauge.
+		prometheus.CounterOpts{
 			Name: ServiceDiscoveryQueryCounterName,
 			Help: "Count DNS queries",
 		},

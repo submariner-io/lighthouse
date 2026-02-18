@@ -393,15 +393,15 @@ func (a *Controller) newServiceImport(name, namespace string) *mcsv1a1.ServiceIm
 }
 
 func (a *Controller) getPortsForService(service *corev1.Service) []mcsv1a1.ServicePort {
-	mcsPorts := make([]mcsv1a1.ServicePort, 0, len(service.Spec.Ports))
+	mcsPorts := make([]mcsv1a1.ServicePort, len(service.Spec.Ports))
 
-	for _, port := range service.Spec.Ports {
-		mcsPorts = append(mcsPorts, mcsv1a1.ServicePort{
-			Name:        port.Name,
-			Protocol:    port.Protocol,
-			Port:        port.Port,
-			AppProtocol: port.AppProtocol,
-		})
+	for i := range service.Spec.Ports {
+		mcsPorts[i] = mcsv1a1.ServicePort{
+			Name:        service.Spec.Ports[i].Name,
+			Protocol:    service.Spec.Ports[i].Protocol,
+			Port:        service.Spec.Ports[i].Port,
+			AppProtocol: service.Spec.Ports[i].AppProtocol,
+		}
 	}
 
 	return mcsPorts

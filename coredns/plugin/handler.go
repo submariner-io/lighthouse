@@ -64,11 +64,10 @@ func (lh *Lighthouse) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns
 		return lh.nextOrFailure(ctx, state, r, dns.RcodeNameError)
 	}
 
-	return lh.getDNSRecord(ctx, zone, state, w, r, pReq)
+	return lh.getDNSRecord(ctx, zone, state, r, pReq)
 }
 
-func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, w dns.ResponseWriter,
-	r *dns.Msg, pReq *recordRequest,
+func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *request.Request, r *dns.Msg, pReq *recordRequest,
 ) (int, error) {
 	ipFamily := k8snet.IPFamilyUnknown
 	if state.QType() == dns.TypeA {
@@ -99,7 +98,7 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 		incDNSQueryCounter(localClusterID, record.ClusterName, pReq.service, pReq.namespace)
 	}
 
-	records := make([]dns.RR, 0)
+	var records []dns.RR
 
 	switch state.QType() {
 	case dns.TypeA:
@@ -119,19 +118,11 @@ func (lh *Lighthouse) getDNSRecord(ctx context.Context, zone string, state *requ
 
 	a := new(dns.Msg)
 	a.SetReply(r)
-	a.Authoritative = true
 	a.Answer = append(a.Answer, records...)
 
 	logger.V(log.DEBUG).Infof("Responding to query with '%s'", a.Answer)
 
-	wErr := w.WriteMsg(a)
-	if wErr != nil {
-		// Error writing reply msg
-		logger.Errorf(wErr, "Failed to write message %#v", a)
-		return dns.RcodeServerFailure, lh.error("failed to write response")
-	}
-
-	return dns.RcodeSuccess, nil
+	return lh.writeResponse(state, a)
 }
 
 func (lh *Lighthouse) emptyResponse(state *request.Request) (int, error) {

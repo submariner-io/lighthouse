@@ -73,6 +73,10 @@ func init() {
 		ServerType: "dns",
 		Action:     setupLighthouse,
 	})
+
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "",
+		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 // setup is the function that gets called when the config parser see the token "lighthouse". Setup is responsible
@@ -123,7 +127,6 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	c.OnShutdown(func() error {
 		close(stopCh)
-		gwController.Stop()
 		resolverController.Stop()
 
 		return nil
@@ -140,7 +143,7 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 
 	configmap.WatchAndSignalOnChange(ctx, k8sClient, submNamespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
 
-	err = gwController.Start(localClient)
+	err = gwController.Start(ctx, localClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "error starting the Gateway controller")
 	}
@@ -169,7 +172,7 @@ func determineSupportedAddressTypes() []k8snet.IPFamily {
 	for cidr := range strings.SplitSeq(cidrEnvVar, ",") {
 		s := strings.TrimSpace(cidr)
 		if s != "" {
-			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(strings.TrimSpace(cidr)))
+			ipFamilies = append(ipFamilies, k8snet.IPFamilyOfCIDRString(s))
 		}
 	}
 
@@ -195,10 +198,4 @@ func parseTTL(c *caddy.Controller) (uint32, error) {
 	}
 
 	return uint32(t), nil
-}
-
-func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "",
-		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }

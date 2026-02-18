@@ -84,20 +84,28 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 		}
 
 		if len(reqPorts) == 0 {
-			return nil
+			continue
 		}
 
-		target := pReq.service + "." + pReq.namespace + ".svc." + zone
+		var target strings.Builder
 
 		if isHeadless {
-			target = dnsRecord.ClusterName + "." + target
+			target.WriteString(dnsRecord.HostName)
+			target.WriteByte('.')
+			target.WriteString(dnsRecord.ClusterName)
+			target.WriteByte('.')
 		} else if pReq.cluster != "" {
-			target = pReq.cluster + "." + target
+			target.WriteString(pReq.cluster)
+			target.WriteByte('.')
 		}
 
-		if isHeadless {
-			target = dnsRecord.HostName + "." + target
-		}
+		target.WriteString(pReq.service)
+		target.WriteByte('.')
+		target.WriteString(pReq.namespace)
+		target.WriteString(".svc.")
+		target.WriteString(zone)
+
+		targetStr := target.String()
 
 		portsSeen := set.New[int32]()
 
@@ -113,7 +121,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 				Priority: 0,
 				Weight:   50,
 				Port:     uint16(port.Port), //nolint:gosec // Need to ignore integer conversion error
-				Target:   target,
+				Target:   targetStr,
 			}
 
 			records = append(records, record)
