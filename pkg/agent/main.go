@@ -109,12 +109,6 @@ func main() {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	exitOnError(err, "Error building kubeconfig")
 
-	restMapper, err := util.BuildRestMapper(cfg)
-	exitOnError(err, "Error building rest mapper")
-
-	localClient, err := dynamic.NewForConfig(cfg)
-	exitOnError(err, "Error creating dynamic client")
-
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
 
@@ -124,9 +118,21 @@ func main() {
 	configMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, agentSpec.Namespace), names.ServiceDiscoveryComponent)
 	exitOnError(err, "Error retrieving ConfigMap")
 
-	global.Init(configMap)
+	globalConfigMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, agentSpec.Namespace), configmap.Global)
+	exitOnError(err, "Error retrieving the global ConfigMap")
 
-	configmap.WatchAndSignalOnChange(ctx, k8sClient, agentSpec.Namespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
+	global.Init(globalConfigMap, configMap)
+
+	configmap.WatchAndSignalOnChange(ctx, k8sClient, agentSpec.Namespace, syscall.SIGINT, configmap.Global, names.ServiceDiscoveryComponent)
+
+	cfg.QPS = float32(global.Get(global.K8sClientQPS, 0))
+	cfg.Burst = global.Get(global.K8sClientBurst, 0)
+
+	restMapper, err := util.BuildRestMapper(cfg)
+	exitOnError(err, "Error building rest mapper")
+
+	localClient, err := dynamic.NewForConfig(cfg)
+	exitOnError(err, "Error creating dynamic client")
 
 	var ipPool *ipam.IPPool
 
