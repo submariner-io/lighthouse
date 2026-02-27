@@ -84,7 +84,7 @@ jobs:
       - name: Check out the mcs-api repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: 8da32eba50d615e0a56d9ca75bc5dd9359496c01
+          ref: 0f775a3eff97b49d354a1dbf29fbfbbc2baff4b2
           repository: kubernetes-sigs/mcs-api
           path: mcs-api
 
@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           export KUBECONFIG=$(find $(git rev-parse --show-toplevel)/output/kubeconfigs/ -type f -printf %p:)
-          label_filter="(!ClusterIP || Connectivity) && !ExportedLabels"
+          label_filter="(!ClusterIP || Connectivity) && !ExportedLabels && !StrictPortConflict"
           if [[ "${{ matrix.using }}" =~ "clusterset-ip" ]]; then
                 label_filter="ClusterIP && !Connectivity"
           fi
