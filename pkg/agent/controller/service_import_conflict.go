@@ -63,6 +63,8 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 	portConflict := false
 	conflictingSessionAffinityClusters := set.New[string]()
 	conflictingSessionAffinityConfigClusters := set.New[string]()
+	conflictingTrafficDistributionClusters := set.New[string]()
+	conflictingInternalTrafficPolicyClusters := set.New[string]()
 	conflictingClusterSetIPEnablementClusters := set.New[string]()
 
 	for i := 1; i < len(siList); i++ {
@@ -82,6 +84,15 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 
 		if !reflect.DeepEqual(serviceImport.Spec.SessionAffinityConfig, precedentServiceImport.Spec.SessionAffinityConfig) {
 			conflictingSessionAffinityConfigClusters.Insert(serviceImport.Labels[mcsv1a1.LabelSourceCluster])
+		}
+
+		if normalizeTrafficDistribution(serviceImport.Spec.TrafficDistribution) !=
+			normalizeTrafficDistribution(precedentServiceImport.Spec.TrafficDistribution) {
+			conflictingTrafficDistributionClusters.Insert(serviceImport.Labels[mcsv1a1.LabelSourceCluster])
+		}
+
+		if !ptr.Equal(serviceImport.Spec.InternalTrafficPolicy, precedentServiceImport.Spec.InternalTrafficPolicy) {
+			conflictingInternalTrafficPolicyClusters.Insert(serviceImport.Labels[mcsv1a1.LabelSourceCluster])
 		}
 
 		if serviceImport.Annotations[constants.UseClustersetIP] != precedentServiceImport.Annotations[constants.UseClustersetIP] {
@@ -147,6 +158,22 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 				"Using SessionAffinityConfig %q from the oldest exporting service in cluster %q (clusters %s disagree).",
 				toStringClusterNames(exportingClusters), toSessionAffinityConfigString(precedentServiceImport.Spec.SessionAffinityConfig),
 				precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingSessionAffinityConfigClusters))
+		})
+
+	addConflictCondition(len(conflictingTrafficDistributionClusters) > 0, mcsv1a1.ServiceExportReasonTrafficDistributionConflict,
+		func() string {
+			return fmt.Sprintf("The service TrafficDistribution conflicts between the constituent clusters %s. "+
+				"Using TrafficDistribution %q from the oldest exporting service in cluster %q (clusters %s disagree).",
+				toStringClusterNames(exportingClusters), ptr.Deref(precedentServiceImport.Spec.TrafficDistribution, ""),
+				precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingTrafficDistributionClusters))
+		})
+
+	addConflictCondition(len(conflictingInternalTrafficPolicyClusters) > 0, mcsv1a1.ServiceExportReasonInternalTrafficPolicyConflict,
+		func() string {
+			return fmt.Sprintf("The service InternalTrafficPolicy conflicts between the constituent clusters %s. "+
+				"Using InternalTrafficPolicy %q from the oldest exporting service in cluster %q (clusters %s disagree).",
+				toStringClusterNames(exportingClusters), ptr.Deref(precedentServiceImport.Spec.InternalTrafficPolicy, ""),
+				precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster], toStringClusterNames(conflictingInternalTrafficPolicyClusters))
 		})
 
 	addConflictCondition(len(conflictingClusterSetIPEnablementClusters) > 0, ServiceExportReasonClusterSetIPEnablementConflict,
@@ -228,4 +255,13 @@ func sortServiceImportsByTimestamp(siList []runtime.Object, aggregatedType mcsv1
 
 		return strings.Compare(siA.Labels[mcsv1a1.LabelSourceCluster], siB.Labels[mcsv1a1.LabelSourceCluster])
 	})
+}
+
+func normalizeTrafficDistribution(v *string) string {
+	td := ptr.Deref(v, "")
+	if td == corev1.ServiceTrafficDistributionPreferClose {
+		td = corev1.ServiceTrafficDistributionPreferSameZone
+	}
+
+	return td
 }

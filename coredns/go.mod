@@ -17,7 +17,7 @@ require (
 	k8s.io/client-go v0.35.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.23.0
-	sigs.k8s.io/mcs-api v0.3.0
+	sigs.k8s.io/mcs-api v0.4.0
 )
 
 require (

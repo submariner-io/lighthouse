@@ -382,6 +382,8 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 			func(aggregated *mcsv1a1.ServiceImport) error {
 				aggregated.Spec.SessionAffinity = precedentServiceImport.Spec.SessionAffinity
 				aggregated.Spec.SessionAffinityConfig = precedentServiceImport.Spec.SessionAffinityConfig
+				aggregated.Spec.TrafficDistribution = precedentServiceImport.Spec.TrafficDistribution
+				aggregated.Spec.InternalTrafficPolicy = precedentServiceImport.Spec.InternalTrafficPolicy
 				aggregated.Spec.Ports = precedentServiceImport.Spec.Ports
 
 				return nil

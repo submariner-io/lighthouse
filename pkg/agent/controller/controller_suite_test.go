@@ -150,6 +150,8 @@ type testDriver struct {
 	aggregatedServicePorts          []mcsv1a1.ServicePort
 	aggregatedSessionAffinity       corev1.ServiceAffinity
 	aggregatedSessionAffinityConfig *corev1.SessionAffinityConfig
+	aggregatedTrafficDistribution   *string
+	aggregatedInternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy
 }
 
 func newTestDiver() *testDriver {
@@ -817,6 +819,8 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 			Ports:                 []mcsv1a1.ServicePort{},
 			SessionAffinity:       t.aggregatedSessionAffinity,
 			SessionAffinityConfig: t.aggregatedSessionAffinityConfig,
+			TrafficDistribution:   t.aggregatedTrafficDistribution,
+			InternalTrafficPolicy: t.aggregatedInternalTrafficPolicy,
 		},
 	}
 
