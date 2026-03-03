@@ -9,14 +9,14 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/submariner-io/admiral v0.24.0-m0.0.20260302080856-b49ecd71c85d
-	github.com/submariner-io/shipyard v0.24.0-m0
-	k8s.io/api v0.35.0
-	k8s.io/apimachinery v0.35.0
-	k8s.io/client-go v0.35.0
+	github.com/submariner-io/shipyard v0.24.0-m0.0.20260306154329-2ebe00673c2d
+	k8s.io/api v0.35.2
+	k8s.io/apimachinery v0.35.2
+	k8s.io/client-go v0.35.2
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.23.1
-	sigs.k8s.io/mcs-api v0.3.0
+	sigs.k8s.io/mcs-api v0.4.0
 )
 
 require (

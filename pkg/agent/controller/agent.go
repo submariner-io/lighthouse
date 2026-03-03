@@ -263,6 +263,8 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 		Type:                  svcType,
 		SessionAffinity:       svc.Spec.SessionAffinity,
 		SessionAffinityConfig: svc.Spec.SessionAffinityConfig,
+		TrafficDistribution:   svc.Spec.TrafficDistribution,
+		InternalTrafficPolicy: svc.Spec.InternalTrafficPolicy,
 	}
 
 	serviceImport.Status = mcsv1a1.ServiceImportStatus{

@@ -258,6 +258,28 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	When("the traffic distribution and policy are configured for an exported service", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			}
+			t.cluster1.service.Spec.InternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyLocal)
+			t.cluster1.service.Spec.TrafficDistribution = ptr.To("PreferClose")
+
+			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
+			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
+			t.aggregatedInternalTrafficPolicy = t.cluster1.service.Spec.InternalTrafficPolicy
+			t.aggregatedTrafficDistribution = t.cluster1.service.Spec.TrafficDistribution
+		})
+
+		It("should be propagated to the ServiceImport", func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		})
+	})
+
 	Context("with clusterset IP enabled", func() {
 		BeforeEach(func() {
 			t.useClusterSetIP = true
@@ -796,6 +818,40 @@ func testClusterIPServiceInTwoClusters() {
 				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
 			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict,
 				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+		})
+	})
+
+	Context("with differing service InternalTrafficPolicy", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.InternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyLocal)
+			t.aggregatedInternalTrafficPolicy = t.cluster1.service.Spec.InternalTrafficPolicy
+		})
+
+		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonInternalTrafficPolicyConflict))
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonInternalTrafficPolicyConflict))
+		})
+	})
+
+	Context("with differing service TrafficDistribution", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.TrafficDistribution = ptr.To(corev1.ServiceTrafficDistributionPreferSameNode)
+			t.aggregatedTrafficDistribution = t.cluster1.service.Spec.TrafficDistribution
+		})
+
+		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
 		})
 	})
 
