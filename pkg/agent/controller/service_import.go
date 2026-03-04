@@ -91,9 +91,11 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		ResourceType:    &mcsv1a1.ServiceImport{},
 		Transform:       controller.onLocalServiceImport,
 		Scheme:          syncerConfig.Scheme,
-		SyncCounterOpts: &prometheus.GaugeOpts{
-			Name: agentConfig.ServiceExportCounterName,
-			Help: "Count of exported services",
+		Metrics: syncer.MetricsConfig{
+			SyncCounterOpts: &prometheus.GaugeOpts{
+				Name: agentConfig.ServiceExportCounterName,
+				Help: "Count of exported services",
+			},
 		},
 		WorkQueueConfig: workqueue.ConfigFromGlobal("local-service-import", nil),
 		MaxLogVerbosity: global.Get("local-service-import.syncer.max-verbosity", 0),
@@ -117,9 +119,11 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		OnSuccessfulSync:  controller.onSuccessfulSyncFromBroker,
 		Scheme:            syncerConfig.Scheme,
 		NamespaceInformer: syncerConfig.NamespaceInformer,
-		SyncCounterOpts: &prometheus.GaugeOpts{
-			Name: agentConfig.ServiceImportCounterName,
-			Help: "Count of imported services",
+		Metrics: syncer.MetricsConfig{
+			SyncCounterOpts: &prometheus.GaugeOpts{
+				Name: agentConfig.ServiceImportCounterName,
+				Help: "Count of imported services",
+			},
 		},
 		WorkQueueConfig: workqueue.ConfigFromGlobal("remote-service-import", nil),
 		MaxLogVerbosity: global.Get("remote-service-import.syncer.max-verbosity", 0),
