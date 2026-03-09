@@ -19,6 +19,7 @@ limitations under the License.
 package lighthouse_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/coredns/coredns/plugin/pkg/log"
@@ -28,6 +29,9 @@ import (
 
 func init() {
 	log.D.Set()
+
+	// Disable WatchListClient feature gate to prevent test hangs
+	os.Setenv("KUBE_FEATURE_WatchListClient", "false")
 }
 
 func TestPlugin(t *testing.T) {
