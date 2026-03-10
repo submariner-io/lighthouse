@@ -20,6 +20,7 @@ package lighthouse_test
 
 import (
 	"flag"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,6 +36,9 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+	
+	// Disable WatchListClient feature gate to prevent test hangs
+	os.Setenv("KUBE_FEATURE_WatchListClient", "false")
 })
 
 func TestPlugin(t *testing.T) {
