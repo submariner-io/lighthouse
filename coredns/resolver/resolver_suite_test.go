@@ -21,6 +21,7 @@ package resolver_test
 import (
 	"flag"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -113,6 +114,9 @@ func init() {
 	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
 	kzerolog.AddFlags(flags)
 	_ = flags.Parse([]string{"-v=2"})
+
+	// Disable WatchListClient feature gate to prevent test hangs
+	os.Setenv("KUBE_FEATURE_WatchListClient", "false")
 }
 
 var _ = BeforeSuite(func() {
