@@ -57,6 +57,7 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 	precedentServiceImport := siList[0].(*mcsv1a1.ServiceImport)
 	intersectionOfServicePorts := precedentServiceImport.Spec.Ports
 	unionOfServicePorts := precedentServiceImport.Spec.Ports
+	unionOfIPFamilies := precedentServiceImport.Spec.IPFamilies
 
 	exportingClusters := set.New[string](precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster])
 	conflictingServiceTypeClusters := set.New[string]()
@@ -66,6 +67,7 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 	conflictingTrafficDistributionClusters := set.New[string]()
 	conflictingInternalTrafficPolicyClusters := set.New[string]()
 	conflictingClusterSetIPEnablementClusters := set.New[string]()
+	ipFamilyConflict := false
 
 	for i := 1; i < len(siList); i++ {
 		serviceImport := siList[i].(*mcsv1a1.ServiceImport)
@@ -106,6 +108,12 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 		intersectionOfServicePorts = slices.Intersect(intersectionOfServicePorts, serviceImport.Spec.Ports, servicePortKey)
 
 		portConflict = portConflict || !slices.Equivalent(precedentServiceImport.Spec.Ports, serviceImport.Spec.Ports, servicePortKey)
+
+		unionOfIPFamilies = slices.Union(unionOfIPFamilies, serviceImport.Spec.IPFamilies, func(f corev1.IPFamily) string {
+			return string(f)
+		})
+
+		ipFamilyConflict = ipFamilyConflict || !goslices.Equal(serviceImport.Spec.IPFamilies, precedentServiceImport.Spec.IPFamilies)
 	}
 
 	var conditions []metav1.Condition
@@ -189,9 +197,17 @@ func (c *ServiceImportController) checkForConflicts(ctx context.Context, aggrega
 				toStringClusterNames(conflictingClusterSetIPEnablementClusters))
 		})
 
+	addConflictCondition(ipFamilyConflict, mcsv1a1.ServiceExportReasonIPFamilyConflict, func() string {
+		return fmt.Sprintf("The service IP families conflict between the constituent clusters %s. "+
+			"The service will expose the union of all backends, but network traffic may only reach backends in a subset of clusters "+
+			"depending on the client's IP family capabilities.",
+			toStringClusterNames(exportingClusters))
+	})
+
 	c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, conditions...)
 
 	precedentServiceImport.Spec.Ports = unionOfServicePorts
+	precedentServiceImport.Spec.IPFamilies = unionOfIPFamilies
 
 	return precedentServiceImport
 }

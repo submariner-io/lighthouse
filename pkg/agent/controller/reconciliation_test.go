@@ -117,6 +117,9 @@ var _ = Describe("Reconciliation", func() {
 			t = newTestDiver()
 			t.useClusterSetIP = true
 
+			// Re-initialize aggregatedIPFamilies from the saved localAggregatedServiceImport
+			t.aggregatedIPFamilies = toServiceImport(localAggregatedServiceImport).Spec.IPFamilies
+
 			brokerDynClient := t.syncerConfig.BrokerClient.(*fake.FakeDynamicClient)
 
 			// Use the broker client for cluster1 to simulate the broker being on the same cluster.

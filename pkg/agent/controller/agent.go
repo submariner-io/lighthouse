@@ -261,6 +261,7 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 	serviceImport.Spec = mcsv1a1.ServiceImportSpec{
 		Ports:                 []mcsv1a1.ServicePort{},
 		Type:                  svcType,
+		IPFamilies:            svc.Spec.IPFamilies,
 		SessionAffinity:       svc.Spec.SessionAffinity,
 		SessionAffinityConfig: svc.Spec.SessionAffinityConfig,
 		TrafficDistribution:   svc.Spec.TrafficDistribution,
