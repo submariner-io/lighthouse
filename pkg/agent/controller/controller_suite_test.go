@@ -152,6 +152,7 @@ type testDriver struct {
 	aggregatedSessionAffinityConfig *corev1.SessionAffinityConfig
 	aggregatedTrafficDistribution   *string
 	aggregatedInternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy
+	aggregatedIPFamilies            []corev1.IPFamily
 }
 
 func newTestDiver() *testDriver {
@@ -172,6 +173,7 @@ func newTestDiver() *testDriver {
 	t := &testDriver{
 		aggregatedServicePorts:    []mcsv1a1.ServicePort{port1, port2},
 		aggregatedSessionAffinity: corev1.ServiceAffinityNone,
+		aggregatedIPFamilies:      nil,
 		cluster1: cluster{
 			clusterID: clusterID1,
 			agentSpec: controller.AgentSpecification{
@@ -338,6 +340,10 @@ func newTestDiver() *testDriver {
 func (t *testDriver) justBeforeEach() {
 	t.cluster1.start(t, *t.syncerConfig)
 	t.cluster2.start(t, *t.syncerConfig)
+
+	if t.aggregatedIPFamilies == nil {
+		t.aggregatedIPFamilies = t.cluster1.service.Spec.IPFamilies
+	}
 }
 
 func (t *testDriver) afterEach() {
@@ -817,6 +823,7 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 		Spec: mcsv1a1.ServiceImportSpec{
 			Type:                  sType,
 			Ports:                 []mcsv1a1.ServicePort{},
+			IPFamilies:            t.aggregatedIPFamilies,
 			SessionAffinity:       t.aggregatedSessionAffinity,
 			SessionAffinityConfig: t.aggregatedSessionAffinityConfig,
 			TrafficDistribution:   t.aggregatedTrafficDistribution,

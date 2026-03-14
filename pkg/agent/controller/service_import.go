@@ -385,6 +385,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 				aggregated.Spec.TrafficDistribution = precedentServiceImport.Spec.TrafficDistribution
 				aggregated.Spec.InternalTrafficPolicy = precedentServiceImport.Spec.InternalTrafficPolicy
 				aggregated.Spec.Ports = precedentServiceImport.Spec.Ports
+				aggregated.Spec.IPFamilies = precedentServiceImport.Spec.IPFamilies
 
 				return nil
 			})

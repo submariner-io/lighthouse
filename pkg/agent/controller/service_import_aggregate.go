@@ -56,8 +56,9 @@ func (c *ServiceImportController) createOrUpdateAggregate(ctx context.Context, o
 			},
 		},
 		Spec: mcsv1a1.ServiceImportSpec{
-			Type:  localServiceImport.Spec.Type,
-			Ports: []mcsv1a1.ServicePort{},
+			Type:       localServiceImport.Spec.Type,
+			Ports:      []mcsv1a1.ServicePort{},
+			IPFamilies: localServiceImport.Spec.IPFamilies,
 		},
 		Status: mcsv1a1.ServiceImportStatus{
 			Clusters: []mcsv1a1.ClusterStatus{

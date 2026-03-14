@@ -21,6 +21,7 @@ package controller_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -489,6 +490,7 @@ func testClusterIPServiceInOneCluster() {
 				Spec: mcsv1a1.ServiceImportSpec{
 					Type:            mcsv1a1.ClusterSetIP,
 					Ports:           t.aggregatedServicePorts,
+					IPFamilies:      t.aggregatedIPFamilies,
 					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 				Status: mcsv1a1.ServiceImportStatus{
@@ -534,6 +536,10 @@ func testClusterIPServiceInTwoClusters() {
 		t.cluster2.createServiceEndpointSlices()
 		t.cluster2.createService()
 		t.cluster2.createServiceExport()
+
+		if t.aggregatedIPFamilies == nil {
+			t.aggregatedIPFamilies = t.cluster1.service.Spec.IPFamilies
+		}
 	})
 
 	AfterEach(func() {
@@ -852,6 +858,24 @@ func testClusterIPServiceInTwoClusters() {
 				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
 			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
 				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
+		})
+	})
+
+	Context("with differing service IP families", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+			t.cluster2.service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
+			t.aggregatedIPFamilies = append(slices.Clone(t.cluster1.service.Spec.IPFamilies), t.cluster2.service.Spec.IPFamilies...)
+		})
+
+		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func() {
+			t.awaitAggregatedServiceImport(mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				&t.cluster1, &t.cluster2)
+
+			t.cluster1.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonIPFamilyConflict))
+			t.cluster2.awaitServiceExportCondition(newServiceExportConflictCondition(
+				mcsv1a1.ServiceExportReasonIPFamilyConflict))
 		})
 	})
 
