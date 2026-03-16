@@ -31,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/configmap"
 	"github.com/submariner-io/admiral/pkg/global"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/names"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -100,6 +101,8 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error building kubeconfig")
 	}
+
+	http.AddTraceMetrics(cfg, "coredns")
 
 	gwController := gateway.NewController()
 

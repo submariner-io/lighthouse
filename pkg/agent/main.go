@@ -112,6 +112,8 @@ func main() {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	exitOnError(err, "Error building kubeconfig")
 
+	http.AddTraceMetrics(cfg, "lighthouse")
+
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
 

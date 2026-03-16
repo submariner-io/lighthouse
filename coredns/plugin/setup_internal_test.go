@@ -21,6 +21,7 @@ package lighthouse
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 
 	"github.com/coredns/caddy"
@@ -30,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/global"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/names"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
@@ -82,9 +84,7 @@ var _ = Describe("Plugin setup", func() {
 			}), nil
 		}
 
-		newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
-			return k8sfake.NewClientset(), nil
-		}
+		setupGlobalConfigMap(map[string]string{})
 
 		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1b1.ServiceImport{})
 	})
@@ -322,6 +322,9 @@ func verifyPluginError(err error, str string) {
 }
 
 func setupGlobalConfigMap(data map[string]string) {
+	data = maps.Clone(data)
+	data[http.DisableHTTPTraceMetrics] = "true"
+
 	newK8sClient = func(_ *rest.Config) (kubernetes.Interface, error) {
 		return k8sfake.NewClientset(&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
