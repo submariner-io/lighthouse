@@ -120,6 +120,8 @@ var _ = Describe("Dual-stack", func() {
 			t.cluster1.service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
 			t.cluster1.service.Spec.ClusterIPs = []string{ipv6ServiceIP}
 			t.cluster1.serviceEndpointSlices = []discovery.EndpointSlice{newIPv6ServiceEndpointSlice()}
+
+			t.cluster2.supportedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
 		})
 
 		It("should only create an IPv6 EndpointSlice", func() {
@@ -147,6 +149,32 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
 					controller.ServiceExportReasonUnsupportedIPFamily))
 				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
+			})
+		})
+
+		Context("and the importing cluster only supports IPv4", func() {
+			BeforeEach(func() {
+				t.cluster2.supportedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+				t.cluster2.verifyImportReadyCondition = assertImportNotReady
+			})
+
+			It("should set the Ready condition to false with IPFamilyNotSupported", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			})
+
+			It("should eventually set the Ready condition to true after the service is exported on the importing cluster", func() {
+				t.awaitNonHeadlessServiceExported(&t.cluster1)
+
+				By("Exporting IPv4 service on second cluster")
+
+				t.aggregatedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+				t.cluster2.verifyImportReadyCondition = assertImportReady
+
+				t.cluster2.createServiceEndpointSlices()
+				t.cluster2.createService()
+				t.cluster2.createServiceExport()
+
+				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
 			})
 		})
 	})
@@ -197,10 +225,23 @@ var _ = Describe("Dual-stack", func() {
 
 			t.cluster1.serviceEndpointSlices = []discovery.EndpointSlice{newIPv6ServiceEndpointSlice()}
 			t.cluster1.headlessEndpointAddresses = [][]discovery.Endpoint{t.cluster1.serviceEndpointSlices[0].Endpoints}
+
+			t.cluster2.supportedIPFamilies = t.cluster1.service.Spec.IPFamilies
 		})
 
 		It("should only create an IPv6 EndpointSlice", func() {
 			t.awaitHeadlessServiceExported(&t.cluster1)
+		})
+
+		Context("and the importing cluster only supports IPv4", func() {
+			BeforeEach(func() {
+				t.cluster2.supportedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+				t.cluster2.verifyImportReadyCondition = assertImportNotReady
+			})
+
+			It("should set the ServiceImport Ready condition false with IPFamilyNotSupported", func() {
+				t.awaitHeadlessServiceExported(&t.cluster1)
+			})
 		})
 	})
 })

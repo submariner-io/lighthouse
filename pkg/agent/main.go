@@ -21,6 +21,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
@@ -36,11 +37,13 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -150,6 +153,7 @@ func main() {
 		ServiceImportCounterName: "submariner_service_import",
 		ServiceExportCounterName: "submariner_service_export",
 		IPPool:                   ipPool,
+		SupportedIPFamilies:      determineSupportedIPFamilies(),
 	})
 	exitOnError(err, "Failed to create lighthouse agent")
 
@@ -170,6 +174,34 @@ func main() {
 	<-ctx.Done()
 
 	logger.Info("All controllers stopped or exited. Stopping main loop")
+}
+
+func determineSupportedIPFamilies() []corev1.IPFamily {
+	var ipFamilies []corev1.IPFamily
+
+	cidrEnvVar := os.Getenv("SUBMARINER_CLUSTERCIDR")
+
+	logger.Infof("SUBMARINER_CLUSTERCIDR env: %q", cidrEnvVar)
+
+	for cidr := range strings.SplitSeq(cidrEnvVar, ",") {
+		s := strings.TrimSpace(cidr)
+		if s != "" {
+			k8sIPFamily := k8snet.IPFamilyOfCIDRString(s)
+			if k8sIPFamily == k8snet.IPv4 {
+				ipFamilies = append(ipFamilies, corev1.IPv4Protocol)
+			} else if k8sIPFamily == k8snet.IPv6 {
+				ipFamilies = append(ipFamilies, corev1.IPv6Protocol)
+			}
+		}
+	}
+
+	if len(ipFamilies) == 0 {
+		ipFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+	}
+
+	logger.Infof("Supported IP families: %v", ipFamilies)
+
+	return ipFamilies
 }
 
 func init() {

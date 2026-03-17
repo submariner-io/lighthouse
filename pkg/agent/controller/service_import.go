@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -36,6 +37,7 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -60,6 +62,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		localLHEndpointSliceLister: localLHEndpointSliceLister,
 		clustersetIPPool:           agentConfig.IPPool,
 		clustersetIPEnabled:        spec.ClustersetIPEnabled,
+		supportedIPFamilies:        agentConfig.SupportedIPFamilies,
 	}
 
 	localToBrokerFederator := federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
@@ -340,6 +343,27 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 
 		delete(serviceImport.Annotations, mcsv1a1.LabelServiceName)
 		delete(serviceImport.Annotations, constants.LabelSourceNamespace)
+
+		ready := metav1.Condition{
+			Type:   string(mcsv1a1.ServiceImportConditionReady),
+			Status: metav1.ConditionTrue,
+			Reason: string(mcsv1a1.ServiceImportReasonReady),
+		}
+
+		// Check if any of the ServiceImport's IPFamilies are supported
+		if !slices.ContainsFunc(serviceImport.Spec.IPFamilies, func(ipFamily corev1.IPFamily) bool {
+			return slices.Contains(c.supportedIPFamilies, ipFamily)
+		}) {
+			ready.Status = metav1.ConditionFalse
+			ready.Reason = string(mcsv1a1.ServiceImportReasonIPFamilyNotSupported)
+			ready.Message = fmt.Sprintf("Service IP families %v are not compatible with the importing cluster IP families %v. "+
+				"The service will not be accessible from this cluster", serviceImport.Spec.IPFamilies, c.supportedIPFamilies)
+		}
+
+		if meta.SetStatusCondition(&serviceImport.Status.Conditions, ready) {
+			logger.Infof("Set status condition for imported ServiceImport (%s/%s): Type: %q, Status: %q, Reason: %q, Message: %q",
+				serviceImport.Namespace, serviceImport.Name, ready.Type, ready.Status, ready.Reason, ready.Message)
+		}
 
 		return serviceImport, false
 	}

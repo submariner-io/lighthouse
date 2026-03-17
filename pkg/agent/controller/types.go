@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -87,6 +88,7 @@ type ServiceImportController struct {
 	localSyncer                syncer.Interface
 	remoteSyncer               syncer.Interface
 	localFederator             federate.Federator
+	supportedIPFamilies        []corev1.IPFamily
 	endpointControllers        sync.Map
 	clusterID                  string
 	localNamespace             string

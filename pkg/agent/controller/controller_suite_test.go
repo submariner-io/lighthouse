@@ -24,13 +24,13 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
@@ -51,7 +51,6 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -133,6 +132,8 @@ type cluster struct {
 	serviceEndpointSlices      []discovery.EndpointSlice
 	clusterID                  string
 	headlessEndpointAddresses  [][]discovery.Endpoint
+	supportedIPFamilies        []corev1.IPFamily
+	verifyImportReadyCondition func(c *metav1.Condition)
 }
 
 type testDriver struct {
@@ -175,7 +176,9 @@ func newTestDiver() *testDriver {
 		aggregatedSessionAffinity: corev1.ServiceAffinityNone,
 		aggregatedIPFamilies:      nil,
 		cluster1: cluster{
-			clusterID: clusterID1,
+			clusterID:                  clusterID1,
+			supportedIPFamilies:        nil,
+			verifyImportReadyCondition: assertImportReady,
 			agentSpec: controller.AgentSpecification{
 				ClusterID:        clusterID1,
 				Namespace:        test.LocalNamespace,
@@ -259,7 +262,9 @@ func newTestDiver() *testDriver {
 			},
 		},
 		cluster2: cluster{
-			clusterID: clusterID2,
+			clusterID:                  clusterID2,
+			supportedIPFamilies:        nil,
+			verifyImportReadyCondition: assertImportReady,
 			agentSpec: controller.AgentSpecification{
 				ClusterID:        clusterID2,
 				Namespace:        test.LocalNamespace,
@@ -412,11 +417,16 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 
 	serviceExportCounterName := "submariner_service_export" + bigint.String()
 
+	if c.supportedIPFamilies == nil {
+		c.supportedIPFamilies = c.service.Spec.IPFamilies
+	}
+
 	c.agentController, err = controller.New(&c.agentSpec, syncerConfig,
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
 			ServiceExportCounterName: serviceExportCounterName,
 			IPPool:                   t.ipPool,
+			SupportedIPFamilies:      c.supportedIPFamilies,
 		})
 
 	Expect(err).To(Succeed())
@@ -659,11 +669,21 @@ func (c *cluster) ensureNoServiceExportActions() {
 	}, 500*time.Millisecond).Should(BeEmpty())
 }
 
+func (c *cluster) verifyServiceImportReady(si *mcsv1a1.ServiceImport) {
+	cond := meta.FindStatusCondition(si.Status.Conditions, string(mcsv1a1.ServiceImportConditionReady))
+	Expect(cond).ToNot(BeNil(), "ServiceImport Ready condition not found")
+	c.verifyImportReadyCondition(cond)
+}
+
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport, ipPool *ipam.IPPool,
 ) *mcsv1a1.ServiceImport {
 	sortSlices := func(si *mcsv1a1.ServiceImport) {
 		sort.SliceStable(si.Spec.Ports, func(i, j int) bool {
 			return si.Spec.Ports[i].Port < si.Spec.Ports[j].Port
+		})
+
+		sort.SliceStable(si.Spec.IPFamilies, func(i, j int) bool {
+			return si.Spec.IPFamilies[i] < si.Spec.IPFamilies[j]
 		})
 
 		sort.SliceStable(si.Status.Clusters, func(i, j int) bool {
@@ -673,50 +693,28 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 
 	sortSlices(expected)
 
-	expected = expected.DeepCopy()
-	expectedServiceImportIPs := expected.Spec.IPs
-	expected.Spec.IPs = nil
-
 	var serviceImport *mcsv1a1.ServiceImport
 
-	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
-		func(ctx context.Context) (bool, error) {
-			obj, err := client.Namespace(expected.Namespace).Get(ctx, expected.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
+	Eventually(func(g Gomega) {
+		obj, err := client.Namespace(expected.Namespace).Get(context.TODO(), expected.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(HaveOccurred())
 
-			serviceImport = toServiceImport(obj)
+		serviceImport = toServiceImport(obj)
+		sortSlices(serviceImport)
 
-			sortSlices(serviceImport)
+		g.Expect(serviceImport.Spec.IPs).To(HaveLen(len(expected.Spec.IPs)))
 
-			ipsEquivalent := len(expectedServiceImportIPs) == len(serviceImport.Spec.IPs)
-			actualSpec := serviceImport.Spec.DeepCopy()
-			actualSpec.IPs = nil
-
-			return ipsEquivalent && reflect.DeepEqual(&expected.Spec, actualSpec) &&
-				reflect.DeepEqual(&expected.Status, &serviceImport.Status), nil
-		})
-
-	if !wait.Interrupted(err) {
-		Expect(err).To(Succeed())
-	}
-
-	if serviceImport == nil {
-		Fail(fmt.Sprintf("ServiceImport %s/%s not found", expected.Namespace, expected.Name))
-	}
-
-	Expect(serviceImport.Spec.IPs).To(HaveLen(len(expectedServiceImportIPs)))
+		g.Expect(serviceImport.Spec).To(BeComparableTo(expected.Spec,
+			cmpopts.IgnoreFields(mcsv1a1.ServiceImportSpec{}, "IPs")),
+			"Actual Spec: %s, Expected Spec %s", resource.ToJSON(serviceImport.Spec), resource.ToJSON(expected.Spec))
+		g.Expect(serviceImport.Status).To(BeComparableTo(expected.Status,
+			cmpopts.IgnoreFields(mcsv1a1.ServiceImportStatus{}, "Conditions")),
+			"Actual Status: %s, Expected Status %s", resource.ToJSON(serviceImport.Status), resource.ToJSON(expected.Status))
+	}).Within(5 * time.Second).ProbeEvery(50 * time.Millisecond).Should(Succeed())
 
 	if len(serviceImport.Spec.IPs) > 0 {
-		Expect(ipPool.Reserve(serviceImport.Spec.IPs...)).ToNot(Succeed(), ""+
-			"ServiceImport IP was not allocated or reserved")
+		Expect(ipPool.Reserve(serviceImport.Spec.IPs...)).ToNot(Succeed(), "ServiceImport IP was not allocated or reserved")
 	}
-
-	serviceImport.Spec.IPs = nil
-
-	Expect(serviceImport.Spec).To(Equal(expected.Spec))
-	Expect(serviceImport.Status).To(Equal(expected.Status))
 
 	Expect(serviceImport.Labels).To(BeEmpty())
 
@@ -855,8 +853,8 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 	expServiceImport.Name = name
 	expServiceImport.Namespace = ns
 
-	awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport, t.ipPool)
-	awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport, t.ipPool)
+	t.cluster1.verifyServiceImportReady(awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport, t.ipPool))
+	t.cluster2.verifyServiceImportReady(awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport, t.ipPool))
 }
 
 func (t *testDriver) ensureAggregatedServiceImport(sType mcsv1a1.ServiceImportType, name, ns string, clusters ...*cluster) {
@@ -1107,4 +1105,14 @@ func toServicePort(port mcsv1a1.ServicePort) corev1.ServicePort {
 		Port:        port.Port,
 		AppProtocol: port.AppProtocol,
 	}
+}
+
+func assertImportReady(c *metav1.Condition) {
+	Expect(c.Status).To(Equal(metav1.ConditionTrue))
+	Expect(c.Reason).To(Equal(string(mcsv1a1.ServiceImportReasonReady)))
+}
+
+func assertImportNotReady(c *metav1.Condition) {
+	Expect(c.Status).To(Equal(metav1.ConditionFalse))
+	Expect(c.Reason).To(Equal(string(mcsv1a1.ServiceImportReasonIPFamilyNotSupported)))
 }
