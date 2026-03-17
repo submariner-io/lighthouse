@@ -20,6 +20,7 @@ package lighthouse
 
 import (
 	"errors"
+	"sync/atomic"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/plugin"
@@ -44,12 +45,17 @@ var logger = log.Logger{Logger: logf.Log.WithName("Handler")}
 
 type Lighthouse struct {
 	Next                plugin.Handler
-	Fall                fall.F
-	Zones               []string
-	TTL                 uint32
-	ClusterStatus       resolver.ClusterStatus
 	Resolver            *resolver.Interface
+	Zones               []string
 	SupportedIPFamilies []k8snet.IPFamily
+	ClusterStatus       resolver.ClusterStatus
+	Fall                fall.F
+	TTL                 uint32
+	ready               atomic.Bool
+}
+
+func (lh *Lighthouse) Ready() bool {
+	return lh.ready.Load()
 }
 
 var _ plugin.Handler = &Lighthouse{}
