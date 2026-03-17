@@ -54,6 +54,7 @@ type AgentConfig struct {
 	ServiceImportCounterName string
 	ServiceExportCounterName string
 	IPPool                   *ipam.IPPool
+	SupportedIPFamilies      []corev1.IPFamily
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("agent")}
