@@ -120,17 +120,8 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		SupportedIPFamilies: determineSupportedAddressTypes(),
 	}
 
-	resolverController := resolver.NewController(lh.Resolver)
-
 	stopCh := make(chan struct{})
 	ctx := wait.ContextForChannel(stopCh)
-
-	c.OnShutdown(func() error {
-		close(stopCh)
-		resolverController.Stop()
-
-		return nil
-	})
 
 	submNamespace := os.Getenv("SUBMARINER_NAMESPACE")
 
@@ -142,6 +133,13 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 	global.Init(configMap)
 
 	configmap.WatchAndSignalOnChange(ctx, k8sClient, submNamespace, syscall.SIGINT, names.ServiceDiscoveryComponent)
+
+	err = lh.configure(c)
+	if err != nil {
+		return nil, err
+	}
+
+	resolverController := resolver.NewController(lh.Resolver)
 
 	err = gwController.Start(ctx, localClient)
 	if err != nil {
@@ -157,9 +155,16 @@ func lighthouseParse(c *caddy.Controller) (*Lighthouse, error) {
 		return nil, errors.Wrap(err, "error starting the resolver controller")
 	}
 
-	err = lh.configure(c)
+	c.OnShutdown(func() error {
+		close(stopCh)
+		resolverController.Stop()
 
-	return lh, err
+		return nil
+	})
+
+	lh.ready.Store(true)
+
+	return lh, nil
 }
 
 func determineSupportedAddressTypes() []k8snet.IPFamily {
