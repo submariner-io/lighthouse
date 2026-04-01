@@ -36,7 +36,14 @@ var _ = Describe("Smooth Weighted RR", func() {
 	var servers []server
 	var smoothTestingServers []server
 	var roundRobinServers []server
-	var lb loadbalancer.Interface
+	var lb loadbalancer.Interface[string]
+
+	nextOK := func() string {
+		name, ok := lb.Next()
+		Expect(ok).To(BeTrue())
+
+		return name
+	}
 
 	addServer := func(s server) {
 		err := lb.Add(s.name, s.weight)
@@ -61,7 +68,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 	// Validations
 	validateServerAdded := func(s server) {
 		for range 100 {
-			if lb.Next() == s.name {
+			if nextOK() == s.name {
 				return
 			}
 		}
@@ -78,7 +85,9 @@ var _ = Describe("Smooth Weighted RR", func() {
 		Expect(lb.ItemCount()).To(Equal(0))
 
 		for range 100 {
-			Expect(lb.Next()).To(BeNil())
+			name, ok := lb.Next()
+			Expect(ok).To(BeFalse())
+			Expect(name).To(BeEmpty())
 		}
 	}
 
@@ -87,8 +96,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 		results := make(map[string]int64)
 
 		for range rounds {
-			s := lb.Next().(string)
-			results[s]++
+			results[nextOK()]++
 		}
 
 		for _, s := range servers {
@@ -99,18 +107,18 @@ var _ = Describe("Smooth Weighted RR", func() {
 	}
 
 	validateSmoothLoadBalancing := func(servers []server) {
-		Expect(lb.Next().(string)).To(Equal(servers[0].name))
-		Expect(lb.Next().(string)).To(Equal(servers[0].name))
-		Expect(lb.Next().(string)).To(Equal(servers[1].name))
-		Expect(lb.Next().(string)).To(Equal(servers[0].name))
-		Expect(lb.Next().(string)).To(Equal(servers[2].name))
-		Expect(lb.Next().(string)).To(Equal(servers[0].name))
-		Expect(lb.Next().(string)).To(Equal(servers[0].name))
+		Expect(nextOK()).To(Equal(servers[0].name))
+		Expect(nextOK()).To(Equal(servers[0].name))
+		Expect(nextOK()).To(Equal(servers[1].name))
+		Expect(nextOK()).To(Equal(servers[0].name))
+		Expect(nextOK()).To(Equal(servers[2].name))
+		Expect(nextOK()).To(Equal(servers[0].name))
+		Expect(nextOK()).To(Equal(servers[0].name))
 	}
 
 	//nolint:gosec // Use of math/rand over crypto/rand is fine here as this is a unit test and is not security-sensitive.
 	BeforeEach(func() {
-		lb = loadbalancer.NewSmoothWeightedRR()
+		lb = loadbalancer.NewSmoothWeightedRR[string]()
 		smoothTestingServers = []server{
 			{name: "server1", weight: 5},
 			{name: "server2", weight: 1},
@@ -154,17 +162,18 @@ var _ = Describe("Smooth Weighted RR", func() {
 		})
 	})
 
-	When("a nil is added", func() {
-		It("should return an error", func() {
-			err := lb.Add(nil, 100)
-			Expect(err).To(HaveOccurred())
-			validateEmptyLBState()
+	When("a zero-value item is added", func() {
+		It("should be accepted like any other item", func() {
+			err := lb.Add("", 100)
+			Expect(err).To(Succeed())
+			Expect(lb.ItemCount()).To(Equal(1))
+			Expect(nextOK()).To(Equal(""))
 		})
 	})
 
 	When("an item is added with a negative weight", func() {
 		It("should return an error", func() {
-			err := lb.Add(servers[0], -100)
+			err := lb.Add(servers[0].name, -100)
 			Expect(err).To(HaveOccurred())
 			validateEmptyLBState()
 		})
@@ -176,7 +185,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 			addServer(s)
 
 			for range 10 {
-				Expect(lb.Next()).To(Equal(s.name))
+				Expect(nextOK()).To(Equal(s.name))
 			}
 		})
 	})
@@ -200,7 +209,7 @@ var _ = Describe("Smooth Weighted RR", func() {
 
 			for range 100 {
 				for _, s := range roundRobinServers {
-					Expect(lb.Next().(string)).To(Equal(s.name))
+					Expect(nextOK()).To(Equal(s.name))
 				}
 			}
 		})
@@ -230,9 +239,9 @@ var _ = Describe("Smooth Weighted RR", func() {
 			failedItem := smoothTestingServers[0].name
 			lb.Skip(failedItem)
 			// Not to appear until a full round
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[1].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[2].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[1].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[2].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
 		})
 	})
 
@@ -240,23 +249,23 @@ var _ = Describe("Smooth Weighted RR", func() {
 		It("should accommodate the addition", func() {
 			addAllServers(smoothTestingServers)
 
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[1].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[1].name))
 
 			newServer := server{name: "server4", weight: 1}
 			smoothTestingServers = append(smoothTestingServers, newServer)
 			err := lb.Add(newServer.name, newServer.weight)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[2].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[3].name)) // new
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[0].name))
-			Expect(lb.Next().(string)).To(Equal(smoothTestingServers[1].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[2].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[3].name)) // new
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[0].name))
+			Expect(nextOK()).To(Equal(smoothTestingServers[1].name))
 
 			validateLoadBalancingByCount(100, smoothTestingServers)
 		})

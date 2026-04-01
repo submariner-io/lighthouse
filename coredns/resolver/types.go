@@ -57,7 +57,7 @@ type clusterInfo struct {
 type IPFamilyInfo struct {
 	addrType discovery.AddressType
 	clusters map[string]*clusterInfo
-	balancer loadbalancer.Interface
+	balancer loadbalancer.Interface[string]
 	ports    []mcsv1a1.ServicePort
 }
 
