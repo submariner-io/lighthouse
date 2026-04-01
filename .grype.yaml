@@ -18,3 +18,25 @@ ignore:
   - vulnerability: GHSA-93mf-426m-g6x9
     package:
       name: github.com/coredns/coredns
+  # The following CVEs require Go 1.25 which is not supported by shipyard's dapper base
+  - vulnerability: GHSA-p77j-4mvh-x3m3
+    package:
+      name: google.golang.org/grpc
+  - vulnerability: GHSA-h75p-j8xm-m278
+    package:
+      name: github.com/coredns/coredns
+  - vulnerability: GHSA-c9v3-4pv7-87pr
+    package:
+      name: github.com/coredns/coredns
+  - vulnerability: GHSA-j5w8-q4qc-rx2x
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GHSA-f6x5-jh6r-wrfv
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GHSA-g754-hx8w-x2g6
+    package:
+      name: github.com/quic-go/quic-go
+  - vulnerability: GHSA-527x-5wrf-22m2
+    package:
+      name: github.com/coredns/coredns
