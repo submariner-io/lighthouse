@@ -19,15 +19,15 @@ limitations under the License.
 package loadbalancer
 
 // Interface - general interface explaining the API of all load balancers available in the package.
-type Interface interface {
-	// Next returns next item accordingly or nil if none present.
-	Next() (item any)
+type Interface[T any] interface {
+	// Next returns the next item and whether one was available.
+	Next() (item T, ok bool)
 	// Skip selecting the given item for a full round. This is useful if the item encountered a temporary failure.
-	Skip(item any)
+	Skip(item T)
 	// Add adds a weighted item for selection, if not already present.
-	Add(item any, weight int64) (err error)
+	Add(item T, weight int64) (err error)
 	// Reset removes all weighted items and resets state while retaining capacity for reuse.
 	Reset()
-	// The number of items in this instance.
+	// ItemCount returns the number of items in this instance.
 	ItemCount() int
 }

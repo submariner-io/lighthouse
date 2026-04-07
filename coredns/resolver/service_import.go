@@ -43,12 +43,12 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 			ipv4Info: IPFamilyInfo{
 				addrType: discovery.AddressTypeIPv4,
 				clusters: make(map[string]*clusterInfo),
-				balancer: loadbalancer.NewSmoothWeightedRR(),
+				balancer: loadbalancer.NewSmoothWeightedRR[string](),
 			},
 			ipv6Info: IPFamilyInfo{
 				addrType: discovery.AddressTypeIPv6,
 				clusters: make(map[string]*clusterInfo),
-				balancer: loadbalancer.NewSmoothWeightedRR(),
+				balancer: loadbalancer.NewSmoothWeightedRR[string](),
 			},
 		}
 

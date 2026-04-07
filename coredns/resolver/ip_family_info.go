@@ -76,9 +76,12 @@ func (i *IPFamilyInfo) newRecordFrom(from *DNSRecord) *DNSRecord {
 }
 
 func (i *IPFamilyInfo) selectIP(checkCluster func(string, k8snet.IPFamily) bool) *DNSRecord {
-	queueLength := i.balancer.ItemCount()
-	for range queueLength {
-		clusterID := i.balancer.Next().(string)
+	for range i.balancer.ItemCount() {
+		clusterID, ok := i.balancer.Next()
+		if !ok {
+			break
+		}
+
 		clusterInfo := i.clusters[clusterID]
 
 		if checkCluster(clusterID, i.getNetIPFamily()) && clusterInfo.endpointsHealthy {

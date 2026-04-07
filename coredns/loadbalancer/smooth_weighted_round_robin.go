@@ -21,35 +21,34 @@ package loadbalancer
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("LoadBalancer")}
 
-type weightedItem struct {
-	item            any
+type weightedItem[T comparable] struct {
+	item            T
 	weight          int64
 	currentWeight   int64
 	effectiveWeight int64
 }
 
 // Smooth Weighted Round Robin load balancer implementation.
-type smoothWeightedRR struct {
-	items   []*weightedItem
-	itemMap map[any]*weightedItem
+type smoothWeightedRR[T comparable] struct {
+	items   []*weightedItem[T]
+	itemMap map[T]*weightedItem[T]
 }
 
 // NewSmoothWeightedRR returns a Smooth Weighted Round Robin load balancer.
-func NewSmoothWeightedRR() Interface {
-	return &smoothWeightedRR{
-		items:   make([]*weightedItem, 0),
-		itemMap: make(map[any]*weightedItem),
+func NewSmoothWeightedRR[T comparable]() Interface[T] {
+	return &smoothWeightedRR[T]{
+		items:   make([]*weightedItem[T], 0),
+		itemMap: make(map[T]*weightedItem[T]),
 	}
 }
 
-func (lb *smoothWeightedRR) Skip(item any) {
+func (lb *smoothWeightedRR[T]) Skip(item T) {
 	if wt, ok := lb.itemMap[item]; ok {
 		wt.effectiveWeight -= wt.weight
 		if wt.effectiveWeight < 0 {
@@ -61,16 +60,12 @@ func (lb *smoothWeightedRR) Skip(item any) {
 }
 
 // ItemCount returns the number of items.
-func (lb *smoothWeightedRR) ItemCount() int {
+func (lb *smoothWeightedRR[T]) ItemCount() int {
 	return len(lb.items)
 }
 
 // Add - adds a new unique item to the list.
-func (lb *smoothWeightedRR) Add(item any, weight int64) error {
-	if item == nil {
-		return errors.New("item cannot be nil")
-	}
-
+func (lb *smoothWeightedRR[T]) Add(item T, weight int64) error {
 	if weight < 0 {
 		return fmt.Errorf("item weight %v cannot be negative", weight)
 	}
@@ -79,7 +74,7 @@ func (lb *smoothWeightedRR) Add(item any, weight int64) error {
 		return fmt.Errorf("item %v already present", item)
 	}
 
-	weightedItem := &weightedItem{item: item, weight: weight, currentWeight: 0, effectiveWeight: weight}
+	weightedItem := &weightedItem[T]{item: item, weight: weight, currentWeight: 0, effectiveWeight: weight}
 
 	lb.itemMap[item] = weightedItem
 	lb.items = append(lb.items, weightedItem)
@@ -87,23 +82,24 @@ func (lb *smoothWeightedRR) Add(item any, weight int64) error {
 	return nil
 }
 
-// Reset - removes all items and resets state while retaining slice capacity for reuse.
-func (lb *smoothWeightedRR) Reset() {
+// Reset - removes all items and resets state while retaining capacity for reuse.
+func (lb *smoothWeightedRR[T]) Reset() {
+	clear(lb.items)
 	lb.items = lb.items[:0]
-	lb.itemMap = make(map[any]*weightedItem)
+	clear(lb.itemMap)
 }
 
 // Next - fetches the next item according to the smooth weighted round robin algorithm.
-func (lb *smoothWeightedRR) Next() any {
+func (lb *smoothWeightedRR[T]) Next() (T, bool) {
 	i := lb.nextWeightedItem()
 	if i == nil {
-		return nil
+		return *new(T), false
 	}
 
-	return i.item
+	return i.item, true
 }
 
-func (lb *smoothWeightedRR) nextWeightedItem() *weightedItem {
+func (lb *smoothWeightedRR[T]) nextWeightedItem() *weightedItem[T] {
 	itemsCount := len(lb.items)
 	if itemsCount == 0 {
 		return nil
@@ -113,7 +109,7 @@ func (lb *smoothWeightedRR) nextWeightedItem() *weightedItem {
 		return lb.items[0]
 	}
 
-	var best *weightedItem
+	var best *weightedItem[T]
 	total := int64(0)
 
 	for _, item := range lb.items {
