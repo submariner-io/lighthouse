@@ -35,17 +35,17 @@ var _ = Describe("[internal] Test Service Discovery Across Clusters", func() {
 	f := lhframework.NewFramework("internal")
 
 	When("the namespace for an imported remote service does not exist locally", func() {
-		It("should not resolve the remote service in the local cluster", func() {
-			RunNonexistentNamespaceDiscoveryTest(f)
+		It("should not resolve the remote service in the local cluster", func(ctx context.Context) {
+			RunNonexistentNamespaceDiscoveryTest(ctx, f)
 		})
 	})
 })
 
-func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
+func RunNonexistentNamespaceDiscoveryTest(ctx context.Context, f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	netshootNS, err := framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	netshootNS, err := framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", f.BaseName),
 		},
@@ -56,44 +56,44 @@ func RunNonexistentNamespaceDiscoveryTest(f *lhframework.Framework) {
 
 	f.AddNamespacesToDelete(netshootNS)
 
-	Expect(framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Delete(context.TODO(),
+	Expect(framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Delete(ctx,
 		f.Namespace, metav1.DeleteOptions{})).To(Succeed())
 
 	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
-	f.NewNginxDeployment(framework.ClusterB)
+	f.NewNginxDeployment(ctx, framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+	nginxServiceClusterB := f.NewNginxService(ctx, framework.ClusterB)
 
-	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	netshootPodList := f.NewNetShootDeploymentInNS(framework.ClusterA, netshootNS.Name)
+	netshootPodList := f.NewNetShootDeploymentInNS(ctx, framework.ClusterA, netshootNS.Name)
 
-	svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	svc, err := f.GetService(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
 
 	for i := 1; i <= 5; i++ {
 		time.Sleep(500 * time.Millisecond)
-		f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, lhframework.CheckedDomains,
+		f.VerifyServiceIPWithDig(ctx, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, lhframework.CheckedDomains,
 			"", false)
 	}
 
 	framework.By(fmt.Sprintf("Recreating namespace %q on %q", f.Namespace, clusterAName))
 
-	_, err = framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	_, err = framework.KubeClients[framework.ClusterA].CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: f.Namespace,
 		},
 	}, metav1.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred(), "Error creating namespace")
 
-	f.VerifyServiceIPWithDig(framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, lhframework.CheckedDomains,
+	f.VerifyServiceIPWithDig(ctx, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, lhframework.CheckedDomains,
 		"", true)
 }

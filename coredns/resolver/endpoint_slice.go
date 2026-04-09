@@ -41,7 +41,7 @@ import (
 
 const maxRecordsToLog = 5
 
-func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice) bool {
+func (i *Interface) PutEndpointSlices(ctx context.Context, endpointSlices ...*discovery.EndpointSlice) bool {
 	if len(endpointSlices) == 0 {
 		return false
 	}
@@ -64,7 +64,7 @@ func (i *Interface) PutEndpointSlices(endpointSlices ...*discovery.EndpointSlice
 		// The EndpointSlice is from the local cluster. With globalnet enabled, the local global endpoint IPs aren't
 		// routable in the local cluster so we retrieve the K8s EndpointSlice and use those endpoints. Note that this
 		// only applies to headless services.
-		localEndpointSlices, localEndpointSliceErr = i.getLocalEndpointSlices(endpointSlices[0])
+		localEndpointSlices, localEndpointSliceErr = i.getLocalEndpointSlices(ctx, endpointSlices[0])
 	}
 
 	i.mutex.Lock()
@@ -199,14 +199,14 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 	}
 }
 
-func (i *Interface) getLocalEndpointSlices(forEPS *discovery.EndpointSlice) ([]*discovery.EndpointSlice, error) {
+func (i *Interface) getLocalEndpointSlices(ctx context.Context, forEPS *discovery.EndpointSlice) ([]*discovery.EndpointSlice, error) {
 	epsGVR := schema.GroupVersionResource{
 		Group:    discovery.SchemeGroupVersion.Group,
 		Version:  discovery.SchemeGroupVersion.Version,
 		Resource: "endpointslices",
 	}
 
-	list, err := i.client.Resource(epsGVR).Namespace(forEPS.Labels[constants.LabelSourceNamespace]).List(context.TODO(),
+	list, err := i.client.Resource(epsGVR).Namespace(forEPS.Labels[constants.LabelSourceNamespace]).List(ctx,
 		metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{
 				discovery.LabelServiceName: forEPS.Labels[mcsv1a1.LabelServiceName],

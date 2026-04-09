@@ -19,6 +19,8 @@ limitations under the License.
 package resolver_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/constants"
@@ -31,9 +33,9 @@ var _ = Describe("PutEndpointSlices", func() {
 	t := newTestDriver()
 
 	When("the EndpointSlice is missing the required labels", func() {
-		It("should not process it", func() {
+		It("should not process it", func(ctx context.Context) {
 			// Missing LabelServiceName
-			t.putEndpointSlice(&discovery.EndpointSlice{
+			t.putEndpointSlice(ctx, &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
@@ -44,7 +46,7 @@ var _ = Describe("PutEndpointSlices", func() {
 			})
 
 			// Missing LabelSourceNamespace
-			t.putEndpointSlice(&discovery.EndpointSlice{
+			t.putEndpointSlice(ctx, &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
@@ -55,7 +57,7 @@ var _ = Describe("PutEndpointSlices", func() {
 			})
 
 			// Missing MCSLabelSourceCluster
-			t.putEndpointSlice(&discovery.EndpointSlice{
+			t.putEndpointSlice(ctx, &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{

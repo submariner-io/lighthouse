@@ -55,13 +55,13 @@ var _ = Describe("Cleanup", func() {
 		localBrokerEndpointSliceClient             dynamic.ResourceInterface
 	)
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 		t.doStart = false
 	})
 
-	JustBeforeEach(func() {
-		t.justBeforeEach()
+	JustBeforeEach(func(ctx context.Context) {
+		t.justBeforeEach(ctx)
 
 		// Exported ServiceImport in one cluster
 
@@ -76,7 +76,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1)
+		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1)
 
 		localServiceImport1OnBroker = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -86,7 +86,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker)
+		test.CreateResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker)
 
 		localAggregatedServiceImport1 = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -99,7 +99,7 @@ var _ = Describe("Cleanup", func() {
 			}},
 		}
 
-		test.CreateResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1)
+		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1)
 
 		aggregatedServiceImportOnRemoteBroker1 = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -112,7 +112,7 @@ var _ = Describe("Cleanup", func() {
 		}
 		aggregatedServiceImportOnRemoteBroker1.Status = localAggregatedServiceImport1.Status
 
-		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker1)
+		test.CreateResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker1)
 
 		// Exported ServiceImport in two clusters
 
@@ -129,7 +129,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2)
+		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2)
 
 		localAggregatedServiceImport2 = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -145,7 +145,7 @@ var _ = Describe("Cleanup", func() {
 			}},
 		}
 
-		test.CreateResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace2), localAggregatedServiceImport2)
+		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace2), localAggregatedServiceImport2)
 
 		aggregatedServiceImportOnRemoteBroker2 = &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
@@ -158,7 +158,7 @@ var _ = Describe("Cleanup", func() {
 		}
 		aggregatedServiceImportOnRemoteBroker2.Status = localAggregatedServiceImport2.Status
 
-		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker2)
+		test.CreateResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker2)
 
 		// Remote ServiceImport in local broker
 
@@ -177,7 +177,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker)
+		test.CreateResource(ctx, localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker)
 
 		// Local EndpointSlice in remote broker
 
@@ -191,8 +191,8 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.cluster1.localEndpointSliceClient, localEndpointSlice)
-		test.CreateResource(t.brokerEndpointSliceClient, test.SetClusterIDLabel(localEndpointSlice, clusterID1))
+		test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, localEndpointSlice)
+		test.CreateResource(ctx, t.brokerEndpointSliceClient, test.SetClusterIDLabel(localEndpointSlice, clusterID1))
 
 		// Remote EndpointSlice in local broker
 
@@ -209,7 +209,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(localBrokerEndpointSliceClient, test.SetClusterIDLabel(remoteEndpointSliceOnLocalBroker, clusterID2))
+		test.CreateResource(ctx, localBrokerEndpointSliceClient, test.SetClusterIDLabel(remoteEndpointSliceOnLocalBroker, clusterID2))
 
 		// Remote EndpointSlice in local namespace
 
@@ -223,7 +223,7 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.cluster1.localEndpointSliceClient, remoteEndpointSliceInLocalNS)
+		test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, remoteEndpointSliceInLocalNS)
 
 		nonLHEndpointSlice = &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -231,46 +231,46 @@ var _ = Describe("Cleanup", func() {
 			},
 		}
 
-		test.CreateResource(t.cluster1.localEndpointSliceClient, nonLHEndpointSlice)
+		test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, nonLHEndpointSlice)
 	})
 
 	AfterEach(func() {
 		t.afterEach()
 	})
 
-	It("should correctly remove local and remote ServiceImports and EndpointSlices", func() {
-		Expect(t.cluster1.agentController.Cleanup(context.Background())).To(Succeed())
+	It("should correctly remove local and remote ServiceImports and EndpointSlices", func(ctx context.Context) {
+		Expect(t.cluster1.agentController.Cleanup(ctx)).To(Succeed())
 
-		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1.Name)
-		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1.Name)
-		test.AwaitNoResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker1.Name)
-		test.AwaitNoResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker.Name)
+		test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1.Name)
+		test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1.Name)
+		test.AwaitNoResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker1.Name)
+		test.AwaitNoResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker.Name)
 
-		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2.Name)
-		test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport2.Name)
+		test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2.Name)
+		test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport2.Name)
 
-		si := ensureResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker2.Name,
+		si := ensureResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker2.Name,
 			&mcsv1a1.ServiceImport{}).(*mcsv1a1.ServiceImport)
 		Expect(si.Status.Clusters).To(HaveLen(1))
 		Expect(si.Status.Clusters).To(ContainElement(mcsv1a1.ClusterStatus{Cluster: clusterID2}))
 
-		ensureResource(localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker.Name, &mcsv1a1.ServiceImport{})
+		ensureResource(ctx, localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker.Name, &mcsv1a1.ServiceImport{})
 
-		test.AwaitNoResource(t.brokerEndpointSliceClient, localEndpointSlice.GetName())
-		test.AwaitNoResource(t.cluster1.localEndpointSliceClient, remoteEndpointSliceInLocalNS.Name)
+		test.AwaitNoResource(ctx, t.brokerEndpointSliceClient, localEndpointSlice.GetName())
+		test.AwaitNoResource(ctx, t.cluster1.localEndpointSliceClient, remoteEndpointSliceInLocalNS.Name)
 
-		ensureResource(localBrokerEndpointSliceClient, remoteEndpointSliceOnLocalBroker.Name, &discovery.EndpointSlice{})
-		ensureResource(t.cluster1.localEndpointSliceClient, nonLHEndpointSlice.Name, &discovery.EndpointSlice{})
+		ensureResource(ctx, localBrokerEndpointSliceClient, remoteEndpointSliceOnLocalBroker.Name, &discovery.EndpointSlice{})
+		ensureResource(ctx, t.cluster1.localEndpointSliceClient, nonLHEndpointSlice.Name, &discovery.EndpointSlice{})
 	})
 })
 
-func ensureResource(client dynamic.ResourceInterface, name string, to runtime.Object) runtime.Object {
+func ensureResource(ctx context.Context, client dynamic.ResourceInterface, name string, to runtime.Object) runtime.Object {
 	Consistently(func() bool {
-		_, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+		_, err := client.Get(ctx, name, metav1.GetOptions{})
 		return apierrors.IsNotFound(err)
 	}).Should(BeFalse(), "Expected resource %q not found", name)
 
-	obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+	obj, err := client.Get(ctx, name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	utilruntime.Must(scheme.Scheme.Convert(obj, to, nil))

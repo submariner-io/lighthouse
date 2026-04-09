@@ -43,17 +43,17 @@ var _ = Describe("Dual-stack", func() {
 func testDualStackClusterIPService() {
 	t := newTestDriver()
 
-	BeforeEach(func() {
-		t.createServiceImport(newAggregatedServiceImport(namespace1, service1))
+	BeforeEach(func(ctx context.Context) {
+		t.createServiceImport(ctx, newAggregatedServiceImport(namespace1, service1))
 	})
 
-	Specify("GetDNSRecords should return the correct DNS record for the requested IP family", func() {
+	Specify("GetDNSRecords should return the correct DNS record for the requested IP family", func(ctx context.Context) {
 		ipv4EPS := newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1)
-		t.createEndpointSlice(ipv4EPS)
+		t.createEndpointSlice(ctx, ipv4EPS)
 
 		ipv6EPS := newClusterIPEndpointSlice(namespace1, service1, clusterID1, ipv6IP, true, port1)
 		ipv6EPS.AddressType = discovery.AddressTypeIPv6
-		t.createEndpointSlice(ipv6EPS)
+		t.createEndpointSlice(ctx, ipv6EPS)
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 			IP:          serviceIP1,
@@ -75,7 +75,7 @@ func testDualStackClusterIPService() {
 
 		By("Deleting the IPv4 EndpointSlice")
 
-		err := t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), ipv4EPS.Name, metav1.DeleteOptions{})
+		err := t.endpointSlices.Namespace(namespace1).Delete(ctx, ipv4EPS.Name, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		t.awaitDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
@@ -88,14 +88,14 @@ func testDualStackClusterIPService() {
 
 		By("Deleting the IPv6 EndpointSlice")
 
-		err = t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), ipv6EPS.Name, metav1.DeleteOptions{})
+		err = t.endpointSlices.Namespace(namespace1).Delete(ctx, ipv6EPS.Name, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		t.awaitDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv6, false)
 
 		By("Deleting the ServiceImport")
 
-		err = t.serviceImports.Namespace(namespace1).Delete(context.TODO(), service1, metav1.DeleteOptions{})
+		err = t.serviceImports.Namespace(namespace1).Delete(ctx, service1, metav1.DeleteOptions{})
 		Expect(err).To(Succeed())
 
 		t.awaitDNSRecords(namespace1, service1, clusterID1, "", false)
@@ -105,18 +105,18 @@ func testDualStackClusterIPService() {
 func testDualStackHeadlessService() {
 	t := newTestDriver()
 
-	BeforeEach(func() {
-		t.createServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+	BeforeEach(func(ctx context.Context) {
+		t.createServiceImport(ctx, newHeadlessAggregatedServiceImport(namespace1, service1))
 	})
 
-	Specify("GetDNSRecords should return the DNS records for both IP families", func() {
+	Specify("GetDNSRecords should return the DNS records for both IP families", func(ctx context.Context) {
 		ipv4EPS1 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
 			discovery.Endpoint{
 				Addresses:  []string{endpointIP1},
 				Conditions: discovery.EndpointConditions{Ready: &ready},
 			},
 		)
-		t.createEndpointSlice(ipv4EPS1)
+		t.createEndpointSlice(ctx, ipv4EPS1)
 
 		ipv4EPS2 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port2},
 			discovery.Endpoint{
@@ -124,7 +124,7 @@ func testDualStackHeadlessService() {
 				Conditions: discovery.EndpointConditions{Ready: &ready},
 			},
 		)
-		t.createEndpointSlice(ipv4EPS2)
+		t.createEndpointSlice(ctx, ipv4EPS2)
 
 		ipv6EPS := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
 			discovery.Endpoint{
@@ -133,7 +133,7 @@ func testDualStackHeadlessService() {
 			},
 		)
 		ipv6EPS.AddressType = discovery.AddressTypeIPv6
-		t.createEndpointSlice(ipv6EPS)
+		t.createEndpointSlice(ctx, ipv6EPS)
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, resolver.DNSRecord{
 			IP:          endpointIP1,
@@ -173,7 +173,7 @@ func testDualStackHeadlessService() {
 
 		By("Deleting an IPv4 EndpointSlice")
 
-		err := t.endpointSlices.Namespace(namespace1).Delete(context.TODO(), ipv4EPS1.Name, metav1.DeleteOptions{})
+		err := t.endpointSlices.Namespace(namespace1).Delete(ctx, ipv4EPS1.Name, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPFamilyUnknown, true, resolver.DNSRecord{

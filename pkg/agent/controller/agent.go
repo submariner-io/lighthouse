@@ -60,7 +60,7 @@ type AgentConfig struct {
 var logger = log.Logger{Logger: logf.Log.WithName("agent")}
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig AgentConfig) (*Controller, error) {
+func New(ctx context.Context, spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig AgentConfig) (*Controller, error) {
 	if errs := validations.IsDNS1123Label(spec.ClusterID); len(errs) > 0 {
 		return nil, errors.Errorf("%s is not a valid ClusterID %v", spec.ClusterID, errs)
 	}
@@ -128,7 +128,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 	agentController.serviceExportClient = NewServiceExportClient(syncerConf.LocalClient, syncerConf.Scheme)
 	agentController.serviceExportClient.localSyncer = agentController.serviceExportSyncer
 
-	agentController.endpointSliceController, err = newEndpointSliceController(spec, syncerConf, agentController.serviceExportClient,
+	agentController.endpointSliceController, err = newEndpointSliceController(ctx, spec, syncerConf, agentController.serviceExportClient,
 		agentController.serviceSyncer)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func New(spec *AgentSpecification, syncerConf broker.SyncerConfig, agentConfig A
 	return agentController, nil
 }
 
-func (a *Controller) Start(stopCh <-chan struct{}) error {
+func (a *Controller) Start(ctx context.Context, stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
@@ -169,7 +169,7 @@ func (a *Controller) Start(stopCh <-chan struct{}) error {
 		return errors.Wrap(err, "error starting EndpointSlice syncer")
 	}
 
-	if err := a.serviceImportController.start(stopCh); err != nil {
+	if err := a.serviceImportController.start(ctx, stopCh); err != nil {
 		return errors.Wrap(err, "error starting ServiceImport controller")
 	}
 

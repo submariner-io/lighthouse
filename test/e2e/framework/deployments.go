@@ -27,11 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Framework) NewNetShootDeployment(cluster framework.ClusterIndex) *corev1.PodList {
-	return f.NewNetShootDeploymentInNS(cluster, f.Namespace)
+func (f *Framework) NewNetShootDeployment(ctx context.Context, cluster framework.ClusterIndex) *corev1.PodList {
+	return f.NewNetShootDeploymentInNS(ctx, cluster, f.Namespace)
 }
 
-func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, namespace string) *corev1.PodList {
+func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster framework.ClusterIndex, namespace string) *corev1.PodList {
 	var replicaCount int32 = 1
 	netShootDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -71,10 +71,10 @@ func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, na
 		},
 	}
 
-	return createDeployment(f, cluster, netShootDeployment)
+	return createDeployment(ctx, f, cluster, netShootDeployment)
 }
 
-func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.PodList {
+func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.ClusterIndex) *corev1.PodList {
 	var replicaCount int32 = 1
 	var port int32 = 8080
 	nginxDeployment := &appsv1.Deployment{
@@ -117,16 +117,16 @@ func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.P
 		},
 	}
 
-	return createDeployment(f, cluster, nginxDeployment)
+	return createDeployment(ctx, f, cluster, nginxDeployment)
 }
 
-func createDeployment(f *Framework, cluster framework.ClusterIndex, deployment *appsv1.Deployment) *corev1.PodList {
+func createDeployment(ctx context.Context, f *Framework, cluster framework.ClusterIndex, deployment *appsv1.Deployment) *corev1.PodList {
 	pc := framework.KubeClients[cluster].AppsV1().Deployments(deployment.Namespace)
 	appName := deployment.Spec.Template.ObjectMeta.Labels["app"]
 
-	_ = framework.AwaitUntil("create deployment", func() (*appsv1.Deployment, error) {
-		return pc.Create(context.TODO(), deployment, metav1.CreateOptions{})
+	_ = framework.AwaitUntil(ctx, "create deployment", func(ctx context.Context) (*appsv1.Deployment, error) {
+		return pc.Create(ctx, deployment, metav1.CreateOptions{})
 	}, framework.NoopCheckResult)
 
-	return f.AwaitPodsByAppLabel(cluster, appName, deployment.Namespace, 1)
+	return f.AwaitPodsByAppLabel(ctx, cluster, appName, deployment.Namespace, 1)
 }

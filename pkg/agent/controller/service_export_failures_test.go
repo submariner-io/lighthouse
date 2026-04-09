@@ -19,6 +19,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,15 +33,15 @@ import (
 var _ = Describe("Service export failures", func() {
 	var t *testDriver
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 	})
 
-	JustBeforeEach(func() {
-		t.justBeforeEach()
-		t.cluster1.createService()
-		t.cluster1.createServiceEndpointSlices()
-		t.cluster1.createServiceExport()
+	JustBeforeEach(func(ctx context.Context) {
+		t.justBeforeEach(ctx)
+		t.cluster1.createService(ctx)
+		t.cluster1.createServiceEndpointSlices(ctx)
+		t.cluster1.createServiceExport(ctx)
 	})
 
 	AfterEach(func() {
@@ -52,12 +53,12 @@ var _ = Describe("Service export failures", func() {
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(errors.New("mock create error"))
 		})
 
-		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
-			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionReady)
+		It("should eventually export the service", func(ctx context.Context) {
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
 	})
 
@@ -66,11 +67,11 @@ var _ = Describe("Service export failures", func() {
 			t.brokerServiceImportReactor.SetFailOnCreate(errors.New("mock create error"))
 		})
 
-		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
+		It("should eventually export the service", func(ctx context.Context) {
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnCreate(nil)
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
 	})
 
@@ -79,11 +80,11 @@ var _ = Describe("Service export failures", func() {
 			t.brokerServiceImportReactor.SetFailOnUpdate(errors.New("mock update error"))
 		})
 
-		It("should eventually export the service", func() {
-			t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
+		It("should eventually export the service", func(ctx context.Context) {
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnUpdate(nil)
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
 	})
 
@@ -93,10 +94,10 @@ var _ = Describe("Service export failures", func() {
 			t.brokerServiceImportReactor.SetResetOnFailure(true)
 		})
 
-		It("should eventually unexport the service", func() {
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
-			t.cluster1.deleteServiceExport()
-			t.awaitServiceUnexported(&t.cluster1)
+		It("should eventually unexport the service", func(ctx context.Context) {
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
+			t.cluster1.deleteServiceExport(ctx)
+			t.awaitServiceUnexported(ctx, &t.cluster1)
 		})
 	})
 
@@ -107,21 +108,21 @@ var _ = Describe("Service export failures", func() {
 			t.cluster1.localServiceImportReactor.SetResetOnFailure(true)
 		})
 
-		It("should eventually update the ServiceExport status", func() {
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		It("should eventually update the ServiceExport status", func(ctx context.Context) {
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
 	})
 
 	When("deleting the local EndpointSlice on unexport initially fails", func() {
-		JustBeforeEach(func() {
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		JustBeforeEach(func(ctx context.Context) {
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 
 			fake.FailOnAction(t.cluster1.localDynClientFake, "endpointslices", "delete-collection", nil, true)
 		})
 
-		It("should eventually unexport the service", func() {
-			t.cluster1.deleteServiceExport()
-			t.awaitServiceUnexported(&t.cluster1)
+		It("should eventually unexport the service", func(ctx context.Context) {
+			t.cluster1.deleteServiceExport(ctx)
+			t.awaitServiceUnexported(ctx, &t.cluster1)
 		})
 	})
 })

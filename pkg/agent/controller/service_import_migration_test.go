@@ -19,6 +19,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,12 +34,12 @@ import (
 var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
 	var t *testDriver
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 	})
 
-	JustBeforeEach(func() {
-		test.CreateResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace), &mcsv1a1.ServiceImport{
+	JustBeforeEach(func(ctx context.Context) {
+		test.CreateResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), &mcsv1a1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
 				Annotations: map[string]string{
@@ -59,21 +60,21 @@ var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
 		t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
 		t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 
-		t.cluster1.createService()
-		t.cluster1.createServiceExport()
+		t.cluster1.createService(ctx)
+		t.cluster1.createServiceExport(ctx)
 
-		t.justBeforeEach()
+		t.justBeforeEach(ctx)
 
-		t.cluster1.createServiceEndpointSlices()
+		t.cluster1.createServiceEndpointSlices(ctx)
 	})
 
 	AfterEach(func() {
 		t.afterEach()
 	})
 
-	It("should update the existing aggregated ServiceImport and not create any Conflict conditions", func() {
-		t.awaitNonHeadlessServiceExported(&t.cluster1)
+	It("should update the existing aggregated ServiceImport and not create any Conflict conditions", func(ctx context.Context) {
+		t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 
-		t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionConflict)
+		t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
 	})
 })

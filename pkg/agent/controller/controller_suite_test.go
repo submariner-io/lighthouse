@@ -156,7 +156,7 @@ type testDriver struct {
 	aggregatedIPFamilies            []corev1.IPFamily
 }
 
-func newTestDiver() *testDriver {
+func newTestDiver(ctx context.Context) *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
@@ -336,15 +336,15 @@ func newTestDiver() *testDriver {
 	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace)
 
-	t.cluster1.init(t.syncerConfig, nil, nil)
-	t.cluster2.init(t.syncerConfig, nil, nil)
+	t.cluster1.init(ctx, t.syncerConfig, nil, nil)
+	t.cluster2.init(ctx, t.syncerConfig, nil, nil)
 
 	return t
 }
 
-func (t *testDriver) justBeforeEach() {
-	t.cluster1.start(t, *t.syncerConfig)
-	t.cluster2.start(t, *t.syncerConfig)
+func (t *testDriver) justBeforeEach(ctx context.Context) {
+	t.cluster1.start(ctx, t, *t.syncerConfig)
+	t.cluster2.start(ctx, t, *t.syncerConfig)
 
 	if t.aggregatedIPFamilies == nil {
 		t.aggregatedIPFamilies = t.cluster1.service.Spec.IPFamilies
@@ -355,7 +355,8 @@ func (t *testDriver) afterEach() {
 	close(t.stopCh)
 }
 
-func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Interface, dynClientFake *k8stesting.Fake) {
+func (c *cluster) init(ctx context.Context, syncerConfig *broker.SyncerConfig, dynClient dynamic.Interface, dynClientFake *k8stesting.Fake,
+) {
 	c.expectedClusterIPEndpoints = nil
 
 	if dynClient == nil {
@@ -383,7 +384,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 		controller.GetGlobalIngressIPObj())).Namespace(serviceNamespace)
 
 	// Add a K8s EPS for some other service to ensure it doesn't interfere with anything.
-	_, err := endpointSliceClientFor(c.localDynClient, c.service.Namespace).Create(context.TODO(),
+	_, err := endpointSliceClientFor(c.localDynClient, c.service.Namespace).Create(ctx,
 		resource.MustToUnstructured(&discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "some-other-service-eps",
@@ -394,7 +395,7 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 }
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
+func (c *cluster) start(ctx context.Context, t *testDriver, syncerConfig broker.SyncerConfig) {
 	for i := range c.serviceEndpointSlices {
 		maps.Copy(c.serviceEndpointSlices[i].Labels, c.service.Labels)
 	}
@@ -421,7 +422,7 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 		c.supportedIPFamilies = c.service.Spec.IPFamilies
 	}
 
-	c.agentController, err = controller.New(&c.agentSpec, syncerConfig,
+	c.agentController, err = controller.New(ctx, &c.agentSpec, syncerConfig,
 		controller.AgentConfig{
 			ServiceImportCounterName: serviceImportCounterName,
 			ServiceExportCounterName: serviceExportCounterName,
@@ -432,36 +433,36 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	Expect(err).To(Succeed())
 
 	if t.doStart {
-		Expect(c.agentController.Start(t.stopCh)).To(Succeed())
+		Expect(c.agentController.Start(ctx, t.stopCh)).To(Succeed())
 	}
 }
 
-func (c *cluster) createService() {
-	test.CreateResource(c.dynamicServiceClientFor().Namespace(c.service.Namespace), c.service)
+func (c *cluster) createService(ctx context.Context) {
+	test.CreateResource(ctx, c.dynamicServiceClientFor().Namespace(c.service.Namespace), c.service)
 }
 
-func (c *cluster) updateService() {
-	test.UpdateResource(c.dynamicServiceClientFor().Namespace(c.service.Namespace), c.service)
+func (c *cluster) updateService(ctx context.Context) {
+	test.UpdateResource(ctx, c.dynamicServiceClientFor().Namespace(c.service.Namespace), c.service)
 }
 
-func (c *cluster) deleteService() {
-	Expect(c.dynamicServiceClientFor().Namespace(c.service.Namespace).Delete(context.TODO(), c.service.Name,
+func (c *cluster) deleteService(ctx context.Context) {
+	Expect(c.dynamicServiceClientFor().Namespace(c.service.Namespace).Delete(ctx, c.service.Name,
 		metav1.DeleteOptions{})).To(Succeed())
 }
 
-func (c *cluster) createServiceExport() {
-	test.CreateResource(c.localServiceExportClient, c.serviceExport)
+func (c *cluster) createServiceExport(ctx context.Context) {
+	test.CreateResource(ctx, c.localServiceExportClient, c.serviceExport)
 }
 
-func (c *cluster) deleteServiceExport() {
-	Expect(c.localServiceExportClient.Delete(context.TODO(), c.serviceExport.GetName(), metav1.DeleteOptions{})).To(Succeed())
+func (c *cluster) deleteServiceExport(ctx context.Context) {
+	Expect(c.localServiceExportClient.Delete(ctx, c.serviceExport.GetName(), metav1.DeleteOptions{})).To(Succeed())
 }
 
-func (c *cluster) createServiceEndpointSlices() {
+func (c *cluster) createServiceEndpointSlices(ctx context.Context) {
 	client := endpointSliceClientFor(c.localDynClient, c.service.Namespace)
 
 	for i := range c.serviceEndpointSlices {
-		_, err := client.Create(context.TODO(), resource.MustToUnstructured(&c.serviceEndpointSlices[i]), metav1.CreateOptions{})
+		_, err := client.Create(ctx, resource.MustToUnstructured(&c.serviceEndpointSlices[i]), metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			continue
 		}
@@ -470,21 +471,21 @@ func (c *cluster) createServiceEndpointSlices() {
 	}
 }
 
-func (c *cluster) updateServiceEndpointSlices() {
+func (c *cluster) updateServiceEndpointSlices(ctx context.Context) {
 	client := endpointSliceClientFor(c.localDynClient, c.service.Namespace)
 
 	for i := range c.serviceEndpointSlices {
-		test.UpdateResource(client, &c.serviceEndpointSlices[i])
+		test.UpdateResource(ctx, client, &c.serviceEndpointSlices[i])
 	}
 }
 
-func (c *cluster) deleteEndpointSlice(name string) {
-	Expect(endpointSliceClientFor(c.localDynClient, c.service.Namespace).Delete(context.TODO(), name,
+func (c *cluster) deleteEndpointSlice(ctx context.Context, name string) {
+	Expect(endpointSliceClientFor(c.localDynClient, c.service.Namespace).Delete(ctx, name,
 		metav1.DeleteOptions{})).To(Succeed())
 }
 
-func (c *cluster) createGlobalIngressIP(ingressIP *unstructured.Unstructured) {
-	test.CreateResource(c.localIngressIPClient, ingressIP)
+func (c *cluster) createGlobalIngressIP(ctx context.Context, ingressIP *unstructured.Unstructured) {
+	test.CreateResource(ctx, c.localIngressIPClient, ingressIP)
 }
 
 func (c *cluster) newHeadlessGlobalIngressIPForPod(target, ip string) *unstructured.Unstructured {
@@ -524,14 +525,16 @@ func (c *cluster) newGlobalIngressIP(name, ip string) *unstructured.Unstructured
 	return ingressIP
 }
 
-func (c *cluster) retrieveServiceExportCondition(se *mcsv1a1.ServiceExport, condType mcsv1a1.ServiceExportConditionType) *metav1.Condition {
-	obj, err := serviceExportClientFor(c.localDynClient, se.Namespace).Get(context.TODO(), se.Name, metav1.GetOptions{})
+func (c *cluster) retrieveServiceExportCondition(ctx context.Context, se *mcsv1a1.ServiceExport,
+	condType mcsv1a1.ServiceExportConditionType,
+) *metav1.Condition {
+	obj, err := serviceExportClientFor(c.localDynClient, se.Namespace).Get(ctx, se.Name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	return meta.FindStatusCondition(toServiceExport(obj).Status.Conditions, string(condType))
 }
 
-func (c *cluster) awaitServiceExportCondition(expected ...metav1.Condition) {
+func (c *cluster) awaitServiceExportCondition(ctx context.Context, expected ...metav1.Condition) {
 	conditionsEqual := func(actual, expected *metav1.Condition) bool {
 		return actual != nil && actual.Type == expected.Type && actual.Status == expected.Status &&
 			actual.Reason == expected.Reason
@@ -578,8 +581,8 @@ func (c *cluster) awaitServiceExportCondition(expected ...metav1.Condition) {
 
 	last := len(expected) - 1
 
-	Eventually(func(g Gomega) {
-		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
+	Eventually(ctx, func(g Gomega, ctx context.Context) {
+		obj, err := c.localServiceExportClient.Get(ctx, c.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		se := toServiceExport(obj)
@@ -619,24 +622,26 @@ func (c *cluster) ensureLastServiceExportCondition(expected metav1.Condition) {
 	}).Should(Equal(initialIndex), "Expected ServiceExport condition to not change: "+resource.ToJSON(expected))
 }
 
-func (c *cluster) ensureNoServiceExportCondition(condType mcsv1a1.ServiceExportConditionType, serviceExports ...*mcsv1a1.ServiceExport) {
+func (c *cluster) ensureNoServiceExportCondition(ctx context.Context, condType mcsv1a1.ServiceExportConditionType,
+	serviceExports ...*mcsv1a1.ServiceExport,
+) {
 	if len(serviceExports) == 0 {
 		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
 	}
 
 	for _, se := range serviceExports {
 		Consistently(func() any {
-			return c.retrieveServiceExportCondition(se, condType)
+			return c.retrieveServiceExportCondition(ctx, se, condType)
 		}).Should(BeNil(), "Unexpected ServiceExport status condition")
 	}
 }
 
-func (c *cluster) awaitNoServiceStatus() {
-	c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonNoService))
+func (c *cluster) awaitNoServiceStatus(ctx context.Context) {
+	c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonNoService))
 }
 
-func (c *cluster) findLocalServiceImport() *mcsv1a1.ServiceImport {
-	list, err := c.localServiceImportClient.Namespace(test.LocalNamespace).List(context.TODO(), metav1.ListOptions{})
+func (c *cluster) findLocalServiceImport(ctx context.Context) *mcsv1a1.ServiceImport {
+	list, err := c.localServiceImportClient.Namespace(test.LocalNamespace).List(ctx, metav1.ListOptions{})
 	Expect(err).To(Succeed())
 
 	for i := range list.Items {
@@ -651,13 +656,13 @@ func (c *cluster) findLocalServiceImport() *mcsv1a1.ServiceImport {
 	return nil
 }
 
-func (c *cluster) findLocalEndpointSlices() []*discovery.EndpointSlice {
-	return findEndpointSlices(c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
+func (c *cluster) findLocalEndpointSlices(ctx context.Context) []*discovery.EndpointSlice {
+	return findEndpointSlices(ctx, c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
 }
 
-func (c *cluster) ensureNoEndpointSlice() {
-	Consistently(func() int {
-		return len(findEndpointSlices(c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID))
+func (c *cluster) ensureNoEndpointSlice(ctx context.Context) {
+	Consistently(ctx, func(ctx context.Context) int {
+		return len(findEndpointSlices(ctx, c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID))
 	}, 300*time.Millisecond).Should(BeZero(), "Unexpected EndpointSlice")
 }
 
@@ -675,7 +680,8 @@ func (c *cluster) verifyServiceImportReady(si *mcsv1a1.ServiceImport) {
 	c.verifyImportReadyCondition(cond)
 }
 
-func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport, ipPool *ipam.IPPool,
+func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport,
+	ipPool *ipam.IPPool,
 ) *mcsv1a1.ServiceImport {
 	sortSlices := func(si *mcsv1a1.ServiceImport) {
 		sort.SliceStable(si.Spec.Ports, func(i, j int) bool {
@@ -695,8 +701,8 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 
 	var serviceImport *mcsv1a1.ServiceImport
 
-	Eventually(func(g Gomega) {
-		obj, err := client.Namespace(expected.Namespace).Get(context.TODO(), expected.Name, metav1.GetOptions{})
+	Eventually(ctx, func(g Gomega, ctx context.Context) {
+		obj, err := client.Namespace(expected.Namespace).Get(ctx, expected.Name, metav1.GetOptions{})
 		g.Expect(err).NotTo(HaveOccurred())
 
 		serviceImport = toServiceImport(obj)
@@ -721,15 +727,16 @@ func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected 
 	return serviceImport
 }
 
-func getServiceImport(client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
-	obj, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func getServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
+	obj, err := client.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	return toServiceImport(obj)
 }
 
-func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clusterID string) []*discovery.EndpointSlice {
-	list, err := client.List(context.TODO(), metav1.ListOptions{})
+func findEndpointSlices(ctx context.Context, client dynamic.ResourceInterface, namespace, name, clusterID string,
+) []*discovery.EndpointSlice {
+	list, err := client.List(ctx, metav1.ListOptions{})
 	if resource.IsMissingNamespaceErr(err) {
 		return []*discovery.EndpointSlice{}
 	}
@@ -752,7 +759,7 @@ func findEndpointSlices(client dynamic.ResourceInterface, namespace, name, clust
 	return endpointSlices
 }
 
-func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, expected *discovery.EndpointSlice) {
+func awaitEndpointSlice(ctx context.Context, client dynamic.ResourceInterface, serviceName string, expected *discovery.EndpointSlice) {
 	sortSlices := func(eps *discovery.EndpointSlice) {
 		sort.SliceStable(eps.Ports, func(i, j int) bool {
 			return *eps.Ports[i].Port < *eps.Ports[j].Port
@@ -765,10 +772,10 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 
 	sortSlices(expected)
 
-	Eventually(func(g Gomega) {
+	Eventually(ctx, func(g Gomega, ctx context.Context) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
+		slices := findEndpointSlices(ctx, client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
 
 		for _, eps := range slices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
@@ -801,9 +808,9 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 	}).ProbeEvery(time.Millisecond * 50).Within(time.Second * 5).Should(Succeed())
 }
 
-func awaitNoEndpointSlice(client dynamic.ResourceInterface, ns, name, clusterID string) {
-	Eventually(func(g Gomega) {
-		eps := findEndpointSlices(client, ns, name, clusterID)
+func awaitNoEndpointSlice(ctx context.Context, client dynamic.ResourceInterface, ns, name, clusterID string) {
+	Eventually(ctx, func(g Gomega, ctx context.Context) {
+		eps := findEndpointSlices(ctx, client, ns, name, clusterID)
 		g.Expect(eps).To(BeEmpty(), "Unexpected EndpointSlice found")
 	}).Should(Succeed())
 }
@@ -812,7 +819,9 @@ func (c *cluster) dynamicServiceClientFor() dynamic.NamespaceableResourceInterfa
 	return c.localDynClient.Resource(schema.GroupVersionResource{Version: "v1", Resource: "services"})
 }
 
-func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportType, name, ns string, clusters ...*cluster) {
+func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcsv1a1.ServiceImportType, name, ns string,
+	clusters ...*cluster,
+) {
 	expServiceImport := &mcsv1a1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", name, ns),
@@ -844,7 +853,7 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 		}
 	}
 
-	actual := awaitServiceImport(t.brokerServiceImportClient, expServiceImport, t.ipPool)
+	actual := awaitServiceImport(ctx, t.brokerServiceImportClient, expServiceImport, t.ipPool)
 
 	if sType == mcsv1a1.ClusterSetIP {
 		Expect(actual.Annotations).To(HaveKeyWithValue(constants.UseClustersetIP, strconv.FormatBool(t.useClusterSetIP)))
@@ -853,25 +862,27 @@ func (t *testDriver) awaitAggregatedServiceImport(sType mcsv1a1.ServiceImportTyp
 	expServiceImport.Name = name
 	expServiceImport.Namespace = ns
 
-	t.cluster1.verifyServiceImportReady(awaitServiceImport(t.cluster1.localServiceImportClient, expServiceImport, t.ipPool))
-	t.cluster2.verifyServiceImportReady(awaitServiceImport(t.cluster2.localServiceImportClient, expServiceImport, t.ipPool))
+	t.cluster1.verifyServiceImportReady(awaitServiceImport(ctx, t.cluster1.localServiceImportClient, expServiceImport, t.ipPool))
+	t.cluster2.verifyServiceImportReady(awaitServiceImport(ctx, t.cluster2.localServiceImportClient, expServiceImport, t.ipPool))
 }
 
-func (t *testDriver) ensureAggregatedServiceImport(sType mcsv1a1.ServiceImportType, name, ns string, clusters ...*cluster) {
-	Consistently(func() bool {
-		t.awaitAggregatedServiceImport(sType, name, ns, clusters...)
+func (t *testDriver) ensureAggregatedServiceImport(ctx context.Context, sType mcsv1a1.ServiceImportType, name, ns string,
+	clusters ...*cluster,
+) {
+	Consistently(ctx, func(ctx context.Context) bool {
+		t.awaitAggregatedServiceImport(ctx, sType, name, ns, clusters...)
 		return true
 	}).Should(BeTrue())
 }
 
-func (t *testDriver) awaitNoAggregatedServiceImport(c *cluster) {
-	test.AwaitNoResource(t.brokerServiceImportClient.Namespace(test.RemoteNamespace),
+func (t *testDriver) awaitNoAggregatedServiceImport(ctx context.Context, c *cluster) {
+	test.AwaitNoResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace),
 		fmt.Sprintf("%s-%s", c.service.Name, c.service.Namespace))
-	test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(c.service.Namespace), c.service.Name)
-	test.AwaitNoResource(t.cluster2.localServiceImportClient.Namespace(c.service.Namespace), c.service.Name)
+	test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(c.service.Namespace), c.service.Name)
+	test.AwaitNoResource(ctx, t.cluster2.localServiceImportClient.Namespace(c.service.Namespace), c.service.Name)
 }
 
-func (t *testDriver) awaitEndpointSlice(c *cluster) {
+func (t *testDriver) awaitEndpointSlice(ctx context.Context, c *cluster) {
 	isHeadless := c.service.Spec.ClusterIP == corev1.ClusterIPNone
 
 	epsTemplate := &discovery.EndpointSlice{
@@ -929,27 +940,27 @@ func (t *testDriver) awaitEndpointSlice(c *cluster) {
 	}
 
 	for i := range expected {
-		awaitEndpointSlice(t.brokerEndpointSliceClient, c.service.Name, &expected[i])
-		awaitEndpointSlice(t.cluster1.localEndpointSliceClient, c.service.Name, &expected[i])
-		awaitEndpointSlice(t.cluster2.localEndpointSliceClient, c.service.Name, &expected[i])
+		awaitEndpointSlice(ctx, t.brokerEndpointSliceClient, c.service.Name, &expected[i])
+		awaitEndpointSlice(ctx, t.cluster1.localEndpointSliceClient, c.service.Name, &expected[i])
+		awaitEndpointSlice(ctx, t.cluster2.localEndpointSliceClient, c.service.Name, &expected[i])
 	}
 
-	Eventually(func() []*discovery.EndpointSlice {
-		return findEndpointSlices(c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
+	Eventually(ctx, func(ctx context.Context) []*discovery.EndpointSlice {
+		return findEndpointSlices(ctx, c.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
 	}).Should(HaveLen(len(expected)))
 }
 
-func (t *testDriver) ensureEndpointSlice(c *cluster) {
-	Consistently(func() bool {
-		t.awaitEndpointSlice(c)
+func (t *testDriver) ensureEndpointSlice(ctx context.Context, c *cluster) {
+	Consistently(ctx, func(ctx context.Context) bool {
+		t.awaitEndpointSlice(ctx, c)
 		return true
 	}).Should(BeTrue())
 }
 
-func (t *testDriver) awaitNoEndpointSlice(c *cluster) {
-	awaitNoEndpointSlice(t.cluster1.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
-	awaitNoEndpointSlice(t.brokerEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
-	awaitNoEndpointSlice(t.cluster2.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
+func (t *testDriver) awaitNoEndpointSlice(ctx context.Context, c *cluster) {
+	awaitNoEndpointSlice(ctx, t.cluster1.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
+	awaitNoEndpointSlice(ctx, t.brokerEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
+	awaitNoEndpointSlice(ctx, t.cluster2.localEndpointSliceClient, c.service.Namespace, c.service.Name, c.clusterID)
 }
 
 func serviceExportClientFor(client dynamic.Interface, namespace string) dynamic.ResourceInterface {
@@ -991,20 +1002,20 @@ func toServiceImport(obj any) *mcsv1a1.ServiceImport {
 	return si
 }
 
-func (t *testDriver) awaitNonHeadlessServiceExported(clusters ...*cluster) {
-	t.awaitServiceExported(mcsv1a1.ClusterSetIP, clusters...)
+func (t *testDriver) awaitNonHeadlessServiceExported(ctx context.Context, clusters ...*cluster) {
+	t.awaitServiceExported(ctx, mcsv1a1.ClusterSetIP, clusters...)
 }
 
-func (t *testDriver) awaitHeadlessServiceExported(clusters ...*cluster) {
-	t.awaitServiceExported(mcsv1a1.Headless, clusters...)
+func (t *testDriver) awaitHeadlessServiceExported(ctx context.Context, clusters ...*cluster) {
+	t.awaitServiceExported(ctx, mcsv1a1.Headless, clusters...)
 }
 
-func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clusters ...*cluster) {
-	t.awaitAggregatedServiceImport(sType, t.cluster1.service.Name, t.cluster1.service.Namespace, clusters...)
+func (t *testDriver) awaitServiceExported(ctx context.Context, sType mcsv1a1.ServiceImportType, clusters ...*cluster) {
+	t.awaitAggregatedServiceImport(ctx, sType, t.cluster1.service.Name, t.cluster1.service.Namespace, clusters...)
 
 	for _, c := range clusters {
-		Eventually(func(g Gomega) {
-			list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(context.TODO(), metav1.ListOptions{
+		Eventually(ctx, func(g Gomega, ctx context.Context) {
+			list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(ctx, metav1.ListOptions{
 				LabelSelector: k8slabels.Set(map[string]string{
 					mcsv1a1.LabelServiceName:       t.cluster1.service.Name,
 					constants.LabelSourceNamespace: t.cluster1.service.Namespace,
@@ -1015,20 +1026,20 @@ func (t *testDriver) awaitServiceExported(sType mcsv1a1.ServiceImportType, clust
 			g.Expect(list.Items).To(HaveLen(1), "Local ServiceImport for %q on the broker", c.clusterID)
 		}).Should(Succeed())
 
-		t.awaitEndpointSlice(c)
+		t.awaitEndpointSlice(ctx, c)
 
-		c.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
-		c.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonExported))
+		c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
+		c.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonExported))
 	}
 }
 
-func (t *testDriver) awaitServiceUnexported(c *cluster) {
-	t.awaitNoEndpointSlice(c)
+func (t *testDriver) awaitServiceUnexported(ctx context.Context, c *cluster) {
+	t.awaitNoEndpointSlice(ctx, c)
 
-	t.awaitNoAggregatedServiceImport(c)
+	t.awaitNoAggregatedServiceImport(ctx, c)
 
-	Eventually(func(g Gomega) {
-		list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(context.TODO(), metav1.ListOptions{
+	Eventually(ctx, func(g Gomega, ctx context.Context) {
+		list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(k8slabels.Set(map[string]string{
 				mcsv1a1.LabelServiceName:       c.service.Name,
 				constants.LabelSourceNamespace: c.service.Namespace,
@@ -1046,7 +1057,7 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 	// exported EndpointSlice isn't recreated.
 	epsClient := endpointSliceClientFor(c.localDynClient, c.service.Namespace)
 
-	_, err := epsClient.Create(context.Background(),
+	_, err := epsClient.Create(ctx,
 		resource.MustToUnstructured(&discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "dummy",
@@ -1055,8 +1066,8 @@ func (t *testDriver) awaitServiceUnexported(c *cluster) {
 		}), metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
-	c.ensureNoEndpointSlice()
-	Expect(epsClient.Delete(context.Background(), "dummy", metav1.DeleteOptions{})).To(Succeed())
+	c.ensureNoEndpointSlice(ctx)
+	Expect(epsClient.Delete(ctx, "dummy", metav1.DeleteOptions{})).To(Succeed())
 }
 
 func newServiceExportValidCondition(status metav1.ConditionStatus, reason mcsv1a1.ServiceExportConditionReason) metav1.Condition {

@@ -144,7 +144,7 @@ func main() {
 		exitOnError(err, "Error creating clusterset IP pool")
 	}
 
-	lightHouseAgent, err := controller.New(&agentSpec, broker.SyncerConfig{
+	lightHouseAgent, err := controller.New(ctx, &agentSpec, broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalClient:     localClient,
 		RestMapper:      restMapper,
@@ -166,7 +166,7 @@ func main() {
 		return
 	}
 
-	err = lightHouseAgent.Start(ctx.Done())
+	err = lightHouseAgent.Start(ctx, ctx.Done())
 	exitOnError(err, "Failed to start lighthouse agent")
 
 	defer http.StartServer(http.Metrics|http.Profile, 8082)()

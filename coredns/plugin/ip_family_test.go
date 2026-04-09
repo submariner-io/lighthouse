@@ -19,6 +19,7 @@ limitations under the License.
 package lighthouse_test
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -60,8 +61,8 @@ func testIPFamilies() {
 		return eps
 	}
 
-	executeTypeAAAAQuery := func() {
-		t.executeTestCase(test.Case{
+	executeTypeAAAAQuery := func(ctx context.Context) {
+		t.executeTestCase(ctx, test.Case{
 			Qname: qname,
 			Qtype: dns.TypeAAAA,
 			Rcode: dns.RcodeSuccess,
@@ -77,35 +78,35 @@ func testIPFamilies() {
 				serviceImportType = serviceType
 			})
 
-			JustBeforeEach(func() {
+			JustBeforeEach(func(ctx context.Context) {
 				t.lh.SupportedIPFamilies = []k8snet.IPFamily{k8snet.IPv6}
 
 				t.mockCs.ConnectClusterID(clusterID, k8snet.IPv6)
-				t.lh.Resolver.PutEndpointSlices(newIPv6EndpointSlice())
+				t.lh.Resolver.PutEndpointSlices(ctx, newIPv6EndpointSlice())
 			})
 
 			Context(fmt.Sprintf("for an IPv6 %s service", serviceType), func() {
-				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func() {
-					executeTypeAAAAQuery()
+				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func(ctx context.Context) {
+					executeTypeAAAAQuery(ctx)
 				})
 
-				Specify("a Type A DNS query should return an empty record", func() {
-					t.execTypeAQueryExpectRespCode(qname, dns.RcodeSuccess)
+				Specify("a Type A DNS query should return an empty record", func(ctx context.Context) {
+					t.execTypeAQueryExpectRespCode(ctx, qname, dns.RcodeSuccess)
 				})
 			})
 
 			Context(fmt.Sprintf("for a dual-stack %s service", serviceType), func() {
-				JustBeforeEach(func() {
-					t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
+				JustBeforeEach(func(ctx context.Context) {
+					t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
 						newEndpoint(serviceIP, "", true)))
 				})
 
-				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func() {
-					executeTypeAAAAQuery()
+				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func(ctx context.Context) {
+					executeTypeAAAAQuery(ctx)
 				})
 
-				Specify("a Type A DNS query should return an empty record", func() {
-					t.execTypeAQueryExpectRespCode(qname, dns.RcodeSuccess)
+				Specify("a Type A DNS query should return an empty record", func(ctx context.Context) {
+					t.execTypeAQueryExpectRespCode(ctx, qname, dns.RcodeSuccess)
 				})
 			})
 		})
@@ -120,26 +121,26 @@ func testIPFamilies() {
 				serviceImportType = serviceType
 			})
 
-			JustBeforeEach(func() {
+			JustBeforeEach(func(ctx context.Context) {
 				t.lh.SupportedIPFamilies = []k8snet.IPFamily{k8snet.IPv6, k8snet.IPv4}
 				t.mockCs.ConnectClusterID(clusterID, k8snet.IPv6)
 				t.mockCs.ConnectClusterID(clusterID, k8snet.IPv4)
 
-				t.lh.Resolver.PutEndpointSlices(newIPv6EndpointSlice())
-				t.lh.Resolver.PutEndpointSlices(newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
+				t.lh.Resolver.PutEndpointSlices(ctx, newIPv6EndpointSlice())
+				t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
 					newEndpoint(serviceIP, "", true)))
 			})
 
 			Context(fmt.Sprintf("for a dual-stack %s service", serviceType), func() {
-				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func() {
-					executeTypeAAAAQuery()
+				Specify("a Type AAAA DNS query should succeed and write a AAAA record response", func(ctx context.Context) {
+					executeTypeAAAAQuery(ctx)
 				})
 
-				Specify("a Type A DNS query should succeed and write an A record response", func() {
-					t.execTypeAQueryExpectIPResp(qname, serviceIP)
+				Specify("a Type A DNS query should succeed and write an A record response", func(ctx context.Context) {
+					t.execTypeAQueryExpectIPResp(ctx, qname, serviceIP)
 				})
 
-				Specify("a Type SRV query should succeed and write an SRV record response", func() {
+				Specify("a Type SRV query should succeed and write an SRV record response", func(ctx context.Context) {
 					answer := []dns.RR{
 						test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, port2.Port, qname)),
 					}
@@ -153,7 +154,7 @@ func testIPFamilies() {
 						}
 					}
 
-					t.executeTestCase(test.Case{
+					t.executeTestCase(ctx, test.Case{
 						Qname:  qname,
 						Qtype:  dns.TypeSRV,
 						Rcode:  dns.RcodeSuccess,
