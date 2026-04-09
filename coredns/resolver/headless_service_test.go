@@ -19,6 +19,7 @@ limitations under the License.
 package resolver_test
 
 import (
+	"context"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -82,9 +83,9 @@ func testHeadlessService() {
 		endpointSlice = nil
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		endpointSlice.Annotations = annotations
-		t.putEndpointSlice(endpointSlice)
+		t.putEndpointSlice(ctx, endpointSlice)
 	})
 
 	When("a service has both ready and not-ready addresses", func() {
@@ -161,7 +162,7 @@ func testHeadlessService() {
 		})
 
 		Context("and globalnet is enabled", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				annotations = map[string]string{
 					constants.GlobalnetEnabled:         strconv.FormatBool(true),
 					constants.PublishNotReadyAddresses: strconv.FormatBool(true),
@@ -171,7 +172,7 @@ func testHeadlessService() {
 				// return true to requeue.
 				eps := newEndpointSlice(namespace1, service1, clusterID1, nil)
 				eps.Annotations = annotations
-				Expect(t.resolver.PutEndpointSlices(eps)).To(BeTrue())
+				Expect(t.resolver.PutEndpointSlices(ctx, eps)).To(BeTrue())
 
 				eps1 := &discovery.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
@@ -195,9 +196,9 @@ func testHeadlessService() {
 						},
 					},
 				}
-				t.createEndpointSlice(eps1)
+				t.createEndpointSlice(ctx, eps1)
 
-				t.createEndpointSlice(&discovery.EndpointSlice{
+				t.createEndpointSlice(ctx, &discovery.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      service1 + "local-2",
 						Namespace: eps1.Namespace,
@@ -250,8 +251,8 @@ func testHeadlessService() {
 			)
 		})
 
-		JustBeforeEach(func() {
-			Expect(t.resolver.PutEndpointSlices(endpointSlice, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+		JustBeforeEach(func(ctx context.Context) {
+			Expect(t.resolver.PutEndpointSlices(ctx, endpointSlice, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -327,16 +328,16 @@ func testHeadlessServiceInMultipleClusters() {
 		t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
 	})
 
-	JustBeforeEach(func() {
-		t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1}, discovery.Endpoint{
+	JustBeforeEach(func(ctx context.Context) {
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1}, discovery.Endpoint{
 			Addresses: []string{endpointIP1},
 		}))
 
-		t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port2}, discovery.Endpoint{
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port2}, discovery.Endpoint{
 			Addresses: []string{endpointIP2},
 		}))
 
-		t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3, port4},
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3, port4},
 			discovery.Endpoint{
 				Addresses:  []string{endpointIP3, endpointIP4},
 				Hostname:   &hostName1,
@@ -447,8 +448,8 @@ func testHeadlessServiceInMultipleClusters() {
 			HostName:    hostName2,
 		}
 
-		JustBeforeEach(func() {
-			t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3},
+		JustBeforeEach(func(ctx context.Context) {
+			t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3},
 				discovery.Endpoint{
 					Addresses: []string{endpointIP4},
 					Hostname:  &hostName1,

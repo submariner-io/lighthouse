@@ -19,6 +19,7 @@ limitations under the License.
 package discovery
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,97 +38,97 @@ var _ = Describe("Test Stateful Sets Discovery Across Clusters", Label(labels.Se
 	f := lhframework.NewFramework("discovery")
 
 	When("a pod tries to resolve a podname from stateful set in a remote cluster", func() {
-		It("should resolve the pod IP from the remote cluster", func() {
-			RunSSDiscoveryTest(f)
+		It("should resolve the pod IP from the remote cluster", func(ctx context.Context) {
+			RunSSDiscoveryTest(ctx, f)
 		})
 	})
 
 	When("a pod tries to resolve a podname from stateful set in a local cluster", func() {
-		It("should resolve the pod IP from the local cluster", func() {
-			RunSSDiscoveryLocalTest(f)
+		It("should resolve the pod IP from the local cluster", func(ctx context.Context) {
+			RunSSDiscoveryLocalTest(ctx, f)
 		})
 	})
 
 	When("the number of active pods backing a stateful set changes", func() {
-		It("should only resolve the IPs from the active pods", func() {
-			RunSSPodsAvailabilityTest(f)
+		It("should only resolve the IPs from the active pods", func(ctx context.Context) {
+			RunSSPodsAvailabilityTest(ctx, f)
 		})
 	})
 })
 
-func RunSSDiscoveryTest(f *lhframework.Framework) {
+func RunSSDiscoveryTest(ctx context.Context, f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
-	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
+	nginxSSClusterB := f.NewNginxStatefulSet(ctx, framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
 	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(ctx, nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
 		map[string]string{"app": appName}, framework.ClusterB, nil)
 
-	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+	netshootPodList := f.NewNetShootDeployment(ctx, framework.ClusterA)
 
-	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
+	endpointSlices := f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 1)
 
-	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, true, clusterAName)
+	verifyEndpointSlices(ctx, f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, true, clusterAName)
 
-	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
-	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
+	f.DeleteServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(ctx, framework.ClusterA, nginxServiceClusterB, 0)
+	f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
 
-	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, false, clusterAName)
+	verifyEndpointSlices(ctx, f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 1, false, clusterAName)
 }
 
-func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
+func RunSSDiscoveryLocalTest(ctx context.Context, f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	// Create StatefulSet on ClusterB
 	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
-	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
+	nginxSSClusterB := f.NewNginxStatefulSet(ctx, framework.ClusterB)
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
 	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(ctx, nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
 		map[string]string{"app": appName}, framework.ClusterB, nil)
 
 	// Create StatefulSet on ClusterA
 	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterAName))
 
-	nginxSSClusterA := f.NewNginxStatefulSet(framework.ClusterA)
+	nginxSSClusterA := f.NewNginxStatefulSet(ctx, framework.ClusterA)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterAName))
 
-	nginxServiceClusterA := f.NewHeadlessServiceWithParams(nginxSSClusterA.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
+	nginxServiceClusterA := f.NewHeadlessServiceWithParams(ctx, nginxSSClusterA.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
 		map[string]string{"app": appName}, framework.ClusterA, nil)
 
-	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	f.NewServiceExport(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
-	f.AwaitServiceExportedStatusCondition(framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+	f.NewServiceExport(ctx, framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterA, nginxServiceClusterA.Name, nginxServiceClusterA.Namespace)
 
 	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+	netshootPodList := f.NewNetShootDeployment(ctx, framework.ClusterA)
 
-	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
+	endpointSlices := f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
-	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 2, true, clusterAName)
+	verifyEndpointSlices(ctx, f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 2, true, clusterAName)
 
-	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
+	f.DeleteServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(ctx, framework.ClusterA, nginxServiceClusterB, 1)
 
 	verifyCount := 0
 
@@ -136,7 +137,7 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+			verifyEndpointsWithDig(ctx, f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				nginxServiceClusterB, checkedDomains, sourceCluster == clusterAName, sourceCluster == clusterAName)
 
 			verifyCount++
@@ -145,56 +146,57 @@ func RunSSDiscoveryLocalTest(f *lhframework.Framework) {
 
 	Expect(verifyCount).To(Equal(2), "Mismatch in count of IPs to be validated with dig")
 
-	f.DeleteServiceExport(framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
-	f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
+	f.DeleteServiceExport(ctx, framework.ClusterA, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(ctx, framework.ClusterA, nginxServiceClusterB, 0)
+	f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 0, 0)
 }
 
-func RunSSPodsAvailabilityTest(f *lhframework.Framework) {
+func RunSSPodsAvailabilityTest(ctx context.Context, f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	framework.By(fmt.Sprintf("Creating an Nginx Stateful Set on %q", clusterBName))
 
-	nginxSSClusterB := f.NewNginxStatefulSet(framework.ClusterB)
-	f.SetNginxStatefulSetReplicas(framework.ClusterB, 3)
+	nginxSSClusterB := f.NewNginxStatefulSet(ctx, framework.ClusterB)
+	f.SetNginxStatefulSetReplicas(ctx, framework.ClusterB, 3)
 
 	appName := nginxSSClusterB.Spec.Selector.MatchLabels["app"]
 
 	framework.By(fmt.Sprintf("Creating a Nginx Headless Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewHeadlessServiceWithParams(nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
+	nginxServiceClusterB := f.NewHeadlessServiceWithParams(ctx, nginxSSClusterB.Spec.ServiceName, httpPortName, corev1.ProtocolTCP,
 		map[string]string{"app": appName}, framework.ClusterB, nil)
 
-	f.NewServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.NewServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+	netshootPodList := f.NewNetShootDeployment(ctx, framework.ClusterA)
 
-	endpointSlices := f.AwaitEndpointSlices(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 3)
+	endpointSlices := f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 1, 3)
 
-	verifyEndpointSlices(f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 3, true, clusterAName)
+	verifyEndpointSlices(ctx, f, framework.ClusterA, netshootPodList, endpointSlices, nginxServiceClusterB, 3, true, clusterAName)
 
-	f.SetNginxStatefulSetReplicas(framework.ClusterB, 1)
+	f.SetNginxStatefulSetReplicas(ctx, framework.ClusterB, 1)
 
 	for i := range endpointSlices.Items {
 		endpointSlice := &endpointSlices.Items[i]
 		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+			verifyEndpointsWithDig(ctx, f, framework.ClusterA, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				nginxServiceClusterB, checkedDomains, *endpointSlice.Endpoints[j].Hostname == "web-0", sourceCluster == clusterAName)
 		}
 	}
 
-	f.DeleteServiceExport(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
-	f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 0)
+	f.DeleteServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitAggregatedServiceImport(ctx, framework.ClusterA, nginxServiceClusterB, 0)
 }
 
-func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.ClusterIndex, netshootPodList *corev1.PodList,
-	endpointSlices *discovery.EndpointSliceList, service *corev1.Service, verifyCount int, shouldContain bool, localClusterName string,
+func verifyEndpointSlices(ctx context.Context, f *lhframework.Framework, targetCluster framework.ClusterIndex,
+	netshootPodList *corev1.PodList, endpointSlices *discovery.EndpointSliceList, service *corev1.Service, verifyCount int,
+	shouldContain bool, localClusterName string,
 ) {
 	count := 0
 
@@ -203,7 +205,7 @@ func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.Clus
 		sourceCluster := endpointSlice.Labels[mcsv1a1.LabelSourceCluster]
 
 		for j := range endpointSlice.Endpoints {
-			verifyEndpointsWithDig(f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
+			verifyEndpointsWithDig(ctx, f, targetCluster, netshootPodList, &endpointSlice.Endpoints[j], sourceCluster,
 				service, checkedDomains, shouldContain, sourceCluster == localClusterName)
 
 			count++
@@ -213,13 +215,13 @@ func verifyEndpointSlices(f *lhframework.Framework, targetCluster framework.Clus
 	Expect(count).To(Equal(verifyCount), "Mismatch in count of IPs to be validated with dig")
 }
 
-func verifyEndpointsWithDig(f *lhframework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
+func verifyEndpointsWithDig(ctx context.Context, f *lhframework.Framework, targetCluster framework.ClusterIndex, targetPod *corev1.PodList,
 	endpoint *discovery.Endpoint, sourceCluster string, service *corev1.Service, domains []string, shouldContain bool, isLocal bool,
 ) {
 	addresses := endpoint.Addresses
 	if isLocal {
-		addresses, _ = f.GetPodIPs(targetCluster, service, true)
+		addresses, _ = f.GetPodIPs(ctx, targetCluster, service, true)
 	}
 
-	f.VerifyIPsWithDig(targetCluster, service, targetPod, addresses, domains, *endpoint.Hostname+"."+sourceCluster, shouldContain)
+	f.VerifyIPsWithDig(ctx, targetCluster, service, targetPod, addresses, domains, *endpoint.Hostname+"."+sourceCluster, shouldContain)
 }

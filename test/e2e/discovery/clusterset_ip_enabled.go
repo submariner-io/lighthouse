@@ -19,6 +19,7 @@ limitations under the License.
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -38,24 +39,24 @@ var _ = Describe("Test Service Discovery Across Clusters", Label(labels.ClusterS
 	f := lhframework.NewFramework("discovery")
 
 	When("clusterset IP is enabled for an exported IPv4-only service", func() {
-		It("should resolve the allocated clusterset IP", func() {
-			RunClusterSetIPTest(f)
+		It("should resolve the allocated clusterset IP", func(ctx context.Context) {
+			RunClusterSetIPTest(ctx, f)
 		})
 	})
 })
 
-func RunClusterSetIPTest(f *lhframework.Framework) {
+func RunClusterSetIPTest(ctx context.Context, f *lhframework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	framework.By(fmt.Sprintf("Creating an Nginx Deployment on %q", clusterBName))
-	f.NewNginxDeployment(framework.ClusterB)
+	f.NewNginxDeployment(ctx, framework.ClusterB)
 
 	framework.By(fmt.Sprintf("Creating a Nginx Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxService(framework.ClusterB)
+	nginxServiceClusterB := f.NewNginxService(ctx, framework.ClusterB)
 
-	f.CreateServiceExport(framework.ClusterB, &mcsv1a1.ServiceExport{
+	f.CreateServiceExport(ctx, framework.ClusterB, &mcsv1a1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nginxServiceClusterB.Name,
 			Namespace:   nginxServiceClusterB.Namespace,
@@ -64,23 +65,23 @@ func RunClusterSetIPTest(f *lhframework.Framework) {
 	})
 
 	if slices.Contains(nginxServiceClusterB.Spec.IPFamilies, corev1.IPv6Protocol) {
-		f.AwaitServiceNotExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+		f.AwaitServiceNotExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 		return
 	}
 
-	f.AwaitServiceExportedStatusCondition(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
 	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
-	netshootPodList := f.NewNetShootDeployment(framework.ClusterA)
+	netshootPodList := f.NewNetShootDeployment(ctx, framework.ClusterA)
 
-	svc, err := f.GetService(framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
+	svc, err := f.GetService(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	nginxServiceClusterB = svc
-	serviceImport := f.AwaitAggregatedServiceImport(framework.ClusterA, nginxServiceClusterB, 1)
+	serviceImport := f.AwaitAggregatedServiceImport(ctx, framework.ClusterA, nginxServiceClusterB, 1)
 	Expect(serviceImport.Spec.IPs).To(HaveLen(1), "ServiceImport was not allocated an IP")
 
-	f.VerifyIPWithDig(framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "", serviceImport.Spec.IPs[0], true)
+	f.VerifyIPWithDig(ctx, framework.ClusterA, nginxServiceClusterB, netshootPodList, checkedDomains, "", serviceImport.Spec.IPs[0], true)
 }

@@ -39,12 +39,12 @@ import (
 var _ = Describe("Service EndpointSlice Controller", func() {
 	var t *testDriver
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 	})
 
-	JustBeforeEach(func() {
-		t.justBeforeEach()
+	JustBeforeEach(func(ctx context.Context) {
+		t.justBeforeEach(ctx)
 	})
 
 	AfterEach(func() {
@@ -54,7 +54,7 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 	When("stopping the previous EPS controller is delayed", func() {
 		var fakeEPSClient *epsDynamicClient
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			dynClient := dynamicfake.NewSimpleDynamicClient(t.syncerConfig.Scheme)
 			fake.AddBasicReactors(&dynClient.Fake)
 
@@ -70,7 +70,7 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 
 			fakeEPSClient.firstCreate.Store(true)
 
-			t.cluster1.init(t.syncerConfig, fakeEPSClient, &dynClient.Fake)
+			t.cluster1.init(ctx, t.syncerConfig, fakeEPSClient, &dynClient.Fake)
 
 			controller.AwaitStoppedTimeout = time.Millisecond * 100
 
@@ -79,13 +79,13 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 			})
 		})
 
-		JustBeforeEach(func() {
-			t.cluster1.createService()
-			t.cluster1.createServiceExport()
-			t.cluster1.createServiceEndpointSlices()
+		JustBeforeEach(func(ctx context.Context) {
+			t.cluster1.createService(ctx)
+			t.cluster1.createServiceExport(ctx)
+			t.cluster1.createServiceEndpointSlices(ctx)
 		})
 
-		It("should not create two EndpointSlices after the delay resolves and the new controller is starter", func() {
+		It("should not create two EndpointSlices after the delay resolves and the new controller is starter", func(ctx context.Context) {
 			Eventually(fakeEPSClient.epsCreateStarted).Within(3 * time.Second).Should(Receive())
 
 			t.cluster1.service.Spec.Ports = append(t.cluster1.service.Spec.Ports, toServicePort(port3))
@@ -93,16 +93,16 @@ var _ = Describe("Service EndpointSlice Controller", func() {
 
 			By("Updating the service")
 
-			t.cluster1.updateService()
+			t.cluster1.updateService(ctx)
 
 			time.Sleep(time.Millisecond * 500)
 
 			fakeEPSClient.epsCreateContinue <- true
 
-			t.awaitEndpointSlice(&t.cluster1)
+			t.awaitEndpointSlice(ctx, &t.cluster1)
 
 			Consistently(func() []*discovery.EndpointSlice {
-				return findEndpointSlices(t.cluster1.localEndpointSliceClient, t.cluster1.service.Namespace,
+				return findEndpointSlices(ctx, t.cluster1.localEndpointSliceClient, t.cluster1.service.Namespace,
 					t.cluster1.service.Name, t.cluster1.clusterID)
 			}).Within(time.Millisecond * 500).Should(HaveLen(1))
 		})

@@ -19,6 +19,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,16 +38,16 @@ var _ = Describe("Dual-stack", func() {
 
 	var t *testDriver
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 	})
 
-	JustBeforeEach(func() {
-		t.justBeforeEach()
+	JustBeforeEach(func(ctx context.Context) {
+		t.justBeforeEach(ctx)
 
-		t.cluster1.createServiceEndpointSlices()
-		t.cluster1.createService()
-		t.cluster1.createServiceExport()
+		t.cluster1.createServiceEndpointSlices(ctx)
+		t.cluster1.createService(ctx)
+		t.cluster1.createServiceExport(ctx)
 	})
 
 	AfterEach(func() {
@@ -67,36 +68,36 @@ var _ = Describe("Dual-stack", func() {
 		})
 
 		Context("then unexported", func() {
-			It("should create/delete separate EndpointSlices for IPv4 and IPv6", func() {
-				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			It("should create/delete separate EndpointSlices for IPv4 and IPv6", func(ctx context.Context) {
+				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 
 				By("Updating the IPv6 EndpointSlice")
 
 				t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(true)}
 				t.cluster1.expectedClusterIPEndpoints[1].Conditions = t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions
 
-				t.cluster1.updateServiceEndpointSlices()
-				t.ensureEndpointSlice(&t.cluster1)
+				t.cluster1.updateServiceEndpointSlices(ctx)
+				t.ensureEndpointSlice(ctx, &t.cluster1)
 
 				By("Deleting the ServiceExport")
 
-				t.cluster1.deleteServiceExport()
-				t.awaitServiceUnexported(&t.cluster1)
+				t.cluster1.deleteServiceExport(ctx)
+				t.awaitServiceUnexported(ctx, &t.cluster1)
 			})
 		})
 
 		Context("with Globalnet enabled and an IPv4 global IP", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				t.cluster1.agentSpec.GlobalnetEnabled = true
-				t.cluster1.createGlobalIngressIP(t.cluster1.newGlobalIngressIP(t.cluster1.service.Name, globalIP1))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newGlobalIngressIP(t.cluster1.service.Name, globalIP1))
 			})
 
 			JustBeforeEach(func() {
 				t.cluster1.expectedClusterIPEndpoints[0].Addresses[0] = globalIP1
 			})
 
-			It("should only retrieve the global IP for the IPv4 EndpointSlice", func() {
-				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			It("should only retrieve the global IP for the IPv4 EndpointSlice", func(ctx context.Context) {
+				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 			})
 		})
 
@@ -105,12 +106,12 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
 			})
 
-			It("should not export it", func() {
-				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue,
+			It("should not export it", func(ctx context.Context) {
+				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue,
 					mcsv1a1.ServiceExportReasonValid))
-				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
+				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse,
 					controller.ServiceExportReasonUnsupportedIPFamily))
-				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
+				test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
 			})
 		})
 	})
@@ -124,8 +125,8 @@ var _ = Describe("Dual-stack", func() {
 			t.cluster2.supportedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
 		})
 
-		It("should only create an IPv6 EndpointSlice", func() {
-			t.awaitNonHeadlessServiceExported(&t.cluster1)
+		It("should only create an IPv6 EndpointSlice", func(ctx context.Context) {
+			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
 
 		Context("with Globalnet enabled", func() {
@@ -133,8 +134,8 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster1.agentSpec.GlobalnetEnabled = true
 			})
 
-			It("should not try to retrieve a global IP for the IPv6 EndpointSlice", func() {
-				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			It("should not try to retrieve a global IP for the IPv6 EndpointSlice", func(ctx context.Context) {
+				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 			})
 		})
 
@@ -143,12 +144,12 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster1.serviceExport.Annotations = map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)}
 			})
 
-			It("should not export it", func() {
-				t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionTrue,
+			It("should not export it", func(ctx context.Context) {
+				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue,
 					mcsv1a1.ServiceExportReasonValid))
-				t.cluster1.awaitServiceExportCondition(newServiceExportReadyCondition(metav1.ConditionFalse,
+				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse,
 					controller.ServiceExportReasonUnsupportedIPFamily))
-				test.AwaitNoResource(t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
+				test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(t.cluster1.service.Namespace), t.cluster1.service.Name)
 			})
 		})
 
@@ -158,24 +159,25 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster2.verifyImportReadyCondition = assertImportNotReady
 			})
 
-			It("should set the Ready condition to false with IPFamilyNotSupported", func() {
-				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			It("should set the Ready condition to false with IPFamilyNotSupported", func(ctx context.Context) {
+				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 			})
 
-			It("should eventually set the Ready condition to true after the service is exported on the importing cluster", func() {
-				t.awaitNonHeadlessServiceExported(&t.cluster1)
+			It("should eventually set the Ready condition to true after the service is exported on the importing cluster",
+				func(ctx context.Context) {
+					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 
-				By("Exporting IPv4 service on second cluster")
+					By("Exporting IPv4 service on second cluster")
 
-				t.aggregatedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
-				t.cluster2.verifyImportReadyCondition = assertImportReady
+					t.aggregatedIPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+					t.cluster2.verifyImportReadyCondition = assertImportReady
 
-				t.cluster2.createServiceEndpointSlices()
-				t.cluster2.createService()
-				t.cluster2.createServiceExport()
+					t.cluster2.createServiceEndpointSlices(ctx)
+					t.cluster2.createService(ctx)
+					t.cluster2.createServiceExport(ctx)
 
-				t.awaitNonHeadlessServiceExported(&t.cluster1, &t.cluster2)
-			})
+					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
+				})
 		})
 	})
 
@@ -194,26 +196,26 @@ var _ = Describe("Dual-stack", func() {
 		})
 
 		Context("then unexported", func() {
-			It("should create/delete separate EndpointSlices for IPv4 and IPv6", func() {
-				t.awaitHeadlessServiceExported(&t.cluster1)
+			It("should create/delete separate EndpointSlices for IPv4 and IPv6", func(ctx context.Context) {
+				t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 
 				By("Deleting the ServiceExport")
 
-				t.cluster1.deleteServiceExport()
-				t.awaitServiceUnexported(&t.cluster1)
+				t.cluster1.deleteServiceExport(ctx)
+				t.awaitServiceUnexported(ctx, &t.cluster1)
 			})
 		})
 
 		Context("with Globalnet enabled and an IPv4 global IP", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				t.cluster1.agentSpec.GlobalnetEnabled = true
 				t.cluster1.headlessEndpointAddresses[0][0].Addresses = []string{globalIP1}
 
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
 			})
 
-			It("should only retrieve the global IP for the IPv4 EndpointSlice", func() {
-				t.awaitHeadlessServiceExported(&t.cluster1)
+			It("should only retrieve the global IP for the IPv4 EndpointSlice", func(ctx context.Context) {
+				t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 			})
 		})
 	})
@@ -229,8 +231,8 @@ var _ = Describe("Dual-stack", func() {
 			t.cluster2.supportedIPFamilies = t.cluster1.service.Spec.IPFamilies
 		})
 
-		It("should only create an IPv6 EndpointSlice", func() {
-			t.awaitHeadlessServiceExported(&t.cluster1)
+		It("should only create an IPv6 EndpointSlice", func(ctx context.Context) {
+			t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 		})
 
 		Context("and the importing cluster only supports IPv4", func() {
@@ -239,8 +241,8 @@ var _ = Describe("Dual-stack", func() {
 				t.cluster2.verifyImportReadyCondition = assertImportNotReady
 			})
 
-			It("should set the ServiceImport Ready condition false with IPFamilyNotSupported", func() {
-				t.awaitHeadlessServiceExported(&t.cluster1)
+			It("should set the ServiceImport Ready condition false with IPFamilyNotSupported", func(ctx context.Context) {
+				t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 			})
 		})
 	})

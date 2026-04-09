@@ -146,7 +146,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 	return controller, err
 }
 
-func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
+func (c *ServiceImportController) start(ctx context.Context, stopCh <-chan struct{}) error {
 	if c.globalIngressIPCache != nil {
 		if err := c.globalIngressIPCache.start(stopCh); err != nil {
 			return err
@@ -168,7 +168,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		logger.Info("ServiceImport Controller stopped")
 	}()
 
-	if err := c.reserveAggregatedServiceImportIPs(); err != nil {
+	if err := c.reserveAggregatedServiceImportIPs(ctx); err != nil {
 		return err
 	}
 
@@ -180,7 +180,7 @@ func (c *ServiceImportController) start(stopCh <-chan struct{}) error {
 		return errors.Wrap(err, "error starting remote ServiceImport syncer")
 	}
 
-	c.reconcileLocalAggregatedServiceImports()
+	c.reconcileLocalAggregatedServiceImports(ctx)
 	c.reconcileRemoteAggregatedServiceImports()
 	c.reconcileLocalServiceImportsOnBroker()
 
@@ -198,10 +198,10 @@ func (c *ServiceImportController) isIPInClustersetCIDR(si *mcsv1a1.ServiceImport
 	return ip != nil && cidr.Contains(ip)
 }
 
-func (c *ServiceImportController) reserveAggregatedServiceImportIPs() error {
+func (c *ServiceImportController) reserveAggregatedServiceImportIPs(ctx context.Context) error {
 	client := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll)
 
-	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	list, err := client.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "error listing the local ServiceImports")
 	}

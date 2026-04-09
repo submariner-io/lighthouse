@@ -249,9 +249,9 @@ func (c *ServiceImportController) reconcileRemoteAggregatedServiceImports() {
 	})
 }
 
-func (c *ServiceImportController) reconcileLocalAggregatedServiceImports() {
+func (c *ServiceImportController) reconcileLocalAggregatedServiceImports(ctx context.Context) {
 	c.remoteSyncer.Reconcile(func() []runtime.Object {
-		siList, err := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		siList, err := c.localClient.Resource(serviceImportGVR).Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			logger.Error(err, "Error listing ServiceImports")
 			return nil

@@ -37,7 +37,7 @@ import (
 )
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
-func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
+func newEndpointSliceController(ctx context.Context, spec *AgentSpecification, syncerConfig broker.SyncerConfig,
 	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
@@ -67,7 +67,7 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 
 	var err error
 
-	c.syncer, err = broker.NewSyncer(syncerConfig)
+	c.syncer, err = broker.NewSyncer(ctx, syncerConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating EndpointSlice syncer")
 	}

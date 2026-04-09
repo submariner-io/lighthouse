@@ -19,6 +19,7 @@ limitations under the License.
 package resolver_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"reflect"
@@ -161,12 +162,12 @@ func newTestDriver() *testDriver {
 	return t
 }
 
-func (t *testDriver) createServiceImport(si *mcsv1a1.ServiceImport) {
-	test.CreateResource(t.serviceImports.Namespace(si.Namespace), si)
+func (t *testDriver) createServiceImport(ctx context.Context, si *mcsv1a1.ServiceImport) {
+	test.CreateResource(ctx, t.serviceImports.Namespace(si.Namespace), si)
 }
 
-func (t *testDriver) createEndpointSlice(es *discovery.EndpointSlice) {
-	test.CreateResource(t.endpointSlices.Namespace(es.Namespace), es)
+func (t *testDriver) createEndpointSlice(ctx context.Context, es *discovery.EndpointSlice) {
+	test.CreateResource(ctx, t.endpointSlices.Namespace(es.Namespace), es)
 }
 
 func (t *testDriver) awaitDNSRecordsFound(ns, name, cluster, hostname string, ipFamily k8snet.IPFamily, expIsHeadless bool,
@@ -273,8 +274,8 @@ func (t *testDriver) testRoundRobin(ns, service string, serviceIPs ...string) {
 	}
 }
 
-func (t *testDriver) putEndpointSlice(es *discovery.EndpointSlice) {
-	Expect(t.resolver.PutEndpointSlices(es)).To(BeFalse())
+func (t *testDriver) putEndpointSlice(ctx context.Context, es *discovery.EndpointSlice) {
+	Expect(t.resolver.PutEndpointSlices(ctx, es)).To(BeFalse())
 }
 
 func newAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {

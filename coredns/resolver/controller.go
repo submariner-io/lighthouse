@@ -19,6 +19,8 @@ limitations under the License.
 package resolver
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -100,11 +102,13 @@ func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bo
 		return false
 	}
 
+	ctx := context.TODO()
+
 	if !isHeadless(endpointSlice) {
-		return c.resolver.PutEndpointSlices(endpointSlice)
+		return c.resolver.PutEndpointSlices(ctx, endpointSlice)
 	}
 
-	return c.resolver.PutEndpointSlices(c.getAllEndpointSlices(endpointSlice)...)
+	return c.resolver.PutEndpointSlices(ctx, c.getAllEndpointSlices(endpointSlice)...)
 }
 
 func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*discovery.EndpointSlice {
@@ -141,7 +145,7 @@ func (c *controller) onEndpointSliceDelete(obj runtime.Object, _ int) bool {
 		c.resolver.RemoveEndpointSlice(endpointSlice)
 	}
 
-	return c.resolver.PutEndpointSlices(epSlices...)
+	return c.resolver.PutEndpointSlices(context.TODO(), epSlices...)
 }
 
 func (c *controller) onServiceImportCreateOrUpdate(obj runtime.Object, _ int) bool {

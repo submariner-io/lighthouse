@@ -19,6 +19,8 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/pkg/agent/controller"
@@ -33,17 +35,17 @@ import (
 var _ = Describe("Globalnet enabled", func() {
 	var t *testDriver
 
-	BeforeEach(func() {
-		t = newTestDiver()
+	BeforeEach(func(ctx context.Context) {
+		t = newTestDiver(ctx)
 		t.cluster1.agentSpec.GlobalnetEnabled = true
 		t.cluster2.agentSpec.GlobalnetEnabled = true
 	})
 
-	JustBeforeEach(func() {
-		t.justBeforeEach()
-		t.cluster1.createServiceEndpointSlices()
-		t.cluster1.createService()
-		t.cluster1.createServiceExport()
+	JustBeforeEach(func(ctx context.Context) {
+		t.justBeforeEach(ctx)
+		t.cluster1.createServiceEndpointSlices(ctx)
+		t.cluster1.createService(ctx)
+		t.cluster1.createServiceExport(ctx)
 	})
 
 	AfterEach(func() {
@@ -63,43 +65,43 @@ var _ = Describe("Globalnet enabled", func() {
 
 		Context("and it has a global IP", func() {
 			Context("via a GlobalIngressIP", func() {
-				BeforeEach(func() {
-					t.cluster1.createGlobalIngressIP(ingressIP)
+				BeforeEach(func(ctx context.Context) {
+					t.cluster1.createGlobalIngressIP(ctx, ingressIP)
 				})
 
-				It("should export the service with the global IP", func() {
-					t.awaitNonHeadlessServiceExported(&t.cluster1)
+				It("should export the service with the global IP", func(ctx context.Context) {
+					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 				})
 			})
 		})
 
 		Context("and it does not initially have a global IP", func() {
 			Context("due to missing GlobalIngressIP", func() {
-				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse,
+				It("should update the ServiceExport status appropriately and eventually export the service", func(ctx context.Context) {
+					t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse,
 						controller.ServiceExportReasonGlobalIPUnavailable))
 
 					By("Creating GlobalIngressIP")
-					t.cluster1.createGlobalIngressIP(ingressIP)
-					t.awaitNonHeadlessServiceExported(&t.cluster1)
+					t.cluster1.createGlobalIngressIP(ctx, ingressIP)
+					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 				})
 			})
 
 			Context("due to no AllocatedIP in the GlobalIngressIP", func() {
-				BeforeEach(func() {
+				BeforeEach(func(ctx context.Context) {
 					setIngressAllocatedIP(ingressIP, "")
 					setIngressIPConditions(ingressIP)
-					t.cluster1.createGlobalIngressIP(ingressIP)
+					t.cluster1.createGlobalIngressIP(ctx, ingressIP)
 				})
 
-				It("should update the ServiceExport status appropriately and eventually export the service", func() {
-					t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse,
+				It("should update the ServiceExport status appropriately and eventually export the service", func(ctx context.Context) {
+					t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse,
 						controller.ServiceExportReasonGlobalIPUnavailable))
 
 					By("Updating GlobalIngressIP")
 					setIngressAllocatedIP(ingressIP, globalIP1)
-					test.UpdateResource(t.cluster1.localIngressIPClient, ingressIP)
-					t.awaitNonHeadlessServiceExported(&t.cluster1)
+					test.UpdateResource(ctx, t.cluster1.localIngressIPClient, ingressIP)
+					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 				})
 			})
 		})
@@ -112,16 +114,16 @@ var _ = Describe("Globalnet enabled", func() {
 				Message: "IPPool is exhausted",
 			}
 
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				setIngressAllocatedIP(ingressIP, "")
 				setIngressIPConditions(ingressIP, condition)
-				t.cluster1.createGlobalIngressIP(ingressIP)
+				t.cluster1.createGlobalIngressIP(ctx, ingressIP)
 			})
 
-			It("should update the ServiceExport status with the condition details", func() {
+			It("should update the ServiceExport status with the condition details", func(ctx context.Context) {
 				c := newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportConditionReason(condition.Reason))
 				c.Message = condition.Message
-				t.cluster1.awaitServiceExportCondition(c)
+				t.cluster1.awaitServiceExportCondition(ctx, c)
 			})
 		})
 	})
@@ -136,35 +138,35 @@ var _ = Describe("Globalnet enabled", func() {
 		})
 
 		Context("and it has global IPs for all endpoint addresses", func() {
-			BeforeEach(func() {
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
+			BeforeEach(func(ctx context.Context) {
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
 			})
 
-			It("should export the service with the global IPs", func() {
-				t.awaitHeadlessServiceExported(&t.cluster1)
+			It("should export the service with the global IPs", func(ctx context.Context) {
+				t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 			})
 		})
 
 		Context("and it initially does not have a global IP for all endpoint addresses", func() {
-			It("should eventually export the service with the global IPs", func() {
-				t.cluster1.ensureNoEndpointSlice()
+			It("should eventually export the service with the global IPs", func(ctx context.Context) {
+				t.cluster1.ensureNoEndpointSlice(ctx)
 
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("one", globalIP1))
 
-				t.cluster1.ensureNoEndpointSlice()
+				t.cluster1.ensureNoEndpointSlice(ctx)
 
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("two", globalIP2))
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForPod("not-ready", globalIP3))
 
-				t.awaitEndpointSlice(&t.cluster1)
+				t.awaitEndpointSlice(ctx, &t.cluster1)
 			})
 		})
 	})
 
 	When("a headless Service without a selector is exported", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			t.cluster1.service.Spec.ClusterIP = corev1.ClusterIPNone
 
 			// TargetRef is nil for all Endpoints of headless Service without selector and Hostname must be set.
@@ -192,12 +194,12 @@ var _ = Describe("Globalnet enabled", func() {
 				},
 			}
 
-			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("one", globalIP1, epIP1))
-			t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("two", globalIP2, epIP2))
+			t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("one", globalIP1, epIP1))
+			t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("two", globalIP2, epIP2))
 		})
 
-		It("should export the service with the global IPs", func() {
-			t.awaitHeadlessServiceExported(&t.cluster1)
+		It("should export the service with the global IPs", func(ctx context.Context) {
+			t.awaitHeadlessServiceExported(ctx, &t.cluster1)
 		})
 
 		Context("and it initially does not have a global IP for all endpoint addresses", func() {
@@ -215,10 +217,10 @@ var _ = Describe("Globalnet enabled", func() {
 					})
 			})
 
-			It("should eventually export the service with the global IPs", func() {
-				t.cluster1.ensureNoEndpointSlice()
-				t.cluster1.createGlobalIngressIP(t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("three", globalIP3, epIP3))
-				t.awaitEndpointSlice(&t.cluster1)
+			It("should eventually export the service with the global IPs", func(ctx context.Context) {
+				t.cluster1.ensureNoEndpointSlice(ctx)
+				t.cluster1.createGlobalIngressIP(ctx, t.cluster1.newHeadlessGlobalIngressIPForEndpointIP("three", globalIP3, epIP3))
+				t.awaitEndpointSlice(ctx, &t.cluster1)
 			})
 		})
 	})
