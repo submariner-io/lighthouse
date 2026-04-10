@@ -41,13 +41,12 @@ bin/%/lighthouse-coredns: $(shell find coredns)
 
 e2e:
 
-licensecheck: export BUILD_UPX = false
-licensecheck: $(ARCH_BINARIES) bin/lichen
-	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
+GO ?= go
+LICHEN = $(shell $(GO) -C tools tool -n github.com/uw-labs/lichen)
 
-bin/lichen:
-	mkdir -p $(@D)
-	cd tools && go build -o $(CURDIR)/$@ github.com/uw-labs/lichen
+licensecheck: export BUILD_UPX = false
+licensecheck: $(ARCH_BINARIES)
+	$(LICHEN) -c .lichen.yaml $(ARCH_BINARIES)
 
 # Lighthouse-specific upgrade test:
 # deploy latest, start nginx service, export it, upgrade, check service
@@ -65,7 +64,7 @@ check-nginx:
 $(TARGETS):
 	./scripts/$@
 
-.PHONY: $(TARGETS)
+.PHONY: licensecheck $(TARGETS)
 
 else
 
