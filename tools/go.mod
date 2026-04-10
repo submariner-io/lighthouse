@@ -2,7 +2,7 @@ module github.com/submariner-io/lighthouse/tools
 
 go 1.25.0
 
-require github.com/uw-labs/lichen v0.1.7
+require github.com/uw-labs/lichen v0.1.7 // indirect
 
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
@@ -20,3 +20,5 @@ require (
 	golang.org/x/sys v0.14.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+tool github.com/uw-labs/lichen
