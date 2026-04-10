@@ -195,7 +195,7 @@ func testWithoutFallback() {
 		})
 
 		Specify("of Type SRV should return RcodeNameError for SRV record query", func(ctx context.Context) {
-			t.execTypeAQueryExpectRespCode(ctx, qname, dns.RcodeNameError)
+			t.execTypeSRVQueryExpectRespCode(ctx, qname, dns.RcodeNameError)
 		})
 	})
 
@@ -929,6 +929,14 @@ func (t *handlerTestDriver) execTypeAQueryExpectRespCode(ctx context.Context, qn
 	t.executeTestCase(ctx, test.Case{
 		Qname: qname,
 		Qtype: dns.TypeA,
+		Rcode: rcode,
+	})
+}
+
+func (t *handlerTestDriver) execTypeSRVQueryExpectRespCode(ctx context.Context, qname string, rcode int) {
+	t.executeTestCase(ctx, test.Case{
+		Qname: qname,
+		Qtype: dns.TypeSRV,
 		Rcode: rcode,
 	})
 }
