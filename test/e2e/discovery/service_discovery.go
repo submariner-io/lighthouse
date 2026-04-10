@@ -499,7 +499,7 @@ func RunServiceDiscoveryRoundRobinTest(ctx context.Context, f *lhframework.Frame
 	f.AwaitEndpointSlices(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace, 2, 2)
 
 	serviceIPClusterB := f.GetServiceIP(ctx, framework.ClusterB, nginxServiceClusterB, corev1.IPFamilyUnknown)
-	serviceIPClusterC := f.GetServiceIP(ctx, framework.ClusterC, nginxServiceClusterB, corev1.IPFamilyUnknown)
+	serviceIPClusterC := f.GetServiceIP(ctx, framework.ClusterC, nginxServiceClusterC, corev1.IPFamilyUnknown)
 
 	verifyRoundRobinWithDig(ctx, f.Framework, framework.ClusterA, nginxServiceClusterB.Name, []string{serviceIPClusterB, serviceIPClusterC},
 		netshootPodList, checkedDomains)
