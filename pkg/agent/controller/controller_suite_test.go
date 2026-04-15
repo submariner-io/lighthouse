@@ -545,7 +545,7 @@ func (c *cluster) awaitServiceExportCondition(ctx context.Context, expected ...m
 	for i := range len(expected) - 1 {
 		j := lastIndex + 1
 
-		Eventually(func(g Gomega) {
+		Eventually(ctx, func(g Gomega) {
 			var (
 				found *metav1.Condition
 				all   []*metav1.Condition
@@ -594,7 +594,7 @@ func (c *cluster) awaitServiceExportCondition(ctx context.Context, expected ...m
 }
 
 //nolint:gocritic // Ignore hugeParam
-func (c *cluster) ensureLastServiceExportCondition(expected metav1.Condition) {
+func (c *cluster) ensureLastServiceExportCondition(ctx context.Context, expected metav1.Condition) {
 	indexOfLastCondition := func() int {
 		actions := c.localDynClientFake.Actions()
 		for i := len(actions) - 1; i >= 0; i-- {
@@ -617,7 +617,7 @@ func (c *cluster) ensureLastServiceExportCondition(expected metav1.Condition) {
 	}
 
 	initialIndex := indexOfLastCondition()
-	Consistently(func() int {
+	Consistently(ctx, func() int {
 		return indexOfLastCondition()
 	}).Should(Equal(initialIndex), "Expected ServiceExport condition to not change: "+resource.ToJSON(expected))
 }
@@ -630,7 +630,7 @@ func (c *cluster) ensureNoServiceExportCondition(ctx context.Context, condType m
 	}
 
 	for _, se := range serviceExports {
-		Consistently(func() any {
+		Consistently(ctx, func() any {
 			return c.retrieveServiceExportCondition(ctx, se, condType)
 		}).Should(BeNil(), "Unexpected ServiceExport status condition")
 	}
