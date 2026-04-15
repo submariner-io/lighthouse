@@ -506,6 +506,7 @@ func RunServiceDiscoveryRoundRobinTest(ctx context.Context, f *lhframework.Frame
 }
 
 func RunServicesClusterAvailabilityMultiClusterTest(ctx context.Context, f *lhframework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 	clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
@@ -519,7 +520,7 @@ func RunServicesClusterAvailabilityMultiClusterTest(ctx context.Context, f *lhfr
 
 	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
-	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterCName))
+	framework.By(fmt.Sprintf("Creating a Netshoot Deployment on %q", clusterAName))
 
 	netshootPodList := f.NewNetShootDeployment(ctx, framework.ClusterA)
 
