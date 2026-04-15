@@ -207,11 +207,7 @@ func testWithoutFallback() {
 		})
 
 		Specify("of Type SRV should return RcodeNameError for SRV record query ", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: qname,
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeNameError,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, qname, dns.RcodeNameError)
 		})
 	})
 
@@ -223,11 +219,7 @@ func testWithoutFallback() {
 		})
 
 		Specify("of Type SRV should return RcodeNameError for SRV record query", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: qname,
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeNameError,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, qname, dns.RcodeNameError)
 		})
 	})
 
@@ -239,11 +231,7 @@ func testWithoutFallback() {
 		})
 
 		Specify("of Type SRV should return RcodeNameError for SRV record query", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: qname,
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeNotZone,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, qname, dns.RcodeNotZone)
 		})
 	})
 
@@ -353,31 +341,19 @@ func testWithFallback() {
 
 	Context("type SRV DNS query for a non-matching lighthouse zone and non-matching fallthrough zone", func() {
 		Specify("should not invoke the next plugin", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: fmt.Sprintf("%s.%s.svc.cluster.east.", service1, namespace1),
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeNotZone,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, fmt.Sprintf("%s.%s.svc.cluster.east.", service1, namespace1), dns.RcodeNotZone)
 		})
 	})
 
 	Context("type SRV DNS query for a pod", func() {
 		Specify("should invoke the next plugin", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: fmt.Sprintf("%s.%s.pod.clusterset.local.", service1, namespace1),
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeBadCookie,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, fmt.Sprintf("%s.%s.pod.clusterset.local.", service1, namespace1), dns.RcodeBadCookie)
 		})
 	})
 
 	Context("type SRV DNS query for a non-existent service", func() {
 		Specify("should invoke the next plugin", func(ctx context.Context) {
-			t.executeTestCase(ctx, test.Case{
-				Qname: fmt.Sprintf("unknown.%s.svc.clusterset.local.", namespace1),
-				Qtype: dns.TypeSRV,
-				Rcode: dns.RcodeBadCookie,
-			})
+			t.execTypeSRVQueryExpectRespCode(ctx, fmt.Sprintf("unknown.%s.svc.clusterset.local.", namespace1), dns.RcodeBadCookie)
 		})
 	})
 }
