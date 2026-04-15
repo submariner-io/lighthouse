@@ -80,7 +80,11 @@ func RunNonexistentNamespaceDiscoveryTest(ctx context.Context, f *lhframework.Fr
 	nginxServiceClusterB = svc
 
 	for i := 1; i <= 5; i++ {
-		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			Fail(fmt.Sprintf("Context cancelled while waiting for DNS verification: %v", ctx.Err()))
+		case <-time.After(500 * time.Millisecond):
+		}
 		f.VerifyServiceIPWithDig(ctx, framework.ClusterA, framework.ClusterB, nginxServiceClusterB, netshootPodList, lhframework.CheckedDomains,
 			"", false)
 	}
