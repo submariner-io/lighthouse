@@ -31,7 +31,7 @@ spec:
     value:
     - linux/x86_64
   - name: dockerfile
-    value: package/Dockerfile.lighthouse-coredns
+    value: package/Dockerfile.lighthouse-coredns.konflux
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
