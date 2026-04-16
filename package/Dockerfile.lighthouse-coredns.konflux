@@ -61,5 +61,4 @@ LABEL com.redhat.component="lighthouse-coredns-container" \
       io.openshift.tags="submariner, lighthouse-coredns, rhacm" \
       maintainer="multi-cluster-networking@redhat.com" \
       com.github.url="https://github.com/submariner-io/lighthouse" \
-      com.github.commit="${BASE_BRANCH}" \
       cpe="cpe:/a:redhat:acm:2.16::el9"
