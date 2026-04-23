@@ -146,7 +146,7 @@ func IsClusterSetIPEnabled(ctx context.Context) bool {
 			return false, "", err
 		}
 
-		clusterSetIPEnabled.Store(ptr.To(enabled))
+		clusterSetIPEnabled.Store(new(enabled))
 
 		return true, "", nil
 	})

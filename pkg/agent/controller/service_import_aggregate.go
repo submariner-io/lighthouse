@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/ptr"
 	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
@@ -203,7 +202,7 @@ func (c *ServiceImportController) updateAggregate(ctx context.Context, name, nam
 
 				err := c.brokerServiceImportClient().Delete(ctx, existing.Name, metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{
-						ResourceVersion: ptr.To(existing.ResourceVersion),
+						ResourceVersion: new(existing.ResourceVersion),
 					},
 				})
 				if apierrors.IsNotFound(err) {

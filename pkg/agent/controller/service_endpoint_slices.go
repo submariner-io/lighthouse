@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
@@ -244,7 +243,7 @@ func (c *ServiceEndpointSliceController) clusterIPEndpointSliceFrom(serviceEPS *
 	endpointSlice.Endpoints = []discovery.Endpoint{{
 		Addresses: []string{serviceIP},
 		Conditions: discovery.EndpointConditions{
-			Ready: ptr.To(c.getReadyAddressCount(serviceEPS.AddressType) > 0),
+			Ready: new(c.getReadyAddressCount(serviceEPS.AddressType) > 0),
 		},
 	}}
 
