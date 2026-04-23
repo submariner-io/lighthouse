@@ -56,7 +56,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
@@ -98,7 +97,7 @@ var (
 		Name:        "POP3",
 		Protocol:    corev1.ProtocolUDP,
 		Port:        110,
-		AppProtocol: ptr.To("smtp"),
+		AppProtocol: new("smtp"),
 	}
 )
 
@@ -221,8 +220,8 @@ func newTestDiver(ctx context.Context) *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{epIP1},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-							Hostname:   ptr.To(hostName),
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
+							Hostname:   new(hostName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "one",
@@ -230,8 +229,8 @@ func newTestDiver(ctx context.Context) *testDriver {
 						},
 						{
 							Addresses:  []string{epIP2},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-							NodeName:   ptr.To(nodeName),
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
+							NodeName:   new(nodeName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "two",
@@ -239,7 +238,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 						},
 						{
 							Addresses:  []string{epIP3},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
+							Conditions: discovery.EndpointConditions{Ready: new(false)},
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "not-ready",
@@ -248,12 +247,12 @@ func newTestDiver(ctx context.Context) *testDriver {
 					},
 					Ports: []discovery.EndpointPort{
 						{
-							Name:     ptr.To(port1.Name),
+							Name:     new(port1.Name),
 							Protocol: &port1.Protocol,
 							Port:     &port1.Port,
 						},
 						{
-							Name:     ptr.To(port2.Name),
+							Name:     new(port2.Name),
 							Protocol: &port2.Protocol,
 							Port:     &port2.Port,
 						},
@@ -300,7 +299,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{"192.168.5.3"},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
 							Hostname:   &hostName,
 						},
 					},
@@ -403,7 +402,7 @@ func (c *cluster) start(ctx context.Context, t *testDriver, syncerConfig broker.
 	for _, ip := range c.service.Spec.ClusterIPs {
 		c.expectedClusterIPEndpoints = append(c.expectedClusterIPEndpoints, discovery.Endpoint{
 			Addresses:  []string{ip},
-			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			Conditions: discovery.EndpointConditions{Ready: new(true)},
 		})
 	}
 

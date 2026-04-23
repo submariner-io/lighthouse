@@ -28,7 +28,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/utils/ptr"
 	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
@@ -207,13 +206,13 @@ var _ = Describe("Globalnet enabled", func() {
 				t.cluster1.serviceEndpointSlices[0].Endpoints = append(t.cluster1.serviceEndpointSlices[0].Endpoints,
 					discovery.Endpoint{
 						Addresses: []string{epIP3},
-						Hostname:  ptr.To("host3"),
+						Hostname:  new("host3"),
 					})
 
 				t.cluster1.headlessEndpointAddresses[0] = append(t.cluster1.headlessEndpointAddresses[0],
 					discovery.Endpoint{
 						Addresses: []string{globalIP3},
-						Hostname:  ptr.To("host3"),
+						Hostname:  new("host3"),
 					})
 			})
 

@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Dual-stack Service Discovery Across Clusters", Label(labels.ServiceDiscovery), func() {
@@ -69,7 +68,7 @@ func RunDualStackClusterIPDiscoveryTest(ctx context.Context, f *lhframework.Fram
 
 	framework.By(fmt.Sprintf("Creating a dual-stack Nginx Service on %q", clusterBName))
 
-	nginxServiceClusterB := f.NewNginxServiceWithIPFamilyPolicy(ctx, framework.ClusterB, ptr.To(corev1.IPFamilyPolicyRequireDualStack))
+	nginxServiceClusterB := f.NewNginxServiceWithIPFamilyPolicy(ctx, framework.ClusterB, new(corev1.IPFamilyPolicyRequireDualStack))
 
 	f.NewServiceExport(ctx, framework.ClusterB, nginxServiceClusterB.Name, nginxServiceClusterB.Namespace)
 
@@ -104,7 +103,7 @@ func RunDualStackHeadlessDiscoveryTest(ctx context.Context, f *lhframework.Frame
 	f.NewNginxDeployment(ctx, framework.ClusterB)
 
 	nginxHeadlessClusterB := f.NewHeadlessServiceWithParams(ctx, "nginx-headless", "http", corev1.ProtocolTCP,
-		map[string]string{"app": "nginx-demo"}, framework.ClusterB, ptr.To(corev1.IPFamilyPolicyRequireDualStack))
+		map[string]string{"app": "nginx-demo"}, framework.ClusterB, new(corev1.IPFamilyPolicyRequireDualStack))
 
 	f.NewServiceExport(ctx, framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
 	f.AwaitServiceExportedStatusCondition(ctx, framework.ClusterB, nginxHeadlessClusterB.Name, nginxHeadlessClusterB.Namespace)
