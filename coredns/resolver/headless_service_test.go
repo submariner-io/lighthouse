@@ -30,7 +30,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("GetDNSRecords", func() {
@@ -45,28 +45,28 @@ func testHeadlessService() {
 
 	endpoint1DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP1,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 		HostName:    endpointHostname1,
 	}
 
 	endpoint2DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP2,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 		HostName:    endpointHostname2,
 	}
 
 	endpoint3DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP3,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 		HostName:    endpointHostname3,
 	}
 
 	endpoint4DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP4,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 		HostName:    endpointHostname4,
 	}
@@ -90,7 +90,7 @@ func testHeadlessService() {
 
 	When("a service has both ready and not-ready addresses", func() {
 		BeforeEach(func() {
-			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -152,7 +152,7 @@ func testHeadlessService() {
 		BeforeEach(func() {
 			t.clusterStatus.SetLocalClusterID(clusterID1)
 
-			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					NodeName:   &nodeName1,
@@ -235,7 +235,7 @@ func testHeadlessService() {
 
 	When("a service has multiple EndpointSlices with duplicate addresses", func() {
 		BeforeEach(func() {
-			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			endpointSlice = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -252,7 +252,7 @@ func testHeadlessService() {
 		})
 
 		JustBeforeEach(func(ctx context.Context) {
-			Expect(t.resolver.PutEndpointSlices(ctx, endpointSlice, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			Expect(t.resolver.PutEndpointSlices(ctx, endpointSlice, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -284,42 +284,42 @@ func testHeadlessServiceInMultipleClusters() {
 
 	cluster1DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP1,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 		HostName:    endpointHostname1,
 	}
 
 	cluster2DNSRecord := resolver.DNSRecord{
 		IP:          endpointIP2,
-		Ports:       []mcsv1a1.ServicePort{port2},
+		Ports:       []mcsv1b1.ServicePort{port2},
 		ClusterName: clusterID2,
 		HostName:    endpointHostname2,
 	}
 
 	cluster3DNSRecord1 := resolver.DNSRecord{
 		IP:          endpointIP3,
-		Ports:       []mcsv1a1.ServicePort{port3, port4},
+		Ports:       []mcsv1b1.ServicePort{port3, port4},
 		ClusterName: clusterID3,
 		HostName:    hostName1,
 	}
 
 	cluster3DNSRecord2 := resolver.DNSRecord{
 		IP:          endpointIP4,
-		Ports:       []mcsv1a1.ServicePort{port3, port4},
+		Ports:       []mcsv1b1.ServicePort{port3, port4},
 		ClusterName: clusterID3,
 		HostName:    hostName1,
 	}
 
 	cluster3DNSRecord3 := resolver.DNSRecord{
 		IP:          endpointIP5,
-		Ports:       []mcsv1a1.ServicePort{port3, port4},
+		Ports:       []mcsv1b1.ServicePort{port3, port4},
 		ClusterName: clusterID3,
 		HostName:    endpointHostname5,
 	}
 
 	cluster3DNSRecord4 := resolver.DNSRecord{
 		IP:          endpointIP6,
-		Ports:       []mcsv1a1.ServicePort{port3, port4},
+		Ports:       []mcsv1b1.ServicePort{port3, port4},
 		ClusterName: clusterID3,
 		HostName:    hostName2,
 	}
@@ -329,15 +329,15 @@ func testHeadlessServiceInMultipleClusters() {
 	})
 
 	JustBeforeEach(func(ctx context.Context) {
-		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1}, discovery.Endpoint{
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1}, discovery.Endpoint{
 			Addresses: []string{endpointIP1},
 		}))
 
-		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID2, []mcsv1a1.ServicePort{port2}, discovery.Endpoint{
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID2, []mcsv1b1.ServicePort{port2}, discovery.Endpoint{
 			Addresses: []string{endpointIP2},
 		}))
 
-		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3, port4},
+		t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1b1.ServicePort{port3, port4},
 			discovery.Endpoint{
 				Addresses:  []string{endpointIP3, endpointIP4},
 				Hostname:   &hostName1,
@@ -429,27 +429,27 @@ func testHeadlessServiceInMultipleClusters() {
 	Context("and the endpoints for one cluster are updated", func() {
 		expDNSRecord1 := resolver.DNSRecord{
 			IP:          endpointIP4,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID3,
 			HostName:    hostName1,
 		}
 
 		expDNSRecord2 := resolver.DNSRecord{
 			IP:          endpointIP5,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID3,
 			HostName:    hostName2,
 		}
 
 		expDNSRecord3 := resolver.DNSRecord{
 			IP:          endpointIP6,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID3,
 			HostName:    hostName2,
 		}
 
 		JustBeforeEach(func(ctx context.Context) {
-			t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1a1.ServicePort{port3},
+			t.putEndpointSlice(ctx, newEndpointSlice(namespace1, service1, clusterID3, []mcsv1b1.ServicePort{port3},
 				discovery.Endpoint{
 					Addresses: []string{endpointIP4},
 					Hostname:  &hostName1,

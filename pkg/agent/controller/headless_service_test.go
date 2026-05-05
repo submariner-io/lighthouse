@@ -27,7 +27,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Headless Service export", func() {
@@ -64,7 +64,7 @@ var _ = Describe("Headless Service export", func() {
 		Context("and no backend service EndpointSlice initially exists", func() {
 			It("should eventually export the EndpointSlice", func(ctx context.Context) {
 				t.cluster1.createServiceExport(ctx)
-				t.awaitAggregatedServiceImport(ctx, mcsv1a1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
+				t.awaitAggregatedServiceImport(ctx, mcsv1b1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
 
 				t.cluster1.createServiceEndpointSlices(ctx)
 				t.awaitEndpointSlice(ctx, &t.cluster1)
@@ -120,8 +120,8 @@ var _ = Describe("Headless Service export", func() {
 
 			t.awaitHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
-			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
+			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
 		})
 	})
 
@@ -164,7 +164,7 @@ var _ = Describe("Headless Service export", func() {
 					t.cluster1.headlessEndpointAddresses[1:]...)
 
 				t.ensureEndpointSlice(ctx, &t.cluster1)
-				t.ensureAggregatedServiceImport(ctx, mcsv1a1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
+				t.ensureAggregatedServiceImport(ctx, mcsv1b1.Headless, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
 			})
 	})
 })

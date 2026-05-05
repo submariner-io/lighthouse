@@ -31,14 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var (
 	serviceImportGVR = schema.GroupVersionResource{
-		Group:    mcsv1a1.GroupName,
-		Version:  mcsv1a1.GroupVersion.Version,
-		Resource: mcsv1a1.ServiceImportPluralName,
+		Group:    mcsv1b1.GroupName,
+		Version:  mcsv1b1.GroupVersion.Version,
+		Resource: mcsv1b1.ServiceImportPluralName,
 	}
 
 	endpointSliceGVR = schema.GroupVersionResource{
@@ -63,7 +63,7 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	}
 
 	for i := range list {
-		_, ok := list[i].GetLabels()[mcsv1a1.LabelServiceName]
+		_, ok := list[i].GetLabels()[mcsv1b1.LabelServiceName]
 		if ok {
 			err = a.serviceImportController.localFederator.Delete(ctx, a.serviceImportController.transformLocalToBroker(
 				a.serviceImportController.converter.toServiceImport(&list[i])))
@@ -95,7 +95,7 @@ func (a *Controller) Cleanup(ctx context.Context) error {
 	err = deleteResources(ctx, a.endpointSliceController.syncer.GetBrokerClient().Resource(endpointSliceGVR),
 		a.endpointSliceController.syncer.GetBrokerNamespace(),
 		&metav1.ListOptions{
-			LabelSelector: labels.Set(map[string]string{mcsv1a1.LabelSourceCluster: a.clusterID}).String(),
+			LabelSelector: labels.Set(map[string]string{mcsv1b1.LabelSourceCluster: a.clusterID}).String(),
 		})
 
 	return errors.Wrap(err, "error deleting remote EndpointSlices")

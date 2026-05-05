@@ -25,7 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func (i *IPFamilyInfo) resetLoadBalancing() {
@@ -46,7 +46,7 @@ func (i *IPFamilyInfo) mergePorts() {
 		if i.ports == nil {
 			i.ports = info.endpointRecords[0].Ports
 		} else {
-			i.ports = slices.Intersect(i.ports, info.endpointRecords[0].Ports, func(p mcsv1a1.ServicePort) string {
+			i.ports = slices.Intersect(i.ports, info.endpointRecords[0].Ports, func(p mcsv1b1.ServicePort) string {
 				return fmt.Sprintf("%s:%s:%d:%s", p.Name, p.Protocol, p.Port, ptr.Deref(p.AppProtocol, ""))
 			})
 		}

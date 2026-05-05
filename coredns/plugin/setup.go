@@ -45,7 +45,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var (
@@ -66,7 +66,7 @@ var (
 // init registers this plugin within the Caddy plugin framework. It uses "example" as the
 // name, and couples it to the Action "setup".
 func init() {
-	utilruntime.Must(mcsv1a1.Install(scheme.Scheme))
+	utilruntime.Must(mcsv1b1.Install(scheme.Scheme))
 	utilruntime.Must(discovery.AddToScheme(scheme.Scheme))
 
 	caddy.RegisterPlugin(PluginName, caddy.Plugin{

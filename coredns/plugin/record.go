@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	"k8s.io/utils/set"
-	"sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func (lh *Lighthouse) createARecords(dnsrecords []resolver.DNSRecord, state *request.Request) []dns.RR {
@@ -64,7 +64,7 @@ func (lh *Lighthouse) createSRVRecords(dnsrecords []resolver.DNSRecord, state *r
 	var records []dns.RR
 
 	for _, dnsRecord := range dnsrecords {
-		var reqPorts []v1alpha1.ServicePort
+		var reqPorts []mcsv1b1.ServicePort
 
 		if pReq.port == "" {
 			reqPorts = dnsRecord.Ports

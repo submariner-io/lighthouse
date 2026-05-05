@@ -46,7 +46,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -85,25 +85,25 @@ var (
 	ready    = true
 	notReady = false
 
-	port1 = mcsv1a1.ServicePort{
+	port1 = mcsv1b1.ServicePort{
 		Name:     "http",
 		Protocol: corev1.ProtocolTCP,
 		Port:     8080,
 	}
 
-	port2 = mcsv1a1.ServicePort{
+	port2 = mcsv1b1.ServicePort{
 		Name:     "POP3",
 		Protocol: corev1.ProtocolUDP,
 		Port:     110,
 	}
 
-	port3 = mcsv1a1.ServicePort{
+	port3 = mcsv1b1.ServicePort{
 		Name:     "https",
 		Protocol: corev1.ProtocolTCP,
 		Port:     443,
 	}
 
-	port4 = mcsv1a1.ServicePort{
+	port4 = mcsv1b1.ServicePort{
 		Name:     "SMTP",
 		Protocol: corev1.ProtocolUDP,
 		Port:     25,
@@ -120,7 +120,7 @@ var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 
 	Expect(discovery.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(mcsv1a1.Install(scheme.Scheme)).To(Succeed())
+	Expect(mcsv1b1.Install(scheme.Scheme)).To(Succeed())
 })
 
 func TestResolver(t *testing.T) {
@@ -143,10 +143,10 @@ func newTestDriver() *testDriver {
 
 		client := fakeClient.NewSimpleDynamicClient(scheme.Scheme)
 
-		restMapper := test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1a1.ServiceImport{})
+		restMapper := test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1b1.ServiceImport{})
 
 		t.endpointSlices = client.Resource(*test.GetGroupVersionResourceFor(restMapper, &discovery.EndpointSlice{}))
-		t.serviceImports = client.Resource(*test.GetGroupVersionResourceFor(restMapper, &mcsv1a1.ServiceImport{}))
+		t.serviceImports = client.Resource(*test.GetGroupVersionResourceFor(restMapper, &mcsv1b1.ServiceImport{}))
 
 		t.resolver = resolver.New(t.clusterStatus, client)
 		controller := resolver.NewController(t.resolver)
@@ -162,7 +162,7 @@ func newTestDriver() *testDriver {
 	return t
 }
 
-func (t *testDriver) createServiceImport(ctx context.Context, si *mcsv1a1.ServiceImport) {
+func (t *testDriver) createServiceImport(ctx context.Context, si *mcsv1b1.ServiceImport) {
 	test.CreateResource(ctx, t.serviceImports.Namespace(si.Namespace), si)
 }
 
@@ -278,27 +278,27 @@ func (t *testDriver) putEndpointSlice(ctx context.Context, es *discovery.Endpoin
 	Expect(t.resolver.PutEndpointSlices(ctx, es)).To(BeFalse())
 }
 
-func newAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
-	return &mcsv1a1.ServiceImport{
+func newAggregatedServiceImport(namespace, name string) *mcsv1b1.ServiceImport {
+	return &mcsv1b1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: mcsv1a1.ServiceImportSpec{
-			Type: mcsv1a1.ClusterSetIP,
+		Spec: mcsv1b1.ServiceImportSpec{
+			Type: mcsv1b1.ClusterSetIP,
 		},
 	}
 }
 
-func newHeadlessAggregatedServiceImport(namespace, name string) *mcsv1a1.ServiceImport {
+func newHeadlessAggregatedServiceImport(namespace, name string) *mcsv1b1.ServiceImport {
 	si := newAggregatedServiceImport(namespace, name)
-	si.Spec.Type = mcsv1a1.Headless
+	si.Spec.Type = mcsv1b1.Headless
 
 	return si
 }
 
 func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isHealthy bool,
-	ports ...mcsv1a1.ServicePort,
+	ports ...mcsv1b1.ServicePort,
 ) *discovery.EndpointSlice {
 	eps := newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
 		Addresses:  []string{clusterIP},
@@ -310,7 +310,7 @@ func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isH
 	return eps
 }
 
-func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.ServicePort,
+func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1b1.ServicePort,
 	endpoints ...discovery.Endpoint,
 ) *discovery.EndpointSlice {
 	epPorts := make([]discovery.EndpointPort, len(ports))
@@ -330,8 +330,8 @@ func newEndpointSlice(namespace, name, clusterID string, ports []mcsv1a1.Service
 			Labels: map[string]string{
 				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace: namespace,
-				mcsv1a1.LabelSourceCluster:     clusterID,
-				mcsv1a1.LabelServiceName:       name,
+				mcsv1b1.LabelSourceCluster:     clusterID,
+				mcsv1b1.LabelServiceName:       name,
 				constants.LabelIsHeadless:      strconv.FormatBool(true),
 			},
 			Annotations: map[string]string{

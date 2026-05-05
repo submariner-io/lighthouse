@@ -57,7 +57,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -82,19 +82,19 @@ var (
 	host1    = "host1"
 	host2    = "host2"
 
-	port1 = mcsv1a1.ServicePort{
+	port1 = mcsv1b1.ServicePort{
 		Name:     "http",
 		Protocol: corev1.ProtocolTCP,
 		Port:     8080,
 	}
 
-	port2 = mcsv1a1.ServicePort{
+	port2 = mcsv1b1.ServicePort{
 		Name:     "https",
 		Protocol: corev1.ProtocolTCP,
 		Port:     8443,
 	}
 
-	port3 = mcsv1a1.ServicePort{
+	port3 = mcsv1b1.ServicePort{
 		Name:        "POP3",
 		Protocol:    corev1.ProtocolUDP,
 		Port:        110,
@@ -105,7 +105,7 @@ var (
 func init() {
 	kzerolog.InitK8sLogging()
 
-	err := mcsv1a1.Install(scheme.Scheme)
+	err := mcsv1b1.Install(scheme.Scheme)
 	if err != nil {
 		panic(err)
 	}
@@ -128,7 +128,7 @@ type cluster struct {
 	agentController            *controller.Controller
 	service                    *corev1.Service
 	expectedClusterIPEndpoints []discovery.Endpoint
-	serviceExport              *mcsv1a1.ServiceExport
+	serviceExport              *mcsv1b1.ServiceExport
 	serviceEndpointSlices      []discovery.EndpointSlice
 	clusterID                  string
 	headlessEndpointAddresses  [][]discovery.Endpoint
@@ -148,7 +148,7 @@ type testDriver struct {
 	useClusterSetIP                 bool
 	ipPool                          *ipam.IPPool
 	brokerServiceImportReactor      *fake.FailingReactor
-	aggregatedServicePorts          []mcsv1a1.ServicePort
+	aggregatedServicePorts          []mcsv1b1.ServicePort
 	aggregatedSessionAffinity       corev1.ServiceAffinity
 	aggregatedSessionAffinityConfig *corev1.SessionAffinityConfig
 	aggregatedTrafficDistribution   *string
@@ -160,7 +160,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
 	Expect(discovery.AddToScheme(syncerScheme)).To(Succeed())
-	Expect(mcsv1a1.Install(syncerScheme)).To(Succeed())
+	Expect(mcsv1b1.Install(syncerScheme)).To(Succeed())
 
 	syncerScheme.AddKnownTypeWithName(schema.GroupVersionKind{
 		Group:   "submariner.io",
@@ -172,7 +172,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 	fake.AddBasicReactors(&brokerClient.Fake)
 
 	t := &testDriver{
-		aggregatedServicePorts:    []mcsv1a1.ServicePort{port1, port2},
+		aggregatedServicePorts:    []mcsv1b1.ServicePort{port1, port2},
 		aggregatedSessionAffinity: corev1.ServiceAffinityNone,
 		aggregatedIPFamilies:      nil,
 		cluster1: cluster{
@@ -202,7 +202,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 			},
-			serviceExport: &mcsv1a1.ServiceExport{
+			serviceExport: &mcsv1b1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: serviceNamespace,
@@ -284,7 +284,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 					SessionAffinity: corev1.ServiceAffinityNone,
 				},
 			},
-			serviceExport: &mcsv1a1.ServiceExport{
+			serviceExport: &mcsv1b1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      serviceName,
 					Namespace: serviceNamespace,
@@ -309,7 +309,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 		},
 		syncerConfig: &broker.SyncerConfig{
 			BrokerNamespace: test.RemoteNamespace,
-			RestMapper: test.GetRESTMapperFor(&mcsv1a1.ServiceExport{}, &mcsv1a1.ServiceImport{}, &corev1.Service{},
+			RestMapper: test.GetRESTMapperFor(&mcsv1b1.ServiceExport{}, &mcsv1b1.ServiceImport{}, &corev1.Service{},
 				&corev1.Endpoints{}, &corev1.Namespace{}, &discovery.EndpointSlice{}, controller.GetGlobalIngressIPObj()),
 			BrokerClient: brokerClient,
 			Scheme:       syncerScheme,
@@ -323,7 +323,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 	t.ipPool, err = ipam.NewIPPool("243.10.1.0/24", nil)
 	Expect(err).To(Succeed())
 
-	t.brokerServiceImportReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, mcsv1a1.ServiceImportPluralName)
+	t.brokerServiceImportReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, mcsv1b1.ServiceImportPluralName)
 	t.brokerEndpointSliceReactor = fake.NewFailingReactorForResource(&brokerClient.Fake, "endpointslices")
 
 	t.cluster1.headlessEndpointAddresses = [][]discovery.Endpoint{t.cluster1.serviceEndpointSlices[0].Endpoints}
@@ -331,7 +331,7 @@ func newTestDiver(ctx context.Context) *testDriver {
 	t.cluster2.headlessEndpointAddresses = [][]discovery.Endpoint{t.cluster2.serviceEndpointSlices[0].Endpoints}
 
 	t.brokerServiceImportClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
-		&mcsv1a1.ServiceImport{}))
+		&mcsv1b1.ServiceImport{}))
 
 	t.brokerEndpointSliceClient = t.syncerConfig.BrokerClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(test.RemoteNamespace)
@@ -369,13 +369,13 @@ func (c *cluster) init(ctx context.Context, syncerConfig *broker.SyncerConfig, d
 		c.localDynClientFake = dynClientFake
 	}
 
-	c.localServiceImportReactor = fake.NewFailingReactorForResource(c.localDynClientFake, mcsv1a1.ServiceImportPluralName)
+	c.localServiceImportReactor = fake.NewFailingReactorForResource(c.localDynClientFake, mcsv1b1.ServiceImportPluralName)
 
 	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
-		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace)
+		&mcsv1b1.ServiceExport{})).Namespace(serviceNamespace)
 
 	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
-		&mcsv1a1.ServiceImport{}))
+		&mcsv1b1.ServiceImport{}))
 
 	c.localEndpointSliceClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&discovery.EndpointSlice{})).Namespace(serviceNamespace)
@@ -525,8 +525,8 @@ func (c *cluster) newGlobalIngressIP(name, ip string) *unstructured.Unstructured
 	return ingressIP
 }
 
-func (c *cluster) retrieveServiceExportCondition(ctx context.Context, se *mcsv1a1.ServiceExport,
-	condType mcsv1a1.ServiceExportConditionType,
+func (c *cluster) retrieveServiceExportCondition(ctx context.Context, se *mcsv1b1.ServiceExport,
+	condType mcsv1b1.ServiceExportConditionType,
 ) *metav1.Condition {
 	obj, err := serviceExportClientFor(c.localDynClient, se.Namespace).Get(ctx, se.Name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
@@ -556,7 +556,7 @@ func (c *cluster) awaitServiceExportCondition(ctx context.Context, expected ...m
 				a := actions[j]
 				j++
 
-				if !a.Matches("update", mcsv1a1.ServiceExportPluralName) {
+				if !a.Matches("update", mcsv1b1.ServiceExportPluralName) {
 					continue
 				}
 
@@ -598,7 +598,7 @@ func (c *cluster) ensureLastServiceExportCondition(ctx context.Context, expected
 	indexOfLastCondition := func() int {
 		actions := c.localDynClientFake.Actions()
 		for i := len(actions) - 1; i >= 0; i-- {
-			if !actions[i].Matches("update", mcsv1a1.ServiceExportPluralName) {
+			if !actions[i].Matches("update", mcsv1b1.ServiceExportPluralName) {
 				continue
 			}
 
@@ -622,11 +622,11 @@ func (c *cluster) ensureLastServiceExportCondition(ctx context.Context, expected
 	}).Should(Equal(initialIndex), "Expected ServiceExport condition to not change: "+resource.ToJSON(expected))
 }
 
-func (c *cluster) ensureNoServiceExportCondition(ctx context.Context, condType mcsv1a1.ServiceExportConditionType,
-	serviceExports ...*mcsv1a1.ServiceExport,
+func (c *cluster) ensureNoServiceExportCondition(ctx context.Context, condType mcsv1b1.ServiceExportConditionType,
+	serviceExports ...*mcsv1b1.ServiceExport,
 ) {
 	if len(serviceExports) == 0 {
-		serviceExports = []*mcsv1a1.ServiceExport{c.serviceExport}
+		serviceExports = []*mcsv1b1.ServiceExport{c.serviceExport}
 	}
 
 	for _, se := range serviceExports {
@@ -637,15 +637,15 @@ func (c *cluster) ensureNoServiceExportCondition(ctx context.Context, condType m
 }
 
 func (c *cluster) awaitNoServiceStatus(ctx context.Context) {
-	c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonNoService))
+	c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportReasonNoService))
 }
 
-func (c *cluster) findLocalServiceImport(ctx context.Context) *mcsv1a1.ServiceImport {
+func (c *cluster) findLocalServiceImport(ctx context.Context) *mcsv1b1.ServiceImport {
 	list, err := c.localServiceImportClient.Namespace(test.LocalNamespace).List(ctx, metav1.ListOptions{})
 	Expect(err).To(Succeed())
 
 	for i := range list.Items {
-		if list.Items[i].GetLabels()[mcsv1a1.LabelServiceName] == c.service.Name &&
+		if list.Items[i].GetLabels()[mcsv1b1.LabelServiceName] == c.service.Name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == c.service.Namespace {
 			serviceImport := toServiceImport(&list.Items[i])
 
@@ -670,20 +670,20 @@ func (c *cluster) ensureNoServiceExportActions() {
 	c.localDynClientFake.ClearActions()
 
 	Consistently(func() []string {
-		return testutil.GetOccurredActionVerbs(c.localDynClientFake, mcsv1a1.ServiceExportPluralName, "get", "update")
+		return testutil.GetOccurredActionVerbs(c.localDynClientFake, mcsv1b1.ServiceExportPluralName, "get", "update")
 	}, 500*time.Millisecond).Should(BeEmpty())
 }
 
-func (c *cluster) verifyServiceImportReady(si *mcsv1a1.ServiceImport) {
-	cond := meta.FindStatusCondition(si.Status.Conditions, string(mcsv1a1.ServiceImportConditionReady))
+func (c *cluster) verifyServiceImportReady(si *mcsv1b1.ServiceImport) {
+	cond := meta.FindStatusCondition(si.Status.Conditions, string(mcsv1b1.ServiceImportConditionReady))
 	Expect(cond).ToNot(BeNil(), "ServiceImport Ready condition not found")
 	c.verifyImportReadyCondition(cond)
 }
 
-func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport,
+func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, expected *mcsv1b1.ServiceImport,
 	ipPool *ipam.IPPool,
-) *mcsv1a1.ServiceImport {
-	sortSlices := func(si *mcsv1a1.ServiceImport) {
+) *mcsv1b1.ServiceImport {
+	sortSlices := func(si *mcsv1b1.ServiceImport) {
 		sort.SliceStable(si.Spec.Ports, func(i, j int) bool {
 			return si.Spec.Ports[i].Port < si.Spec.Ports[j].Port
 		})
@@ -699,7 +699,7 @@ func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourc
 
 	sortSlices(expected)
 
-	var serviceImport *mcsv1a1.ServiceImport
+	var serviceImport *mcsv1b1.ServiceImport
 
 	Eventually(ctx, func(g Gomega, ctx context.Context) {
 		obj, err := client.Namespace(expected.Namespace).Get(ctx, expected.Name, metav1.GetOptions{})
@@ -711,10 +711,10 @@ func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourc
 		g.Expect(serviceImport.Spec.IPs).To(HaveLen(len(expected.Spec.IPs)))
 
 		g.Expect(serviceImport.Spec).To(BeComparableTo(expected.Spec,
-			cmpopts.IgnoreFields(mcsv1a1.ServiceImportSpec{}, "IPs")),
+			cmpopts.IgnoreFields(mcsv1b1.ServiceImportSpec{}, "IPs")),
 			"Actual Spec: %s, Expected Spec %s", resource.ToJSON(serviceImport.Spec), resource.ToJSON(expected.Spec))
 		g.Expect(serviceImport.Status).To(BeComparableTo(expected.Status,
-			cmpopts.IgnoreFields(mcsv1a1.ServiceImportStatus{}, "Conditions")),
+			cmpopts.IgnoreFields(mcsv1b1.ServiceImportStatus{}, "Conditions")),
 			"Actual Status: %s, Expected Status %s", resource.ToJSON(serviceImport.Status), resource.ToJSON(expected.Status))
 	}).Within(5 * time.Second).ProbeEvery(50 * time.Millisecond).Should(Succeed())
 
@@ -727,7 +727,7 @@ func awaitServiceImport(ctx context.Context, client dynamic.NamespaceableResourc
 	return serviceImport
 }
 
-func getServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1a1.ServiceImport {
+func getServiceImport(ctx context.Context, client dynamic.NamespaceableResourceInterface, namespace, name string) *mcsv1b1.ServiceImport {
 	obj, err := client.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
@@ -746,9 +746,9 @@ func findEndpointSlices(ctx context.Context, client dynamic.ResourceInterface, n
 	var endpointSlices []*discovery.EndpointSlice
 
 	for i := range list.Items {
-		if list.Items[i].GetLabels()[mcsv1a1.LabelServiceName] == name &&
+		if list.Items[i].GetLabels()[mcsv1b1.LabelServiceName] == name &&
 			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace &&
-			list.Items[i].GetLabels()[mcsv1a1.LabelSourceCluster] == clusterID {
+			list.Items[i].GetLabels()[mcsv1b1.LabelSourceCluster] == clusterID {
 			eps := &discovery.EndpointSlice{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], eps, nil)).To(Succeed())
 
@@ -775,7 +775,7 @@ func awaitEndpointSlice(ctx context.Context, client dynamic.ResourceInterface, s
 	Eventually(ctx, func(g Gomega, ctx context.Context) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(ctx, client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
+		slices := findEndpointSlices(ctx, client, expected.Namespace, serviceName, expected.Labels[mcsv1b1.LabelSourceCluster])
 
 		for _, eps := range slices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
@@ -819,17 +819,17 @@ func (c *cluster) dynamicServiceClientFor() dynamic.NamespaceableResourceInterfa
 	return c.localDynClient.Resource(schema.GroupVersionResource{Version: "v1", Resource: "services"})
 }
 
-func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcsv1a1.ServiceImportType, name, ns string,
+func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcsv1b1.ServiceImportType, name, ns string,
 	clusters ...*cluster,
 ) {
-	expServiceImport := &mcsv1a1.ServiceImport{
+	expServiceImport := &mcsv1b1.ServiceImport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", name, ns),
 			Namespace: test.RemoteNamespace,
 		},
-		Spec: mcsv1a1.ServiceImportSpec{
+		Spec: mcsv1b1.ServiceImportSpec{
 			Type:                  sType,
-			Ports:                 []mcsv1a1.ServicePort{},
+			Ports:                 []mcsv1b1.ServicePort{},
 			IPFamilies:            t.aggregatedIPFamilies,
 			SessionAffinity:       t.aggregatedSessionAffinity,
 			SessionAffinityConfig: t.aggregatedSessionAffinityConfig,
@@ -839,7 +839,7 @@ func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcs
 	}
 
 	if len(clusters) > 0 {
-		if sType == mcsv1a1.ClusterSetIP {
+		if sType == mcsv1b1.ClusterSetIP {
 			expServiceImport.Spec.Ports = t.aggregatedServicePorts
 
 			if t.useClusterSetIP {
@@ -849,13 +849,13 @@ func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcs
 
 		for _, c := range clusters {
 			expServiceImport.Status.Clusters = append(expServiceImport.Status.Clusters,
-				mcsv1a1.ClusterStatus{Cluster: c.clusterID})
+				mcsv1b1.ClusterStatus{Cluster: c.clusterID})
 		}
 	}
 
 	actual := awaitServiceImport(ctx, t.brokerServiceImportClient, expServiceImport, t.ipPool)
 
-	if sType == mcsv1a1.ClusterSetIP {
+	if sType == mcsv1b1.ClusterSetIP {
 		Expect(actual.Annotations).To(HaveKeyWithValue(constants.UseClustersetIP, strconv.FormatBool(t.useClusterSetIP)))
 	}
 
@@ -866,7 +866,7 @@ func (t *testDriver) awaitAggregatedServiceImport(ctx context.Context, sType mcs
 	t.cluster2.verifyServiceImportReady(awaitServiceImport(ctx, t.cluster2.localServiceImportClient, expServiceImport, t.ipPool))
 }
 
-func (t *testDriver) ensureAggregatedServiceImport(ctx context.Context, sType mcsv1a1.ServiceImportType, name, ns string,
+func (t *testDriver) ensureAggregatedServiceImport(ctx context.Context, sType mcsv1b1.ServiceImportType, name, ns string,
 	clusters ...*cluster,
 ) {
 	Consistently(ctx, func(ctx context.Context) bool {
@@ -890,8 +890,8 @@ func (t *testDriver) awaitEndpointSlice(ctx context.Context, c *cluster) {
 			Namespace: c.service.Namespace,
 			Labels: map[string]string{
 				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
-				mcsv1a1.LabelSourceCluster:     c.clusterID,
-				mcsv1a1.LabelServiceName:       c.service.Name,
+				mcsv1b1.LabelSourceCluster:     c.clusterID,
+				mcsv1b1.LabelServiceName:       c.service.Name,
 				constants.LabelSourceNamespace: c.service.Namespace,
 				constants.LabelIsHeadless:      strconv.FormatBool(isHeadless),
 			},
@@ -965,9 +965,9 @@ func (t *testDriver) awaitNoEndpointSlice(ctx context.Context, c *cluster) {
 
 func serviceExportClientFor(client dynamic.Interface, namespace string) dynamic.ResourceInterface {
 	return client.Resource(schema.GroupVersionResource{
-		Group:    mcsv1a1.GroupVersion.Group,
-		Version:  mcsv1a1.GroupVersion.Version,
-		Resource: mcsv1a1.ServiceExportPluralName,
+		Group:    mcsv1b1.GroupVersion.Group,
+		Version:  mcsv1b1.GroupVersion.Version,
+		Resource: mcsv1b1.ServiceExportPluralName,
 	}).Namespace(namespace)
 }
 
@@ -988,38 +988,38 @@ func assertEquivalentConditions(g Gomega, actual, expected *metav1.Condition) {
 	}
 }
 
-func toServiceExport(obj any) *mcsv1a1.ServiceExport {
-	se := &mcsv1a1.ServiceExport{}
+func toServiceExport(obj any) *mcsv1b1.ServiceExport {
+	se := &mcsv1b1.ServiceExport{}
 	Expect(scheme.Scheme.Convert(obj, se, nil)).To(Succeed())
 
 	return se
 }
 
-func toServiceImport(obj any) *mcsv1a1.ServiceImport {
-	si := &mcsv1a1.ServiceImport{}
+func toServiceImport(obj any) *mcsv1b1.ServiceImport {
+	si := &mcsv1b1.ServiceImport{}
 	Expect(scheme.Scheme.Convert(obj, si, nil)).To(Succeed())
 
 	return si
 }
 
 func (t *testDriver) awaitNonHeadlessServiceExported(ctx context.Context, clusters ...*cluster) {
-	t.awaitServiceExported(ctx, mcsv1a1.ClusterSetIP, clusters...)
+	t.awaitServiceExported(ctx, mcsv1b1.ClusterSetIP, clusters...)
 }
 
 func (t *testDriver) awaitHeadlessServiceExported(ctx context.Context, clusters ...*cluster) {
-	t.awaitServiceExported(ctx, mcsv1a1.Headless, clusters...)
+	t.awaitServiceExported(ctx, mcsv1b1.Headless, clusters...)
 }
 
-func (t *testDriver) awaitServiceExported(ctx context.Context, sType mcsv1a1.ServiceImportType, clusters ...*cluster) {
+func (t *testDriver) awaitServiceExported(ctx context.Context, sType mcsv1b1.ServiceImportType, clusters ...*cluster) {
 	t.awaitAggregatedServiceImport(ctx, sType, t.cluster1.service.Name, t.cluster1.service.Namespace, clusters...)
 
 	for _, c := range clusters {
 		Eventually(ctx, func(g Gomega, ctx context.Context) {
 			list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(ctx, metav1.ListOptions{
 				LabelSelector: k8slabels.Set(map[string]string{
-					mcsv1a1.LabelServiceName:       t.cluster1.service.Name,
+					mcsv1b1.LabelServiceName:       t.cluster1.service.Name,
 					constants.LabelSourceNamespace: t.cluster1.service.Namespace,
-					mcsv1a1.LabelSourceCluster:     c.clusterID,
+					mcsv1b1.LabelSourceCluster:     c.clusterID,
 				}).String(),
 			})
 			Expect(err).To(Succeed())
@@ -1028,8 +1028,8 @@ func (t *testDriver) awaitServiceExported(ctx context.Context, sType mcsv1a1.Ser
 
 		t.awaitEndpointSlice(ctx, c)
 
-		c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
-		c.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonExported))
+		c.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1b1.ServiceExportReasonValid))
+		c.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1b1.ServiceExportReasonExported))
 	}
 }
 
@@ -1041,9 +1041,9 @@ func (t *testDriver) awaitServiceUnexported(ctx context.Context, c *cluster) {
 	Eventually(ctx, func(g Gomega, ctx context.Context) {
 		list, err := t.brokerServiceImportClient.Namespace(test.RemoteNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(k8slabels.Set(map[string]string{
-				mcsv1a1.LabelServiceName:       c.service.Name,
+				mcsv1b1.LabelServiceName:       c.service.Name,
 				constants.LabelSourceNamespace: c.service.Namespace,
-				mcsv1a1.LabelSourceCluster:     c.clusterID,
+				mcsv1b1.LabelSourceCluster:     c.clusterID,
 			})).String(),
 		})
 
@@ -1070,15 +1070,15 @@ func (t *testDriver) awaitServiceUnexported(ctx context.Context, c *cluster) {
 	Expect(epsClient.Delete(ctx, "dummy", metav1.DeleteOptions{})).To(Succeed())
 }
 
-func newServiceExportValidCondition(status metav1.ConditionStatus, reason mcsv1a1.ServiceExportConditionReason) metav1.Condition {
-	return mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionValid, status, reason, "")
+func newServiceExportValidCondition(status metav1.ConditionStatus, reason mcsv1b1.ServiceExportConditionReason) metav1.Condition {
+	return mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionValid, status, reason, "")
 }
 
-func newServiceExportReadyCondition(status metav1.ConditionStatus, reason mcsv1a1.ServiceExportConditionReason) metav1.Condition {
-	return mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady, status, reason, "")
+func newServiceExportReadyCondition(status metav1.ConditionStatus, reason mcsv1b1.ServiceExportConditionReason) metav1.Condition {
+	return mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionReady, status, reason, "")
 }
 
-func newServiceExportConflictCondition(reason ...mcsv1a1.ServiceExportConditionReason) metav1.Condition {
+func newServiceExportConflictCondition(reason ...mcsv1b1.ServiceExportConditionReason) metav1.Condition {
 	var joined strings.Builder
 
 	for i := range reason {
@@ -1089,8 +1089,8 @@ func newServiceExportConflictCondition(reason ...mcsv1a1.ServiceExportConditionR
 		joined.WriteString(string(reason[i]))
 	}
 
-	return mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionConflict, metav1.ConditionTrue,
-		mcsv1a1.ServiceExportConditionReason(joined.String()), "")
+	return mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionConflict, metav1.ConditionTrue,
+		mcsv1b1.ServiceExportConditionReason(joined.String()), "")
 }
 
 func setIngressIPConditions(ingressIP *unstructured.Unstructured, conditions ...metav1.Condition) {
@@ -1109,7 +1109,7 @@ func setIngressAllocatedIP(ingressIP *unstructured.Unstructured, ip string) {
 	Expect(unstructured.SetNestedField(ingressIP.Object, ip, "status", "allocatedIP")).To(Succeed())
 }
 
-func toServicePort(port mcsv1a1.ServicePort) corev1.ServicePort {
+func toServicePort(port mcsv1b1.ServicePort) corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:        port.Name,
 		Protocol:    port.Protocol,
@@ -1120,10 +1120,10 @@ func toServicePort(port mcsv1a1.ServicePort) corev1.ServicePort {
 
 func assertImportReady(c *metav1.Condition) {
 	Expect(c.Status).To(Equal(metav1.ConditionTrue))
-	Expect(c.Reason).To(Equal(string(mcsv1a1.ServiceImportReasonReady)))
+	Expect(c.Reason).To(Equal(string(mcsv1b1.ServiceImportReasonReady)))
 }
 
 func assertImportNotReady(c *metav1.Condition) {
 	Expect(c.Status).To(Equal(metav1.ConditionFalse))
-	Expect(c.Reason).To(Equal(string(mcsv1a1.ServiceImportReasonIPFamilyNotSupported)))
+	Expect(c.Reason).To(Equal(string(mcsv1b1.ServiceImportReasonIPFamilyNotSupported)))
 }

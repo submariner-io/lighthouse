@@ -27,7 +27,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -57,19 +57,19 @@ func testDualStackClusterIPService() {
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 			IP:          serviceIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		})
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv6, false, resolver.DNSRecord{
 			IP:          ipv6IP,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		})
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPFamilyUnknown, false, resolver.DNSRecord{
 			IP:          serviceIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		})
 
@@ -82,7 +82,7 @@ func testDualStackClusterIPService() {
 
 		t.ensureDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv6, false, resolver.DNSRecord{
 			IP:          ipv6IP,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		})
 
@@ -110,7 +110,7 @@ func testDualStackHeadlessService() {
 	})
 
 	Specify("GetDNSRecords should return the DNS records for both IP families", func(ctx context.Context) {
-		ipv4EPS1 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+		ipv4EPS1 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 			discovery.Endpoint{
 				Addresses:  []string{endpointIP1},
 				Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -118,7 +118,7 @@ func testDualStackHeadlessService() {
 		)
 		t.createEndpointSlice(ctx, ipv4EPS1)
 
-		ipv4EPS2 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port2},
+		ipv4EPS2 := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port2},
 			discovery.Endpoint{
 				Addresses:  []string{endpointIP3},
 				Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -126,7 +126,7 @@ func testDualStackHeadlessService() {
 		)
 		t.createEndpointSlice(ctx, ipv4EPS2)
 
-		ipv6EPS := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port3},
+		ipv6EPS := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port3},
 			discovery.Endpoint{
 				Addresses:  []string{ipv6IP},
 				Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -137,36 +137,36 @@ func testDualStackHeadlessService() {
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true, resolver.DNSRecord{
 			IP:          endpointIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 			HostName:    endpointHostname1,
 		}, resolver.DNSRecord{
 			IP:          endpointIP3,
-			Ports:       []mcsv1a1.ServicePort{port2},
+			Ports:       []mcsv1b1.ServicePort{port2},
 			ClusterName: clusterID1,
 			HostName:    endpointHostname3,
 		})
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv6, true, resolver.DNSRecord{
 			IP:          ipv6IP,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID1,
 			HostName:    ipv6Hostname,
 		})
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPFamilyUnknown, true, resolver.DNSRecord{
 			IP:          endpointIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 			HostName:    endpointHostname1,
 		}, resolver.DNSRecord{
 			IP:          endpointIP3,
-			Ports:       []mcsv1a1.ServicePort{port2},
+			Ports:       []mcsv1b1.ServicePort{port2},
 			ClusterName: clusterID1,
 			HostName:    endpointHostname3,
 		}, resolver.DNSRecord{
 			IP:          ipv6IP,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID1,
 			HostName:    ipv6Hostname,
 		})
@@ -178,12 +178,12 @@ func testDualStackHeadlessService() {
 
 		t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPFamilyUnknown, true, resolver.DNSRecord{
 			IP:          endpointIP3,
-			Ports:       []mcsv1a1.ServicePort{port2},
+			Ports:       []mcsv1b1.ServicePort{port2},
 			ClusterName: clusterID1,
 			HostName:    endpointHostname3,
 		}, resolver.DNSRecord{
 			IP:          ipv6IP,
-			Ports:       []mcsv1a1.ServicePort{port3},
+			Ports:       []mcsv1b1.ServicePort{port3},
 			ClusterName: clusterID1,
 			HostName:    ipv6Hostname,
 		})

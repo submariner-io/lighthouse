@@ -46,7 +46,7 @@ import (
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var (
@@ -106,8 +106,8 @@ func main() {
 
 	util.AddCertificateErrorHandler(agentSpec.HaltOnCertError)
 
-	err = mcsv1a1.Install(scheme.Scheme)
-	exitOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
+	err = mcsv1b1.Install(scheme.Scheme)
+	exitOnError(err, "Error adding Multicluster v1beta1 to the scheme")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	exitOnError(err, "Error building kubeconfig")

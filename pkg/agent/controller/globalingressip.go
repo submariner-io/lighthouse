@@ -21,7 +21,7 @@ package controller
 import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -34,7 +34,7 @@ const (
 type IngressIP struct {
 	namespace         string
 	allocatedIP       string
-	unallocatedReason mcsv1a1.ServiceExportConditionReason
+	unallocatedReason mcsv1b1.ServiceExportConditionReason
 	unallocatedMsg    string
 }
 
@@ -51,7 +51,7 @@ func parseIngressIP(obj *unstructured.Unstructured) *IngressIP {
 		for i := range conditions {
 			if conditions[i].Type == "Allocated" {
 				gip.unallocatedMsg = "Unable to obtain global IP: " + conditions[i].Message
-				gip.unallocatedReason = mcsv1a1.ServiceExportConditionReason(conditions[i].Reason)
+				gip.unallocatedReason = mcsv1b1.ServiceExportConditionReason(conditions[i].Reason)
 
 				break
 			}

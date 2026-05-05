@@ -33,15 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func NewServiceExportClient(client dynamic.Interface, scheme *runtime.Scheme) *ServiceExportClient {
 	return &ServiceExportClient{
 		NamespaceableResourceInterface: client.Resource(schema.GroupVersionResource{
-			Group:    mcsv1a1.GroupVersion.Group,
-			Version:  mcsv1a1.GroupVersion.Version,
-			Resource: mcsv1a1.ServiceExportPluralName,
+			Group:    mcsv1b1.GroupVersion.Group,
+			Version:  mcsv1b1.GroupVersion.Version,
+			Resource: mcsv1b1.ServiceExportPluralName,
 		}),
 		converter: converter{scheme: scheme},
 	}
@@ -58,7 +58,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 		return
 	}
 
-	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1a1.ServiceExport) bool {
+	c.doUpdate(ctx, name, namespace, func(toUpdate *mcsv1b1.ServiceExport) bool {
 		updated := false
 
 		for i := range conditions {
@@ -67,7 +67,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 			prevCond := meta.FindStatusCondition(toUpdate.Status.Conditions, condition.Type)
 
 			if prevCond == nil {
-				if condition.Type == string(mcsv1a1.ServiceExportConditionConflict) && condition.Status == metav1.ConditionFalse {
+				if condition.Type == string(mcsv1b1.ServiceExportConditionConflict) && condition.Status == metav1.ConditionFalse {
 					// The caller intends to clear the Conflict condition so don't add it.
 					continue
 				}
@@ -77,7 +77,7 @@ func (c *ServiceExportClient) tryUpdateStatusConditions(ctx context.Context, nam
 
 				toUpdate.Status.Conditions = append(toUpdate.Status.Conditions, *condition)
 				updated = true
-			} else if condition.Type == string(mcsv1a1.ServiceExportConditionConflict) {
+			} else if condition.Type == string(mcsv1b1.ServiceExportConditionConflict) {
 				condUpdated := c.mergeConflictCondition(prevCond, condition)
 				if condUpdated {
 					logger.Infof(
@@ -108,7 +108,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	if to.Reason != "" {
 		reasons = strings.Split(to.Reason, ",")
 		reasons = goslices.DeleteFunc(reasons, func(s string) bool {
-			return s == string(mcsv1a1.ServiceExportReasonNoConflicts)
+			return s == string(mcsv1b1.ServiceExportReasonNoConflicts)
 		})
 	}
 
@@ -144,7 +144,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	if to.Reason != "" {
 		to.Status = metav1.ConditionTrue
 	} else {
-		to.Reason = string(mcsv1a1.ServiceExportReasonNoConflicts)
+		to.Reason = string(mcsv1b1.ServiceExportReasonNoConflicts)
 		to.Status = metav1.ConditionFalse
 	}
 
@@ -155,7 +155,7 @@ func (c *ServiceExportClient) mergeConflictCondition(to, from *metav1.Condition)
 	return updated
 }
 
-func (c *ServiceExportClient) doUpdate(ctx context.Context, name, namespace string, update func(toUpdate *mcsv1a1.ServiceExport) bool) {
+func (c *ServiceExportClient) doUpdate(ctx context.Context, name, namespace string, update func(toUpdate *mcsv1b1.ServiceExport) bool) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		obj, err := c.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -181,17 +181,17 @@ func (c *ServiceExportClient) doUpdate(ctx context.Context, name, namespace stri
 	}
 }
 
-func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1a1.ServiceExport {
+func (c *ServiceExportClient) getLocalInstance(name, namespace string) *mcsv1b1.ServiceExport {
 	obj, found, _ := c.localSyncer.GetResource(name, namespace)
 	if !found {
 		return nil
 	}
 
-	return obj.(*mcsv1a1.ServiceExport)
+	return obj.(*mcsv1b1.ServiceExport)
 }
 
-func (c *ServiceExportClient) hasCondition(name, namespace string, condType mcsv1a1.ServiceExportConditionType,
-	reason mcsv1a1.ServiceExportConditionReason,
+func (c *ServiceExportClient) hasCondition(name, namespace string, condType mcsv1b1.ServiceExportConditionType,
+	reason mcsv1b1.ServiceExportConditionReason,
 ) bool {
 	se := c.getLocalInstance(name, namespace)
 	if se == nil {

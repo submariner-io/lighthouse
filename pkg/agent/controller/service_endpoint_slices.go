@@ -44,13 +44,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var AwaitStoppedTimeout = time.Second * 5
 
 func startEndpointSliceController(localClient dynamic.Interface, restMapper meta.RESTMapper, scheme *runtime.Scheme,
-	serviceImport *mcsv1a1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
+	serviceImport *mcsv1b1.ServiceImport, clusterID string, globalIngressIPCache *globalIngressIPCache,
 	localLHEndpointSliceLister EndpointSliceListerFn,
 ) (*ServiceEndpointSliceController, error) {
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
@@ -82,7 +82,7 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 			IdentifyingLabels: []string{
 				constants.LabelSourceName,
 				constants.LabelSourceNamespace,
-				mcsv1a1.LabelSourceCluster,
+				mcsv1b1.LabelSourceCluster,
 			},
 		})
 	} else {
@@ -91,9 +91,9 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 			RestMapper:      restMapper,
 			TargetNamespace: serviceNamespace,
 			IdentifyingLabels: []string{
-				mcsv1a1.LabelServiceName,
+				mcsv1b1.LabelServiceName,
 				constants.LabelSourceNamespace,
-				mcsv1a1.LabelSourceCluster,
+				mcsv1b1.LabelSourceCluster,
 			},
 		})
 		federator = &federate.FederatorFuncs{
@@ -133,8 +133,8 @@ func startEndpointSliceController(localClient dynamic.Interface, restMapper meta
 		controller.epsSyncer.Reconcile(func() []runtime.Object {
 			list := localLHEndpointSliceLister(k8slabels.SelectorFromSet(map[string]string{
 				constants.LabelSourceNamespace: serviceNamespace,
-				mcsv1a1.LabelServiceName:       serviceName,
-				mcsv1a1.LabelSourceCluster:     clusterID,
+				mcsv1b1.LabelServiceName:       serviceName,
+				mcsv1b1.LabelSourceCluster:     clusterID,
 			}))
 
 			retList := make([]runtime.Object, 0, len(list))
@@ -174,8 +174,8 @@ func (c *ServiceEndpointSliceController) cleanup(ctx context.Context) error {
 		LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 			discovery.LabelManagedBy:       constants.LabelValueManagedBy,
 			constants.LabelSourceNamespace: c.serviceNamespace,
-			mcsv1a1.LabelSourceCluster:     c.clusterID,
-			mcsv1a1.LabelServiceName:       c.serviceName,
+			mcsv1b1.LabelSourceCluster:     c.clusterID,
+			mcsv1b1.LabelServiceName:       c.serviceName,
 		}).String(),
 	}
 
@@ -314,8 +314,8 @@ func (c *ServiceEndpointSliceController) newEndpointSliceFrom(serviceEPS *discov
 			Labels: map[string]string{
 				discovery.LabelManagedBy:       constants.LabelValueManagedBy,
 				constants.LabelSourceNamespace: c.serviceNamespace,
-				mcsv1a1.LabelSourceCluster:     c.clusterID,
-				mcsv1a1.LabelServiceName:       c.serviceName,
+				mcsv1b1.LabelSourceCluster:     c.clusterID,
+				mcsv1b1.LabelServiceName:       c.serviceName,
 				constants.LabelIsHeadless:      strconv.FormatBool(c.isHeadless()),
 			},
 			Annotations: map[string]string{
@@ -387,7 +387,7 @@ func (c *ServiceEndpointSliceController) getHeadlessEndpointAddresses(name strin
 }
 
 func (c *ServiceEndpointSliceController) isHeadless() bool {
-	return c.serviceImportSpec.Type == mcsv1a1.Headless
+	return c.serviceImportSpec.Type == mcsv1b1.Headless
 }
 
 type endpointSliceStringer struct {

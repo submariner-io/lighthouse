@@ -33,20 +33,20 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Cleanup", func() {
 	var (
 		t                                          *testDriver
-		localServiceImport1                        *mcsv1a1.ServiceImport
-		localServiceImport1OnBroker                *mcsv1a1.ServiceImport
-		localAggregatedServiceImport1              *mcsv1a1.ServiceImport
-		aggregatedServiceImportOnRemoteBroker1     *mcsv1a1.ServiceImport
-		localServiceImport2                        *mcsv1a1.ServiceImport
-		localAggregatedServiceImport2              *mcsv1a1.ServiceImport
-		aggregatedServiceImportOnRemoteBroker2     *mcsv1a1.ServiceImport
-		remoteAggregatedServiceImportOnLocalBroker *mcsv1a1.ServiceImport
+		localServiceImport1                        *mcsv1b1.ServiceImport
+		localServiceImport1OnBroker                *mcsv1b1.ServiceImport
+		localAggregatedServiceImport1              *mcsv1b1.ServiceImport
+		aggregatedServiceImportOnRemoteBroker1     *mcsv1b1.ServiceImport
+		localServiceImport2                        *mcsv1b1.ServiceImport
+		localAggregatedServiceImport2              *mcsv1b1.ServiceImport
+		aggregatedServiceImportOnRemoteBroker2     *mcsv1b1.ServiceImport
+		remoteAggregatedServiceImportOnLocalBroker *mcsv1b1.ServiceImport
 		localEndpointSlice                         *discovery.EndpointSlice
 		remoteEndpointSliceOnLocalBroker           *discovery.EndpointSlice
 		remoteEndpointSliceInLocalNS               *discovery.EndpointSlice
@@ -65,20 +65,20 @@ var _ = Describe("Cleanup", func() {
 
 		// Exported ServiceImport in one cluster
 
-		localServiceImport1 = &mcsv1a1.ServiceImport{
+		localServiceImport1 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s-%s", serviceName, serviceNamespace, clusterID1),
 				Labels: map[string]string{
-					mcsv1a1.LabelServiceName:       serviceName,
+					mcsv1b1.LabelServiceName:       serviceName,
 					constants.LabelSourceNamespace: serviceNamespace,
-					mcsv1a1.LabelSourceCluster:     clusterID1,
+					mcsv1b1.LabelSourceCluster:     clusterID1,
 				},
 			},
 		}
 
 		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport1)
 
-		localServiceImport1OnBroker = &mcsv1a1.ServiceImport{
+		localServiceImport1OnBroker = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:         "localServiceImport1OnBroker",
 				GenerateName: serviceName + "-",
@@ -88,11 +88,11 @@ var _ = Describe("Cleanup", func() {
 
 		test.CreateResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), localServiceImport1OnBroker)
 
-		localAggregatedServiceImport1 = &mcsv1a1.ServiceImport{
+		localAggregatedServiceImport1 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
-			Status: mcsv1a1.ServiceImportStatus{Clusters: []mcsv1a1.ClusterStatus{
+			Status: mcsv1b1.ServiceImportStatus{Clusters: []mcsv1b1.ClusterStatus{
 				{
 					Cluster: clusterID1,
 				},
@@ -101,11 +101,11 @@ var _ = Describe("Cleanup", func() {
 
 		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport1)
 
-		aggregatedServiceImportOnRemoteBroker1 = &mcsv1a1.ServiceImport{
+		aggregatedServiceImportOnRemoteBroker1 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace),
 				Annotations: map[string]string{
-					mcsv1a1.LabelServiceName:       serviceName,
+					mcsv1b1.LabelServiceName:       serviceName,
 					constants.LabelSourceNamespace: serviceNamespace,
 				},
 			},
@@ -118,24 +118,24 @@ var _ = Describe("Cleanup", func() {
 
 		serviceNamespace2 := "ns2"
 
-		localServiceImport2 = &mcsv1a1.ServiceImport{
+		localServiceImport2 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s-%s", serviceName, serviceNamespace2, clusterID1),
 				Labels: map[string]string{
-					mcsv1a1.LabelServiceName:       serviceName,
+					mcsv1b1.LabelServiceName:       serviceName,
 					constants.LabelSourceNamespace: serviceNamespace2,
-					mcsv1a1.LabelSourceCluster:     clusterID1,
+					mcsv1b1.LabelSourceCluster:     clusterID1,
 				},
 			},
 		}
 
 		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport2)
 
-		localAggregatedServiceImport2 = &mcsv1a1.ServiceImport{
+		localAggregatedServiceImport2 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
-			Status: mcsv1a1.ServiceImportStatus{Clusters: []mcsv1a1.ClusterStatus{
+			Status: mcsv1b1.ServiceImportStatus{Clusters: []mcsv1b1.ClusterStatus{
 				{
 					Cluster: clusterID1,
 				},
@@ -147,11 +147,11 @@ var _ = Describe("Cleanup", func() {
 
 		test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace2), localAggregatedServiceImport2)
 
-		aggregatedServiceImportOnRemoteBroker2 = &mcsv1a1.ServiceImport{
+		aggregatedServiceImportOnRemoteBroker2 = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace2),
 				Annotations: map[string]string{
-					mcsv1a1.LabelServiceName:       serviceName,
+					mcsv1b1.LabelServiceName:       serviceName,
 					constants.LabelSourceNamespace: serviceNamespace2,
 				},
 			},
@@ -165,13 +165,13 @@ var _ = Describe("Cleanup", func() {
 		serviceNamespace3 := "ns3"
 
 		localBrokerServiceImportClient = t.cluster1.localDynClient.Resource(*test.GetGroupVersionResourceFor(t.syncerConfig.RestMapper,
-			&mcsv1a1.ServiceImport{})).Namespace(test.RemoteNamespace)
+			&mcsv1b1.ServiceImport{})).Namespace(test.RemoteNamespace)
 
-		remoteAggregatedServiceImportOnLocalBroker = &mcsv1a1.ServiceImport{
+		remoteAggregatedServiceImportOnLocalBroker = &mcsv1b1.ServiceImport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%s", serviceName, serviceNamespace3),
 				Annotations: map[string]string{
-					mcsv1a1.LabelServiceName:       serviceName,
+					mcsv1b1.LabelServiceName:       serviceName,
 					constants.LabelSourceNamespace: serviceNamespace3,
 				},
 			},
@@ -185,7 +185,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-ns1" + clusterID1,
 				Labels: map[string]string{
-					mcsv1a1.LabelSourceCluster: clusterID1,
+					mcsv1b1.LabelSourceCluster: clusterID1,
 					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
@@ -203,7 +203,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx-ns3" + clusterID2,
 				Labels: map[string]string{
-					mcsv1a1.LabelSourceCluster: clusterID2,
+					mcsv1b1.LabelSourceCluster: clusterID2,
 					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
@@ -217,7 +217,7 @@ var _ = Describe("Cleanup", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "nginx2-" + clusterID2,
 				Labels: map[string]string{
-					mcsv1a1.LabelSourceCluster: clusterID2,
+					mcsv1b1.LabelSourceCluster: clusterID2,
 					discovery.LabelManagedBy:   constants.LabelValueManagedBy,
 				},
 			},
@@ -250,11 +250,11 @@ var _ = Describe("Cleanup", func() {
 		test.AwaitNoResource(ctx, t.cluster1.localServiceImportClient.Namespace(serviceNamespace), localAggregatedServiceImport2.Name)
 
 		si := ensureResource(ctx, t.brokerServiceImportClient.Namespace(test.RemoteNamespace), aggregatedServiceImportOnRemoteBroker2.Name,
-			&mcsv1a1.ServiceImport{}).(*mcsv1a1.ServiceImport)
+			&mcsv1b1.ServiceImport{}).(*mcsv1b1.ServiceImport)
 		Expect(si.Status.Clusters).To(HaveLen(1))
-		Expect(si.Status.Clusters).To(ContainElement(mcsv1a1.ClusterStatus{Cluster: clusterID2}))
+		Expect(si.Status.Clusters).To(ContainElement(mcsv1b1.ClusterStatus{Cluster: clusterID2}))
 
-		ensureResource(ctx, localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker.Name, &mcsv1a1.ServiceImport{})
+		ensureResource(ctx, localBrokerServiceImportClient, remoteAggregatedServiceImportOnLocalBroker.Name, &mcsv1b1.ServiceImport{})
 
 		test.AwaitNoResource(ctx, t.brokerEndpointSliceClient, localEndpointSlice.GetName())
 		test.AwaitNoResource(ctx, t.cluster1.localEndpointSliceClient, remoteEndpointSliceInLocalNS.Name)

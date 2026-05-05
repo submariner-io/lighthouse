@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	discovery "k8s.io/api/discovery/v1"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -40,13 +40,13 @@ func testIPFamilies() {
 
 	var (
 		t                 *handlerTestDriver
-		serviceImportType mcsv1a1.ServiceImportType
+		serviceImportType mcsv1b1.ServiceImportType
 	)
 
 	BeforeEach(func() {
 		t = newHandlerTestDriver()
 
-		serviceImportType = mcsv1a1.ClusterSetIP
+		serviceImportType = mcsv1b1.ClusterSetIP
 	})
 
 	JustBeforeEach(func() {
@@ -54,7 +54,7 @@ func testIPFamilies() {
 	})
 
 	newIPv6EndpointSlice := func() *discovery.EndpointSlice {
-		eps := newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port1},
+		eps := newEndpointSlice(namespace1, service1, clusterID, []mcsv1b1.ServicePort{port1},
 			newEndpoint(ipv6ServiceIP, "", true))
 		eps.AddressType = discovery.AddressTypeIPv6
 
@@ -72,7 +72,7 @@ func testIPFamilies() {
 		})
 	}
 
-	testIPV6Only := func(serviceType mcsv1a1.ServiceImportType) {
+	testIPV6Only := func(serviceType mcsv1b1.ServiceImportType) {
 		When("only IPv6 is supported locally", func() {
 			BeforeEach(func() {
 				serviceImportType = serviceType
@@ -97,7 +97,7 @@ func testIPFamilies() {
 
 			Context(fmt.Sprintf("for a dual-stack %s service", serviceType), func() {
 				JustBeforeEach(func(ctx context.Context) {
-					t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
+					t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1b1.ServicePort{port2},
 						newEndpoint(serviceIP, "", true)))
 				})
 
@@ -112,10 +112,10 @@ func testIPFamilies() {
 		})
 	}
 
-	testIPV6Only(mcsv1a1.ClusterSetIP)
-	testIPV6Only(mcsv1a1.Headless)
+	testIPV6Only(mcsv1b1.ClusterSetIP)
+	testIPV6Only(mcsv1b1.Headless)
 
-	testDualStack := func(serviceType mcsv1a1.ServiceImportType) {
+	testDualStack := func(serviceType mcsv1b1.ServiceImportType) {
 		When("dual-stack is supported locally", func() {
 			BeforeEach(func() {
 				serviceImportType = serviceType
@@ -127,7 +127,7 @@ func testIPFamilies() {
 				t.mockCs.ConnectClusterID(clusterID, k8snet.IPv4)
 
 				t.lh.Resolver.PutEndpointSlices(ctx, newIPv6EndpointSlice())
-				t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1a1.ServicePort{port2},
+				t.lh.Resolver.PutEndpointSlices(ctx, newEndpointSlice(namespace1, service1, clusterID, []mcsv1b1.ServicePort{port2},
 					newEndpoint(serviceIP, "", true)))
 			})
 
@@ -145,7 +145,7 @@ func testIPFamilies() {
 						test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s", qname, port2.Port, qname)),
 					}
 
-					if serviceType == mcsv1a1.Headless {
+					if serviceType == mcsv1b1.Headless {
 						answer = []dns.RR{
 							test.SRV(fmt.Sprintf("%s    5    IN    SRV 0 50 %d %s.%s.%s", qname, port2.Port,
 								strings.ReplaceAll(serviceIP, ".", "-"), clusterID, qname)),
@@ -165,6 +165,6 @@ func testIPFamilies() {
 		})
 	}
 
-	testDualStack(mcsv1a1.ClusterSetIP)
-	testDualStack(mcsv1a1.Headless)
+	testDualStack(mcsv1b1.ClusterSetIP)
+	testDualStack(mcsv1b1.Headless)
 }

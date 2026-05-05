@@ -44,7 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 type fakeHandler struct{}
@@ -86,7 +86,7 @@ var _ = Describe("Plugin setup", func() {
 			return k8sfake.NewClientset(), nil
 		}
 
-		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1a1.ServiceImport{})
+		restMapper = test.GetRESTMapperFor(&discovery.EndpointSlice{}, &mcsv1b1.ServiceImport{})
 	})
 
 	Context("Parsing correct configurations", testCorrectConfig)

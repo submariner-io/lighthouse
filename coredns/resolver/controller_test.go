@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Controller", func() {
@@ -39,7 +39,7 @@ var _ = Describe("Controller", func() {
 	When("a ClusterIP service EndpointSlice is created", func() {
 		expDNSRecord := resolver.DNSRecord{
 			IP:          serviceIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		}
 
@@ -123,7 +123,7 @@ var _ = Describe("Controller", func() {
 		JustBeforeEach(func(ctx context.Context) {
 			t.createServiceImport(ctx, newHeadlessAggregatedServiceImport(namespace1, service1))
 
-			eps := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+			eps := newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port1},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP1},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -136,7 +136,7 @@ var _ = Describe("Controller", func() {
 			epsName1 = eps.Name
 			t.createEndpointSlice(ctx, eps)
 
-			eps = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port2},
+			eps = newEndpointSlice(namespace1, service1, clusterID1, []mcsv1b1.ServicePort{port2},
 				discovery.Endpoint{
 					Addresses:  []string{endpointIP3},
 					Conditions: discovery.EndpointConditions{Ready: &ready},
@@ -158,25 +158,25 @@ var _ = Describe("Controller", func() {
 			t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
 				resolver.DNSRecord{
 					IP:          endpointIP1,
-					Ports:       []mcsv1a1.ServicePort{port1},
+					Ports:       []mcsv1b1.ServicePort{port1},
 					ClusterName: clusterID1,
 					HostName:    endpointHostname1,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP2,
-					Ports:       []mcsv1a1.ServicePort{port1},
+					Ports:       []mcsv1b1.ServicePort{port1},
 					ClusterName: clusterID1,
 					HostName:    endpointHostname2,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP3,
-					Ports:       []mcsv1a1.ServicePort{port2},
+					Ports:       []mcsv1b1.ServicePort{port2},
 					ClusterName: clusterID1,
 					HostName:    endpointHostname3,
 				},
 				resolver.DNSRecord{
 					IP:          endpointIP4,
-					Ports:       []mcsv1a1.ServicePort{port2},
+					Ports:       []mcsv1b1.ServicePort{port2},
 					ClusterName: clusterID1,
 					HostName:    endpointHostname4,
 				})
@@ -191,13 +191,13 @@ var _ = Describe("Controller", func() {
 				t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
 					resolver.DNSRecord{
 						IP:          endpointIP3,
-						Ports:       []mcsv1a1.ServicePort{port2},
+						Ports:       []mcsv1b1.ServicePort{port2},
 						ClusterName: clusterID1,
 						HostName:    endpointHostname3,
 					},
 					resolver.DNSRecord{
 						IP:          endpointIP4,
-						Ports:       []mcsv1a1.ServicePort{port2},
+						Ports:       []mcsv1b1.ServicePort{port2},
 						ClusterName: clusterID1,
 						HostName:    endpointHostname4,
 					})
@@ -224,8 +224,8 @@ var _ = Describe("Controller", func() {
 					Name:      "test",
 					Namespace: test.RemoteNamespace,
 					Labels: map[string]string{
-						mcsv1a1.LabelSourceCluster:     "test",
-						mcsv1a1.LabelServiceName:       "test",
+						mcsv1b1.LabelSourceCluster:     "test",
+						mcsv1b1.LabelServiceName:       "test",
 						constants.LabelSourceNamespace: namespace1,
 					},
 				},
