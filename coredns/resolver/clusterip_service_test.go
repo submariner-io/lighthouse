@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/resolver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("GetDNSRecords", func() {
@@ -46,7 +46,7 @@ func testClusterIPServiceInOneCluster() {
 
 	expDNSRecord := resolver.DNSRecord{
 		IP:          serviceIP1,
-		Ports:       []mcsv1a1.ServicePort{port1},
+		Ports:       []mcsv1b1.ServicePort{port1},
 		ClusterName: clusterID1,
 	}
 
@@ -113,7 +113,7 @@ func testClusterIPServiceInOneCluster() {
 		It("should return the correct DNS record information", func() {
 			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP2,
-				Ports:       []mcsv1a1.ServicePort{port2},
+				Ports:       []mcsv1b1.ServicePort{port2},
 				ClusterName: clusterID1,
 			})
 		})
@@ -157,7 +157,7 @@ func testClusterIPServiceInTwoClusters() {
 	Context("and one becomes disconnected", func() {
 		expDNSRecord := resolver.DNSRecord{
 			IP:          serviceIP2,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID2,
 		}
 
@@ -177,7 +177,7 @@ func testClusterIPServiceInTwoClusters() {
 			It("should still return its DNS record", func() {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 					IP:          serviceIP1,
-					Ports:       []mcsv1a1.ServicePort{port1},
+					Ports:       []mcsv1b1.ServicePort{port1},
 					ClusterName: clusterID1,
 				})
 			})
@@ -203,7 +203,7 @@ func testClusterIPServiceInTwoClusters() {
 	Context("and one becomes unhealthy", func() {
 		expDNSRecord := resolver.DNSRecord{
 			IP:          serviceIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		}
 
@@ -223,7 +223,7 @@ func testClusterIPServiceInTwoClusters() {
 			It("should still return its DNS record", func() {
 				t.assertDNSRecordsFound(namespace1, service1, clusterID2, "", k8snet.IPv4, false, resolver.DNSRecord{
 					IP:          serviceIP2,
-					Ports:       []mcsv1a1.ServicePort{port1},
+					Ports:       []mcsv1b1.ServicePort{port1},
 					ClusterName: clusterID2,
 				})
 			})
@@ -239,7 +239,7 @@ func testClusterIPServiceInTwoClusters() {
 	Context("and one is subsequently removed", func() {
 		expDNSRecord := resolver.DNSRecord{
 			IP:          serviceIP1,
-			Ports:       []mcsv1a1.ServicePort{port1},
+			Ports:       []mcsv1b1.ServicePort{port1},
 			ClusterName: clusterID1,
 		}
 
@@ -283,7 +283,7 @@ func testClusterIPServiceInThreeClusters() {
 
 		It("should consistently return the merged service ports", func() {
 			for range 10 {
-				Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").Ports).To(Equal([]mcsv1a1.ServicePort{port1}))
+				Expect(t.getNonHeadlessDNSRecord(namespace1, service1, "").Ports).To(Equal([]mcsv1b1.ServicePort{port1}))
 			}
 		})
 	})
@@ -291,7 +291,7 @@ func testClusterIPServiceInThreeClusters() {
 	Context("and a specific cluster is requested", func() {
 		expDNSRecord := resolver.DNSRecord{
 			IP:          serviceIP2,
-			Ports:       []mcsv1a1.ServicePort{port1, port2},
+			Ports:       []mcsv1b1.ServicePort{port1, port2},
 			ClusterName: clusterID2,
 		}
 
@@ -361,13 +361,13 @@ func testClusterIPServiceMisc() {
 		It("should return the correct DNS record for each namespace", func() {
 			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
-				Ports:       []mcsv1a1.ServicePort{},
+				Ports:       []mcsv1b1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 
 			t.assertDNSRecordsFound(namespace2, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP2,
-				Ports:       []mcsv1a1.ServicePort{},
+				Ports:       []mcsv1b1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 		})
@@ -385,7 +385,7 @@ func testClusterIPServiceMisc() {
 
 			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
-				Ports:       []mcsv1a1.ServicePort{},
+				Ports:       []mcsv1b1.ServicePort{},
 				ClusterName: clusterID1,
 			})
 		})
@@ -393,20 +393,20 @@ func testClusterIPServiceMisc() {
 
 	When("a local cluster ServiceImport is created", func() {
 		It("should ignore it", func(ctx context.Context) {
-			serviceImport := &mcsv1a1.ServiceImport{
+			serviceImport := &mcsv1b1.ServiceImport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      service1 + "-" + namespace1 + "-" + clusterID1,
 					Namespace: submarinerNamespace,
 					Labels: map[string]string{
-						mcsv1a1.LabelServiceName: service1,
+						mcsv1b1.LabelServiceName: service1,
 					},
 				},
-				Spec: mcsv1a1.ServiceImportSpec{
-					Type: mcsv1a1.ClusterSetIP,
+				Spec: mcsv1b1.ServiceImportSpec{
+					Type: mcsv1b1.ClusterSetIP,
 					IPs:  []string{serviceIP1},
 				},
-				Status: mcsv1a1.ServiceImportStatus{
-					Clusters: []mcsv1a1.ClusterStatus{
+				Status: mcsv1b1.ServiceImportStatus{
+					Clusters: []mcsv1b1.ClusterStatus{
 						{
 							Cluster: clusterID1,
 						},
@@ -424,16 +424,16 @@ func testClusterIPServiceMisc() {
 
 	When("an aggregated ServiceImport on the broker is created", func() {
 		It("should ignore it", func(ctx context.Context) {
-			serviceImport := &mcsv1a1.ServiceImport{
+			serviceImport := &mcsv1b1.ServiceImport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      service1 + "-" + namespace1,
 					Namespace: test.RemoteNamespace,
 					Annotations: map[string]string{
-						mcsv1a1.LabelServiceName: service1,
+						mcsv1b1.LabelServiceName: service1,
 					},
 				},
-				Spec: mcsv1a1.ServiceImportSpec{
-					Type: mcsv1a1.ClusterSetIP,
+				Spec: mcsv1b1.ServiceImportSpec{
+					Type: mcsv1b1.ClusterSetIP,
 				},
 			}
 
@@ -459,7 +459,7 @@ func testClusterSetIP() {
 
 		// We call PutServiceImport separately with the ports to ensure it updates the cache. This simulates the
 		// real behavior where the port information is added/updated in the ServiceImport some time after creation.
-		si.Spec.Ports = []mcsv1a1.ServicePort{port1, port2}
+		si.Spec.Ports = []mcsv1b1.ServicePort{port1, port2}
 		t.resolver.PutServiceImport(si)
 
 		t.putEndpointSlice(ctx, newClusterIPEndpointSlice(namespace1, service1, clusterID1, serviceIP1, true, port1))
@@ -470,7 +470,7 @@ func testClusterSetIP() {
 		It("should return the clusterset IP DNS record", func() {
 			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:    clusterSetIP,
-				Ports: []mcsv1a1.ServicePort{port1, port2},
+				Ports: []mcsv1b1.ServicePort{port1, port2},
 			})
 		})
 	})
@@ -479,7 +479,7 @@ func testClusterSetIP() {
 		It("should return its DNS record", func() {
 			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, resolver.DNSRecord{
 				IP:          serviceIP1,
-				Ports:       []mcsv1a1.ServicePort{port1},
+				Ports:       []mcsv1b1.ServicePort{port1},
 				ClusterName: clusterID1,
 			})
 		})

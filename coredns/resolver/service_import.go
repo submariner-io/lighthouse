@@ -21,10 +21,10 @@ package resolver
 import (
 	"github.com/submariner-io/lighthouse/coredns/loadbalancer"
 	discovery "k8s.io/api/discovery/v1"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
-func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
+func (i *Interface) PutServiceImport(serviceImport *mcsv1b1.ServiceImport) {
 	if ignoreServiceImport(serviceImport) {
 		return
 	}
@@ -59,7 +59,7 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 	svcInfo.isExported = true
 }
 
-func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
+func (i *Interface) RemoveServiceImport(serviceImport *mcsv1b1.ServiceImport) {
 	if ignoreServiceImport(serviceImport) {
 		return
 	}
@@ -81,9 +81,9 @@ func (i *Interface) RemoveServiceImport(serviceImport *mcsv1a1.ServiceImport) {
 	}
 }
 
-func ignoreServiceImport(serviceImport *mcsv1a1.ServiceImport) bool {
-	_, isLocal := serviceImport.Labels[mcsv1a1.LabelServiceName]
-	_, isOnBroker := serviceImport.Annotations[mcsv1a1.LabelServiceName]
+func ignoreServiceImport(serviceImport *mcsv1b1.ServiceImport) bool {
+	_, isLocal := serviceImport.Labels[mcsv1b1.LabelServiceName]
+	_, isOnBroker := serviceImport.Annotations[mcsv1b1.LabelServiceName]
 
 	return isLocal || isOnBroker
 }

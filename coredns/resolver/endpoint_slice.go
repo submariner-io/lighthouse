@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const maxRecordsToLog = 5
@@ -209,7 +209,7 @@ func (i *Interface) getLocalEndpointSlices(ctx context.Context, forEPS *discover
 	list, err := i.client.Resource(epsGVR).Namespace(forEPS.Labels[constants.LabelSourceNamespace]).List(ctx,
 		metav1.ListOptions{
 			LabelSelector: labels.Set(map[string]string{
-				discovery.LabelServiceName: forEPS.Labels[mcsv1a1.LabelServiceName],
+				discovery.LabelServiceName: forEPS.Labels[mcsv1b1.LabelServiceName],
 			}).String(),
 		})
 	if err != nil {
@@ -218,7 +218,7 @@ func (i *Interface) getLocalEndpointSlices(ctx context.Context, forEPS *discover
 
 	if len(list.Items) == 0 {
 		return nil, fmt.Errorf("local EndpointSlice not found for %s/%s", forEPS.Labels[constants.LabelSourceNamespace],
-			forEPS.Labels[mcsv1a1.LabelServiceName])
+			forEPS.Labels[mcsv1b1.LabelServiceName])
 	}
 
 	epSlices := make([]*discovery.EndpointSlice, len(list.Items))
@@ -265,9 +265,9 @@ func (i *Interface) RemoveEndpointSlice(endpointSlice *discovery.EndpointSlice) 
 }
 
 func getKeyInfoFrom(es *discovery.EndpointSlice) (string, string, bool) {
-	name, ok := es.Labels[mcsv1a1.LabelServiceName]
+	name, ok := es.Labels[mcsv1b1.LabelServiceName]
 	if !ok {
-		logger.Warningf("EndpointSlice missing label %q: %#v", mcsv1a1.LabelServiceName, es.ObjectMeta)
+		logger.Warningf("EndpointSlice missing label %q: %#v", mcsv1b1.LabelServiceName, es.ObjectMeta)
 		return "", "", false
 	}
 
@@ -277,19 +277,19 @@ func getKeyInfoFrom(es *discovery.EndpointSlice) (string, string, bool) {
 		return "", "", false
 	}
 
-	clusterID, ok := es.Labels[mcsv1a1.LabelSourceCluster]
+	clusterID, ok := es.Labels[mcsv1b1.LabelSourceCluster]
 	if !ok {
-		logger.Warningf("EndpointSlice missing label %q: %#v", mcsv1a1.LabelSourceCluster, es.ObjectMeta)
+		logger.Warningf("EndpointSlice missing label %q: %#v", mcsv1b1.LabelSourceCluster, es.ObjectMeta)
 		return "", "", false
 	}
 
 	return keyFunc(namespace, name), clusterID, true
 }
 
-func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1a1.ServicePort {
-	mcsPorts := make([]mcsv1a1.ServicePort, len(ports))
+func mcsServicePortsFrom(ports []discovery.EndpointPort) []mcsv1b1.ServicePort {
+	mcsPorts := make([]mcsv1b1.ServicePort, len(ports))
 	for i, port := range ports {
-		mcsPorts[i] = mcsv1a1.ServicePort{
+		mcsPorts[i] = mcsv1b1.ServicePort{
 			Name:        ptr.Deref(port.Name, ""),
 			Protocol:    ptr.Deref(port.Protocol, ""),
 			AppProtocol: port.AppProtocol,

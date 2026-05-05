@@ -20,7 +20,7 @@ package resolver
 
 import (
 	discovery "k8s.io/api/discovery/v1"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func (si *serviceInfo) getIPFamilyInfo(addrType discovery.AddressType) *IPFamilyInfo {
@@ -32,7 +32,7 @@ func (si *serviceInfo) getIPFamilyInfo(addrType discovery.AddressType) *IPFamily
 }
 
 func (si *serviceInfo) isHeadless() bool {
-	return si.spec.Type == mcsv1a1.Headless
+	return si.spec.Type == mcsv1b1.Headless
 }
 
 func (si *serviceInfo) canBeDeleted() bool {

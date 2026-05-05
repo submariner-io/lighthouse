@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Service export failures", func() {
@@ -54,8 +54,8 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func(ctx context.Context) {
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonValid))
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionReady)
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue, mcsv1b1.ServiceExportReasonValid))
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionReady)
 
 			t.cluster1.localServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
@@ -68,7 +68,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func(ctx context.Context) {
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnCreate(nil)
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
@@ -81,7 +81,7 @@ var _ = Describe("Service export failures", func() {
 		})
 
 		It("should eventually export the service", func(ctx context.Context) {
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportReasonFailed))
 
 			t.brokerServiceImportReactor.SetFailOnUpdate(nil)
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)

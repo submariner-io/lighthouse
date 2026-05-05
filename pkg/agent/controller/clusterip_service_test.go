@@ -38,7 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("ClusterIP Service export", func() {
@@ -72,9 +72,9 @@ func testClusterIPServiceInOneCluster() {
 				t.cluster1.createServiceExport(ctx)
 				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 				t.cluster1.awaitServiceExportCondition(ctx,
-					newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonPending),
-					newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1a1.ServiceExportReasonExported))
-				t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
+					newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportReasonPending),
+					newServiceExportReadyCondition(metav1.ConditionTrue, mcsv1b1.ServiceExportReasonExported))
+				t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
 
 				By(fmt.Sprintf("Ensure cluster %q does not try to update the status for a non-existent ServiceExport",
 					t.cluster2.clusterID))
@@ -135,7 +135,7 @@ func testClusterIPServiceInOneCluster() {
 			t.cluster1.updateService(ctx)
 
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse,
-				mcsv1a1.ServiceExportReasonInvalidServiceType))
+				mcsv1b1.ServiceExportReasonInvalidServiceType))
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse,
 				controller.ServiceExportReasonNoServiceImport))
 			t.awaitServiceUnexported(ctx, &t.cluster1)
@@ -154,14 +154,14 @@ func testClusterIPServiceInOneCluster() {
 
 		It("should update the ServiceExport status appropriately and not export the serviceImport", func(ctx context.Context) {
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse,
-				mcsv1a1.ServiceExportReasonInvalidServiceType))
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionReady)
+				mcsv1b1.ServiceExportReasonInvalidServiceType))
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionReady)
 		})
 
 		Context("and is subsequently updated to a supported type", func() {
 			It("should eventually export the service and update the ServiceExport status appropriately", func(ctx context.Context) {
 				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionFalse,
-					mcsv1a1.ServiceExportReasonInvalidServiceType))
+					mcsv1b1.ServiceExportReasonInvalidServiceType))
 
 				t.cluster1.service.Spec.Type = corev1.ServiceTypeClusterIP
 				t.cluster1.updateService(ctx)
@@ -335,7 +335,7 @@ func testClusterIPServiceInOneCluster() {
 
 				It("should eventually set the IP on the aggregated ServiceImport", func(ctx context.Context) {
 					t.cluster1.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse,
-						mcsv1a1.ServiceExportReasonFailed))
+						mcsv1b1.ServiceExportReasonFailed))
 
 					_ = t.ipPool.Release(ips...)
 
@@ -382,7 +382,7 @@ func testClusterIPServiceInOneCluster() {
 				},
 			}
 
-			serviceExport := &mcsv1a1.ServiceExport{
+			serviceExport := &mcsv1b1.ServiceExport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      service.Name,
 					Namespace: service.Namespace,
@@ -397,17 +397,17 @@ func testClusterIPServiceInOneCluster() {
 				AddressType: discovery.AddressTypeIPv4,
 			}
 
-			expServiceImport := &mcsv1a1.ServiceImport{
+			expServiceImport := &mcsv1b1.ServiceImport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      service.Name,
 					Namespace: service.Namespace,
 				},
-				Spec: mcsv1a1.ServiceImportSpec{
-					Type:  mcsv1a1.ClusterSetIP,
-					Ports: []mcsv1a1.ServicePort{},
+				Spec: mcsv1b1.ServiceImportSpec{
+					Type:  mcsv1b1.ClusterSetIP,
+					Ports: []mcsv1b1.ServicePort{},
 				},
-				Status: mcsv1a1.ServiceImportStatus{
-					Clusters: []mcsv1a1.ClusterStatus{
+				Status: mcsv1b1.ServiceImportStatus{
+					Clusters: []mcsv1b1.ClusterStatus{
 						{
 							Cluster: t.cluster1.clusterID,
 						},
@@ -421,8 +421,8 @@ func testClusterIPServiceInOneCluster() {
 					Namespace: service.Namespace,
 					Labels: map[string]string{
 						discovery.LabelManagedBy:       constants.LabelValueManagedBy,
-						mcsv1a1.LabelSourceCluster:     t.cluster1.clusterID,
-						mcsv1a1.LabelServiceName:       service.Name,
+						mcsv1b1.LabelSourceCluster:     t.cluster1.clusterID,
+						mcsv1b1.LabelServiceName:       service.Name,
 						constants.LabelSourceNamespace: service.Namespace,
 						constants.LabelIsHeadless:      strconv.FormatBool(false),
 					},
@@ -444,10 +444,10 @@ func testClusterIPServiceInOneCluster() {
 			awaitEndpointSlice(ctx, endpointSliceClientFor(t.cluster2.localDynClient, service.Namespace), service.Name, expEndpointSlice)
 
 			// Ensure the resources for the first Service weren't overwritten
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster1)
 
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict, serviceExport)
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict, serviceExport)
 		})
 	})
 
@@ -472,7 +472,7 @@ func testClusterIPServiceInOneCluster() {
 		}
 
 		BeforeEach(func(ctx context.Context) {
-			fake.AddVerifyNamespaceReactor(t.cluster2.localDynClientFake, mcsv1a1.ServiceImportPluralName, "endpointslices")
+			fake.AddVerifyNamespaceReactor(t.cluster2.localDynClientFake, mcsv1b1.ServiceImportPluralName, "endpointslices")
 
 			createNamespace(ctx, t.cluster2.localDynClient, test.LocalNamespace)
 		})
@@ -483,19 +483,19 @@ func testClusterIPServiceInOneCluster() {
 		})
 
 		It("should eventually import the service when the namespace is created", func(ctx context.Context) {
-			expServiceImport := &mcsv1a1.ServiceImport{
+			expServiceImport := &mcsv1b1.ServiceImport{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      t.cluster1.service.Name,
 					Namespace: t.cluster1.service.Namespace,
 				},
-				Spec: mcsv1a1.ServiceImportSpec{
-					Type:            mcsv1a1.ClusterSetIP,
+				Spec: mcsv1b1.ServiceImportSpec{
+					Type:            mcsv1b1.ClusterSetIP,
 					Ports:           t.aggregatedServicePorts,
 					IPFamilies:      t.aggregatedIPFamilies,
 					SessionAffinity: corev1.ServiceAffinityNone,
 				},
-				Status: mcsv1a1.ServiceImportStatus{
-					Clusters: []mcsv1a1.ClusterStatus{{Cluster: t.cluster1.clusterID}},
+				Status: mcsv1b1.ServiceImportStatus{
+					Clusters: []mcsv1b1.ClusterStatus{{Cluster: t.cluster1.clusterID}},
 				},
 			}
 
@@ -516,8 +516,8 @@ func testClusterIPServiceInOneCluster() {
 
 //nolint:maintidx // This function composes test cases so ignore low maintainability index.
 func testClusterIPServiceInTwoClusters() {
-	noConflictCondition := mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionConflict, metav1.ConditionFalse,
-		mcsv1a1.ServiceExportReasonNoConflicts, "")
+	noConflictCondition := mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionConflict, metav1.ConditionFalse,
+		mcsv1b1.ServiceExportReasonNoConflicts, "")
 
 	var t *testDriver
 
@@ -564,11 +564,11 @@ func testClusterIPServiceInTwoClusters() {
 		It("should export the service in both clusters", func(ctx context.Context) {
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 			t.cluster1.ensureLastServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionTrue,
-				mcsv1a1.ServiceExportReasonExported))
+				mcsv1b1.ServiceExportReasonExported))
 			t.cluster1.ensureLastServiceExportCondition(ctx, newServiceExportValidCondition(metav1.ConditionTrue,
-				mcsv1a1.ServiceExportReasonValid))
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
-			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
+				mcsv1b1.ServiceExportReasonValid))
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
+			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
 
 			By("Ensure conflict checking does not try to unnecessarily update the ServiceExport status")
 
@@ -579,14 +579,14 @@ func testClusterIPServiceInTwoClusters() {
 	Context("with differing ports", func() {
 		BeforeEach(func() {
 			t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port3)}
-			t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
+			t.aggregatedServicePorts = []mcsv1b1.ServicePort{port1, port2, port3}
 		})
 
 		It("should correctly set the ports in the aggregated ServiceImport and "+
 			"set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 
-			condition := newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonPortConflict)
+			condition := newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonPortConflict)
 			t.cluster1.awaitServiceExportCondition(ctx, condition)
 			t.cluster2.awaitServiceExportCondition(ctx, condition)
 		})
@@ -596,11 +596,11 @@ func testClusterIPServiceInTwoClusters() {
 				func(ctx context.Context) {
 					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 
-					t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port3}
+					t.aggregatedServicePorts = []mcsv1b1.ServicePort{port1, port3}
 					t.cluster1.deleteServiceExport(ctx)
 
 					t.awaitNoEndpointSlice(ctx, &t.cluster1)
-					t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster2.service.Name, t.cluster2.service.Namespace,
+					t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster2.service.Name, t.cluster2.service.Namespace,
 						&t.cluster2)
 					t.cluster2.awaitServiceExportCondition(ctx, noConflictCondition)
 				})
@@ -610,9 +610,9 @@ func testClusterIPServiceInTwoClusters() {
 			It("should correctly update the ports in the aggregated ServiceImport and clear the Conflict status condition",
 				func(ctx context.Context) {
 					t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
-					t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonPortConflict))
+					t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonPortConflict))
 
-					t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2}
+					t.aggregatedServicePorts = []mcsv1b1.ServicePort{port1, port2}
 					t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port2)}
 					t.cluster2.updateService(ctx)
 
@@ -627,14 +627,14 @@ func testClusterIPServiceInTwoClusters() {
 		BeforeEach(func() {
 			t.cluster2.service.Spec.Ports = []corev1.ServicePort{t.cluster1.service.Spec.Ports[0], toServicePort(port3)}
 			t.cluster2.service.Spec.Ports[0].Port++
-			t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
+			t.aggregatedServicePorts = []mcsv1b1.ServicePort{port1, port2, port3}
 		})
 
 		It("should correctly set the ports in the aggregated ServiceImport and "+
 			"set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 
-			condition := newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonPortConflict)
+			condition := newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonPortConflict)
 			t.cluster1.awaitServiceExportCondition(ctx, condition)
 			t.cluster2.awaitServiceExportCondition(ctx, condition)
 		})
@@ -650,14 +650,14 @@ func testClusterIPServiceInTwoClusters() {
 			t.cluster2.ensureNoEndpointSlice(ctx)
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 
-			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonTypeConflict))
-			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportReasonFailed))
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonTypeConflict))
+			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonTypeConflict))
+			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportReadyCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportReasonFailed))
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonTypeConflict))
 		})
 
 		Context("initially and after updating the service types to match", func() {
 			It("should export the service in both clusters", func(ctx context.Context) {
-				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonTypeConflict))
+				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonTypeConflict))
 
 				t.cluster2.service.Spec.ClusterIP = t.cluster2.expectedClusterIPEndpoints[0].Addresses[0]
 				t.cluster2.updateService(ctx)
@@ -675,16 +675,16 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict))
-			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict))
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonSessionAffinityConflict))
+			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonSessionAffinityConflict))
 		})
 
 		Context("initially and after updating the SessionAffinity on the conflicting cluster to match", func() {
 			It("should clear the Conflict status condition", func(ctx context.Context) {
-				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict))
+				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonSessionAffinityConflict))
 
 				By("Updating the SessionAffinity on the service")
 
@@ -699,7 +699,7 @@ func testClusterIPServiceInTwoClusters() {
 		Context("initially and after updating the SessionAffinity on the oldest exporting cluster to match", func() {
 			It("should clear the Conflict status condition", func(ctx context.Context) {
 				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-					mcsv1a1.ServiceExportReasonSessionAffinityConflict))
+					mcsv1b1.ServiceExportReasonSessionAffinityConflict))
 
 				By("Updating the SessionAffinity on the service")
 
@@ -707,7 +707,7 @@ func testClusterIPServiceInTwoClusters() {
 				t.cluster1.updateService(ctx)
 
 				t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
-				t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 					&t.cluster1, &t.cluster2)
 
 				t.cluster1.awaitServiceExportCondition(ctx, noConflictCondition)
@@ -719,7 +719,7 @@ func testClusterIPServiceInTwoClusters() {
 			It("should update the SessionAffinity on the aggregated ServiceImport and clear the Conflict status condition",
 				func(ctx context.Context) {
 					t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-						mcsv1a1.ServiceExportReasonSessionAffinityConflict))
+						mcsv1b1.ServiceExportReasonSessionAffinityConflict))
 
 					By("Unexporting the service")
 
@@ -727,7 +727,7 @@ func testClusterIPServiceInTwoClusters() {
 
 					t.cluster2.awaitServiceExportCondition(ctx, noConflictCondition)
 					t.aggregatedSessionAffinity = t.cluster2.service.Spec.SessionAffinity
-					t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+					t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 						&t.cluster2)
 				})
 		})
@@ -746,19 +746,19 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+				mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+				mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 		})
 
 		Context("initially and after updating the SessionAffinityConfig on the conflicting cluster to match", func() {
 			It("should clear the Conflict status condition", func(ctx context.Context) {
 				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-					mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+					mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 
 				By("Updating the SessionAffinityConfig on the service")
 
@@ -773,7 +773,7 @@ func testClusterIPServiceInTwoClusters() {
 		Context("initially and after updating the SessionAffinityConfig on the oldest exporting cluster to match", func() {
 			It("should clear the Conflict status condition", func(ctx context.Context) {
 				t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-					mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+					mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 
 				By("Updating the SessionAffinityConfig on the service")
 
@@ -781,7 +781,7 @@ func testClusterIPServiceInTwoClusters() {
 				t.cluster1.updateService(ctx)
 
 				t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
-				t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+				t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 					&t.cluster1, &t.cluster2)
 
 				t.cluster1.awaitServiceExportCondition(ctx, noConflictCondition)
@@ -799,7 +799,7 @@ func testClusterIPServiceInTwoClusters() {
 			It("should update the SessionAffinity on the aggregated ServiceImport and clear the Conflict status condition",
 				func(ctx context.Context) {
 					t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-						mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+						mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 
 					By("Unexporting the service")
 
@@ -807,7 +807,7 @@ func testClusterIPServiceInTwoClusters() {
 
 					t.cluster2.awaitServiceExportCondition(ctx, noConflictCondition)
 					t.aggregatedSessionAffinityConfig = t.cluster2.service.Spec.SessionAffinityConfig
-					t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+					t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 						&t.cluster2)
 				})
 		})
@@ -825,13 +825,13 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflicts and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
-			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict,
-				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
-			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonSessionAffinityConflict,
-				mcsv1a1.ServiceExportReasonSessionAffinityConfigConflict))
+			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonSessionAffinityConflict,
+				mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
+			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonSessionAffinityConflict,
+				mcsv1b1.ServiceExportReasonSessionAffinityConfigConflict))
 		})
 	})
 
@@ -842,13 +842,13 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonInternalTrafficPolicyConflict))
+				mcsv1b1.ServiceExportReasonInternalTrafficPolicyConflict))
 			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonInternalTrafficPolicyConflict))
+				mcsv1b1.ServiceExportReasonInternalTrafficPolicyConflict))
 		})
 	})
 
@@ -859,13 +859,13 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
+				mcsv1b1.ServiceExportReasonTrafficDistributionConflict))
 			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonTrafficDistributionConflict))
+				mcsv1b1.ServiceExportReasonTrafficDistributionConflict))
 		})
 	})
 
@@ -877,13 +877,13 @@ func testClusterIPServiceInTwoClusters() {
 		})
 
 		It("should resolve the conflict and set the Conflict status condition on all exporting clusters", func(ctx context.Context) {
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace,
 				&t.cluster1, &t.cluster2)
 
 			t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonIPFamilyConflict))
+				mcsv1b1.ServiceExportReasonIPFamilyConflict))
 			t.cluster2.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(
-				mcsv1a1.ServiceExportReasonIPFamilyConflict))
+				mcsv1b1.ServiceExportReasonIPFamilyConflict))
 		})
 	})
 
@@ -923,7 +923,7 @@ func testClusterIPServiceInTwoClusters() {
 			t.cluster1.deleteServiceExport(ctx)
 
 			t.awaitNoEndpointSlice(ctx, &t.cluster1)
-			t.awaitAggregatedServiceImport(ctx, mcsv1a1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster2)
+			t.awaitAggregatedServiceImport(ctx, mcsv1b1.ClusterSetIP, t.cluster1.service.Name, t.cluster1.service.Namespace, &t.cluster2)
 
 			Consistently(func() error {
 				return t.ipPool.Reserve(localSI.Spec.IPs...)
@@ -968,22 +968,22 @@ func testClusterIPServiceInTwoClusters() {
 			localSI := getServiceImport(ctx, t.cluster1.localServiceImportClient, t.cluster1.service.Namespace, t.cluster1.service.Name)
 			Expect(localSI.Annotations).To(HaveKeyWithValue(constants.ClustersetIPAllocatedBy, t.cluster1.clusterID))
 
-			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
-			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1a1.ServiceExportConditionConflict)
+			t.cluster1.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
+			t.cluster2.ensureNoServiceExportCondition(ctx, mcsv1b1.ServiceExportConditionConflict)
 		})
 
 		Context("with differing ports", func() {
 			BeforeEach(func() {
 				t.cluster2.service.Spec.Ports = []corev1.ServicePort{toServicePort(port1), toServicePort(port3)}
-				t.aggregatedServicePorts = []mcsv1a1.ServicePort{port1, port2, port3}
+				t.aggregatedServicePorts = []mcsv1b1.ServicePort{port1, port2, port3}
 			})
 
 			It("should correctly set the Conflict status condition", func(ctx context.Context) {
 				t.awaitNonHeadlessServiceExported(ctx, &t.cluster1, &t.cluster2)
 
-				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1a1.ServiceExportReasonPortConflict))
+				t.cluster1.awaitServiceExportCondition(ctx, newServiceExportConflictCondition(mcsv1b1.ServiceExportReasonPortConflict))
 
-				Expect(t.cluster1.retrieveServiceExportCondition(ctx, t.cluster1.serviceExport, mcsv1a1.ServiceExportConditionConflict).
+				Expect(t.cluster1.retrieveServiceExportCondition(ctx, t.cluster1.serviceExport, mcsv1b1.ServiceExportConditionConflict).
 					Message).To(ContainSubstring("expose the union"))
 			})
 		})

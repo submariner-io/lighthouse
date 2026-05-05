@@ -25,7 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/client-go/dynamic"
 	k8snet "k8s.io/utils/net"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 type Interface struct {
@@ -42,7 +42,7 @@ type ClusterStatus interface {
 
 type DNSRecord struct {
 	IP          string
-	Ports       []mcsv1a1.ServicePort
+	Ports       []mcsv1b1.ServicePort
 	HostName    string
 	ClusterName string
 }
@@ -58,12 +58,12 @@ type IPFamilyInfo struct {
 	addrType discovery.AddressType
 	clusters map[string]*clusterInfo
 	balancer loadbalancer.Interface[string]
-	ports    []mcsv1a1.ServicePort
+	ports    []mcsv1b1.ServicePort
 }
 
 type serviceInfo struct {
 	ipv4Info   IPFamilyInfo
 	ipv6Info   IPFamilyInfo
 	isExported bool
-	spec       mcsv1a1.ServiceImportSpec
+	spec       mcsv1b1.ServiceImportSpec
 }

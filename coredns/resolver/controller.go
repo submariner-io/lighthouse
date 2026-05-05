@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Resolver")}
@@ -65,7 +65,7 @@ func (c *controller) Start(config *watcher.Config) error {
 		},
 		{
 			Name:            "ServiceImport watcher",
-			ResourceType:    &mcsv1a1.ServiceImport{},
+			ResourceType:    &mcsv1b1.ServiceImport{},
 			SourceNamespace: metav1.NamespaceAll,
 			Handler: watcher.EventHandlerFuncs{
 				OnCreateFunc: c.onServiceImportCreateOrUpdate,
@@ -114,8 +114,8 @@ func (c *controller) onEndpointSliceCreateOrUpdate(obj runtime.Object, _ int) bo
 func (c *controller) getAllEndpointSlices(forEPS *discovery.EndpointSlice) []*discovery.EndpointSlice {
 	list := c.resourceWatcher.ListResources(&discovery.EndpointSlice{}, labels.SelectorFromSet(map[string]string{
 		constants.LabelSourceNamespace: forEPS.Labels[constants.LabelSourceNamespace],
-		mcsv1a1.LabelServiceName:       forEPS.Labels[mcsv1a1.LabelServiceName],
-		mcsv1a1.LabelSourceCluster:     forEPS.Labels[mcsv1a1.LabelSourceCluster],
+		mcsv1b1.LabelServiceName:       forEPS.Labels[mcsv1b1.LabelServiceName],
+		mcsv1b1.LabelSourceCluster:     forEPS.Labels[mcsv1b1.LabelSourceCluster],
 	}))
 
 	var epSlices []*discovery.EndpointSlice
@@ -149,12 +149,12 @@ func (c *controller) onEndpointSliceDelete(obj runtime.Object, _ int) bool {
 }
 
 func (c *controller) onServiceImportCreateOrUpdate(obj runtime.Object, _ int) bool {
-	c.resolver.PutServiceImport(obj.(*mcsv1a1.ServiceImport))
+	c.resolver.PutServiceImport(obj.(*mcsv1b1.ServiceImport))
 	return false
 }
 
 func (c *controller) onServiceImportDelete(obj runtime.Object, _ int) bool {
-	c.resolver.RemoveServiceImport(obj.(*mcsv1a1.ServiceImport))
+	c.resolver.RemoveServiceImport(obj.(*mcsv1b1.ServiceImport))
 	return false
 }
 

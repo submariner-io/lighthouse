@@ -34,20 +34,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
-	ServiceExportReasonNoServiceImport                mcsv1a1.ServiceExportConditionReason = "NoServiceImport"
-	ServiceExportReasonRetrievalFailed                mcsv1a1.ServiceExportConditionReason = "ServiceRetrievalFailed"
-	ServiceExportReasonClusterSetIPEnablementConflict mcsv1a1.ServiceExportConditionReason = "ClusterSetIPEnablementConflict"
-	ServiceExportReasonUnsupportedIPFamily            mcsv1a1.ServiceExportConditionReason = "UnsupportedIPFamily"
-	ServiceExportReasonGlobalIPUnavailable            mcsv1a1.ServiceExportConditionReason = "ServiceGlobalIPUnavailable"
+	ServiceExportReasonNoServiceImport                mcsv1b1.ServiceExportConditionReason = "NoServiceImport"
+	ServiceExportReasonRetrievalFailed                mcsv1b1.ServiceExportConditionReason = "ServiceRetrievalFailed"
+	ServiceExportReasonClusterSetIPEnablementConflict mcsv1b1.ServiceExportConditionReason = "ClusterSetIPEnablementConflict"
+	ServiceExportReasonUnsupportedIPFamily            mcsv1b1.ServiceExportConditionReason = "UnsupportedIPFamily"
+	ServiceExportReasonGlobalIPUnavailable            mcsv1b1.ServiceExportConditionReason = "ServiceGlobalIPUnavailable"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
 
-type AggregatedServiceImportGetterFn func(serviceName string, serviceNamespace string) *mcsv1a1.ServiceImport
+type AggregatedServiceImportGetterFn func(serviceName string, serviceNamespace string) *mcsv1b1.ServiceImport
 
 type converter struct {
 	scheme *runtime.Scheme
@@ -105,7 +105,7 @@ type ServiceEndpointSliceController struct {
 	clusterID                string
 	serviceName              string
 	serviceNamespace         string
-	serviceImportSpec        *mcsv1a1.ServiceImportSpec
+	serviceImportSpec        *mcsv1b1.ServiceImportSpec
 	publishNotReadyAddresses string
 	stopCh                   chan struct{}
 	stopOnce                 sync.Once

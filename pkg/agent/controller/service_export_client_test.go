@@ -30,18 +30,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("ServiceExportClient", func() {
 	var (
 		serviceExportClient  *controller.ServiceExportClient
 		dynClient            *dynamicfake.FakeDynamicClient
-		initialServiceExport *mcsv1a1.ServiceExport
+		initialServiceExport *mcsv1b1.ServiceExport
 	)
 
 	BeforeEach(func() {
-		initialServiceExport = &mcsv1a1.ServiceExport{
+		initialServiceExport = &mcsv1b1.ServiceExport{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: serviceNamespace,
@@ -54,7 +54,7 @@ var _ = Describe("ServiceExportClient", func() {
 		serviceExportClient = controller.NewServiceExportClient(dynClient, scheme.Scheme)
 	})
 
-	getServiceExport := func(ctx context.Context) *mcsv1a1.ServiceExport {
+	getServiceExport := func(ctx context.Context) *mcsv1b1.ServiceExport {
 		obj, err := serviceExportClientFor(dynClient, serviceNamespace).Get(ctx, serviceName, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
@@ -64,14 +64,14 @@ var _ = Describe("ServiceExportClient", func() {
 	Context("UpdateStatusConditions", func() {
 		It("should correctly add/update conditions", func(ctx context.Context) {
 			cond1 := metav1.Condition{
-				Type:    string(mcsv1a1.ServiceExportConditionReady),
+				Type:    string(mcsv1b1.ServiceExportConditionReady),
 				Status:  metav1.ConditionFalse,
 				Reason:  "Failed",
 				Message: "A failure occurred",
 			}
 
 			cond2 := metav1.Condition{
-				Type:    string(mcsv1a1.ServiceExportConditionValid),
+				Type:    string(mcsv1b1.ServiceExportConditionValid),
 				Status:  metav1.ConditionFalse,
 				Reason:  "NotValid",
 				Message: "Not valid",
@@ -94,7 +94,7 @@ var _ = Describe("ServiceExportClient", func() {
 			dynClient.ClearActions()
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, cond1)
 
-			test.EnsureNoActionsForResource(&dynClient.Fake, mcsv1a1.ServiceExportPluralName, "update")
+			test.EnsureNoActionsForResource(&dynClient.Fake, mcsv1b1.ServiceExportPluralName, "update")
 		})
 	})
 
@@ -102,20 +102,20 @@ var _ = Describe("ServiceExportClient", func() {
 		It("should aggregate the different reasons and messages", func(ctx context.Context) {
 			// The condition shouldn't be added with Status False.
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, metav1.Condition{
-				Type:   string(mcsv1a1.ServiceExportConditionConflict),
+				Type:   string(mcsv1b1.ServiceExportConditionConflict),
 				Status: metav1.ConditionFalse,
 			})
 
 			Expect(meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions,
-				string(mcsv1a1.ServiceExportConditionConflict))).To(BeNil())
+				string(mcsv1b1.ServiceExportConditionConflict))).To(BeNil())
 
 			portConflictMsg := "The service ports conflict"
 			typeConflictMsg := "The service types conflict"
 
 			cond := metav1.Condition{
-				Type:    string(mcsv1a1.ServiceExportConditionConflict),
+				Type:    string(mcsv1b1.ServiceExportConditionConflict),
 				Status:  metav1.ConditionTrue,
-				Reason:  string(mcsv1a1.ServiceExportReasonPortConflict),
+				Reason:  string(mcsv1b1.ServiceExportReasonPortConflict),
 				Message: portConflictMsg,
 			}
 
@@ -127,14 +127,14 @@ var _ = Describe("ServiceExportClient", func() {
 
 			// Add second condition reason
 
-			cond.Reason = string(mcsv1a1.ServiceExportReasonTypeConflict)
+			cond.Reason = string(mcsv1b1.ServiceExportReasonTypeConflict)
 			cond.Message = typeConflictMsg
 
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, cond)
 
 			actual := meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions, cond.Type)
-			Expect(strings.Split(actual.Reason, ",")).To(HaveExactElements(string(mcsv1a1.ServiceExportReasonPortConflict),
-				string(mcsv1a1.ServiceExportReasonTypeConflict)))
+			Expect(strings.Split(actual.Reason, ",")).To(HaveExactElements(string(mcsv1b1.ServiceExportReasonPortConflict),
+				string(mcsv1b1.ServiceExportReasonTypeConflict)))
 			Expect(strings.Split(actual.Message, "\n")).To(HaveExactElements(portConflictMsg, typeConflictMsg))
 			Expect(actual.Status).To(Equal(metav1.ConditionTrue))
 
@@ -146,51 +146,51 @@ var _ = Describe("ServiceExportClient", func() {
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, cond)
 
 			actual = meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions, cond.Type)
-			Expect(strings.Split(actual.Reason, ",")).To(HaveExactElements(string(mcsv1a1.ServiceExportReasonPortConflict),
-				string(mcsv1a1.ServiceExportReasonTypeConflict)))
+			Expect(strings.Split(actual.Reason, ",")).To(HaveExactElements(string(mcsv1b1.ServiceExportReasonPortConflict),
+				string(mcsv1b1.ServiceExportReasonTypeConflict)))
 			Expect(strings.Split(actual.Message, "\n")).To(HaveExactElements(portConflictMsg, typeConflictMsg))
 			Expect(actual.Status).To(Equal(metav1.ConditionTrue))
 
 			// Resolve first condition
 
-			cond.Reason = string(mcsv1a1.ServiceExportReasonPortConflict)
+			cond.Reason = string(mcsv1b1.ServiceExportReasonPortConflict)
 			cond.Message = ""
 			cond.Status = metav1.ConditionFalse
 
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, cond)
 
 			actual = meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions, cond.Type)
-			Expect(actual.Reason).To(Equal(string(mcsv1a1.ServiceExportReasonTypeConflict)))
+			Expect(actual.Reason).To(Equal(string(mcsv1b1.ServiceExportReasonTypeConflict)))
 			Expect(actual.Message).To(Equal(typeConflictMsg))
 			Expect(actual.Status).To(Equal(metav1.ConditionTrue))
 
 			// Resolve second condition
 
-			cond.Reason = string(mcsv1a1.ServiceExportReasonTypeConflict)
+			cond.Reason = string(mcsv1b1.ServiceExportReasonTypeConflict)
 
 			for i := 1; i <= 2; i++ {
 				serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, cond)
 
 				actual = meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions, cond.Type)
 				Expect(actual.Status).To(Equal(metav1.ConditionFalse))
-				Expect(actual.Reason).To(Equal(string(mcsv1a1.ServiceExportReasonNoConflicts)))
+				Expect(actual.Reason).To(Equal(string(mcsv1b1.ServiceExportReasonNoConflicts)))
 				Expect(actual.Message).To(BeEmpty())
 			}
 
 			// Add the first condition back
 
 			serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace, metav1.Condition{
-				Type:   string(mcsv1a1.ServiceExportConditionConflict),
+				Type:   string(mcsv1b1.ServiceExportConditionConflict),
 				Status: metav1.ConditionTrue,
-				Reason: string(mcsv1a1.ServiceExportReasonPortConflict),
+				Reason: string(mcsv1b1.ServiceExportReasonPortConflict),
 			}, metav1.Condition{
-				Type:   string(mcsv1a1.ServiceExportConditionConflict),
+				Type:   string(mcsv1b1.ServiceExportConditionConflict),
 				Status: metav1.ConditionFalse,
-				Reason: string(mcsv1a1.ServiceExportReasonTypeConflict),
+				Reason: string(mcsv1b1.ServiceExportReasonTypeConflict),
 			})
 
 			actual = meta.FindStatusCondition(getServiceExport(ctx).Status.Conditions, cond.Type)
-			Expect(actual.Reason).To(Equal(string(mcsv1a1.ServiceExportReasonPortConflict)))
+			Expect(actual.Reason).To(Equal(string(mcsv1b1.ServiceExportReasonPortConflict)))
 			Expect(actual.Status).To(Equal(metav1.ConditionTrue))
 		})
 	})

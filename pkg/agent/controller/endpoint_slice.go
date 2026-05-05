@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
@@ -103,7 +103,7 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 		return nil, false
 	}
 
-	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
+	serviceName := endpointSlice.Labels[mcsv1b1.LabelServiceName]
 
 	logger.Infof("Local EndpointSlice \"%s/%s\" for service %q %sd",
 		endpointSlice.Namespace, endpointSlice.Name, serviceName, op)
@@ -134,7 +134,7 @@ func (c *EndpointSliceController) onLocalEndpointSlice(obj runtime.Object, _ int
 
 func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	// Any EndpointSlice's name prior to 0.16 was suffixed with the cluster ID.
-	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[mcsv1a1.LabelSourceCluster])
+	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[mcsv1b1.LabelSourceCluster])
 }
 
 func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
@@ -148,7 +148,7 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	ctx := context.TODO()
 
-	serviceName := endpointSlice.Labels[mcsv1a1.LabelServiceName]
+	serviceName := endpointSlice.Labels[mcsv1b1.LabelServiceName]
 	serviceNamespace := endpointSlice.Labels[constants.LabelSourceNamespace]
 
 	logger.Infof("Local EndpointSlice \"%s/%s\" for service %q %sd on broker",
@@ -163,8 +163,8 @@ func (c *EndpointSliceController) onLocalEndpointSliceSynced(obj runtime.Object,
 
 	if op != syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceNamespace,
-			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady, metav1.ConditionTrue,
-				mcsv1a1.ServiceExportReasonExported, "Service was successfully exported to the broker"))
+			mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionReady, metav1.ConditionTrue,
+				mcsv1b1.ServiceExportReasonExported, "Service was successfully exported to the broker"))
 	}
 
 	return false

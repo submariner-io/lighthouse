@@ -32,7 +32,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Test Service Discovery Across Clusters", Label(labels.ClusterSetIP), func() {
@@ -56,7 +56,7 @@ func RunClusterSetIPTest(ctx context.Context, f *lhframework.Framework) {
 
 	nginxServiceClusterB := f.NewNginxService(ctx, framework.ClusterB)
 
-	f.CreateServiceExport(ctx, framework.ClusterB, &mcsv1a1.ServiceExport{
+	f.CreateServiceExport(ctx, framework.ClusterB, &mcsv1b1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nginxServiceClusterB.Name,
 			Namespace:   nginxServiceClusterB.Namespace,

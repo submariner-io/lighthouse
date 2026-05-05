@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
@@ -70,9 +70,9 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		RestMapper:      syncerConfig.RestMapper,
 		TargetNamespace: brokerNamespace,
 		IdentifyingLabels: []string{
-			mcsv1a1.LabelServiceName,
+			mcsv1b1.LabelServiceName,
 			constants.LabelSourceNamespace,
-			mcsv1a1.LabelSourceCluster,
+			mcsv1b1.LabelSourceCluster,
 		},
 	})
 	localToBrokerFederator.LogEvents("local -> broker")
@@ -91,7 +91,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		Direction:       syncer.LocalToRemote,
 		RestMapper:      syncerConfig.RestMapper,
 		Federator:       controller.localFederator,
-		ResourceType:    &mcsv1a1.ServiceImport{},
+		ResourceType:    &mcsv1b1.ServiceImport{},
 		Transform:       controller.onLocalServiceImport,
 		Scheme:          syncerConfig.Scheme,
 		Metrics: syncer.MetricsConfig{
@@ -117,7 +117,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 			RestMapper:      syncerConfig.RestMapper,
 			TargetNamespace: corev1.NamespaceAll,
 		}),
-		ResourceType:      &mcsv1a1.ServiceImport{},
+		ResourceType:      &mcsv1b1.ServiceImport{},
 		Transform:         controller.onRemoteServiceImport,
 		OnSuccessfulSync:  controller.onSuccessfulSyncFromBroker,
 		Scheme:            syncerConfig.Scheme,
@@ -187,7 +187,7 @@ func (c *ServiceImportController) start(ctx context.Context, stopCh <-chan struc
 	return nil
 }
 
-func (c *ServiceImportController) isIPInClustersetCIDR(si *mcsv1a1.ServiceImport) bool {
+func (c *ServiceImportController) isIPInClustersetCIDR(si *mcsv1b1.ServiceImport) bool {
 	if c.clustersetIPPool == nil || len(si.Spec.IPs) == 0 {
 		return false
 	}
@@ -231,14 +231,14 @@ func (c *ServiceImportController) reconcileLocalServiceImportsOnBroker() {
 		for i := range siList {
 			si := c.converter.toServiceImport(siList[i])
 
-			if si.Annotations[mcsv1a1.LabelServiceName] != "" ||
-				si.Labels[mcsv1a1.LabelSourceCluster] != c.clusterID {
+			if si.Annotations[mcsv1b1.LabelServiceName] != "" ||
+				si.Labels[mcsv1b1.LabelSourceCluster] != c.clusterID {
 				// This is an aggregated ServiceImport or another cluster's local ServiceImport.
 				continue
 			}
 
 			si.Namespace = c.localNamespace
-			si.Name = si.Labels[mcsv1a1.LabelServiceName] + "-" + si.Labels[constants.LabelSourceNamespace] + "-" + c.clusterID
+			si.Name = si.Labels[mcsv1b1.LabelServiceName] + "-" + si.Labels[constants.LabelSourceNamespace] + "-" + c.clusterID
 
 			retList = append(retList, si)
 		}
@@ -247,7 +247,7 @@ func (c *ServiceImportController) reconcileLocalServiceImportsOnBroker() {
 	})
 }
 
-func (c *ServiceImportController) startEndpointsController(ctx context.Context, serviceImport *mcsv1a1.ServiceImport) error {
+func (c *ServiceImportController) startEndpointsController(ctx context.Context, serviceImport *mcsv1b1.ServiceImport) error {
 	key := localEndpointsControllerKey(serviceImport)
 
 	if obj, found := c.endpointControllers.Load(key); found {
@@ -292,13 +292,13 @@ func (c *ServiceImportController) stopEndpointsController(ctx context.Context, k
 }
 
 func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
-	serviceImport := obj.(*mcsv1a1.ServiceImport)
+	serviceImport := obj.(*mcsv1b1.ServiceImport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 	ctx := context.TODO()
 
 	serviceName := serviceImportSourceName(serviceImport)
 
-	if serviceImport.Labels[mcsv1a1.LabelSourceCluster] != c.clusterID {
+	if serviceImport.Labels[mcsv1b1.LabelSourceCluster] != c.clusterID {
 		return nil, false
 	}
 
@@ -306,22 +306,22 @@ func (c *ServiceImportController) onLocalServiceImport(obj runtime.Object, _ int
 
 	if op == syncer.Delete {
 		c.serviceExportClient.UpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
-			mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady,
+			mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionReady,
 				metav1.ConditionFalse, ServiceExportReasonNoServiceImport, "ServiceImport was deleted"))
 	} else if op == syncer.Create {
 		c.serviceExportClient.tryUpdateStatusConditions(ctx, serviceName, serviceImport.Labels[constants.LabelSourceNamespace],
-			false, mcsv1a1.NewServiceExportCondition(mcsv1a1.ServiceExportConditionReady, metav1.ConditionFalse,
-				mcsv1a1.ServiceExportReasonPending, fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
+			false, mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionReady, metav1.ConditionFalse,
+				mcsv1b1.ServiceExportReasonPending, fmt.Sprintf("ServiceImport %sd - awaiting aggregation on the broker", op)))
 	}
 
 	return c.transformLocalToBroker(serviceImport), false
 }
 
-func (c *ServiceImportController) transformLocalToBroker(serviceImport *mcsv1a1.ServiceImport) *mcsv1a1.ServiceImport {
+func (c *ServiceImportController) transformLocalToBroker(serviceImport *mcsv1b1.ServiceImport) *mcsv1b1.ServiceImport {
 	// Prepare the local ServiceImport for sync to the broker.
 	serviceImport.Name = ""
 	serviceImport.GenerateName = serviceImportSourceName(serviceImport) + "-"
-	serviceImport.Status = mcsv1a1.ServiceImportStatus{}
+	serviceImport.Status = mcsv1b1.ServiceImportStatus{}
 
 	if serviceImport.Annotations == nil {
 		serviceImport.Annotations = map[string]string{}
@@ -333,21 +333,21 @@ func (c *ServiceImportController) transformLocalToBroker(serviceImport *mcsv1a1.
 }
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
-	serviceImport := obj.(*mcsv1a1.ServiceImport)
+	serviceImport := obj.(*mcsv1b1.ServiceImport)
 
-	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
+	serviceName, ok := serviceImport.Annotations[mcsv1b1.LabelServiceName]
 	if ok {
 		// This is an aggregated ServiceImport - sync it to the local service namespace.
 		serviceImport.Name = serviceName
 		serviceImport.Namespace = serviceImport.Annotations[constants.LabelSourceNamespace]
 
-		delete(serviceImport.Annotations, mcsv1a1.LabelServiceName)
+		delete(serviceImport.Annotations, mcsv1b1.LabelServiceName)
 		delete(serviceImport.Annotations, constants.LabelSourceNamespace)
 
 		ready := metav1.Condition{
-			Type:   string(mcsv1a1.ServiceImportConditionReady),
+			Type:   string(mcsv1b1.ServiceImportConditionReady),
 			Status: metav1.ConditionTrue,
-			Reason: string(mcsv1a1.ServiceImportReasonReady),
+			Reason: string(mcsv1b1.ServiceImportReasonReady),
 		}
 
 		// Check if any of the ServiceImport's IPFamilies are supported
@@ -355,7 +355,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 			return slices.Contains(c.supportedIPFamilies, ipFamily)
 		}) {
 			ready.Status = metav1.ConditionFalse
-			ready.Reason = string(mcsv1a1.ServiceImportReasonIPFamilyNotSupported)
+			ready.Reason = string(mcsv1b1.ServiceImportReasonIPFamilyNotSupported)
 			ready.Message = fmt.Sprintf("Service IP families %v are not compatible with the importing cluster IP families %v. "+
 				"The service will not be accessible from this cluster", serviceImport.Spec.IPFamilies, c.supportedIPFamilies)
 		}
@@ -369,7 +369,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 	}
 
 	ctx := context.TODO()
-	serviceName = serviceImport.Labels[mcsv1a1.LabelServiceName]
+	serviceName = serviceImport.Labels[mcsv1b1.LabelServiceName]
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
 
 	localServiceExport := c.serviceExportClient.getLocalInstance(serviceName, serviceNamespace)
@@ -393,17 +393,17 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 	key, _ := cache.MetaNamespaceKeyFunc(serviceImport)
 
 	logger.Infof("ServiceImport %q from cluster %q %sd on broker",
-		key, serviceImport.Labels[mcsv1a1.LabelSourceCluster], op)
+		key, serviceImport.Labels[mcsv1b1.LabelSourceCluster], op)
 
 	precedentServiceImport := c.checkForConflicts(ctx, aggregatedServiceImport)
 	if precedentServiceImport == nil {
 		return nil, false
 	}
 
-	isPrecedentCluster := precedentServiceImport.Labels[mcsv1a1.LabelSourceCluster] == c.clusterID
+	isPrecedentCluster := precedentServiceImport.Labels[mcsv1b1.LabelSourceCluster] == c.clusterID
 	if isPrecedentCluster {
 		err = c.updateAggregate(ctx, serviceName, serviceNamespace,
-			func(aggregated *mcsv1a1.ServiceImport) error {
+			func(aggregated *mcsv1b1.ServiceImport) error {
 				aggregated.Spec.SessionAffinity = precedentServiceImport.Spec.SessionAffinity
 				aggregated.Spec.SessionAffinityConfig = precedentServiceImport.Spec.SessionAffinityConfig
 				aggregated.Spec.TrafficDistribution = precedentServiceImport.Spec.TrafficDistribution
@@ -422,7 +422,7 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 }
 
 func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Object, op syncer.Operation) bool {
-	aggregatedServiceImport := synced.(*mcsv1a1.ServiceImport)
+	aggregatedServiceImport := synced.(*mcsv1b1.ServiceImport)
 
 	if op == syncer.Delete {
 		if c.isIPInClustersetCIDR(aggregatedServiceImport) {
@@ -433,7 +433,7 @@ func (c *ServiceImportController) onSuccessfulSyncFromBroker(synced runtime.Obje
 	return false
 }
 
-func (c *ServiceImportController) determineUseClusterSetIP(localServiceImport *mcsv1a1.ServiceImport) bool {
+func (c *ServiceImportController) determineUseClusterSetIP(localServiceImport *mcsv1b1.ServiceImport) bool {
 	var useClusterSetIP bool
 
 	useClusterSetIPStr, found := localServiceImport.Annotations[constants.UseClustersetIP]
@@ -459,15 +459,15 @@ func (c *ServiceImportController) allocateClusterSetIPIfNeeded(existingIP string
 	return existingIP, nil
 }
 
-func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1a1.ServiceImport) runtime.Object) []runtime.Object {
+func (c *ServiceImportController) localServiceImportLister(transform func(si *mcsv1b1.ServiceImport) runtime.Object) []runtime.Object {
 	siList := c.localSyncer.ListResources()
 
 	retList := make([]runtime.Object, 0, len(siList))
 
 	for _, obj := range siList {
-		si := obj.(*mcsv1a1.ServiceImport)
+		si := obj.(*mcsv1b1.ServiceImport)
 
-		if si.Labels[mcsv1a1.LabelSourceCluster] != c.clusterID {
+		if si.Labels[mcsv1b1.LabelSourceCluster] != c.clusterID {
 			continue
 		}
 
@@ -477,10 +477,10 @@ func (c *ServiceImportController) localServiceImportLister(transform func(si *mc
 	return retList
 }
 
-func serviceImportSourceName(serviceImport *mcsv1a1.ServiceImport) string {
-	return serviceImport.Labels[mcsv1a1.LabelServiceName]
+func serviceImportSourceName(serviceImport *mcsv1b1.ServiceImport) string {
+	return serviceImport.Labels[mcsv1b1.LabelServiceName]
 }
 
-func localEndpointsControllerKey(si *mcsv1a1.ServiceImport) string {
-	return si.Labels[constants.LabelSourceNamespace] + "/" + si.Labels[mcsv1a1.LabelServiceName]
+func localEndpointsControllerKey(si *mcsv1b1.ServiceImport) string {
+	return si.Labels[constants.LabelSourceNamespace] + "/" + si.Labels[mcsv1b1.LabelServiceName]
 }

@@ -26,7 +26,7 @@ import (
 	"github.com/submariner-io/lighthouse/coredns/constants"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("PutEndpointSlices", func() {
@@ -40,7 +40,7 @@ var _ = Describe("PutEndpointSlices", func() {
 					Name: "test",
 					Labels: map[string]string{
 						constants.LabelSourceNamespace: "test",
-						mcsv1a1.LabelSourceCluster:     "test",
+						mcsv1b1.LabelSourceCluster:     "test",
 					},
 				},
 			})
@@ -50,8 +50,8 @@ var _ = Describe("PutEndpointSlices", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
-						mcsv1a1.LabelSourceCluster: "test",
-						mcsv1a1.LabelServiceName:   "test",
+						mcsv1b1.LabelSourceCluster: "test",
+						mcsv1b1.LabelServiceName:   "test",
 					},
 				},
 			})
@@ -62,7 +62,7 @@ var _ = Describe("PutEndpointSlices", func() {
 					Name: "test",
 					Labels: map[string]string{
 						constants.LabelSourceNamespace: "test",
-						mcsv1a1.LabelServiceName:       "test",
+						mcsv1b1.LabelServiceName:       "test",
 					},
 				},
 			})
@@ -80,7 +80,7 @@ var _ = Describe("RemoveEndpointSlice", func() {
 					Name: "test",
 					Labels: map[string]string{
 						constants.LabelSourceNamespace: "test",
-						mcsv1a1.LabelSourceCluster:     "test",
+						mcsv1b1.LabelSourceCluster:     "test",
 					},
 				},
 			})
@@ -108,8 +108,8 @@ var _ = Describe("RemoveEndpointSlice", func() {
 					Name:      "test",
 					Namespace: test.RemoteNamespace,
 					Labels: map[string]string{
-						mcsv1a1.LabelSourceCluster:     "test",
-						mcsv1a1.LabelServiceName:       "test",
+						mcsv1b1.LabelSourceCluster:     "test",
+						mcsv1b1.LabelServiceName:       "test",
 						constants.LabelSourceNamespace: namespace1,
 					},
 				},

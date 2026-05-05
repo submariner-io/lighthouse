@@ -35,14 +35,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic/fake"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Reconciliation", func() {
 	var (
 		t                            *testDriver
-		serviceExport                *mcsv1a1.ServiceExport
-		localServiceImport           *mcsv1a1.ServiceImport
+		serviceExport                *mcsv1b1.ServiceExport
+		localServiceImport           *mcsv1b1.ServiceImport
 		localAggregatedServiceImport *unstructured.Unstructured
 		localEndpointSlice           *discovery.EndpointSlice
 		brokerServiceImports         *unstructured.UnstructuredList
@@ -143,7 +143,7 @@ var _ = Describe("Reconciliation", func() {
 			t.cluster1.createServiceEndpointSlices(ctx)
 
 			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, "endpointslices", "delete")
-			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, mcsv1a1.ServiceImportPluralName, "delete")
+			testutil.EnsureNoActionsForResource(&brokerDynClient.Fake, mcsv1b1.ServiceImportPluralName, "delete")
 
 			t.awaitNonHeadlessServiceExported(ctx, &t.cluster1)
 		})
@@ -287,7 +287,7 @@ var _ = Describe("Reconciliation", func() {
 				// Create a remote EPS for the same service and ensure it's not deleted.
 				remoteEndpointSlice := localEndpointSlice.DeepCopy()
 				remoteEndpointSlice.Name = "remote-eps"
-				remoteEndpointSlice.Labels[mcsv1a1.LabelSourceCluster] = t.cluster2.clusterID
+				remoteEndpointSlice.Labels[mcsv1b1.LabelSourceCluster] = t.cluster2.clusterID
 				remoteEndpointSlice.Labels[federate.ClusterIDLabelKey] = t.cluster2.clusterID
 				test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, remoteEndpointSlice)
 
@@ -352,8 +352,8 @@ var _ = Describe("EndpointSlice migration", func() {
 					Namespace: serviceNamespace,
 					Labels: map[string]string{
 						discovery.LabelManagedBy:   constants.LabelValueManagedBy,
-						mcsv1a1.LabelSourceCluster: clusterID1,
-						mcsv1a1.LabelServiceName:   "nginx",
+						mcsv1b1.LabelSourceCluster: clusterID1,
+						mcsv1b1.LabelServiceName:   "nginx",
 					},
 				},
 			}
@@ -380,8 +380,8 @@ var _ = Describe("EndpointSlice migration", func() {
 					Namespace: serviceNamespace,
 					Labels: map[string]string{
 						discovery.LabelManagedBy:   constants.LabelValueManagedBy,
-						mcsv1a1.LabelSourceCluster: clusterID1,
-						mcsv1a1.LabelServiceName:   "nginx",
+						mcsv1b1.LabelSourceCluster: clusterID1,
+						mcsv1b1.LabelServiceName:   "nginx",
 						constants.LabelIsHeadless:  strconv.FormatBool(true),
 					},
 				},

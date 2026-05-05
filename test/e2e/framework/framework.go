@@ -46,7 +46,7 @@ import (
 	"k8s.io/client-go/rest"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 	mcsClientset "sigs.k8s.io/mcs-api/pkg/client/clientset/versioned"
 )
 
@@ -154,8 +154,8 @@ func IsClusterSetIPEnabled(ctx context.Context) bool {
 	return *clusterSetIPEnabled.Load()
 }
 
-func (f *Framework) NewServiceExport(ctx context.Context, cluster framework.ClusterIndex, name, namespace string) *mcsv1a1.ServiceExport {
-	return f.CreateServiceExport(ctx, cluster, &mcsv1a1.ServiceExport{
+func (f *Framework) NewServiceExport(ctx context.Context, cluster framework.ClusterIndex, name, namespace string) *mcsv1b1.ServiceExport {
+	return f.CreateServiceExport(ctx, cluster, &mcsv1b1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -163,14 +163,14 @@ func (f *Framework) NewServiceExport(ctx context.Context, cluster framework.Clus
 	})
 }
 
-func (f *Framework) CreateServiceExport(ctx context.Context, cluster framework.ClusterIndex, serviceExport *mcsv1a1.ServiceExport,
-) *mcsv1a1.ServiceExport {
-	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(serviceExport.Namespace)
+func (f *Framework) CreateServiceExport(ctx context.Context, cluster framework.ClusterIndex, serviceExport *mcsv1b1.ServiceExport,
+) *mcsv1b1.ServiceExport {
+	se := MCSClients[cluster].MulticlusterV1beta1().ServiceExports(serviceExport.Namespace)
 
 	framework.By(fmt.Sprintf("Creating serviceExport %s.%s on %q", serviceExport.Name, serviceExport.Namespace,
 		framework.TestContext.ClusterIDs[cluster]))
 
-	return framework.AwaitUntil(ctx, "create serviceExport", func(ctx context.Context) (*mcsv1a1.ServiceExport, error) {
+	return framework.AwaitUntil(ctx, "create serviceExport", func(ctx context.Context) (*mcsv1b1.ServiceExport, error) {
 		return se.Create(ctx, serviceExport, metav1.CreateOptions{})
 	}, framework.NoopCheckResult)
 }
@@ -186,7 +186,7 @@ func (f *Framework) AwaitServiceNotExportedStatusCondition(ctx context.Context, 
 func (f *Framework) DeleteServiceExport(ctx context.Context, cluster framework.ClusterIndex, name, namespace string) {
 	framework.By(fmt.Sprintf("Deleting serviceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 	framework.AwaitUntil(ctx, "delete service export", func(ctx context.Context) (any, error) {
-		return nil, MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace).Delete(
+		return nil, MCSClients[cluster].MulticlusterV1beta1().ServiceExports(namespace).Delete(
 			ctx, name, metav1.DeleteOptions{})
 	}, framework.NoopCheckResult)
 }
@@ -198,20 +198,20 @@ func (f *Framework) GetService(ctx context.Context, cluster framework.ClusterInd
 
 func (f *Framework) AwaitAggregatedServiceImport(ctx context.Context, targetCluster framework.ClusterIndex, svc *v1.Service,
 	clusterCount int,
-) *mcsv1a1.ServiceImport {
+) *mcsv1b1.ServiceImport {
 	framework.By(fmt.Sprintf("Retrieving ServiceImport for %q in ns %q on %q", svc.Name, svc.Namespace,
 		framework.TestContext.ClusterIDs[targetCluster]))
 
-	siClient := MCSClients[targetCluster].MulticlusterV1alpha1().ServiceImports(svc.Namespace)
+	siClient := MCSClients[targetCluster].MulticlusterV1beta1().ServiceImports(svc.Namespace)
 
-	return framework.AwaitUntil(ctx, "retrieve ServiceImport", func(ctx context.Context) (*mcsv1a1.ServiceImport, error) {
+	return framework.AwaitUntil(ctx, "retrieve ServiceImport", func(ctx context.Context) (*mcsv1b1.ServiceImport, error) {
 		obj, err := siClient.Get(ctx, svc.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
 
 		return obj, err
-	}, func(si *mcsv1a1.ServiceImport) (bool, string, error) {
+	}, func(si *mcsv1b1.ServiceImport) (bool, string, error) {
 		if clusterCount == 0 {
 			if si != nil {
 				return false, "ServiceImport still exists", nil
@@ -229,16 +229,16 @@ func (f *Framework) AwaitAggregatedServiceImport(ctx context.Context, targetClus
 				len(si.Status.Clusters), clusterCount), nil
 		}
 
-		expPorts := make([]mcsv1a1.ServicePort, len(svc.Spec.Ports))
+		expPorts := make([]mcsv1b1.ServicePort, len(svc.Spec.Ports))
 		for i := range svc.Spec.Ports {
-			expPorts[i] = mcsv1a1.ServicePort{
+			expPorts[i] = mcsv1b1.ServicePort{
 				Name:     svc.Spec.Ports[i].Name,
 				Protocol: svc.Spec.Ports[i].Protocol,
 				Port:     svc.Spec.Ports[i].Port,
 			}
 		}
 
-		if svc.Spec.ClusterIP != v1.ClusterIPNone && !slices.Equivalent(expPorts, si.Spec.Ports, func(p mcsv1a1.ServicePort) string {
+		if svc.Spec.ClusterIP != v1.ClusterIPNone && !slices.Equivalent(expPorts, si.Spec.Ports, func(p mcsv1b1.ServicePort) string {
 			return fmt.Sprintf("%s%s%d", p.Name, p.Protocol, p.Port)
 		}) {
 			return false, fmt.Sprintf("ServiceImport ports do not match. Expected: %s, Actual: %s",
@@ -567,7 +567,7 @@ func (f *Framework) AwaitEndpointSlices(ctx context.Context, targetCluster frame
 
 		for i := range endpointSliceList.Items {
 			es := &endpointSliceList.Items[i]
-			if name == "" || es.Labels[mcsv1a1.LabelServiceName] == name {
+			if name == "" || es.Labels[mcsv1b1.LabelServiceName] == name {
 				sliceCount++
 
 				for j := range es.Endpoints {
@@ -835,18 +835,18 @@ func (f *Framework) awaitServiceExportedStatusCondition(ctx context.Context, clu
 ) {
 	framework.By(fmt.Sprintf("Retrieving ServiceExport %s.%s on %q", name, namespace, framework.TestContext.ClusterIDs[cluster]))
 
-	se := MCSClients[cluster].MulticlusterV1alpha1().ServiceExports(namespace)
+	se := MCSClients[cluster].MulticlusterV1beta1().ServiceExports(namespace)
 
-	framework.AwaitUntil(ctx, "retrieve ServiceExport", func(ctx context.Context) (*mcsv1a1.ServiceExport, error) {
+	framework.AwaitUntil(ctx, "retrieve ServiceExport", func(ctx context.Context) (*mcsv1b1.ServiceExport, error) {
 		return se.Get(ctx, name, metav1.GetOptions{})
-	}, func(result *mcsv1a1.ServiceExport) (bool, string, error) {
-		cond := meta.FindStatusCondition(result.Status.Conditions, string(mcsv1a1.ServiceExportConditionReady))
+	}, func(result *mcsv1b1.ServiceExport) (bool, string, error) {
+		cond := meta.FindStatusCondition(result.Status.Conditions, string(mcsv1b1.ServiceExportConditionReady))
 		if cond != nil {
 			if cond.Status != status {
 				out, _ := json.MarshalIndent(cond, "", "  ")
 
 				return false, fmt.Sprintf("ServiceExport %s condition status is %s. Expected %s",
-					mcsv1a1.ServiceExportConditionReady, out, status), nil
+					mcsv1b1.ServiceExportConditionReady, out, status), nil
 			}
 
 			return true, "", nil
@@ -855,6 +855,6 @@ func (f *Framework) awaitServiceExportedStatusCondition(ctx context.Context, clu
 		out, _ := json.MarshalIndent(result.Status.Conditions, "", " ")
 
 		return false, fmt.Sprintf("ServiceExport %s condition status not found. Actual: %s",
-			mcsv1a1.ServiceExportConditionReady, out), nil
+			mcsv1b1.ServiceExportConditionReady, out), nil
 	})
 }

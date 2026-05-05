@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var _ = Describe("Globalnet enabled", func() {
@@ -121,7 +121,7 @@ var _ = Describe("Globalnet enabled", func() {
 			})
 
 			It("should update the ServiceExport status with the condition details", func(ctx context.Context) {
-				c := newServiceExportValidCondition(metav1.ConditionFalse, mcsv1a1.ServiceExportConditionReason(condition.Reason))
+				c := newServiceExportValidCondition(metav1.ConditionFalse, mcsv1b1.ServiceExportConditionReason(condition.Reason))
 				c.Message = condition.Message
 				t.cluster1.awaitServiceExportCondition(ctx, c)
 			})
