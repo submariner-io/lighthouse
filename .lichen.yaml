@@ -39,3 +39,5 @@ exceptions:
       licenses: ["MPL-2.0"]
     - path: "github.com/hashicorp/go-version"
       licenses: ["MPL-2.0"]
+    - path: "github.com/hashicorp/golang-lru/v2"
+      licenses: ["MPL-2.0"]
