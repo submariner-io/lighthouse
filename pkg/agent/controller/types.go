@@ -64,6 +64,7 @@ type Controller struct {
 	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
 	namespaceInformer           cache.SharedInformer
+	clusterLocalReflector       *ClusterLocalReflector
 }
 
 type AgentSpecification struct {
@@ -74,6 +75,11 @@ type AgentSpecification struct {
 	GlobalnetEnabled    bool   `split_words:"true"`
 	Uninstall           bool
 	HaltOnCertError     bool `split_words:"true"`
+	// ReflectClusterLocal, when true, makes the agent reflect each imported service
+	// into a native cluster.local Service + EndpointSlice (<svc>-<sourceCluster>) so
+	// discovery works on clusters whose DNS cannot host the clusterset.local stanza
+	// (e.g. EKS Auto Mode's immutable node-local CoreDNS). Opt-in; default false.
+	ReflectClusterLocal bool `split_words:"true"`
 }
 
 // The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports

@@ -746,9 +746,12 @@ func findEndpointSlices(ctx context.Context, client dynamic.ResourceInterface, n
 	var endpointSlices []*discovery.EndpointSlice
 
 	for i := range list.Items {
-		if list.Items[i].GetLabels()[mcsv1b1.LabelServiceName] == name &&
-			list.Items[i].GetLabels()[constants.LabelSourceNamespace] == namespace &&
-			list.Items[i].GetLabels()[mcsv1b1.LabelSourceCluster] == clusterID {
+		labels := list.Items[i].GetLabels()
+		nameMatch := name == "" || labels[mcsv1b1.LabelServiceName] == name || labels[discovery.LabelServiceName] == name
+		namespaceMatch := namespace == "" || labels[constants.LabelSourceNamespace] == namespace
+		clusterMatch := clusterID == "" || labels[mcsv1b1.LabelSourceCluster] == clusterID
+
+		if nameMatch && namespaceMatch && clusterMatch {
 			eps := &discovery.EndpointSlice{}
 			Expect(scheme.Scheme.Convert(&list.Items[i], eps, nil)).To(Succeed())
 
