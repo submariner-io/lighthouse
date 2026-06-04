@@ -144,6 +144,13 @@ func New(ctx context.Context, spec *AgentSpecification, syncerConf broker.Syncer
 		return nil, err
 	}
 
+	if spec.ReflectClusterLocal {
+		agentController.clusterLocalReflector, err = newClusterLocalReflector(spec, syncerConf)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return agentController, nil
 }
 
@@ -171,6 +178,12 @@ func (a *Controller) Start(ctx context.Context, stopCh <-chan struct{}) error {
 
 	if err := a.serviceImportController.start(ctx, stopCh); err != nil {
 		return errors.Wrap(err, "error starting ServiceImport controller")
+	}
+
+	if a.clusterLocalReflector != nil {
+		if err := a.clusterLocalReflector.start(stopCh); err != nil {
+			return errors.Wrap(err, "error starting ClusterLocal reflector")
+		}
 	}
 
 	a.serviceExportSyncer.Reconcile(func() []runtime.Object {
