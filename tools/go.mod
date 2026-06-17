@@ -1,6 +1,6 @@
 module github.com/submariner-io/lighthouse/tools
 
-go 1.21
+go 1.25.0
 
 require github.com/uw-labs/lichen v0.1.7
 
@@ -17,6 +17,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
