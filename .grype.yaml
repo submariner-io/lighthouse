@@ -10,3 +10,11 @@ ignore:
   - vulnerability: CVE-2021-22570
     package:
       name: google.golang.org/protobuf
+  # Update requires Go >= 1.25. Low severity doesn't justify breaking changes.
+  - vulnerability: GO-2026-5024
+    package:
+      name: golang.org/x/sys
+  # Deprecation advisory for unmaintained openpgp subpackage, not a fixable CVE.
+  - vulnerability: GO-2026-5932
+    package:
+      name: golang.org/x/crypto
