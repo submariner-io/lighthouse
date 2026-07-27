@@ -171,7 +171,12 @@ func main() {
 	err = lightHouseAgent.Start(ctx, ctx.Done())
 	exitOnError(err, "Failed to start lighthouse agent")
 
-	defer http.StartServer(http.Metrics|http.Profile, 8082)()
+	httpEndpoints := http.Metrics
+	if agentSpec.Debug {
+		httpEndpoints |= http.Profile
+	}
+
+	defer http.StartServer(httpEndpoints, 8082)()
 
 	<-ctx.Done()
 
