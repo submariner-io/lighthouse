@@ -80,6 +80,7 @@ type AgentSpecification struct {
 	// discovery works on clusters whose DNS cannot host the clusterset.local stanza
 	// (e.g. EKS Auto Mode's immutable node-local CoreDNS). Opt-in; default false.
 	ReflectClusterLocal bool `split_words:"true"`
+	Debug               bool
 }
 
 // The ServiceImportController encapsulates two resource syncers; one that watches for local cluster ServiceImports
