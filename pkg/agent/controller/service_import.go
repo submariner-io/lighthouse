@@ -46,7 +46,7 @@ import (
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfig, syncerConfig broker.SyncerConfig,
 	brokerClient dynamic.Interface, brokerNamespace string, serviceExportClient *ServiceExportClient,
-	localLHEndpointSliceLister EndpointSliceListerFn,
+	localLHEndpointSliceLister EndpointSliceListerFn, namespaceValidator *NamespaceValidator,
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
 		localClient:                syncerConfig.LocalClient,
@@ -60,6 +60,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		localLHEndpointSliceLister: localLHEndpointSliceLister,
 		clustersetIPPool:           agentConfig.IPPool,
 		clustersetIPEnabled:        spec.ClustersetIPEnabled,
+		namespaceValidator:         namespaceValidator,
 	}
 
 	localToBrokerFederator := federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
@@ -328,11 +329,32 @@ func (c *ServiceImportController) transformLocalToBroker(serviceImport *mcsv1a1.
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
 
+	ctx := context.TODO()
+
 	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
 	if ok {
 		// This is an aggregated ServiceImport - sync it to the local service namespace.
 		serviceImport.Name = serviceName
-		serviceImport.Namespace = serviceImport.Annotations[constants.LabelSourceNamespace]
+		targetNamespace := serviceImport.Annotations[constants.LabelSourceNamespace]
+
+		if op != syncer.Delete {
+			if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+				logger.Warningf("Rejecting aggregated ServiceImport: %v", err)
+
+				// Delete stale local ServiceImport if it exists
+				deleteErr := c.localClient.Resource(serviceImportGVR).Namespace(targetNamespace).Delete(
+					ctx, serviceName, metav1.DeleteOptions{})
+				if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+					logger.Errorf(deleteErr, "Error deleting rejected ServiceImport %s/%s", targetNamespace, serviceName)
+
+					return nil, true
+				}
+
+				return nil, false
+			}
+		}
+
+		serviceImport.Namespace = targetNamespace
 
 		delete(serviceImport.Annotations, mcsv1a1.LabelServiceName)
 		delete(serviceImport.Annotations, constants.LabelSourceNamespace)
@@ -340,7 +362,6 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 		return serviceImport, false
 	}
 
-	ctx := context.TODO()
 	serviceName = serviceImport.Labels[mcsv1a1.LabelServiceName]
 	serviceNamespace := serviceImport.Labels[constants.LabelSourceNamespace]
 
