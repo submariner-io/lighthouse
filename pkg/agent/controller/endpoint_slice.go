@@ -38,12 +38,14 @@ import (
 
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
-	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface,
+	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface, namespaceValidator *NamespaceValidator,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
 		clusterID:           spec.ClusterID,
 		serviceExportClient: serviceExportClient,
 		serviceSyncer:       serviceSyncer,
+		localClient:         syncerConfig.LocalClient,
+		namespaceValidator:  namespaceValidator,
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -137,9 +139,28 @@ func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[mcsv1a1.LabelSourceCluster])
 }
 
-func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
+	targetNamespace := endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
+
+	if op != syncer.Delete {
+		if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+			logger.Warningf("Rejecting EndpointSlice from cluster %q: %v", endpointSlice.Labels[mcsv1a1.LabelSourceCluster], err)
+
+			// Delete stale local ServiceImport if it exists
+			deleteErr := c.localClient.Resource(endpointSliceGVR).Namespace(targetNamespace).Delete(
+				context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+			if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+				logger.Errorf(deleteErr, "Error deleting rejected EndpointSlice %s/%s", targetNamespace, endpointSlice.Name)
+
+				return nil, true
+			}
+
+			return nil, false
+		}
+	}
+
+	endpointSlice.Namespace = targetNamespace
 
 	return endpointSlice, false
 }
