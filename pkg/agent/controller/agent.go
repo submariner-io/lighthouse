@@ -284,7 +284,6 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	serviceImport := a.newServiceImport(svcExport.Name, svcExport.Namespace)
 	serviceImport.Annotations[constants.PublishNotReadyAddresses] = strconv.FormatBool(svc.Spec.PublishNotReadyAddresses)
-	serviceImport.Annotations[constants.ServiceExportTimestamp] = strconv.FormatInt(svcExport.CreationTimestamp.UTC().UnixNano(), 10)
 
 	if svcExport.Annotations[constants.UseClustersetIP] != "" {
 		serviceImport.Annotations[constants.UseClustersetIP] = svcExport.Annotations[constants.UseClustersetIP]
