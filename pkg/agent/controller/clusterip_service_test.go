@@ -164,6 +164,24 @@ func testClusterIPServiceInOneCluster() {
 		})
 	})
 
+	When("a ServiceExport is created for a Service whose namespace is restricted", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Namespace = metav1.NamespaceSystem
+			t.cluster1.serviceExport.Namespace = metav1.NamespaceSystem
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+		})
+
+		It("should not export the service", func() {
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse,
+				controller.ServiceExportReasonRestrictedNamespace))
+			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
+		})
+	})
+
 	When("the backend service EndpointSlice has no ready addresses", func() {
 		JustBeforeEach(func() {
 			t.cluster1.createService()
@@ -827,11 +845,11 @@ func testClusterIPServiceInTwoClusters() {
 
 			By("Updating the ServiceExport on the second cluster")
 
-			se, err := t.cluster2.localServiceExportClient.Get(context.TODO(), t.cluster2.serviceExport.Name, metav1.GetOptions{})
+			se, err := t.cluster2.localServiceExportClient().Get(context.TODO(), t.cluster2.serviceExport.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 
 			se.SetAnnotations(map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)})
-			test.UpdateResource(t.cluster2.localServiceExportClient, se)
+			test.UpdateResource(t.cluster2.localServiceExportClient(), se)
 
 			t.cluster2.awaitServiceExportCondition(noConflictCondition)
 		})
