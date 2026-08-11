@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
@@ -167,6 +168,24 @@ func testClusterIPServiceInOneCluster() {
 
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
+		})
+	})
+
+	When("a ServiceExport is created for a Service whose namespace is restricted", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Namespace = metav1.NamespaceSystem
+			t.cluster1.serviceExport.Namespace = metav1.NamespaceSystem
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+		})
+
+		It("should not export the service", func() {
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(metav1.ConditionFalse,
+				controller.ServiceExportReasonRestrictedNamespace))
+			t.cluster1.ensureNoServiceExportCondition(mcsv1a1.ServiceExportConditionReady)
 		})
 	})
 
@@ -486,6 +505,25 @@ func testClusterIPServiceInOneCluster() {
 
 			t.awaitNonHeadlessServiceExported(&t.cluster1)
 		})
+	})
+
+	Specify("an EndpointSlice with a restricted service namespace should not be synced from the broker", func() {
+		restrictedNamespace := metav1.NamespaceSystem
+
+		test.CreateResource(endpointSliceClientFor(t.syncerConfig.BrokerClient, test.RemoteNamespace),
+			&discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Name: "restricted-eps",
+				Labels: map[string]string{
+					discovery.LabelManagedBy:       constants.LabelValueManagedBy,
+					constants.LabelSourceNamespace: restrictedNamespace,
+					mcsv1a1.LabelSourceCluster:     "south",
+					mcsv1a1.LabelServiceName:       serviceName,
+					federate.ClusterIDLabelKey:     "south",
+				},
+			}})
+
+		testutil.EnsureNoResource(resource.ForDynamic(endpointSliceClientFor(t.cluster1.localDynClient,
+			restrictedNamespace)), "restricted-eps")
 	})
 }
 
@@ -817,11 +855,11 @@ func testClusterIPServiceInTwoClusters() {
 
 			By("Updating the ServiceExport on the second cluster")
 
-			se, err := t.cluster2.localServiceExportClient.Get(context.TODO(), t.cluster2.serviceExport.Name, metav1.GetOptions{})
+			se, err := t.cluster2.localServiceExportClient().Get(context.TODO(), t.cluster2.serviceExport.Name, metav1.GetOptions{})
 			Expect(err).To(Succeed())
 
 			se.SetAnnotations(map[string]string{constants.UseClustersetIP: strconv.FormatBool(true)})
-			test.UpdateResource(t.cluster2.localServiceExportClient, se)
+			test.UpdateResource(t.cluster2.localServiceExportClient(), se)
 
 			t.cluster1.awaitServiceExportCondition(noConflictCondition)
 			t.cluster2.awaitServiceExportCondition(noConflictCondition)
