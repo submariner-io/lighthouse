@@ -39,6 +39,7 @@ const (
 	exportFailedReason = "ExportFailed"
 	typeConflictReason = "ConflictingType"
 	portConflictReason = "ConflictingPorts"
+	ServiceExportReasonRestrictedNamespace = "RestrictedNamespace"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
@@ -58,6 +59,7 @@ type Controller struct {
 	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
 	namespaceInformer           cache.SharedInformer
+	namespaceValidator          *NamespaceValidator
 }
 
 type AgentSpecification struct {
@@ -94,6 +96,7 @@ type ServiceImportController struct {
 	converter                  converter
 	globalIngressIPCache       *globalIngressIPCache
 	localLHEndpointSliceLister EndpointSliceListerFn
+	namespaceValidator         *NamespaceValidator
 }
 
 // Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
@@ -121,6 +124,8 @@ type EndpointSliceController struct {
 	serviceExportClient     *ServiceExportClient
 	serviceSyncer           syncer.Interface
 	conflictCheckWorkQueue  workqueue.Interface
+	localClient                   dynamic.Interface
+	namespaceValidator            *NamespaceValidator
 }
 
 type ServiceExportClient struct {

@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
+	"github.com/submariner-io/lighthouse/pkg/agent/controller"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -157,6 +158,24 @@ func testClusterIPServiceInOneCluster() {
 
 				t.awaitNonHeadlessServiceExported(&t.cluster1)
 			})
+		})
+	})
+
+	When("a ServiceExport is created for a Service whose namespace is restricted", func() {
+		BeforeEach(func() {
+			t.cluster1.service.Namespace = metav1.NamespaceSystem
+			t.cluster1.serviceExport.Namespace = metav1.NamespaceSystem
+		})
+
+		JustBeforeEach(func() {
+			t.cluster1.createService()
+			t.cluster1.createServiceExport()
+		})
+
+		It("should not export the service", func() {
+			t.cluster1.awaitServiceExportCondition(newServiceExportValidCondition(corev1.ConditionFalse,
+				controller.ServiceExportReasonRestrictedNamespace))
+			t.cluster1.ensureNoServiceExportCondition(constants.ServiceExportReady)
 		})
 	})
 
