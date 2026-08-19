@@ -24,7 +24,9 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func (f *Framework) NewNetShootDeployment(cluster framework.ClusterIndex) *corev1.PodList {
@@ -55,11 +57,30 @@ func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, na
 					},
 				},
 				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To(int64(10000)),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "netshoot",
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+								Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("256Mi")},
+							},
 							Command: []string{
 								"sleep", "600",
 							},
@@ -96,11 +117,30 @@ func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.P
 					},
 				},
 				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To(int64(10000)),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "nginx-demo",
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+								Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("256Mi")},
+							},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: port,
