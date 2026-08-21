@@ -92,7 +92,6 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
@@ -100,7 +99,7 @@ require (
 	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
@@ -148,9 +147,9 @@ require (
 	github.com/trailofbits/go-mutexasserts v0.0.0-20250514102930-c1f3d2e37561 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.12 // indirect
+	go.etcd.io/etcd/api/v3 v3.7.1 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.7.1 // indirect
-	go.etcd.io/etcd/client/v3 v3.6.12 // indirect
+	go.etcd.io/etcd/client/v3 v3.7.1 // indirect
 	go.opentelemetry.io/collector/component v1.51.1-0.20260205185216-81bc641f26c0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.51.1-0.20260205185216-81bc641f26c0 // indirect
 	go.opentelemetry.io/collector/pdata v1.51.1-0.20260205185216-81bc641f26c0 // indirect
