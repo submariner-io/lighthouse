@@ -66,9 +66,10 @@ func New(ctx context.Context, spec *AgentSpecification, syncerConf broker.Syncer
 	}
 
 	agentController := &Controller{
-		clusterID:        spec.ClusterID,
-		namespace:        spec.Namespace,
-		globalnetEnabled: spec.GlobalnetEnabled,
+		clusterID:          spec.ClusterID,
+		namespace:          spec.Namespace,
+		globalnetEnabled:   spec.GlobalnetEnabled,
+		namespaceValidator: NewNamespaceValidator(),
 	}
 
 	agentController.localServiceImportFederator = federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
@@ -129,7 +130,7 @@ func New(ctx context.Context, spec *AgentSpecification, syncerConf broker.Syncer
 	agentController.serviceExportClient.localSyncer = agentController.serviceExportSyncer
 
 	agentController.endpointSliceController, err = newEndpointSliceController(ctx, spec, syncerConf, agentController.serviceExportClient,
-		agentController.serviceSyncer)
+		agentController.serviceSyncer, agentController.namespaceValidator)
 	if err != nil {
 		return nil, err
 	}
@@ -139,13 +140,13 @@ func New(ctx context.Context, spec *AgentSpecification, syncerConf broker.Syncer
 		agentController.endpointSliceController.syncer.GetBrokerNamespace(), agentController.serviceExportClient,
 		func(selector k8slabels.Selector) []runtime.Object {
 			return agentController.endpointSliceController.syncer.ListLocalResourcesBySelector(&discovery.EndpointSlice{}, selector)
-		})
+		}, agentController.namespaceValidator)
 	if err != nil {
 		return nil, err
 	}
 
 	if spec.ReflectClusterLocal {
-		agentController.clusterLocalReflector, err = newClusterLocalReflector(spec, syncerConf)
+		agentController.clusterLocalReflector, err = newClusterLocalReflector(spec, syncerConf, agentController.namespaceValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -213,6 +214,7 @@ func (a *Controller) Start(ctx context.Context, stopCh <-chan struct{}) error {
 	return nil
 }
 
+//nolint:gocyclo // Refactoring would create helper functions requiring 4-5 parameters each.
 func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	svcExport := obj.(*mcsv1b1.ServiceExport)
 
@@ -222,6 +224,22 @@ func (a *Controller) serviceExportToServiceImport(obj runtime.Object, _ int, op 
 
 	if op == syncer.Delete {
 		return a.newServiceImport(svcExport.Name, svcExport.Namespace), false
+	}
+
+	if err := a.namespaceValidator.CheckAllowed(svcExport.Namespace); err != nil {
+		a.serviceExportClient.UpdateStatusConditions(ctx, svcExport.Name, svcExport.Namespace,
+			mcsv1b1.NewServiceExportCondition(mcsv1b1.ServiceExportConditionValid, metav1.ConditionFalse,
+				ServiceExportReasonRestrictedNamespace,
+				fmt.Sprintf("Service in namespace %q cannot be exported due to namespace restriction", svcExport.Namespace)))
+
+		err = a.localServiceImportFederator.Delete(ctx, a.newServiceImport(svcExport.Name, svcExport.Namespace))
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Errorf(err, "Error deleting ServiceImport for restricted Service (%s/%s)", svcExport.Namespace, svcExport.Name)
+
+			return nil, true
+		}
+
+		return nil, false
 	}
 
 	obj, found, err := a.serviceSyncer.GetResource(svcExport.Name, svcExport.Namespace)

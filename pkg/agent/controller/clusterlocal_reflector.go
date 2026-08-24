@@ -78,14 +78,17 @@ type ClusterLocalReflector struct {
 	federator           federate.Federator
 	serviceClient       dynamic.NamespaceableResourceInterface
 	endpointSliceClient dynamic.NamespaceableResourceInterface
+	namespaceValidator  *NamespaceValidator
 }
 
 //nolint:gocritic // (hugeParam) matches the other controller constructors.
-func newClusterLocalReflector(spec *AgentSpecification, syncerConfig broker.SyncerConfig) (*ClusterLocalReflector, error) {
+func newClusterLocalReflector(spec *AgentSpecification, syncerConfig broker.SyncerConfig, namespaceValidator *NamespaceValidator,
+) (*ClusterLocalReflector, error) {
 	c := &ClusterLocalReflector{
 		clusterID:           spec.ClusterID,
 		serviceClient:       syncerConfig.LocalClient.Resource(ServiceGVR),
 		endpointSliceClient: syncerConfig.LocalClient.Resource(endpointSliceGVR),
+		namespaceValidator:  namespaceValidator,
 	}
 
 	// Empty TargetNamespace => the federator uses each object's own namespace.
@@ -195,6 +198,14 @@ func (c *ClusterLocalReflector) reflect(obj runtime.Object, _ int, op syncer.Ope
 	// services already exist locally under their real cluster.local name.
 	if serviceName == "" || serviceNamespace == "" || sourceCluster == "" || sourceCluster == c.clusterID {
 		return nil, false
+	}
+
+	if op != syncer.Delete {
+		if err := c.namespaceValidator.CheckAllowed(serviceNamespace); err != nil {
+			logger.Warningf("Rejecting EndpointSlice from cluster %q: %v", imported.Labels[mcsv1b1.LabelSourceCluster], err)
+
+			return nil, false
+		}
 	}
 
 	reflectedName := serviceName + "-" + sourceCluster

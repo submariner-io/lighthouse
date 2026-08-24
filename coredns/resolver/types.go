@@ -62,8 +62,9 @@ type IPFamilyInfo struct {
 }
 
 type serviceInfo struct {
-	ipv4Info   IPFamilyInfo
-	ipv6Info   IPFamilyInfo
-	isExported bool
-	spec       mcsv1b1.ServiceImportSpec
+	ipv4Info     IPFamilyInfo
+	ipv6Info     IPFamilyInfo
+	isExported   bool
+	isClusterset bool
+	spec         mcsv1b1.ServiceImportSpec
 }
