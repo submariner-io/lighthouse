@@ -145,17 +145,11 @@ func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ in
 
 	if op != syncer.Delete {
 		if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
-			logger.Warningf("Rejecting EndpointSlice from cluster %q: %v", endpointSlice.Labels[mcsv1a1.LabelSourceCluster], err)
+			logger.Warningf("Rejecting EndpointSlice %q from cluster %q: %v",
+				endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelSourceCluster], err)
 
-			// Delete stale local ServiceImport if it exists
-			deleteErr := c.localClient.Resource(endpointSliceGVR).Namespace(targetNamespace).Delete(
-				context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
-			if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
-				logger.Errorf(deleteErr, "Error deleting rejected EndpointSlice %s/%s", targetNamespace, endpointSlice.Name)
-
-				return nil, true
-			}
-
+			// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+			// Stale local resources should be cleaned up by administrators.
 			return nil, false
 		}
 	}
