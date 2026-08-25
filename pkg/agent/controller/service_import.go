@@ -340,17 +340,10 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 
 		if op != syncer.Delete {
 			if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
-				logger.Warningf("Rejecting aggregated ServiceImport: %v", err)
+				logger.Warningf("Rejecting aggregated ServiceImport %q: %v", serviceName, err)
 
-				// Delete stale local ServiceImport if it exists
-				deleteErr := c.localClient.Resource(serviceImportGVR).Namespace(targetNamespace).Delete(
-					ctx, serviceName, metav1.DeleteOptions{})
-				if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
-					logger.Errorf(deleteErr, "Error deleting rejected ServiceImport %s/%s", targetNamespace, serviceName)
-
-					return nil, true
-				}
-
+				// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+				// Stale local resources should be cleaned up by administrators.
 				return nil, false
 			}
 		}
