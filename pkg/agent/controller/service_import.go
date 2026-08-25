@@ -38,7 +38,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -530,9 +529,7 @@ func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object
 
 func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
-
-	ctx := context.TODO()
-
+	
 	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
 	if ok {
 		// This is an aggregated ServiceImport - sync it to the local service namespace.
@@ -541,17 +538,10 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 
 		if op != syncer.Delete {
 			if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
-				logger.Warningf("Rejecting aggregated ServiceImport: %v", err)
+				logger.Warningf("Rejecting aggregated ServiceImport %q: %v", serviceName, err)
 
-				// Delete stale local ServiceImport if it exists
-				deleteErr := c.localClient.Resource(serviceImportGVR).Namespace(targetNamespace).Delete(
-					ctx, serviceName, metav1.DeleteOptions{})
-				if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
-					logger.Errorf(deleteErr, "Error deleting rejected ServiceImport %s/%s", targetNamespace, serviceName)
-
-					return nil, true
-				}
-
+				// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+				// Stale local resources should be cleaned up by administrators.
 				return nil, false
 			}
 		}
