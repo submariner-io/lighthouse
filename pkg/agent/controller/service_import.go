@@ -338,14 +338,12 @@ func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ in
 		serviceImport.Name = serviceName
 		targetNamespace := serviceImport.Annotations[constants.LabelSourceNamespace]
 
-		if op != syncer.Delete {
-			if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
-				logger.Warningf("Rejecting aggregated ServiceImport %q: %v", serviceName, err)
+		if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+			logger.Warningf("Rejecting aggregated ServiceImport %q: %v", serviceName, err)
 
-				// Do not delete local resources based on rejected broker objects - they cannot be trusted.
-				// Stale local resources should be cleaned up by administrators.
-				return nil, false
-			}
+			// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+			// Stale local resources should be cleaned up by administrators.
+			return nil, false
 		}
 
 		serviceImport.Namespace = targetNamespace
