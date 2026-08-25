@@ -143,14 +143,13 @@ func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ in
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	targetNamespace := endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
 
-	if op != syncer.Delete {
-		if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
-			logger.Warningf("Rejecting EndpointSlice from cluster %q: %v", endpointSlice.Labels[mcsv1b1.LabelSourceCluster], err)
+	if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+		logger.Warningf("Rejecting EndpointSlice %q from cluster %q: %v",
+			endpointSlice.Name, endpointSlice.Labels[mcsv1b1.LabelSourceCluster], err)
 
-			// Do not delete local resources based on rejected broker objects - they cannot be trusted.
-			// Stale local resources should be cleaned up by administrators.
-			return nil, false
-		}
+		// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+		// Stale local resources should be cleaned up by administrators.
+		return nil, false
 	}
 
 	endpointSlice.Namespace = targetNamespace
