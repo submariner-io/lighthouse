@@ -16,3 +16,8 @@ ignore:
     package:
       name: golang.org/x/crypto
       location: /coredns/go.mod
+  # No available fix; required by multiple transitive dependencies at incompatible versions
+  - vulnerability: GO-2026-5932
+    fix-state: unknown
+    package:
+      name: golang.org/x/crypto
