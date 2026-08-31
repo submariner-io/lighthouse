@@ -38,12 +38,13 @@ import (
 )
 
 const (
-	ExportFailedReason                   = "ExportFailed"
-	TypeConflictReason                   = "ConflictingType"
-	PortConflictReason                   = "ConflictingPorts"
-	SessionAffinityConflictReason        = "ConflictingSessionAffinity"
-	SessionAffinityConfigConflictReason  = "ConflictingSessionAffinityConfig"
-	ClusterSetIPEnablementConflictReason = "ConflictingClusterSetIPEnablement"
+	ExportFailedReason                     = "ExportFailed"
+	TypeConflictReason                     = "ConflictingType"
+	PortConflictReason                     = "ConflictingPorts"
+	SessionAffinityConflictReason          = "ConflictingSessionAffinity"
+	SessionAffinityConfigConflictReason    = "ConflictingSessionAffinityConfig"
+	ClusterSetIPEnablementConflictReason   = "ConflictingClusterSetIPEnablement"
+	ServiceExportReasonRestrictedNamespace = "RestrictedNamespace"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
@@ -65,6 +66,7 @@ type Controller struct {
 	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
 	namespaceInformer           cache.SharedInformer
+	namespaceValidator          *NamespaceValidator
 }
 
 type AgentSpecification struct {
@@ -105,6 +107,7 @@ type ServiceImportController struct {
 	localLHEndpointSliceLister EndpointSliceListerFn
 	clustersetIPPool           *ipam.IPPool
 	clustersetIPEnabled        bool
+	namespaceValidator         *NamespaceValidator
 }
 
 // Each ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
@@ -134,6 +137,8 @@ type EndpointSliceController struct {
 	serviceExportClient           *ServiceExportClient
 	serviceSyncer                 syncer.Interface
 	conflictCheckWorkQueue        workqueue.Interface
+	localClient                   dynamic.Interface
+	namespaceValidator            *NamespaceValidator
 }
 
 type ServiceExportClient struct {

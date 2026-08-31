@@ -54,7 +54,7 @@ const timestampAnnotationPrefix = "timestamp.submariner.io/"
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfig, syncerConfig broker.SyncerConfig,
 	brokerClient dynamic.Interface, brokerNamespace string, serviceExportClient *ServiceExportClient,
-	localLHEndpointSliceLister EndpointSliceListerFn,
+	localLHEndpointSliceLister EndpointSliceListerFn, namespaceValidator *NamespaceValidator,
 ) (*ServiceImportController, error) {
 	controller := &ServiceImportController{
 		localClient:                syncerConfig.LocalClient,
@@ -67,6 +67,7 @@ func newServiceImportController(spec *AgentSpecification, agentConfig AgentConfi
 		localLHEndpointSliceLister: localLHEndpointSliceLister,
 		clustersetIPPool:           agentConfig.IPPool,
 		clustersetIPEnabled:        spec.ClustersetIPEnabled,
+		namespaceValidator:         namespaceValidator,
 	}
 
 	var err error
@@ -526,14 +527,24 @@ func (c *ServiceImportController) Delete(ctx context.Context, obj runtime.Object
 	return c.serviceImportMigrator.onLocalServiceImportDeleted(ctx, localServiceImport)
 }
 
-func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+func (c *ServiceImportController) onRemoteServiceImport(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceImport := obj.(*mcsv1a1.ServiceImport)
-
+	
 	serviceName, ok := serviceImport.Annotations[mcsv1a1.LabelServiceName]
 	if ok {
 		// This is an aggregated ServiceImport - sync it to the local service namespace.
 		serviceImport.Name = serviceName
-		serviceImport.Namespace = serviceImport.Annotations[constants.LabelSourceNamespace]
+		targetNamespace := serviceImport.Annotations[constants.LabelSourceNamespace]
+
+		if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+			logger.Warningf("Rejecting aggregated ServiceImport %q: %v", serviceName, err)
+
+			// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+			// Stale local resources should be cleaned up by administrators.
+			return nil, false
+		}
+
+		serviceImport.Namespace = targetNamespace
 
 		delete(serviceImport.Annotations, mcsv1a1.LabelServiceName)
 		delete(serviceImport.Annotations, constants.LabelSourceNamespace)
