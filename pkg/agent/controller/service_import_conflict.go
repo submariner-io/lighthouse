@@ -24,7 +24,6 @@ import (
 	"math"
 	"reflect"
 	goslices "slices"
-	"strconv"
 	"strings"
 
 	"github.com/submariner-io/admiral/pkg/slices"
@@ -191,16 +190,12 @@ func toSessionAffinityConfigString(c *corev1.SessionAffinityConfig) string {
 	return "none"
 }
 
-func parseTimestamp(si *mcsv1a1.ServiceImport) int64 {
-	v := si.Annotations[constants.ServiceExportTimestamp]
-
-	t, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		logger.Warningf("Invalid %q annotation value %q for ServiceImport %q", constants.ServiceExportTimestamp, v, si.Name)
+func getTimestamp(si *mcsv1a1.ServiceImport) int64 {
+	if si.CreationTimestamp.IsZero() {
 		return math.MaxInt64
 	}
 
-	return t
+	return si.CreationTimestamp.UnixNano()
 }
 
 func sortServiceImportsByTimestamp(siList []runtime.Object, aggregatedType mcsv1a1.ServiceImportType) {
@@ -217,8 +212,8 @@ func sortServiceImportsByTimestamp(siList []runtime.Object, aggregatedType mcsv1
 			return -1
 		}
 
-		tsA := parseTimestamp(siA)
-		tsB := parseTimestamp(siB)
+		tsA := getTimestamp(siA)
+		tsB := getTimestamp(siB)
 
 		if tsA < tsB {
 			return -1
