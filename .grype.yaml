@@ -10,3 +10,9 @@ ignore:
   - vulnerability: CVE-2021-22570
     package:
       name: google.golang.org/protobuf
+  # No fix available for golang.org/x/crypto.
+  - vulnerability: GO-2026-5932
+    fix-state: not-fixed
+    package:
+      name: golang.org/x/crypto
+      location: /coredns/go.mod
