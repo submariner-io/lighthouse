@@ -26,3 +26,8 @@ ignore:
     fix-state: not-fixed
     package:
       name: golang.org/x/crypto
+  # Fix to v1.83.1 causes github.com/DataDog/go-tuf downgrade from v1.1.1-0.5.2 to v1.1.1 that cannot be resolved
+  - vulnerability: GHSA-vp52-pcj8-j9qc
+    fix-state: not-fixed
+    package:
+      name: google.golang.org/grpc
