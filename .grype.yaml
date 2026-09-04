@@ -16,3 +16,13 @@ ignore:
     package:
       name: golang.org/x/crypto
       location: /coredns/go.mod
+  # Fix requires Go 1.26 (minor version bump), incompatible with release-0.23 branch
+  - vulnerability: GO-2026-6354
+    fix-state: not-fixed
+    package:
+      name: golang.org/x/crypto
+  # Fix requires Go 1.26 (minor version bump), incompatible with release-0.23 branch
+  - vulnerability: GO-2026-6355
+    fix-state: not-fixed
+    package:
+      name: golang.org/x/crypto
