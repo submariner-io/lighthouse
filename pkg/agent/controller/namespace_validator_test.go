@@ -46,8 +46,8 @@ var _ = Describe("NamespaceValidator", func() {
 		validator = controller.NewNamespaceValidator()
 	})
 
-	Context("with no configured deny list", func() {
-		It("should use the default deny list", func() {
+	Context("with no configured deny and allow lists", func() {
+		It("should use the defaults", func() {
 			Expect(validator.CheckAllowed("kube-system")).NotTo(Succeed())
 			Expect(validator.CheckAllowed("kube-public")).NotTo(Succeed())
 			Expect(validator.CheckAllowed("kube-node-lease")).NotTo(Succeed())
@@ -60,6 +60,7 @@ var _ = Describe("NamespaceValidator", func() {
 			Expect(validator.CheckAllowed("production")).To(Succeed())
 			Expect(validator.CheckAllowed("my-openshift-app")).To(Succeed())
 			Expect(validator.CheckAllowed("test-kube-demo")).To(Succeed())
+			Expect(validator.CheckAllowed("openshift-storage")).To(Succeed())
 		})
 	})
 
@@ -78,6 +79,45 @@ var _ = Describe("NamespaceValidator", func() {
 
 			Expect(validator.CheckAllowed("defaulttest")).To(Succeed())
 			Expect(validator.CheckAllowed("my-system")).To(Succeed())
+		})
+	})
+
+	Context("with allow list overriding deny list", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				Data: map[string]string{
+					controller.ConfigKeyImportNamespaceDenyList:  "app-,deny-override",
+					controller.ConfigKeyImportNamespaceAllowList: "app-allow,deny-override",
+				},
+			}
+		})
+
+		It("should allow exceptions to the deny list", func() {
+			Expect(validator.CheckAllowed("app-allow")).To(Succeed())
+			Expect(validator.CheckAllowed("app-disallow")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("my-app")).To(Succeed())
+			Expect(validator.CheckAllowed("deny-override")).To(Succeed())
+		})
+	})
+
+	Context("with allow list using prefix matching", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				Data: map[string]string{
+					controller.ConfigKeyImportNamespaceDenyList:  "kube-, openshift-",
+					controller.ConfigKeyImportNamespaceAllowList: "openshift-storage, kube-public-",
+				},
+			}
+		})
+
+		It("should allow prefixes that override deny list", func() {
+			Expect(validator.CheckAllowed("openshift-storage")).To(Succeed())
+			Expect(validator.CheckAllowed("kube-public-test")).To(Succeed())
+			Expect(validator.CheckAllowed("kube-public-demo")).To(Succeed())
+
+			Expect(validator.CheckAllowed("openshift-console")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-system")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-public")).NotTo(Succeed())
 		})
 	})
 })
