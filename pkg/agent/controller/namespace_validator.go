@@ -31,19 +31,23 @@ import (
 )
 
 const (
-	ConfigKeyImportNamespaceDenyList = "import-namespace-deny-list"
-	DefaultImportNamespaceDenyList   = "kube-,openshift-,openshift"
+	ConfigKeyImportNamespaceAllowList = "import-namespace-allow-list"
+	ConfigKeyImportNamespaceDenyList  = "import-namespace-deny-list"
+	DefaultImportNamespaceDenyList    = "kube-,openshift-,openshift"
+	DefaultImportNamespaceAllowList   = "openshift-storage"
 )
 
-// NamespaceValidator validates broker-supplied namespace labels against a configurable denylist.
+// NamespaceValidator validates broker-supplied namespace labels against a configurable allowlist and denylist.
 type NamespaceValidator struct {
-	denyList []string
+	allowList []string
+	denyList  []string
 }
 
-// NewNamespaceValidator creates a validator using the configured denylist from ConfigMap.
-// If not configured, uses DefaultImportNamespaceDenyList.
+// NewNamespaceValidator creates a validator using the configured allowlist and denylist from ConfigMap.
+// If not configured, uses DefaultImportNamespaceDenyList and DefaultImportNamespaceAllowList.
 func NewNamespaceValidator(dynClient dynamic.Interface) *NamespaceValidator {
 	denyListStr := DefaultImportNamespaceDenyList
+	allowListStr := DefaultImportNamespaceAllowList
 
 	obj, err := dynClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("submariner-operator").Get(
 		context.TODO(), "submariner-lighthouse-agent", metav1.GetOptions{})
@@ -54,23 +58,23 @@ func NewNamespaceValidator(dynClient dynamic.Interface) *NamespaceValidator {
 		if s != "" {
 			denyListStr = s
 		}
+
+		s = cm.Data[ConfigKeyImportNamespaceAllowList]
+		if s != "" {
+			allowListStr = s
+		}
 	} else if err != nil && !apierrors.IsNotFound(err) {
 		logger.Errorf(err, "Failed to get submariner-lighthouse-agent configmap")
 	}
 
-	var denyList []string
-	if denyListStr != "" {
-		denyList = strings.Split(denyListStr, ",")
-		// Trim whitespace from each entry
-		for i := range denyList {
-			denyList[i] = strings.TrimSpace(denyList[i])
-		}
-	}
+	denyList := parseListStr(denyListStr)
+	allowList := parseListStr(allowListStr)
 
-	logger.Infof("Namespace validator using deny list: %v", denyList)
+	logger.Infof("Namespace validator using allow list: %v, deny list: %v", allowList, denyList)
 
 	return &NamespaceValidator{
-		denyList: denyList,
+		allowList: allowList,
+		denyList:  denyList,
 	}
 }
 
@@ -87,19 +91,59 @@ func (v *NamespaceValidator) CheckAllowed(namespace string) error {
 
 	// Check against denylist
 	for _, entry := range v.denyList {
-		if entry == "" {
-			continue
-		}
-
 		// If entry ends with hyphen, treat as prefix match only, otherwise use exact match.
 		if strings.HasSuffix(entry, "-") {
 			if strings.HasPrefix(namespace, entry) {
+				// Check if allow list overrides this denial
+				if v.isInAllowList(namespace) {
+					return nil
+				}
+
 				return errors.Errorf("namespace %q matches denied prefix %q", namespace, entry)
 			}
 		} else if namespace == entry {
+			// Check if allow list overrides this denial
+			if v.isInAllowList(namespace) {
+				return nil
+			}
+
 			return errors.Errorf("namespace %q is denied (matches %q)", namespace, entry)
 		}
 	}
 
 	return nil
+}
+
+func (v *NamespaceValidator) isInAllowList(namespace string) bool {
+	for _, entry := range v.allowList {
+		// If entry ends with hyphen, treat as prefix match only, otherwise use exact match.
+		if strings.HasSuffix(entry, "-") {
+			if strings.HasPrefix(namespace, entry) {
+				return true
+			}
+		} else if namespace == entry {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parseListStr(listStr string) []string {
+	var retList []string
+
+	if listStr != "" {
+		list := strings.Split(listStr, ",")
+		retList = make([]string, 0, len(list))
+
+		// Trim whitespace from each entry
+		for i := range list {
+			s := strings.TrimSpace(list[i])
+			if s != "" {
+				retList = append(retList, s)
+			}
+		}
+	}
+
+	return retList
 }
