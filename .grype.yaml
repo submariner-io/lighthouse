@@ -1,12 +1,13 @@
 ---
 ignore:
-  # False positive, CVE is actually about the C++ project protocolbuffers/protobuf
-  # https://github.com/anchore/grype/issues/558
-  - vulnerability: CVE-2015-5237
+  # No fix available for golang.org/x/crypto.
+  - vulnerability: GO-2026-5932
+    fix-state: not-fixed
     package:
-      name: google.golang.org/protobuf
-  # False positive, CVE is actually about the C++ project protocolbuffers/protobuf
-  # https://github.com/anchore/grype/issues/633
-  - vulnerability: CVE-2021-22570
+      name: golang.org/x/crypto
+      location: /coredns/go.mod
+  # No available fix; required by multiple transitive dependencies at incompatible versions
+  - vulnerability: GO-2026-5932
+    fix-state: unknown
     package:
-      name: google.golang.org/protobuf
+      name: golang.org/x/crypto

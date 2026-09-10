@@ -27,7 +27,6 @@ const (
 	GlobalnetEnabled         = "lighthouse.submariner.io/globalnet-enabled"
 	UseClustersetIP          = "lighthouse.submariner.io/use-clusterset-ip"
 	ClustersetIPAllocatedBy  = "lighthouse.submariner.io/clusterset-ip-allocated-by"
-	ServiceExportTimestamp   = "lighthouse.submariner.io/svc-export-timestanp"
 )
 
 const ServiceExportReady = "Ready"

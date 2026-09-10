@@ -50,7 +50,7 @@ ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
 
 LABEL com.redhat.component="lighthouse-agent-container" \
       name="rhacm2/lighthouse-agent-rhel9" \
-      version="v0.24.0" \
+      version="v0.24.1" \
       summary="Lighthouse Agent" \
       description="The Lighthouse Agent provides service discovery for Submariner." \
       io.k8s.display-name="Lighthouse Agent" \

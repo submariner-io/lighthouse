@@ -43,6 +43,7 @@ const (
 	ServiceExportReasonClusterSetIPEnablementConflict mcsv1a1.ServiceExportConditionReason = "ClusterSetIPEnablementConflict"
 	ServiceExportReasonUnsupportedIPFamily            mcsv1a1.ServiceExportConditionReason = "UnsupportedIPFamily"
 	ServiceExportReasonGlobalIPUnavailable            mcsv1a1.ServiceExportConditionReason = "ServiceGlobalIPUnavailable"
+	ServiceExportReasonRestrictedNamespace            mcsv1a1.ServiceExportConditionReason = "RestrictedNamespace"
 )
 
 type EndpointSliceListerFn func(selector k8slabels.Selector) []runtime.Object
@@ -64,6 +65,7 @@ type Controller struct {
 	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
 	namespaceInformer           cache.SharedInformer
+	namespaceValidator          *NamespaceValidator
 }
 
 type AgentSpecification struct {
@@ -97,6 +99,7 @@ type ServiceImportController struct {
 	localLHEndpointSliceLister EndpointSliceListerFn
 	clustersetIPPool           *ipam.IPPool
 	clustersetIPEnabled        bool
+	namespaceValidator         *NamespaceValidator
 }
 
 // ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
@@ -122,6 +125,8 @@ type EndpointSliceController struct {
 	syncer              *broker.Syncer
 	serviceExportClient *ServiceExportClient
 	serviceSyncer       syncer.Interface
+	localClient         dynamic.Interface
+	namespaceValidator  *NamespaceValidator
 }
 
 type ServiceExportClient struct {
