@@ -21,6 +21,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -123,9 +124,21 @@ func (i *Interface) putClusterIPEndpointSlice(key, clusterID string, endpointSli
 		return false
 	}
 
+	address := endpointSlice.Endpoints[0].Addresses[0]
+	if !isPermittedEndpointAddress(address) {
+		logger.Warningf("Rejecting non-routable address %q in EndpointSlice %q from cluster %q", address, key, clusterID)
+
+		delete(ipFamilyInfo.clusters, clusterID)
+		ipFamilyInfo.mergePorts()
+		ipFamilyInfo.resetLoadBalancing()
+
+		return false
+	}
+
 	clusterInfo := ipFamilyInfo.ensureClusterInfo(clusterID)
+
 	clusterInfo.endpointRecords = []DNSRecord{{
-		IP:          endpointSlice.Endpoints[0].Addresses[0],
+		IP:          address,
 		Ports:       mcsServicePortsFrom(endpointSlice.Ports),
 		ClusterName: clusterID,
 	}}
@@ -173,6 +186,13 @@ func (i *Interface) putHeadlessEndpointSlices(key, clusterID string, endpointSli
 				}
 
 				allAddresses.Insert(address)
+
+				if !isPermittedEndpointAddress(address) {
+					logger.Warningf("Rejecting non-routable address %q in headless EndpointSlice %q from cluster %q",
+						address, key, clusterID)
+
+					continue
+				}
 
 				var hostname string
 
@@ -329,4 +349,19 @@ func shouldRetrieveLocalEndpointSlicesFor(endpointSlice *discovery.EndpointSlice
 
 	return endpointSlice.AddressType == discovery.AddressTypeIPv4 &&
 		isHeadless(endpointSlice) && globalnetEnabled == strconv.FormatBool(true)
+}
+
+// isPermittedEndpointAddress reports whether the given broker-supplied address may be served as a clusterset.local DNS answer.
+// Endpoint and ServiceImport addresses originate from remote member clusters via the broker and are therefore untrusted; serving them
+// without range validation lets a compromised peer steer cross-cluster DNS to loopback, link-local (incl. 169.254.169.254 cloud metadata),
+// unspecified, multicast or broadcast addresses. This guards the DNS sink only and does not attempt source-cluster CIDR matching, which
+// requires data not available to the resolver.
+func isPermittedEndpointAddress(address string) bool {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return false
+	}
+
+	return !ip.IsUnspecified() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() && !ip.IsMulticast() &&
+		!ip.Equal(net.IPv4bcast)
 }

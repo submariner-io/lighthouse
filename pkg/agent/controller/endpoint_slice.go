@@ -46,6 +46,7 @@ import (
 //nolint:gocritic // (hugeParam) This function modifies syncerConf so we don't want to pass by pointer.
 func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.SyncerConfig,
 	serviceExportClient *ServiceExportClient, serviceSyncer syncer.Interface, aggregatedServiceImportGetter AggregatedServiceImportGetterFn,
+	namespaceValidator *NamespaceValidator,
 ) (*EndpointSliceController, error) {
 	c := &EndpointSliceController{
 		clusterID:                     spec.ClusterID,
@@ -53,6 +54,8 @@ func newEndpointSliceController(spec *AgentSpecification, syncerConfig broker.Sy
 		serviceSyncer:                 serviceSyncer,
 		conflictCheckWorkQueue:        workqueue.New("ConflictChecker"),
 		aggregatedServiceImportGetter: aggregatedServiceImportGetter,
+		localClient:                   syncerConfig.LocalClient,
+		namespaceValidator:            namespaceValidator,
 	}
 
 	syncerConfig.LocalNamespace = metav1.NamespaceAll
@@ -153,9 +156,20 @@ func isLegacyEndpointSlice(endpointSlice *discovery.EndpointSlice) bool {
 	return strings.HasSuffix(endpointSlice.Name, "-"+endpointSlice.Labels[mcsv1a1.LabelSourceCluster])
 }
 
-func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+func (c *EndpointSliceController) onRemoteEndpointSlice(obj runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice.Namespace = endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
+	targetNamespace := endpointSlice.GetObjectMeta().GetLabels()[constants.LabelSourceNamespace]
+
+	if err := c.namespaceValidator.CheckAllowed(targetNamespace); err != nil {
+		logger.Warningf("Rejecting EndpointSlice %q from cluster %q: %v",
+			endpointSlice.Name, endpointSlice.Labels[mcsv1a1.LabelSourceCluster], err)
+
+		// Do not delete local resources based on rejected broker objects - they cannot be trusted.
+		// Stale local resources should be cleaned up by administrators.
+		return nil, false
+	}
+
+	endpointSlice.Namespace = targetNamespace
 
 	return endpointSlice, false
 }
