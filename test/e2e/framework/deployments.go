@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func (f *Framework) NewNetShootDeployment(ctx context.Context, cluster framework.ClusterIndex) *corev1.PodList {
@@ -57,10 +56,10 @@ func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster frame
 					},
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: ptr.To(false),
+					AutomountServiceAccountToken: new(false),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(int64(10000)),
+						RunAsNonRoot: new(true),
+						RunAsUser:    new(int64(10000)),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -71,8 +70,8 @@ func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster frame
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
-								ReadOnlyRootFilesystem:   ptr.To(true),
+								AllowPrivilegeEscalation: new(false),
+								ReadOnlyRootFilesystem:   new(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -117,10 +116,10 @@ func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.Cl
 					},
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: ptr.To(false),
+					AutomountServiceAccountToken: new(false),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(int64(10000)),
+						RunAsNonRoot: new(true),
+						RunAsUser:    new(int64(10000)),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -131,8 +130,8 @@ func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.Cl
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
-								ReadOnlyRootFilesystem:   ptr.To(true),
+								AllowPrivilegeEscalation: new(false),
+								ReadOnlyRootFilesystem:   new(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
