@@ -22,8 +22,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/lighthouse/coredns/constants"
+	"github.com/submariner-io/lighthouse/coredns/resolver"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -64,6 +66,49 @@ var _ = Describe("PutEndpointSlices", func() {
 					},
 				},
 			})
+		})
+	})
+
+	When("a ClusterIP EndpointSlice has a non-routable address", func() {
+		It("should not add a DNS record", func() {
+			t.resolver.PutServiceImport(newAggregatedServiceImport(namespace1, service1))
+
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, "10.253.2.2", true, port1))
+			t.putEndpointSlice(newClusterIPEndpointSlice(namespace1, service1, clusterID1, "127.0.0.1", true, port1))
+
+			t.assertDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
+		})
+	})
+
+	When("a headless EndpointSlice has non-routable addresses", func() {
+		It("should not add DNS records for those addresses", func() {
+			t.resolver.PutServiceImport(newHeadlessAggregatedServiceImport(namespace1, service1))
+
+			// EndpointSlice with mix of routable and non-routable addresses
+			t.putEndpointSlice(newEndpointSlice(namespace1, service1, clusterID1, []mcsv1a1.ServicePort{port1},
+				discovery.Endpoint{
+					Addresses:  []string{endpointIP1}, // Routable
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{"127.0.0.1"}, // Non-routable: loopback
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+				discovery.Endpoint{
+					Addresses:  []string{"0.0.0.0"}, // Non-routable: unspecified
+					Conditions: discovery.EndpointConditions{Ready: &ready},
+				},
+			))
+
+			// Should only have the routable address
+			t.assertDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, true,
+				resolver.DNSRecord{
+					IP:          endpointIP1,
+					Ports:       []mcsv1a1.ServicePort{port1},
+					ClusterName: clusterID1,
+					HostName:    endpointHostname1,
+				},
+			)
 		})
 	})
 })

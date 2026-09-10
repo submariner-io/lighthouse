@@ -82,11 +82,15 @@ func (i *Interface) getClusterIPRecord(serviceInfo *serviceInfo, addrType discov
 		return &clusterInfo.endpointRecords[0], true
 	}
 
-	if len(serviceInfo.spec.IPs) > 0 {
-		return &DNSRecord{
-			IP:    serviceInfo.spec.IPs[0],
-			Ports: serviceInfo.spec.Ports,
-		}, true
+	if serviceInfo.isClusterset {
+		if len(serviceInfo.spec.IPs) > 0 {
+			return &DNSRecord{
+				IP:    serviceInfo.spec.IPs[0],
+				Ports: serviceInfo.spec.Ports,
+			}, true
+		}
+
+		return nil, false
 	}
 
 	// If we are aware of the local cluster and we found some accessible IP, we shall return it.
