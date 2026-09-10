@@ -57,6 +57,17 @@ func (i *Interface) PutServiceImport(serviceImport *mcsv1b1.ServiceImport) {
 
 	svcInfo.spec = serviceImport.Spec
 	svcInfo.isExported = true
+	svcInfo.isClusterset = len(serviceImport.Spec.IPs) > 0
+
+	for _, ip := range svcInfo.spec.IPs {
+		if !isPermittedEndpointAddress(ip) {
+			logger.Warningf("Rejecting non-routable clusterset IP %q on ServiceImport %q", ip, key)
+
+			svcInfo.spec.IPs = nil
+
+			break
+		}
+	}
 }
 
 func (i *Interface) RemoveServiceImport(serviceImport *mcsv1b1.ServiceImport) {

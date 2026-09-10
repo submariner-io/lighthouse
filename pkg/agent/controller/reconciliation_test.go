@@ -86,7 +86,7 @@ var _ = Describe("Reconciliation", func() {
 		Expect(endpointSlices).To(HaveLen(1))
 		localEndpointSlice = endpointSlices[0]
 
-		obj, err := t.cluster1.localServiceExportClient.Get(ctx, t.cluster1.serviceExport.Name, metav1.GetOptions{})
+		obj, err := t.cluster1.localServiceExportClient().Get(ctx, t.cluster1.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		serviceExport = toServiceExport(obj)
@@ -127,7 +127,7 @@ var _ = Describe("Reconciliation", func() {
 
 			test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 			test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, localEndpointSlice)
-			test.CreateResource(ctx, t.cluster1.localServiceExportClient, serviceExport)
+			test.CreateResource(ctx, t.cluster1.localServiceExportClient(), serviceExport)
 
 			_, err := t.cluster1.localServiceImportClient.Namespace(serviceNamespace).Create(ctx, localAggregatedServiceImport,
 				metav1.CreateOptions{})
@@ -281,7 +281,7 @@ var _ = Describe("Reconciliation", func() {
 				restoreBrokerResources(ctx)
 				test.CreateResource(ctx, t.cluster1.localServiceImportClient.Namespace(test.LocalNamespace), localServiceImport)
 				test.CreateResource(ctx, t.cluster1.localEndpointSliceClient, localEndpointSlice)
-				test.CreateResource(ctx, t.cluster1.localServiceExportClient, serviceExport)
+				test.CreateResource(ctx, t.cluster1.localServiceExportClient(), serviceExport)
 				t.cluster1.createService(ctx)
 
 				// Create a remote EPS for the same service and ensure it's not deleted.

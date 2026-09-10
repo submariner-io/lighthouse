@@ -447,11 +447,15 @@ func testClusterIPServiceMisc() {
 }
 
 func testClusterSetIP() {
-	const clusterSetIP = "243.1.0.1"
-
 	t := newTestDriver()
 
+	var clusterSetIP string
+
 	BeforeEach(func(ctx context.Context) {
+		clusterSetIP = "243.1.0.1"
+	})
+
+	JustBeforeEach(func(ctx context.Context) {
 		si := newAggregatedServiceImport(namespace1, service1)
 
 		si.Spec.IPs = []string{clusterSetIP}
@@ -482,6 +486,16 @@ func testClusterSetIP() {
 				Ports:       []mcsv1b1.ServicePort{port1},
 				ClusterName: clusterID1,
 			})
+		})
+	})
+
+	Context("that is invalid", func() {
+		BeforeEach(func(ctx context.Context) {
+			clusterSetIP = "127.0.0.0"
+		})
+
+		It("should return no DNS records found", func() {
+			t.assertDNSRecordsNotFound(namespace1, service1, "", "")
 		})
 	})
 }
