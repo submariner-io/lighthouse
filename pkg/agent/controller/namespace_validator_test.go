@@ -1,0 +1,134 @@
+/*
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller_test
+
+import (
+	"context"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/lighthouse/pkg/agent/controller"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+)
+
+var _ = Describe("NamespaceValidator", func() {
+	var (
+		validator *controller.NamespaceValidator
+		configMap *corev1.ConfigMap
+		dynClient dynamic.Interface
+	)
+
+	BeforeEach(func() {
+		configMap = nil
+		dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+	})
+
+	JustBeforeEach(func() {
+		if configMap != nil {
+			_, err := dynClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("submariner-operator").
+				Create(context.TODO(), resource.MustToUnstructured(configMap), metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		validator = controller.NewNamespaceValidator(dynClient)
+	})
+
+	Context("with no configured deny and allow lists", func() {
+		It("should use the defaults", func() {
+			Expect(validator.CheckAllowed("kube-system")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-public")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-node-lease")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("openshift-ovn-kubernetes")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("openshift-console")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("")).NotTo(Succeed())
+
+			Expect(validator.CheckAllowed("default")).To(Succeed())
+			Expect(validator.CheckAllowed("my-app")).To(Succeed())
+			Expect(validator.CheckAllowed("production")).To(Succeed())
+			Expect(validator.CheckAllowed("my-openshift-app")).To(Succeed())
+			Expect(validator.CheckAllowed("test-kube-demo")).To(Succeed())
+			Expect(validator.CheckAllowed("openshift-storage")).To(Succeed())
+		})
+	})
+
+	Context("with a configured deny list", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "submariner-lighthouse-agent"},
+				Data: map[string]string{
+					controller.ConfigKeyImportNamespaceDenyList: "default , system-",
+				},
+			}
+		})
+
+		It("should use it", func() {
+			Expect(validator.CheckAllowed("default")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("system-core")).NotTo(Succeed())
+
+			Expect(validator.CheckAllowed("defaulttest")).To(Succeed())
+			Expect(validator.CheckAllowed("my-system")).To(Succeed())
+		})
+	})
+
+	Context("with allow list overriding deny list", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "submariner-lighthouse-agent"},
+				Data: map[string]string{
+					controller.ConfigKeyImportNamespaceDenyList:  "app-,deny-override",
+					controller.ConfigKeyImportNamespaceAllowList: "app-allow,deny-override",
+				},
+			}
+		})
+
+		It("should allow exceptions to the deny list", func() {
+			Expect(validator.CheckAllowed("app-allow")).To(Succeed())
+			Expect(validator.CheckAllowed("app-disallow")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("my-app")).To(Succeed())
+			Expect(validator.CheckAllowed("deny-override")).To(Succeed())
+		})
+	})
+
+	Context("with allow list using prefix matching", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "submariner-lighthouse-agent"},
+				Data: map[string]string{
+					controller.ConfigKeyImportNamespaceDenyList:  "kube-, openshift-",
+					controller.ConfigKeyImportNamespaceAllowList: "openshift-storage, kube-public-",
+				},
+			}
+		})
+
+		It("should allow prefixes that override deny list", func() {
+			Expect(validator.CheckAllowed("openshift-storage")).To(Succeed())
+			Expect(validator.CheckAllowed("kube-public-test")).To(Succeed())
+			Expect(validator.CheckAllowed("kube-public-demo")).To(Succeed())
+
+			Expect(validator.CheckAllowed("openshift-console")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-system")).NotTo(Succeed())
+			Expect(validator.CheckAllowed("kube-public")).NotTo(Succeed())
+		})
+	})
+})

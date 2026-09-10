@@ -121,7 +121,6 @@ type cluster struct {
 	agentSpec                 controller.AgentSpecification
 	localDynClient            dynamic.Interface
 	localDynClientFake        *k8stesting.Fake
-	localServiceExportClient  dynamic.ResourceInterface
 	localServiceImportClient  dynamic.NamespaceableResourceInterface
 	localIngressIPClient      dynamic.ResourceInterface
 	localEndpointSliceClient  dynamic.ResourceInterface
@@ -360,9 +359,6 @@ func (c *cluster) init(syncerConfig *broker.SyncerConfig, dynClient dynamic.Inte
 
 	c.localServiceImportReactor = fake.NewFailingReactorForResource(c.localDynClientFake, "serviceimports")
 
-	c.localServiceExportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
-		&mcsv1a1.ServiceExport{})).Namespace(serviceNamespace)
-
 	c.localServiceImportClient = c.localDynClient.Resource(*test.GetGroupVersionResourceFor(syncerConfig.RestMapper,
 		&mcsv1a1.ServiceImport{}))
 
@@ -424,11 +420,11 @@ func (c *cluster) deleteService() {
 }
 
 func (c *cluster) createServiceExport() {
-	test.CreateResource(c.localServiceExportClient, c.serviceExport)
+	test.CreateResource(c.localServiceExportClient(), c.serviceExport)
 }
 
 func (c *cluster) deleteServiceExport() {
-	Expect(c.localServiceExportClient.Delete(context.TODO(), c.serviceExport.GetName(), metav1.DeleteOptions{})).To(Succeed())
+	Expect(c.localServiceExportClient().Delete(context.TODO(), c.serviceExport.GetName(), metav1.DeleteOptions{})).To(Succeed())
 }
 
 func (c *cluster) createServiceEndpointSlices() {
@@ -545,7 +541,7 @@ func (c *cluster) awaitServiceExportCondition(expected ...*mcsv1a1.ServiceExport
 	last := len(expected) - 1
 
 	Eventually(func() interface{} {
-		obj, err := c.localServiceExportClient.Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
+		obj, err := c.localServiceExportClient().Get(context.Background(), c.serviceExport.Name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 		se := toServiceExport(obj)
 
@@ -639,6 +635,10 @@ func (c *cluster) ensureNoServiceExportActions() {
 	Consistently(func() []string {
 		return testutil.GetOccurredActionVerbs(c.localDynClientFake, "serviceexports", "get", "update")
 	}, 500*time.Millisecond).Should(BeEmpty())
+}
+
+func (c *cluster) localServiceExportClient() dynamic.ResourceInterface {
+	return serviceExportClientFor(c.localDynClient, c.serviceExport.Namespace)
 }
 
 func awaitServiceImport(client dynamic.NamespaceableResourceInterface, expected *mcsv1a1.ServiceImport, ipPool *ipam.IPPool,
