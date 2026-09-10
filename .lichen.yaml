@@ -23,6 +23,8 @@ override:
     licenses: ["Apache-2.0"]
   - path: "sigs.k8s.io/yaml"
     licenses: ["Apache-2.0", "MIT"]
+  - path: "github.com/zeebo/blake3"
+    licenses: ["MIT"]
 
 # Check https://github.com/cncf/foundation/blob/main/license-exceptions/CNCF-licensing-exceptions.csv
 exceptions:
