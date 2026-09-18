@@ -1,9 +1,5 @@
 ---
 ignore:
-  # Deprecation advisory for unmaintained openpgp subpackage, not a fixable CVE.
-  - vulnerability: GO-2026-5932
-    package:
-      name: google.golang.org/protobuf
   # False positive, CVE is actually about the C++ project protocolbuffers/protobuf
   # https://github.com/anchore/grype/issues/633
   - vulnerability: CVE-2021-22570
