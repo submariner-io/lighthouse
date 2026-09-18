@@ -1,9 +1,5 @@
 ---
 ignore:
-  # Update requires Go >= 1.25. Low severity doesn't justify breaking changes.
-  - vulnerability: GO-2026-5024
-    package:
-      name: golang.org/x/sys
   # Deprecation advisory for unmaintained openpgp subpackage, not a fixable CVE.
   - vulnerability: GO-2026-5932
     package:
