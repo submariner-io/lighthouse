@@ -1,11 +1,5 @@
 ---
 ignore:
-  # No fix available for golang.org/x/crypto.
-  - vulnerability: GO-2026-5932
-    fix-state: not-fixed
-    package:
-      name: golang.org/x/crypto
-      location: /coredns/go.mod
   # Fix requires Go 1.26 (minor version bump), incompatible with release-0.23 branch
   - vulnerability: GO-2026-6354
     fix-state: not-fixed
@@ -21,3 +15,9 @@ ignore:
     fix-state: not-fixed
     package:
       name: google.golang.org/grpc
+  # No fix available for golang.org/x/crypto.
+  - vulnerability: GO-2026-5932
+    fix-state: unknown
+    package:
+      name: golang.org/x/crypto
+      location: /coredns/go.mod
