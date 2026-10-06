@@ -14,3 +14,9 @@ ignore:
   - vulnerability: GHSA-cvx7-x8pj-x2gw
     package:
       name: github.com/coredns/coredns
+
+  # No fix available
+  - vulnerability: GO-2026-5932
+    fix-state: unknown
+    package:
+      name: golang.org/x/crypto
