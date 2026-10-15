@@ -20,6 +20,7 @@ package framework
 
 import (
 	"context"
+	"slices"
 
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
@@ -59,7 +60,7 @@ func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster frame
 					AutomountServiceAccountToken: new(false),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: new(true),
-						RunAsUser:    new(int64(10000)),
+						RunAsUser:    nettestRunAsUser(ctx, cluster),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -119,7 +120,7 @@ func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.Cl
 					AutomountServiceAccountToken: new(false),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: new(true),
-						RunAsUser:    new(int64(10000)),
+						RunAsUser:    nettestRunAsUser(ctx, cluster),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -168,4 +169,18 @@ func createDeployment(ctx context.Context, f *Framework, cluster framework.Clust
 	}, framework.NoopCheckResult)
 
 	return f.AwaitPodsByAppLabel(ctx, cluster, appName, deployment.Namespace, 1)
+}
+
+// nettestRunAsUser returns nil on OpenShift, where restricted-v2 SCC admission assigns a UID from the namespace's range,
+// and 10000 elsewhere because older nettest images default to root.
+func nettestRunAsUser(ctx context.Context, cluster framework.ClusterIndex) *int64 {
+	groups := framework.AwaitUntil(ctx, "discover API groups for nettest UID selection",
+		framework.KubeClients[cluster].Discovery().ServerGroupsWithContext,
+		framework.NoopCheckResult)
+
+	if slices.ContainsFunc(groups.Groups, func(group metav1.APIGroup) bool { return group.Name == "security.openshift.io" }) {
+		return nil
+	}
+
+	return new(int64(10000))
 }
