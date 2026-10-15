@@ -20,6 +20,7 @@ package framework
 
 import (
 	"context"
+	"slices"
 
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,6 +35,8 @@ func (f *Framework) NewNetShootDeployment(cluster framework.ClusterIndex) *corev
 }
 
 func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, namespace string) *corev1.PodList {
+	runAsUser := nettestRunAsUser(cluster)
+
 	var replicaCount int32 = 1
 	netShootDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -60,7 +63,7 @@ func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, na
 					AutomountServiceAccountToken: ptr.To(false),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(int64(10000)),
+						RunAsUser:    runAsUser,
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -96,6 +99,8 @@ func (f *Framework) NewNetShootDeploymentInNS(cluster framework.ClusterIndex, na
 }
 
 func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.PodList {
+	runAsUser := nettestRunAsUser(cluster)
+
 	var replicaCount int32 = 1
 	var port int32 = 8080
 	nginxDeployment := &appsv1.Deployment{
@@ -120,7 +125,7 @@ func (f *Framework) NewNginxDeployment(cluster framework.ClusterIndex) *corev1.P
 					AutomountServiceAccountToken: ptr.To(false),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(int64(10000)),
+						RunAsUser:    runAsUser,
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -169,4 +174,19 @@ func createDeployment(f *Framework, cluster framework.ClusterIndex, deployment *
 	}, framework.NoopCheckResult).(*appsv1.Deployment)
 
 	return f.AwaitPodsByAppLabel(cluster, appName, deployment.Namespace, 1)
+}
+
+// nettestRunAsUser returns the pod UID for the nettest helper Deployments. OpenShift's default restricted-v2 SCC only
+// admits UIDs from the namespace's allocated range and assigns one when none is set, so leave it unset there. Elsewhere,
+// set a non-root UID explicitly because older nettest images default to root.
+func nettestRunAsUser(cluster framework.ClusterIndex) *int64 {
+	groups := framework.AwaitUntil("discover API groups for nettest UID selection", func() (interface{}, error) {
+		return framework.KubeClients[cluster].Discovery().ServerGroups()
+	}, framework.NoopCheckResult).(*metav1.APIGroupList)
+
+	if slices.ContainsFunc(groups.Groups, func(group metav1.APIGroup) bool { return group.Name == "security.openshift.io" }) {
+		return nil
+	}
+
+	return ptr.To(int64(10000))
 }
