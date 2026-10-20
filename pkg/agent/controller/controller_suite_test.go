@@ -768,9 +768,9 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 	Eventually(func(g Gomega) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
+		endpointSlices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
 
-		for _, eps := range slices {
+		for _, eps := range endpointSlices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
 				if eps.Labels[constants.LabelSourceName] == expected.Name {
 					endpointSlice = eps
