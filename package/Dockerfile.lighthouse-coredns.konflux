@@ -21,7 +21,7 @@ WORKDIR ${SOURCE}/coredns
 
 RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
-    -X main.version=${BASE_BRANCH}" \
+    -X main.version=v0.24.2" \
     -tags "${BUILD_TAGS}" \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-coredns \
     .
