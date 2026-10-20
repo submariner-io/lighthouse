@@ -21,7 +21,7 @@ WORKDIR ${SOURCE}
 
 RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
-    -X main.version=${BASE_BRANCH}" \
+    -X main.version=v0.24.2" \
     -tags "${BUILD_TAGS}" \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-agent \
     ${SOURCE}/pkg/agent/main.go
@@ -50,7 +50,7 @@ ENTRYPOINT ["/usr/local/bin/lighthouse-agent", "-alsologtostderr"]
 
 LABEL com.redhat.component="lighthouse-agent-container" \
       name="rhacm2/lighthouse-agent-rhel9" \
-      version="v0.24.1" \
+      version="v0.24.2" \
       summary="Lighthouse Agent" \
       description="The Lighthouse Agent provides service discovery for Submariner." \
       io.k8s.display-name="Lighthouse Agent" \

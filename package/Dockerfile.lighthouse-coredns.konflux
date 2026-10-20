@@ -21,7 +21,7 @@ WORKDIR ${SOURCE}/coredns
 
 RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
-    -X main.version=${BASE_BRANCH}" \
+    -X main.version=v0.24.2" \
     -tags "${BUILD_TAGS}" \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/lighthouse-coredns \
     .
@@ -53,7 +53,7 @@ ENTRYPOINT ["/usr/local/bin/lighthouse-coredns"]
 
 LABEL com.redhat.component="lighthouse-coredns-container" \
       name="rhacm2/lighthouse-coredns-rhel9" \
-      version="v0.24.1" \
+      version="v0.24.2" \
       summary="Lighthouse CoreDNS" \
       description="The Lighthouse CoreDNS provides DNS resolution for cross-cluster services." \
       io.k8s.display-name="Lighthouse CoreDNS" \
