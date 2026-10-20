@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/lighthouse/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -53,7 +52,7 @@ var _ = Describe("Pre-clusterset IP ServiceImport migration", func() {
 
 		t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
 		t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-			ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+			ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 		}
 
 		t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity

@@ -44,7 +44,6 @@ import (
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -301,7 +300,7 @@ func newClusterIPEndpointSlice(namespace, name, clusterID, clusterIP string, isH
 ) *discovery.EndpointSlice {
 	eps := newEndpointSlice(namespace, name, clusterID, ports, discovery.Endpoint{
 		Addresses:  []string{clusterIP},
-		Conditions: discovery.EndpointConditions{Ready: ptr.To(isHealthy)},
+		Conditions: discovery.EndpointConditions{Ready: new(isHealthy)},
 	})
 
 	eps.Labels[constants.LabelIsHeadless] = strconv.FormatBool(false)

@@ -29,7 +29,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -108,7 +107,7 @@ var _ = Describe("Controller", func() {
 				Specify("GetDNSRecords should eventually return no DNS record", func() {
 					t.awaitDNSRecordsFound(namespace1, service1, clusterID1, "", k8snet.IPv4, false, expDNSRecord)
 
-					endpointSlice.Endpoints[0].Conditions.Ready = ptr.To(false)
+					endpointSlice.Endpoints[0].Conditions.Ready = new(false)
 					test.UpdateResource(t.endpointSlices.Namespace(namespace1), endpointSlice)
 
 					t.awaitDNSRecordsFound(namespace1, service1, "", "", k8snet.IPv4, false)
