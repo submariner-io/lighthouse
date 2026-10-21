@@ -149,7 +149,7 @@ func IsClusterSetIPEnabled() bool {
 			return false, "", err
 		}
 
-		clusterSetIPEnabled.Store(ptr.To(enabled))
+		clusterSetIPEnabled.Store(new(enabled))
 
 		return true, "", nil
 	})
