@@ -95,9 +95,9 @@ jobs:
           path: mcs-api
 
       - name: Deploy Submariner
-        shell: bash
-        run: |
-          make deploy using="${{ matrix.using }} ${{ matrix.ip-family }}"
+        uses: submariner-io/shipyard/gh-actions/deploy@release-0.25
+        with:
+          using: ${{ matrix.using }} ${{ matrix.ip-family }}
 
       - name: Run conformance tests
         shell: bash
