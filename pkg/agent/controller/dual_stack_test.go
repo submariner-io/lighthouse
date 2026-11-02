@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -59,7 +58,7 @@ var _ = Describe("Dual-stack", func() {
 			t.cluster1.service.Spec.ClusterIPs = append(t.cluster1.service.Spec.ClusterIPs, ipv6ServiceIP)
 
 			t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, newIPv6ServiceEndpointSlice())
-			t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+			t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions = discovery.EndpointConditions{Ready: new(false)}
 		})
 
 		JustBeforeEach(func() {
@@ -72,7 +71,7 @@ var _ = Describe("Dual-stack", func() {
 
 				By("Updating the IPv6 EndpointSlice")
 
-				t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(true)}
+				t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions = discovery.EndpointConditions{Ready: new(true)}
 				t.cluster1.expectedClusterIPEndpoints[1].Conditions = t.cluster1.serviceEndpointSlices[1].Endpoints[0].Conditions
 
 				t.cluster1.updateServiceEndpointSlices()
@@ -258,7 +257,7 @@ func newIPv6ServiceEndpointSlice() discovery.EndpointSlice {
 		Endpoints: []discovery.Endpoint{
 			{
 				Addresses:  []string{"fd00:2001::1234"},
-				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				Conditions: discovery.EndpointConditions{Ready: new(true)},
 			},
 		},
 	}

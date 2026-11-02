@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -98,7 +98,7 @@ var (
 		Name:        "POP3",
 		Protocol:    corev1.ProtocolUDP,
 		Port:        110,
-		AppProtocol: ptr.To("smtp"),
+		AppProtocol: new("smtp"),
 	}
 )
 
@@ -220,8 +220,8 @@ func newTestDiver() *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{epIP1},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-							Hostname:   ptr.To(hostName),
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
+							Hostname:   new(hostName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "one",
@@ -229,8 +229,8 @@ func newTestDiver() *testDriver {
 						},
 						{
 							Addresses:  []string{epIP2},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-							NodeName:   ptr.To(nodeName),
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
+							NodeName:   new(nodeName),
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "two",
@@ -238,7 +238,7 @@ func newTestDiver() *testDriver {
 						},
 						{
 							Addresses:  []string{epIP3},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
+							Conditions: discovery.EndpointConditions{Ready: new(false)},
 							TargetRef: &corev1.ObjectReference{
 								Kind: "Pod",
 								Name: "not-ready",
@@ -247,12 +247,12 @@ func newTestDiver() *testDriver {
 					},
 					Ports: []discovery.EndpointPort{
 						{
-							Name:     ptr.To(port1.Name),
+							Name:     new(port1.Name),
 							Protocol: &port1.Protocol,
 							Port:     &port1.Port,
 						},
 						{
-							Name:     ptr.To(port2.Name),
+							Name:     new(port2.Name),
 							Protocol: &port2.Protocol,
 							Port:     &port2.Port,
 						},
@@ -299,7 +299,7 @@ func newTestDiver() *testDriver {
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses:  []string{"192.168.5.3"},
-							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+							Conditions: discovery.EndpointConditions{Ready: new(true)},
 							Hostname:   &hostName,
 						},
 					},
@@ -398,7 +398,7 @@ func (c *cluster) start(t *testDriver, syncerConfig broker.SyncerConfig) {
 	for _, ip := range c.service.Spec.ClusterIPs {
 		c.expectedClusterIPEndpoints = append(c.expectedClusterIPEndpoints, discovery.Endpoint{
 			Addresses:  []string{ip},
-			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			Conditions: discovery.EndpointConditions{Ready: new(true)},
 		})
 	}
 
@@ -590,13 +590,13 @@ func (c *cluster) awaitServiceExportCondition(expected ...metav1.Condition) {
 func (c *cluster) ensureLastServiceExportCondition(expected metav1.Condition) {
 	indexOfLastCondition := func() int {
 		actions := c.localDynClientFake.Actions()
-		for i := len(actions) - 1; i >= 0; i-- {
-			if !actions[i].Matches("update", mcsv1a1.ServiceExportPluralName) {
+		for i, action := range slices.Backward(actions) {
+			if !action.Matches("update", mcsv1a1.ServiceExportPluralName) {
 				continue
 			}
 
 			actual := meta.FindStatusCondition(
-				toServiceExport(actions[i].(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected.Type)
+				toServiceExport(action.(k8stesting.UpdateActionImpl).Object).Status.Conditions, expected.Type)
 
 			if actual != nil {
 				assertEquivalentConditions(Default, actual, &expected)
@@ -768,9 +768,9 @@ func awaitEndpointSlice(client dynamic.ResourceInterface, serviceName string, ex
 	Eventually(func(g Gomega) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
+		endpointSlices := findEndpointSlices(client, expected.Namespace, serviceName, expected.Labels[mcsv1a1.LabelSourceCluster])
 
-		for _, eps := range slices {
+		for _, eps := range endpointSlices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
 				if eps.Labels[constants.LabelSourceName] == expected.Name {
 					endpointSlice = eps

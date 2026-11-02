@@ -38,7 +38,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/ptr"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -199,10 +198,10 @@ func testClusterIPServiceInOneCluster() {
 
 		Specify("the exported EndpointSlice's service IP address should indicate not ready", func() {
 			for i := range t.cluster1.serviceEndpointSlices[0].Endpoints {
-				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+				t.cluster1.serviceEndpointSlices[0].Endpoints[i].Conditions = discovery.EndpointConditions{Ready: new(false)}
 			}
 
-			t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+			t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: new(false)}
 
 			t.cluster1.updateServiceEndpointSlices()
 			t.ensureEndpointSlice(&t.cluster1)
@@ -264,7 +263,7 @@ func testClusterIPServiceInOneCluster() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 			}
 
 			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
@@ -282,10 +281,10 @@ func testClusterIPServiceInOneCluster() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 			}
-			t.cluster1.service.Spec.InternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyLocal)
-			t.cluster1.service.Spec.TrafficDistribution = ptr.To("PreferClose")
+			t.cluster1.service.Spec.InternalTrafficPolicy = new(corev1.ServiceInternalTrafficPolicyLocal)
+			t.cluster1.service.Spec.TrafficDistribution = new("PreferClose")
 
 			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
 			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
@@ -449,7 +448,7 @@ func testClusterIPServiceInOneCluster() {
 				Endpoints: []discovery.Endpoint{
 					{
 						Addresses:  []string{service.Spec.ClusterIPs[0]},
-						Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
+						Conditions: discovery.EndpointConditions{Ready: new(false)},
 					},
 				},
 			}
@@ -588,7 +587,7 @@ func testClusterIPServiceInTwoClusters() {
 		BeforeEach(func() {
 			t.cluster1.service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 			}
 
 			t.cluster2.service.Spec.SessionAffinity = t.cluster1.service.Spec.SessionAffinity
@@ -772,7 +771,7 @@ func testClusterIPServiceInTwoClusters() {
 			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
 
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 			}
 			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 		})
@@ -824,7 +823,7 @@ func testClusterIPServiceInTwoClusters() {
 		Context("initially and after the service on the oldest exporting cluster is unexported", func() {
 			BeforeEach(func() {
 				t.cluster2.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-					ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(20))},
+					ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(20))},
 				}
 			})
 
@@ -849,7 +848,7 @@ func testClusterIPServiceInTwoClusters() {
 			t.aggregatedSessionAffinity = t.cluster1.service.Spec.SessionAffinity
 
 			t.cluster1.service.Spec.SessionAffinityConfig = &corev1.SessionAffinityConfig{
-				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: ptr.To(int32(10))},
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: new(int32(10))},
 			}
 			t.aggregatedSessionAffinityConfig = t.cluster1.service.Spec.SessionAffinityConfig
 		})
@@ -867,7 +866,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("with differing service InternalTrafficPolicy", func() {
 		BeforeEach(func() {
-			t.cluster1.service.Spec.InternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyLocal)
+			t.cluster1.service.Spec.InternalTrafficPolicy = new(corev1.ServiceInternalTrafficPolicyLocal)
 			t.aggregatedInternalTrafficPolicy = t.cluster1.service.Spec.InternalTrafficPolicy
 		})
 
@@ -884,7 +883,7 @@ func testClusterIPServiceInTwoClusters() {
 
 	Context("with differing service TrafficDistribution", func() {
 		BeforeEach(func() {
-			t.cluster1.service.Spec.TrafficDistribution = ptr.To(corev1.ServiceTrafficDistributionPreferSameNode)
+			t.cluster1.service.Spec.TrafficDistribution = new(corev1.ServiceTrafficDistributionPreferSameNode)
 			t.aggregatedTrafficDistribution = t.cluster1.service.Spec.TrafficDistribution
 		})
 
@@ -1041,12 +1040,12 @@ func testClusterIPServiceWithMultipleEPS() {
 	Specify("the exported EndpointSlice should be correctly updated as backend service EndpointSlices are created/updated/deleted", func() {
 		By("Creating initial service EndpointSlice with no ready endpoints")
 
-		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: new(false)}
 
 		t.cluster1.serviceEndpointSlices[0].Endpoints = []discovery.Endpoint{
 			{
 				Addresses:  []string{epIP1},
-				Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
+				Conditions: discovery.EndpointConditions{Ready: new(false)},
 			},
 		}
 
@@ -1055,7 +1054,7 @@ func testClusterIPServiceWithMultipleEPS() {
 
 		By("Creating service EndpointSlice with ready endpoint")
 
-		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(true)}
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: new(true)}
 
 		t.cluster1.serviceEndpointSlices = append(t.cluster1.serviceEndpointSlices, discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1066,7 +1065,7 @@ func testClusterIPServiceWithMultipleEPS() {
 			Endpoints: []discovery.Endpoint{
 				{
 					Addresses:  []string{epIP2},
-					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+					Conditions: discovery.EndpointConditions{Ready: new(true)},
 				},
 			},
 		})
@@ -1078,7 +1077,7 @@ func testClusterIPServiceWithMultipleEPS() {
 
 		t.cluster1.deleteEndpointSlice(t.cluster1.serviceEndpointSlices[1].Name)
 
-		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: ptr.To(false)}
+		t.cluster1.expectedClusterIPEndpoints[0].Conditions = discovery.EndpointConditions{Ready: new(false)}
 		t.cluster1.serviceEndpointSlices = t.cluster1.serviceEndpointSlices[:1]
 
 		t.ensureEndpointSlice(&t.cluster1)
