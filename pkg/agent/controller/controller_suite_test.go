@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -592,7 +593,7 @@ func (c *cluster) awaitServiceExportCondition(ctx context.Context, expected ...m
 func (c *cluster) ensureLastServiceExportCondition(ctx context.Context, expected metav1.Condition) {
 	indexOfLastCondition := func() int {
 		actions := c.localDynClientFake.Actions()
-		for i := len(actions) - 1; i >= 0; i-- {
+		for i := range slices.Backward(actions) {
 			if !actions[i].Matches("update", mcsv1b1.ServiceExportPluralName) {
 				continue
 			}
@@ -777,9 +778,9 @@ func awaitEndpointSlice(ctx context.Context, client dynamic.ResourceInterface, s
 	Eventually(ctx, func(g Gomega, ctx context.Context) {
 		var endpointSlice *discovery.EndpointSlice
 
-		slices := findEndpointSlices(ctx, client, expected.Namespace, serviceName, expected.Labels[mcsv1b1.LabelSourceCluster])
+		epSlices := findEndpointSlices(ctx, client, expected.Namespace, serviceName, expected.Labels[mcsv1b1.LabelSourceCluster])
 
-		for _, eps := range slices {
+		for _, eps := range epSlices {
 			if expected.Labels[constants.LabelIsHeadless] == strconv.FormatBool(true) {
 				if eps.Labels[constants.LabelSourceName] == expected.Name {
 					endpointSlice = eps

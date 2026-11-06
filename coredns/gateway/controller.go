@@ -45,6 +45,8 @@ import (
 
 var logger = log.Logger{Logger: logf.Log.WithName("Gateway")}
 
+const ConnectedStatus = "connected"
+
 type clusterStatusMapType map[k8snet.IPFamily]map[string]bool
 
 type Controller struct {
@@ -189,7 +191,7 @@ func (c *Controller) updateClusterStatusMap(connections []any) {
 
 		ipFamily := k8snet.IPFamilyOfString(usingIP)
 
-		if status == "connected" {
+		if status == ConnectedStatus {
 			_, found := currentMap[ipFamily][clusterID]
 			if !found {
 				if newMap == nil {
@@ -243,13 +245,13 @@ func getGatewayStatus(obj *unstructured.Unstructured) ([]any, string, bool) {
 		// Add connection entries for IPv4 and IPv6, distinguished by the "usingIP" field. Note, we use any address
 		// as only IP family is relevant.
 		connections = append(connections, map[string]any{
-			"status":  "connected",
+			"status":  ConnectedStatus,
 			"usingIP": "127.0.0.0",
 			"endpoint": map[string]any{
 				"cluster_id": localClusterID,
 			},
 		}, map[string]any{
-			"status":  "connected",
+			"status":  ConnectedStatus,
 			"usingIP": "::1",
 			"endpoint": map[string]any{
 				"cluster_id": localClusterID,
