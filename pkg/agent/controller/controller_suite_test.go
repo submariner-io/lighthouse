@@ -116,22 +116,22 @@ func TestController(t *testing.T) {
 }
 
 type cluster struct {
-	agentSpec                  controller.AgentSpecification
-	localDynClient             dynamic.Interface
-	localDynClientFake         *k8stesting.Fake
-	localServiceImportClient   dynamic.NamespaceableResourceInterface
 	localIngressIPClient       dynamic.ResourceInterface
+	localDynClient             dynamic.Interface
 	localEndpointSliceClient   dynamic.ResourceInterface
+	localServiceImportClient   dynamic.NamespaceableResourceInterface
+	service                    *corev1.Service
+	localDynClientFake         *k8stesting.Fake
 	localServiceImportReactor  *fake.FailingReactor
 	agentController            *controller.Controller
-	service                    *corev1.Service
-	expectedClusterIPEndpoints []discovery.Endpoint
 	serviceExport              *mcsv1b1.ServiceExport
-	serviceEndpointSlices      []discovery.EndpointSlice
+	verifyImportReadyCondition func(c *metav1.Condition)
 	clusterID                  string
+	agentSpec                  controller.AgentSpecification
+	expectedClusterIPEndpoints []discovery.Endpoint
+	serviceEndpointSlices      []discovery.EndpointSlice
 	headlessEndpointAddresses  [][]discovery.Endpoint
 	supportedIPFamilies        []corev1.IPFamily
-	verifyImportReadyCondition func(c *metav1.Condition)
 }
 
 type testDriver struct {
@@ -142,18 +142,19 @@ type testDriver struct {
 	brokerEndpointSliceReactor      *fake.FailingReactor
 	stopCh                          chan struct{}
 	syncerConfig                    *broker.SyncerConfig
-	doStart                         bool
-	useClusterSetIP                 bool
+	aggregatedInternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy
+	aggregatedTrafficDistribution   *string
 	ipPool                          *ipam.IPPool
 	brokerServiceImportReactor      *fake.FailingReactor
-	aggregatedServicePorts          []mcsv1b1.ServicePort
-	aggregatedSessionAffinity       corev1.ServiceAffinity
 	aggregatedSessionAffinityConfig *corev1.SessionAffinityConfig
-	aggregatedTrafficDistribution   *string
-	aggregatedInternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy
+	aggregatedSessionAffinity       corev1.ServiceAffinity
+	aggregatedServicePorts          []mcsv1b1.ServicePort
 	aggregatedIPFamilies            []corev1.IPFamily
+	useClusterSetIP                 bool
+	doStart                         bool
 }
 
+//nolint:staticcheck // This purposefully supports deprecated Endpoints
 func newTestDiver(ctx context.Context) *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
