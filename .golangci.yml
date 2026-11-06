@@ -13,6 +13,10 @@ linters:
     errchkjson:
       check-error-free-encoding: true
       report-no-exported: true
+    goconst:
+      ignore-map-keys: true
+      ignore-string-values:
+        - '^Pod$'
     gocritic:
       disabled-checks:
         - ifElseChain
@@ -41,9 +45,6 @@ linters:
         WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
         See the License for the specific language governing permissions and
         limitations under the License.
-    govet:
-      enable:
-        - fieldalignment
     lll:
       line-length: 140
     revive:

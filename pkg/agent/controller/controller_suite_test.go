@@ -154,6 +154,7 @@ type testDriver struct {
 	doStart                         bool
 }
 
+//nolint:staticcheck // This purposefully supports deprecated Endpoints
 func newTestDiver(ctx context.Context) *testDriver {
 	syncerScheme := runtime.NewScheme()
 	Expect(corev1.AddToScheme(syncerScheme)).To(Succeed())
