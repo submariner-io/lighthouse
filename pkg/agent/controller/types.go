@@ -55,18 +55,18 @@ type converter struct {
 }
 
 type Controller struct {
-	clusterID                   string
-	globalnetEnabled            bool
-	namespace                   string
-	serviceExportClient         *ServiceExportClient
 	serviceExportSyncer         syncer.Interface
-	endpointSliceController     *EndpointSliceController
 	serviceSyncer               syncer.Interface
-	serviceImportController     *ServiceImportController
 	localServiceImportFederator federate.Federator
 	namespaceInformer           cache.SharedInformer
+	serviceExportClient         *ServiceExportClient
+	endpointSliceController     *EndpointSliceController
+	serviceImportController     *ServiceImportController
 	clusterLocalReflector       *ClusterLocalReflector
 	namespaceValidator          *NamespaceValidator
+	clusterID                   string
+	namespace                   string
+	globalnetEnabled            bool
 }
 
 type AgentSpecification struct {
@@ -89,51 +89,51 @@ type AgentSpecification struct {
 // from the submariner namespace and creates/updates the aggregated ServiceImport on the broker; the other that syncs
 // aggregated ServiceImports from the broker to the local service namespace. It also creates a ServiceEndpointSliceController.
 type ServiceImportController struct {
-	localClient                dynamic.Interface
-	brokerClient               dynamic.Interface
-	brokerNamespace            string
-	restMapper                 meta.RESTMapper
-	serviceExportClient        *ServiceExportClient
-	localSyncer                syncer.Interface
 	remoteSyncer               syncer.Interface
+	brokerClient               dynamic.Interface
+	localClient                dynamic.Interface
+	restMapper                 meta.RESTMapper
 	localFederator             federate.Federator
-	supportedIPFamilies        []corev1.IPFamily
-	endpointControllers        sync.Map
-	clusterID                  string
-	localNamespace             string
+	localSyncer                syncer.Interface
 	converter                  converter
+	serviceExportClient        *ServiceExportClient
 	globalIngressIPCache       *globalIngressIPCache
 	localLHEndpointSliceLister EndpointSliceListerFn
 	clustersetIPPool           *ipam.IPPool
-	clustersetIPEnabled        bool
 	namespaceValidator         *NamespaceValidator
+	endpointControllers        sync.Map
+	clusterID                  string
+	localNamespace             string
+	brokerNamespace            string
+	supportedIPFamilies        []corev1.IPFamily
+	clustersetIPEnabled        bool
 }
 
 // ServiceEndpointSliceController watches for the EndpointSlices that backs a Service and have a ServiceImport.
 // It creates LH EndpointSlices corresponding to service EndpointSlices that are distributed to other clusters.
 type ServiceEndpointSliceController struct {
+	localClient              dynamic.ResourceInterface
+	ingressIPClient          dynamic.NamespaceableResourceInterface
+	epsSyncer                syncer.Interface
+	serviceImportSpec        *mcsv1b1.ServiceImportSpec
+	stopCh                   chan struct{}
+	globalIngressIPCache     *globalIngressIPCache
 	clusterID                string
 	serviceName              string
 	serviceNamespace         string
-	serviceImportSpec        *mcsv1b1.ServiceImportSpec
 	publishNotReadyAddresses string
-	stopCh                   chan struct{}
-	stopOnce                 sync.Once
-	localClient              dynamic.ResourceInterface
-	ingressIPClient          dynamic.NamespaceableResourceInterface
-	globalIngressIPCache     *globalIngressIPCache
-	epsSyncer                syncer.Interface
 	awaitStoppedTimeout      time.Duration
+	stopOnce                 sync.Once
 }
 
 // EndpointSliceController encapsulates a syncer that syncs EndpointSlices to and from that broker.
 type EndpointSliceController struct {
-	clusterID           string
-	syncer              *broker.Syncer
-	serviceExportClient *ServiceExportClient
 	serviceSyncer       syncer.Interface
 	localClient         dynamic.Interface
+	syncer              *broker.Syncer
+	serviceExportClient *ServiceExportClient
 	namespaceValidator  *NamespaceValidator
+	clusterID           string
 }
 
 type ServiceExportClient struct {
@@ -155,8 +155,8 @@ type globalIngressIPMap struct {
 }
 
 type globalIngressIPCache struct {
+	watcher     watcher.Interface
 	byService   globalIngressIPMap
 	byPod       globalIngressIPMap
 	byEndpoints globalIngressIPMap
-	watcher     watcher.Interface
 }
