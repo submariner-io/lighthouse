@@ -72,13 +72,13 @@ var ServiceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource:
 // LabelServiceName/LabelSourceCluster/LabelSourceNamespace), reflecting only those
 // whose source cluster is not this cluster.
 type ClusterLocalReflector struct {
-	clusterID           string
 	syncer              syncer.Interface
 	serviceWatcher      watcher.Interface
 	federator           federate.Federator
 	serviceClient       dynamic.NamespaceableResourceInterface
 	endpointSliceClient dynamic.NamespaceableResourceInterface
 	namespaceValidator  *NamespaceValidator
+	clusterID           string
 }
 
 //nolint:gocritic // (hugeParam) matches the other controller constructors.
