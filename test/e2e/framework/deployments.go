@@ -34,25 +34,26 @@ func (f *Framework) NewNetShootDeployment(ctx context.Context, cluster framework
 
 func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster framework.ClusterIndex, namespace string) *corev1.PodList {
 	var replicaCount int32 = 1
+	const appName = "netshoot"
 	netShootDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "netshoot",
+			GenerateName: appName,
 			Namespace:    namespace,
 			Labels: map[string]string{
-				"run": "netshoot",
+				"run": appName,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "netshoot",
+					"app": appName,
 				},
 			},
 			Replicas: &replicaCount,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "netshoot",
+						"app": appName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -66,7 +67,7 @@ func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster frame
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "netshoot",
+							Name:            appName,
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
@@ -97,22 +98,23 @@ func (f *Framework) NewNetShootDeploymentInNS(ctx context.Context, cluster frame
 func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.ClusterIndex) *corev1.PodList {
 	var replicaCount int32 = 1
 	var port int32 = 8080
+	const appName = "nginx-demo"
 	nginxDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx-demo",
+			Name:      appName,
 			Namespace: f.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "nginx-demo",
+					"app": appName,
 				},
 			},
 			Replicas: &replicaCount,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "nginx-demo",
+						"app": appName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -126,7 +128,7 @@ func (f *Framework) NewNginxDeployment(ctx context.Context, cluster framework.Cl
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "nginx-demo",
+							Name:            appName,
 							Image:           framework.TestContext.NettestImageURL,
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
